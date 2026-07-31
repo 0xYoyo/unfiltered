@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//Users/yoyopc/repos/unfiltered/**)",
+      "Edit(//Users/yoyopc/repos/unfiltered/**)",
+      "Read(//Users/yoyopc/repos/unfiltered.build/**)",
+      "Edit(//Users/yoyopc/repos/unfiltered.build/**)",
+      "Bash(*)"
+    ]
+  }
+}
