@@ -16,5 +16,6 @@ sensitive_paths:
   - "**/billing/**"
   - "**/auth/**"
   - "**/webhooks/**"
+  - ".claude/**"
 
 max_fix_rounds: 2
