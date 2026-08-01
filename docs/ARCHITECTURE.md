@@ -1,0 +1,78 @@
+# Architecture
+
+> **Maintenance notice:** any change that alters setup commands, workspace
+> layout, auth model, data layer, or the engine API must update this file and
+> [README.md](../README.md) in the same pull request. Doc accuracy is part of
+> review.
+
+Product requirements live in [PRD.md](PRD.md); this document records how the
+codebase is structured and the constraints that structure must preserve.
+
+## Monorepo structure
+
+npm-workspaces monorepo (`apps/*`, `packages/*`) with two workspaces:
+
+- **`apps/shopify-app`** — the embedded Shopify app, generated from Shopify's
+  official React Router + TypeScript app template. Owns everything
+  Shopify-specific: authentication, session persistence, webhooks, admin UI,
+  and (in later milestones) catalog ingestion and the storefront snippet. It
+  consumes the search engine strictly as a client of `packages/engine`'s
+  public API — see the engine-boundary rule below.
+- **`packages/engine`** — the search engine as a standalone TypeScript
+  package with its own `tsc` build and zero runtime dependencies. Currently a
+  stub: the public API is real, the implementation returns an empty,
+  well-typed result.
+
+## Engine-boundary rule (binding constraint)
+
+The search engine is a separate module/service with its own API, and the
+Shopify app calls it as a client. Concretely:
+
+1. The engine exposes its own versioned, typed public API; consumers use only
+   that surface.
+2. No Shopify types or APIs inside the engine's core — no `@shopify/*`
+   dependencies, no Shopify imports, no Shopify-specific concepts in its
+   input/output types (generic documents, fields, and scores only).
+3. Future catalog sources (a feed + JS snippet for non-Shopify stores, or any
+   other platform) integrate by feeding the same engine API, not by
+   rewriting the engine.
+
+Any change that would move Shopify knowledge into the engine, or have the app
+reach past the public API into engine internals, is an architecture change
+and needs explicit human sign-off — not an incidental refactor.
+
+## Auth model
+
+Embedded Shopify app using Shopify-managed installation with token-exchange
+authentication (`@shopify/shopify-app-react-router`): embedded requests carry
+a session token that the app exchanges for an API access token. There are no
+classic authorization-code-grant code paths. Sessions are persisted through
+`@shopify/shopify-app-session-storage-prisma`.
+
+## Data layer
+
+Prisma with SQLite (`apps/shopify-app/prisma/schema.prisma`, currently the
+template's `Session` model only). A managed database and any vector store are
+deliberately deferred to later milestones; SQLite is the only store today.
+
+## Engine public API (current surface)
+
+`packages/engine` (`@unfiltered/engine`) exports, from `src/index.ts`:
+
+- `version: string` — semantic version of the API contract (`"0.1.0"`).
+- `interface EngineDocument` — `{ id: string; fields: Record<string, string> }`.
+- `interface SearchOptions` — `{ limit?: number; offset?: number }`.
+- `interface SearchHit` — `{ documentId: string; score: number }`.
+- `interface SearchResult` — `{ hits: SearchHit[]; totalCount: number; query: string }`.
+- `interface Engine` — `{ readonly version: string; search(query, options?): Promise<SearchResult> }`.
+- `createEngine(): Engine` — returns the stub implementation (every search
+  resolves to an empty result).
+
+The app's `/healthz` route (`apps/shopify-app/app/routes/healthz.tsx`) calls
+`createEngine().search(...)` and proves the wiring end to end.
+
+## Deferred components
+
+Real search logic, vector store, catalog ingestion, merchant dashboard,
+billing, deployment/hosting, and the cost-per-search admin are all future
+milestones and intentionally absent from the current codebase.
