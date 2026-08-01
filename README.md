@@ -34,13 +34,29 @@ Install all workspaces from the repo root:
 npm install
 ```
 
-## Typecheck
+## Quality gates
 
 TypeScript `strict` is enabled in every workspace. From the root:
 
 ```bash
 npm run typecheck
 ```
+
+Vitest runs the test suites of both workspaces, including the boundary test
+that fails if `packages/engine` ever references a `@shopify/*` package:
+
+```bash
+npm test
+```
+
+ESLint runs per workspace via:
+
+```bash
+npm run lint
+```
+
+All three commands run in CI (`.github/workflows/ci.yml`) on every pull
+request and must pass before merge.
 
 ## Run locally
 

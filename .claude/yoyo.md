@@ -2,9 +2,9 @@
 
 repo_slug: unfiltered
 linear_team: YOY
-test_command: (none yet — bootstrap install; first spec must add a test suite)
-lint_command: (none yet)
-typecheck_command: (none yet)
+test_command: npm test
+lint_command: npm run lint
+typecheck_command: npm run typecheck
 
 sensitive_paths:
   - .github/workflows/
