@@ -49,6 +49,18 @@ a session token that the app exchanges for an API access token. There are no
 classic authorization-code-grant code paths. Sessions are persisted through
 `@shopify/shopify-app-session-storage-prisma`.
 
+### Webhooks
+
+Five topics are registered in `shopify.app.toml` and handled under
+`apps/shopify-app/app/routes/webhooks.*`: `app/uninstalled` (deletes the
+shop's persisted sessions), `app/scopes_update`, and the three mandatory GDPR
+compliance topics `customers/data_request`, `customers/redact`, and
+`shop/redact` (acknowledge-and-200 — no shopper data is stored yet). Every
+handler authenticates through the library's HMAC verification; signature and
+auth behavior are covered by offline unit tests with fixture payloads
+(`app/routes/webhooks.test.ts`, `app/routes/app.auth.test.ts`,
+`app/session-storage.test.ts`).
+
 ## Data layer
 
 Prisma with SQLite (`apps/shopify-app/prisma/schema.prisma`, currently the
