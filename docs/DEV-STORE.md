@@ -21,14 +21,17 @@ or a deployed environment (the CLI tunnels to your machine).
    npm install -g @shopify/cli@latest
    ```
 
+4. `apps/shopify-app/shopify.web.toml` must exist (it is committed in this
+   repository). Without it the CLI treats the repo root as the app root and
+   serves a placeholder app home instead of this app.
+
 ## Link the app to your Partner organization
 
-4. From the app workspace, link the local project to a Shopify app record.
+5. From the repo root, link the local project to a Shopify app record.
    The CLI opens a browser for Partner login the first time:
 
    ```bash
-   cd apps/shopify-app
-   npm run config:link
+   npm --workspace app run config:link
    ```
 
    Choose your Partner organization, then **create a new app** named
@@ -36,7 +39,7 @@ or a deployed environment (the CLI tunnels to your machine).
    `client_id` and app URLs into `shopify.app.toml`. `client_id` is a public
    identifier and safe to commit; never commit the client secret.
 
-5. Environment variables are injected by the CLI during `shopify app dev` —
+6. Environment variables are injected by the CLI during `shopify app dev` —
    no `.env` file is required for this runbook. (`.env.example` exists for
    the credential-free smoke test described in the README; if you want a
    local `.env` for other tooling, run `npm run env -- pull` and note that
@@ -44,24 +47,25 @@ or a deployed environment (the CLI tunnels to your machine).
 
 ## Run and install
 
-6. Start the dev server (from `apps/shopify-app`):
+7. Start the dev server (from the repo root):
 
    ```bash
-   npm run dev
+   npm --workspace app run dev
    ```
 
    When prompted, select `unfiltered-dev` as the development store. The CLI
    starts a tunnel, runs `prisma migrate deploy` automatically (creating
-   `prisma/dev.sqlite`), and prints a preview URL.
+   `prisma/dev.sqlite`), and **auto-installs the app on the dev store** — no
+   consent screen appears (the CLI output includes "App has been installed").
 
-7. Press `p` (or open the printed preview URL). Shopify shows the
-   install/consent screen for `unfiltered-dev`. Accept it. The embedded app
-   must load inside the Shopify admin with no errors in the page or in the
-   terminal. **[Evidence → AC-2]**
+8. Open the app from the Shopify admin: use the **Dev Console** panel →
+   **Previews** → **Web**, or navigate to **Apps → unfiltered**. The embedded
+   app must load inside the Shopify admin with no errors in the page or in
+   the terminal. **[Evidence → AC-2]**
 
 ## Verify session persistence
 
-8. Confirm a session row exists for the store:
+9. Confirm a session row exists for the store:
 
    ```bash
    sqlite3 apps/shopify-app/prisma/dev.sqlite \
@@ -70,13 +74,13 @@ or a deployed environment (the CLI tunnels to your machine).
 
    Expect at least one row with `shop = unfiltered-dev.myshopify.com`.
 
-9. Reload the embedded app in the Shopify admin (or close and reopen it from
-   Apps). It must load straight into the app with **no second install
-   prompt** — the persisted session is being reused. **[Evidence → AC-3]**
+10. Reload the embedded app in the Shopify admin (or close and reopen it from
+    Apps). It must load straight into the app with **no second install
+    prompt** — the persisted session is being reused. **[Evidence → AC-3]**
 
 ## Verify the engine wiring
 
-10. Open `https://<your-tunnel-host>/healthz` (the tunnel host is shown in
+11. Open `https://<your-tunnel-host>/healthz` (the tunnel host is shown in
     the `shopify app dev` output; `/healthz` is the route that calls the
     engine's public API — see docs/ARCHITECTURE.md). Expect:
 
@@ -88,8 +92,8 @@ or a deployed environment (the CLI tunnels to your machine).
 
 ## Wrap up
 
-11. Stop `shopify app dev` with `Ctrl+C`.
-12. Commit any config the CLI corrected in `shopify.app.toml` (client_id,
+12. Stop `shopify app dev` with `Ctrl+C`.
+13. Commit any config the CLI corrected in `shopify.app.toml` (client_id,
     application_url, redirect URLs). Before committing, search the diff for
     secrets — the API secret and any access tokens must never appear:
 
@@ -97,36 +101,50 @@ or a deployed environment (the CLI tunnels to your machine).
     git diff | grep -iE "secret|shpat_|shpss_" || echo "no secrets in diff"
     ```
 
-13. Fill in the verification record below with the date, store domain, and
+14. Fill in the verification record below with the date, store domain, and
     evidence (pasted output and/or screenshots) and commit it on this branch.
 
 ---
 
 ## Verification record
 
-> **PENDING HUMAN RUN** — this section is completed by the person executing
-> the runbook. Replace each placeholder with real evidence; the PR reviewer
-> confirms the manual pass from this record alone.
-
-- **Date:** _pending_
-- **Executed by:** _pending_
-- **Store domain:** _pending (expected: unfiltered-dev.myshopify.com)_
+- **Date:** 2026-08-01
+- **Executed by:** Yoyo (owner)
+- **Store domain:** unfiltered-dev.myshopify.com
 
 ### AC-2 — install and embedded load
 
-_Pending: paste the CLI output around the install, and a screenshot (or
-description) of the embedded app loaded in the Shopify admin without errors._
+The app was auto-installed by the CLI during `npm --workspace app run dev`
+("App has been installed" in the CLI output). The embedded app loaded in the
+admin via Dev Console → Web preview: the template home page ("Congrats on
+creating a new Shopify app") rendered with no errors, after two config
+corrections committed in this PR (`shopify.web.toml` created; test files
+excluded from the route glob). Screenshot retained by the operator.
 
 ### AC-3 — session persisted and reused
 
-_Pending: paste the `sqlite3` query output showing the Session row, and note
-that reloading the embedded app produced no second install prompt._
+`sqlite3` query output:
+
+```
+offline_unfiltered-dev.myshopify.com|unfiltered-dev.myshopify.com|0
+```
+
+Reopening the app from Apps → unfiltered loaded directly with no second
+install prompt.
 
 ### AC-4 — engine route renders
 
-_Pending: paste the JSON response from `https://<tunnel-host>/healthz`._
+`GET /healthz` on the dev tunnel returned:
+
+```json
+{"status":"ok","engine":{"version":"0.1.0","search":{"hits":[],"totalCount":0,"query":"healthcheck"}}}
+```
 
 ### AC-6 — config corrections and secret check
 
-_Pending: list any `shopify.app.toml` fields the CLI changed (committed in
-this PR), and paste the output of the secret-grep from step 12._
+Config corrections committed in this PR: single `shopify.app.toml` under
+`apps/shopify-app` with the real `client_id`; `shopify.web.toml` committed
+(rendered from the `.liquid` template, now removed); `routes.ts`
+`ignoredRouteFiles` for `*.test.*`; package-lock `hasInstallScript`.
+
+Secret check output: `no secrets in diff`.
