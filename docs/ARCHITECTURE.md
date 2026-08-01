@@ -71,6 +71,14 @@ deliberately deferred to later milestones; SQLite is the only store today.
 The app's `/healthz` route (`apps/shopify-app/app/routes/healthz.tsx`) calls
 `createEngine().search(...)` and proves the wiring end to end.
 
+## Quality gates
+
+Vitest, ESLint, and `tsc --noEmit` run from the root as `npm test`,
+`npm run lint`, and `npm run typecheck`; `.github/workflows/ci.yml` runs all
+three on every pull request. The engine-boundary rule is mechanically
+enforced by `packages/engine/test/boundary.test.ts`, which fails the suite if
+the engine's manifest or source ever references a `@shopify/*` package.
+
 ## Deferred components
 
 Real search logic, vector store, catalog ingestion, merchant dashboard,
