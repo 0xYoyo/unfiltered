@@ -1,7 +1,12 @@
 # This file stores configurations for your Shopify app.
 # client_id is filled in by `shopify app config link`.
-client_id = ""
+client_id = "f1bcfb5169066f87e38a69ef05342498"
+name = "unfiltered"
+application_url = "https://shopify.dev/apps/default-app-home"
 embedded = true
+
+[auth]
+redirect_urls = [ "https://shopify.dev/apps/default-app-home/api/auth" ]
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
@@ -45,3 +50,7 @@ api_version = "2025-10"
   [[webhooks.subscriptions]]
   uri = "/webhooks/shop/redact"
   compliance_topics = ["shop/redact"]
+
+[build]
+include_config_on_deploy = true
+automatically_update_urls_on_dev = true
