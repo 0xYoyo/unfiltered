@@ -73,7 +73,7 @@ describe("webhook HMAC verification", () => {
     expect(await db.session.findMany({ where: { shop: SHOP } })).toHaveLength(1);
   });
 
-  it("rejects a missing HMAC header with 401 and never executes the handler", async () => {
+  it("rejects a missing HMAC header with 400 and never executes the handler", async () => {
     await seedSession(db);
 
     let thrown: unknown;
