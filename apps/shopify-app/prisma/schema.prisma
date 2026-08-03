@@ -14,6 +14,23 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Cost-metering ledger: one row per AI call, written through the CostRecorder
+// port so no AI spend is ever unmetered.
+model AiCall {
+  id           String   @id @default(uuid())
+  createdAt    DateTime @default(now())
+  provider     String
+  modelId      String
+  operation    String
+  inputTokens  Int
+  outputTokens Int
+  costUsd      Float
+  shopDomain   String?
+  searchId     String?
+
+  @@index([searchId])
+}
+
 model Session {
   id            String    @id
   shop          String
