@@ -1,24 +1,30 @@
 import { createHmac, randomUUID } from "node:crypto";
-import { mkdtempSync } from "node:fs";
 import { readFile, readdir } from "node:fs/promises";
-import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { PGlite } from "@electric-sql/pglite";
+import { vector } from "@electric-sql/pglite-pgvector";
 import { PrismaClient } from "@prisma/client";
+import { PrismaPGlite } from "pglite-prisma-adapter";
 
 const appRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 /**
- * Create a PrismaClient against a fresh throwaway SQLite database with the
- * Session table applied from the committed migration SQL. Keeps every test
- * fully offline and isolated from prisma/dev.sqlite.
+ * Create a PrismaClient against a fresh in-process PGlite (embedded Postgres)
+ * database with the pgvector extension loaded and the committed migration SQL
+ * applied. Keeps every test fully offline: no DATABASE_URL and no external
+ * Postgres server is ever needed.
  */
 export async function createTestDb(): Promise<PrismaClient> {
-  const dir = mkdtempSync(join(tmpdir(), "unfiltered-test-db-"));
-  const client = new PrismaClient({
-    datasourceUrl: `file:${join(dir, "test.sqlite")}`,
-  });
+  const pglite = new PGlite({ extensions: { vector } });
+  // pglite-prisma-adapter pins @prisma/driver-adapter-utils@6.10.1 while
+  // @prisma/client ships its own copy, so TS sees two structurally identical
+  // but nominally distinct adapter types.
+  const adapter = new PrismaPGlite(pglite) as unknown as NonNullable<
+    NonNullable<ConstructorParameters<typeof PrismaClient>[0]>["adapter"]
+  >;
+  const client = new PrismaClient({ adapter });
 
   const migrationsDir = join(appRoot, "prisma", "migrations");
   for (const migration of (await readdir(migrationsDir)).sort()) {
