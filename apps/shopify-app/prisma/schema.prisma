@@ -31,6 +31,33 @@ model AiCall {
   @@index([searchId])
 }
 
+// Per-shop catalog snapshot: one row per Shopify product, in the shape the
+// engine and later enrichment/embedding steps consume (YOY-20).
+model CatalogProduct {
+  id              String   @id @default(uuid())
+  shopDomain      String
+  productId       String
+  title           String
+  description     String
+  tags            String[]
+  vendor          String
+  productType     String
+  priceMin        Float
+  priceMax        Float
+  currencyCode    String
+  available       Boolean
+  imageAltTexts   String[]
+  sourceUpdatedAt DateTime
+  // SHA-256 over the searchable fields; unchanged hash means the row is
+  // untouched on re-ingestion.
+  contentHash     String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([shopDomain, productId])
+  @@index([shopDomain])
+}
+
 model Session {
   id            String    @id
   shop          String

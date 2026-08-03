@@ -74,7 +74,9 @@ auth behavior are covered by offline unit tests with fixture payloads
 
 Prisma on Postgres 18 with the pgvector extension
 (`apps/shopify-app/prisma/schema.prisma`, currently the template's `Session`
-model plus the `AiCall` cost-metering ledger; the baseline migration runs
+model, the `AiCall` cost-metering ledger, and the `CatalogProduct` per-shop
+catalog snapshot (unique per `shopDomain` + `productId`, content-hashed for
+idempotent re-ingestion via `app/catalog/ingest.server.ts`); the baseline migration runs
 `CREATE EXTENSION IF NOT EXISTS vector`). The app knows only a Postgres connection string: `DATABASE_URL`
 from a gitignored `.env` (a managed Neon database in dev), documented in
 `.env.example`. SQLite is gone.
