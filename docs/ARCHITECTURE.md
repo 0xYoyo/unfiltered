@@ -65,8 +65,8 @@ auth behavior are covered by offline unit tests with fixture payloads
 
 Prisma on Postgres 18 with the pgvector extension
 (`apps/shopify-app/prisma/schema.prisma`, currently the template's `Session`
-model only; the baseline migration runs `CREATE EXTENSION IF NOT EXISTS
-vector`). The app knows only a Postgres connection string: `DATABASE_URL`
+model plus the `AiCall` cost-metering ledger; the baseline migration runs
+`CREATE EXTENSION IF NOT EXISTS vector`). The app knows only a Postgres connection string: `DATABASE_URL`
 from a gitignored `.env` (a managed Neon database in dev), documented in
 `.env.example`. SQLite is gone.
 
@@ -92,6 +92,18 @@ passes with no `DATABASE_URL` set and no external Postgres.
 The app's `/healthz` route (`apps/shopify-app/app/routes/healthz.tsx`) calls
 `createEngine().search(...)` and proves the wiring end to end.
 
+## AI cost metering
+
+Every AI call must be metered before any code capable of live LLM calls
+exists. The `CostRecorder` port
+(`apps/shopify-app/app/ai/cost-recorder.server.ts`) is provider-agnostic;
+its Prisma implementation computes USD cost from the committed price table
+`config/ai-prices.json` (per-1M-token paid-tier rates; unknown model IDs
+throw rather than metering $0) and appends one `AiCall` ledger row per call.
+The internal admin at `/internal/costs` renders ledger aggregates and is
+gated by `ADMIN_TOKEN` (`?token=` query parameter): without the exact token
+it answers 404, indistinguishable from a nonexistent route.
+
 ## Quality gates
 
 Vitest, ESLint, and `tsc --noEmit` run from the root as `npm test`,
@@ -103,5 +115,5 @@ the engine's manifest or source ever references a `@shopify/*` package.
 ## Deferred components
 
 Real search logic, vector store, catalog ingestion, merchant dashboard,
-billing, deployment/hosting, and the cost-per-search admin are all future
-milestones and intentionally absent from the current codebase.
+billing, and deployment/hosting are all future milestones and intentionally
+absent from the current codebase.
