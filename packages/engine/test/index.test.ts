@@ -4,7 +4,7 @@ import { createEngine, version, type SearchResult } from "../src/index.js";
 
 describe("engine public API stub", () => {
   it("exposes the API contract version", () => {
-    expect(version).toBe("0.1.0");
+    expect(version).toBe("0.2.0");
     expect(createEngine().version).toBe(version);
   });
 
