@@ -124,6 +124,22 @@ The internal admin at `/internal/costs` renders ledger aggregates and is
 gated by `ADMIN_TOKEN` (`?token=` query parameter): without the exact token
 it answers 404, indistinguishable from a nonexistent route.
 
+## Test-location rule
+
+New test files do not go inside `apps/shopify-app/app/routes/`: route tests
+live beside the app code instead (e.g. `app/ai-costs.test.ts` exercising
+`app/routes/internal.costs.tsx`). The backstop making this a convention
+rather than a footgun is React Router's route registration
+(`apps/shopify-app/app/routes.ts`), which uses
+`flatRoutes({ ignoredRouteFiles: ["**/*.test.*"] })` so a `*.test.*` file can
+never register as a route — which is also why the M1-era suites that predate
+the rule (`app/routes/webhooks.test.ts`, `app.auth.test.ts`,
+`healthz.test.ts`) are safe where they are. The `include` globs in the root
+`vitest.config.ts` (`apps/*/app/**/*.test.{ts,tsx}` and
+`packages/*/test/**/*.test.ts`) are the single source of truth for where
+tests live; a test outside those globs silently never runs, so new test
+locations must be added there deliberately.
+
 ## Quality gates
 
 Vitest, ESLint, and `tsc --noEmit` run from the root as `npm test`,
