@@ -63,9 +63,18 @@ auth behavior are covered by offline unit tests with fixture payloads
 
 ## Data layer
 
-Prisma with SQLite (`apps/shopify-app/prisma/schema.prisma`, currently the
-template's `Session` model only). A managed database and any vector store are
-deliberately deferred to later milestones; SQLite is the only store today.
+Prisma on Postgres 18 with the pgvector extension
+(`apps/shopify-app/prisma/schema.prisma`, currently the template's `Session`
+model only; the baseline migration runs `CREATE EXTENSION IF NOT EXISTS
+vector`). The app knows only a Postgres connection string: `DATABASE_URL`
+from a gitignored `.env` (a managed Neon database in dev), documented in
+`.env.example`. SQLite is gone.
+
+Tests never require a live database: `createTestDb()`
+(`apps/shopify-app/app/testing/helpers.server.ts`) spins up an in-process
+embedded Postgres (PGlite) with pgvector loaded, applies the committed
+migration SQL, and hands Prisma a driver adapter for it — so `npm test`
+passes with no `DATABASE_URL` set and no external Postgres.
 
 ## Engine public API (current surface)
 
