@@ -109,7 +109,9 @@ describe("Shopify→snapshot mapping", () => {
 
   it("exposes computeContentHash as a pure function of the searchable fields", () => {
     const snapshot = mapProductNode(productNode({ id: "p" }));
-    const { contentHash, sourceUpdatedAt: _ignored, ...fields } = snapshot;
+    // computeContentHash reads only the searchable fields, so passing the
+    // full snapshot (sourceUpdatedAt included) must reproduce the hash.
+    const { contentHash, ...fields } = snapshot;
     expect(computeContentHash(fields)).toBe(contentHash);
   });
 });
