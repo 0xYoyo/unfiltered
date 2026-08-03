@@ -13,7 +13,12 @@
     "build": "npm run build --workspaces --if-present"
   },
   "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
     "vitest": "^3.2.4"
+  },
+  "overrides": {
+    "lodash": "^4.18.1"
   },
   "engines": {
     "node": ">=20.19 <22 || >=22.12"
