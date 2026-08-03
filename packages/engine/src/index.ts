@@ -8,7 +8,7 @@
  */
 
 /** Semantic version of the engine's public API contract. */
-export const version = "0.1.0";
+export const version = "0.2.0";
 
 /** A single searchable document, as the consumer indexed it. */
 export interface EngineDocument {
@@ -42,6 +42,83 @@ export interface SearchResult {
   totalCount: number;
   /** The query string the engine actually evaluated. */
   query: string;
+}
+
+/** A JSON Schema document describing the shape a model's output must satisfy. */
+export type JsonSchema = Record<string, unknown>;
+
+/** One structured-output completion request to an LLM. */
+export interface StructuredCompletionRequest {
+  /** Full prompt text for the model. */
+  prompt: string;
+  /** JSON Schema the model's JSON output must conform to. */
+  schema: JsonSchema;
+  /** Cost-ledger operation label, e.g. "classification", "intent", "enrichment". */
+  operation: string;
+  /** Shop the call is made on behalf of, for metering, when known. */
+  shopDomain?: string;
+  /** Correlation ID tying together every call serving one search. */
+  searchId?: string;
+}
+
+/**
+ * Port for LLM structured-output completion. Implementations live outside the
+ * engine (provider adapter packages); the engine and its consumers depend on
+ * this vendor-free surface only.
+ */
+export interface LlmClient {
+  /** Complete the prompt into schema-conforming JSON, parsed and returned. */
+  completeStructured(request: StructuredCompletionRequest): Promise<unknown>;
+}
+
+/** One batch embedding request. */
+export interface EmbeddingRequest {
+  /** Texts to embed; one vector is returned per text, in order. */
+  texts: string[];
+  /** Cost-ledger operation label; implementations default to "embedding". */
+  operation?: string;
+  /** Shop the call is made on behalf of, for metering, when known. */
+  shopDomain?: string;
+  /** Correlation ID tying together every call serving one search. */
+  searchId?: string;
+}
+
+/**
+ * Port for text embedding. Implementations declare the fixed dimension every
+ * returned vector has.
+ */
+export interface EmbeddingClient {
+  /** Dimension of every vector this client returns. */
+  readonly dimension: number;
+  /** Embed each text into a vector of exactly `dimension` numbers. */
+  embed(request: EmbeddingRequest): Promise<number[][]>;
+}
+
+/**
+ * Usage of a single AI call, expressed provider-agnostically: adapters map
+ * their vendor SDK's response into this shape before recording.
+ */
+export interface AiCallUsage {
+  /** Provider name, e.g. "google". */
+  provider: string;
+  /** Provider model ID the call used. */
+  modelId: string;
+  /** What the call was for, e.g. "classification", "intent", "enrichment", "embedding". */
+  operation: string;
+  inputTokens: number;
+  outputTokens: number;
+  /** Shop the call was made on behalf of, when known. */
+  shopDomain?: string;
+  /** Correlation ID tying together every call serving one search. */
+  searchId?: string;
+}
+
+/**
+ * Port through which every AI call is metered. Provider adapters depend on
+ * this interface only — never on the persistence behind it.
+ */
+export interface CostRecorder {
+  record(usage: AiCallUsage): Promise<void>;
 }
 
 /** The engine's public interface. */

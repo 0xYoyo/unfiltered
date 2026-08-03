@@ -1,33 +1,12 @@
 import type { PrismaClient } from "@prisma/client";
+import type { AiCallUsage, CostRecorder } from "@unfiltered/engine";
 
 import { computeCostUsd } from "./pricing.server";
 
-/**
- * Usage of a single AI call, expressed provider-agnostically: adapters map
- * their vendor SDK's response into this shape before recording.
- */
-export interface AiCallUsage {
-  /** Provider name, e.g. "google". */
-  provider: string;
-  /** Provider model ID, e.g. "gemini-2.5-flash". Must exist in the price table. */
-  modelId: string;
-  /** What the call was for, e.g. "classification", "intent", "enrichment", "embedding". */
-  operation: string;
-  inputTokens: number;
-  outputTokens: number;
-  /** Shop the call was made on behalf of, when known. */
-  shopDomain?: string;
-  /** Correlation ID tying together every call serving one search. */
-  searchId?: string;
-}
-
-/**
- * Port through which every AI call is metered. Provider adapters depend on
- * this interface only — never on the persistence behind it.
- */
-export interface CostRecorder {
-  record(usage: AiCallUsage): Promise<void>;
-}
+// The CostRecorder port lives in the engine's public API so provider adapter
+// packages can depend on it without knowing this app; re-exported here for
+// app-side consumers.
+export type { AiCallUsage, CostRecorder };
 
 /**
  * Prisma-backed CostRecorder: computes the call's USD cost from the committed

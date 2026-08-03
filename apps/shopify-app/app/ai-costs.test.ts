@@ -31,7 +31,7 @@ async function seedFixtureLedger(client: PrismaClient) {
   // Two calls serving search-1, one for search-2, one uncorrelated.
   await recorder.record({
     provider: "google",
-    modelId: "gemini-2.5-flash",
+    modelId: "gemini-3.5-flash-lite",
     operation: "classification",
     inputTokens: 1000,
     outputTokens: 500,
@@ -48,7 +48,7 @@ async function seedFixtureLedger(client: PrismaClient) {
   });
   await recorder.record({
     provider: "google",
-    modelId: "gemini-2.5-flash",
+    modelId: "gemini-3.5-flash-lite",
     operation: "intent",
     inputTokens: 1000,
     outputTokens: 500,
@@ -56,7 +56,7 @@ async function seedFixtureLedger(client: PrismaClient) {
   });
   await recorder.record({
     provider: "google",
-    modelId: "gemini-2.5-flash",
+    modelId: "gemini-3.5-flash-lite",
     operation: "enrichment",
     inputTokens: 1000,
     outputTokens: 500,
@@ -82,7 +82,7 @@ describe("Prisma cost recorder", () => {
     const recorder = createPrismaCostRecorder(db);
     await recorder.record({
       provider: "google",
-      modelId: "gemini-2.5-flash",
+      modelId: "gemini-3.5-flash-lite",
       operation: "classification",
       inputTokens: 1000,
       outputTokens: 500,
@@ -94,7 +94,7 @@ describe("Prisma cost recorder", () => {
     expect(rows).toHaveLength(1);
     const row = rows[0]!;
     expect(row.provider).toBe("google");
-    expect(row.modelId).toBe("gemini-2.5-flash");
+    expect(row.modelId).toBe("gemini-3.5-flash-lite");
     expect(row.operation).toBe("classification");
     expect(row.inputTokens).toBe(1000);
     expect(row.outputTokens).toBe(500);
@@ -108,7 +108,7 @@ describe("Prisma cost recorder", () => {
     const recorder = createPrismaCostRecorder(db);
     await recorder.record({
       provider: "google",
-      modelId: "gemini-2.5-flash",
+      modelId: "gemini-3.5-flash-lite",
       operation: "enrichment",
       inputTokens: 10,
       outputTokens: 10,
@@ -147,7 +147,7 @@ describe("cost aggregates", () => {
     expect(aggregates.totalCostUsd).toBeCloseTo(3 * flashCallCost + embeddingCost, 10);
 
     expect(aggregates.byModel).toEqual([
-      expect.objectContaining({ key: "gemini-2.5-flash", calls: 3 }),
+      expect.objectContaining({ key: "gemini-3.5-flash-lite", calls: 3 }),
       expect.objectContaining({ key: "gemini-embedding-001", calls: 1 }),
     ]);
 
@@ -205,7 +205,7 @@ describe("/internal/costs route", () => {
     const aggregates = await costsLoader(costsRequest(TOKEN));
     expect(aggregates.totalCalls).toBe(4);
     expect(aggregates.byModel.map((group) => group.key)).toContain(
-      "gemini-2.5-flash",
+      "gemini-3.5-flash-lite",
     );
   });
 

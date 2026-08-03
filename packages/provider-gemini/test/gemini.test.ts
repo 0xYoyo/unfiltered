@@ -1,0 +1,373 @@
+import { describe, expect, it } from "vitest";
+
+import type { AiCallUsage } from "@unfiltered/engine";
+import {
+  DEFAULT_CLASSIFICATION_MODEL,
+  DEFAULT_EMBEDDING_DIMENSION,
+  DEFAULT_EMBEDDING_MODEL,
+  DEFAULT_INTENT_MODEL,
+  GeminiApiError,
+  GeminiConfigError,
+  GeminiResponseError,
+  createGeminiEmbeddingClient,
+  createGeminiLlmClient,
+  geminiModelsFromEnv,
+} from "../src/index.js";
+
+// All tests run on fixture responses through an injected fetch stub — no
+// network, no API key from the environment.
+
+const SCHEMA = {
+  type: "object",
+  properties: { color: { type: "string" } },
+  required: ["color"],
+};
+
+function recorderSpy() {
+  const recorded: AiCallUsage[] = [];
+  return {
+    recorded,
+    recorder: {
+      record: async (usage: AiCallUsage) => {
+        recorded.push(usage);
+      },
+    },
+  };
+}
+
+interface CapturedRequest {
+  url: string;
+  headers: Record<string, string>;
+  body: Record<string, unknown>;
+}
+
+function fetchStub(status: number, payload: unknown) {
+  const captured: CapturedRequest[] = [];
+  const impl = (async (url: unknown, init?: RequestInit) => {
+    captured.push({
+      url: String(url),
+      headers: (init?.headers ?? {}) as Record<string, string>,
+      body: JSON.parse(String(init?.body)) as Record<string, unknown>,
+    });
+    return new Response(JSON.stringify(payload), { status });
+  }) as typeof fetch;
+  return { captured, impl };
+}
+
+const completionFixture = {
+  candidates: [{ content: { parts: [{ text: '{"color":"black"}' }] } }],
+  usageMetadata: { promptTokenCount: 120, candidatesTokenCount: 8 },
+};
+
+function llmClient(
+  fetchImpl: typeof fetch,
+  recorder: { record: (usage: AiCallUsage) => Promise<void> },
+  modelId = "test-flash-model",
+) {
+  return createGeminiLlmClient({
+    modelId,
+    apiKey: "test-key-not-real",
+    costRecorder: recorder,
+    fetchImpl,
+  });
+}
+
+describe("model configuration", () => {
+  it("defaults every model from the documented list", () => {
+    const models = geminiModelsFromEnv({});
+    expect(models).toEqual({
+      classificationModel: DEFAULT_CLASSIFICATION_MODEL,
+      intentModel: DEFAULT_INTENT_MODEL,
+      embeddingModel: DEFAULT_EMBEDDING_MODEL,
+      embeddingDimension: DEFAULT_EMBEDDING_DIMENSION,
+    });
+  });
+
+  it("reads every model from env overrides", () => {
+    const models = geminiModelsFromEnv({
+      GEMINI_CLASSIFICATION_MODEL: "model-a",
+      GEMINI_INTENT_MODEL: "model-b",
+      GEMINI_EMBEDDING_MODEL: "model-c",
+      GEMINI_EMBEDDING_DIMENSION: "1536",
+    });
+    expect(models).toEqual({
+      classificationModel: "model-a",
+      intentModel: "model-b",
+      embeddingModel: "model-c",
+      embeddingDimension: 1536,
+    });
+  });
+
+  it("refuses to construct a client without an API key", () => {
+    const { recorder } = recorderSpy();
+    const previous = process.env.GEMINI_API_KEY;
+    delete process.env.GEMINI_API_KEY;
+    try {
+      expect(() =>
+        createGeminiLlmClient({ modelId: "m", costRecorder: recorder }),
+      ).toThrow(GeminiConfigError);
+    } finally {
+      if (previous !== undefined) {
+        process.env.GEMINI_API_KEY = previous;
+      }
+    }
+  });
+});
+
+describe("structured completion", () => {
+  it("shapes the request: model in URL, key in header, schema in generationConfig", async () => {
+    const { recorder } = recorderSpy();
+    const { captured, impl } = fetchStub(200, completionFixture);
+
+    await llmClient(impl, recorder).completeStructured({
+      prompt: "Classify this product",
+      schema: SCHEMA,
+      operation: "classification",
+    });
+
+    expect(captured).toHaveLength(1);
+    const request = captured[0]!;
+    expect(request.url).toBe(
+      "https://generativelanguage.googleapis.com/v1beta/models/test-flash-model:generateContent",
+    );
+    expect(request.headers["x-goog-api-key"]).toBe("test-key-not-real");
+    expect(request.body.contents).toEqual([
+      { role: "user", parts: [{ text: "Classify this product" }] },
+    ]);
+    expect(request.body.generationConfig).toEqual({
+      responseMimeType: "application/json",
+      responseSchema: SCHEMA,
+    });
+  });
+
+  it("parses the JSON candidate into an object", async () => {
+    const { recorder } = recorderSpy();
+    const { impl } = fetchStub(200, completionFixture);
+
+    const result = await llmClient(impl, recorder).completeStructured({
+      prompt: "p",
+      schema: SCHEMA,
+      operation: "classification",
+    });
+
+    expect(result).toEqual({ color: "black" });
+  });
+
+  it("records one metering row per call with real token counts", async () => {
+    const { recorded, recorder } = recorderSpy();
+    const { impl } = fetchStub(200, completionFixture);
+
+    await llmClient(impl, recorder).completeStructured({
+      prompt: "p",
+      schema: SCHEMA,
+      operation: "intent",
+      shopDomain: "test-shop.myshopify.com",
+      searchId: "search-1",
+    });
+
+    expect(recorded).toEqual([
+      {
+        provider: "google",
+        modelId: "test-flash-model",
+        operation: "intent",
+        inputTokens: 120,
+        outputTokens: 8,
+        shopDomain: "test-shop.myshopify.com",
+        searchId: "search-1",
+      },
+    ]);
+  });
+
+  it("still meters a schema-violating (non-JSON) answer before throwing", async () => {
+    const { recorded, recorder } = recorderSpy();
+    const { impl } = fetchStub(200, {
+      candidates: [{ content: { parts: [{ text: "not json at all" }] } }],
+      usageMetadata: { promptTokenCount: 50, candidatesTokenCount: 5 },
+    });
+
+    await expect(
+      llmClient(impl, recorder).completeStructured({
+        prompt: "p",
+        schema: SCHEMA,
+        operation: "classification",
+      }),
+    ).rejects.toThrow(GeminiResponseError);
+    expect(recorded).toHaveLength(1);
+  });
+
+  it("throws unmetered when the response carries no usageMetadata", async () => {
+    const { recorded, recorder } = recorderSpy();
+    const { impl } = fetchStub(200, {
+      candidates: [{ content: { parts: [{ text: "{}" }] } }],
+    });
+
+    await expect(
+      llmClient(impl, recorder).completeStructured({
+        prompt: "p",
+        schema: SCHEMA,
+        operation: "classification",
+      }),
+    ).rejects.toThrow(/usageMetadata/);
+    expect(recorded).toHaveLength(0);
+  });
+
+  it("maps an HTTP error to GeminiApiError with status and body", async () => {
+    const { recorded, recorder } = recorderSpy();
+    const { impl } = fetchStub(429, { error: { message: "quota" } });
+
+    const call = llmClient(impl, recorder).completeStructured({
+      prompt: "p",
+      schema: SCHEMA,
+      operation: "classification",
+    });
+
+    await expect(call).rejects.toThrow(GeminiApiError);
+    await expect(
+      llmClient(impl, recorder).completeStructured({
+        prompt: "p",
+        schema: SCHEMA,
+        operation: "classification",
+      }),
+    ).rejects.toMatchObject({ status: 429 });
+    // A failed HTTP call consumed nothing meterable.
+    expect(recorded).toHaveLength(0);
+  });
+});
+
+function embeddingFixture(dimension: number, count: number) {
+  return {
+    embeddings: Array.from({ length: count }, (_, i) => ({
+      // Non-normalized values so tests prove re-normalization.
+      values: Array.from({ length: dimension }, (_, j) =>
+        j === i % dimension ? 2 : 0,
+      ),
+    })),
+  };
+}
+
+describe("embeddings", () => {
+  it("shapes a batch request with outputDimensionality per text", async () => {
+    const { recorder } = recorderSpy();
+    const { captured, impl } = fetchStub(200, embeddingFixture(4, 2));
+
+    const client = createGeminiEmbeddingClient({
+      modelId: "test-embedding-model",
+      apiKey: "test-key-not-real",
+      costRecorder: recorder,
+      fetchImpl: impl,
+      dimension: 4,
+    });
+    await client.embed({ texts: ["first text", "second text"] });
+
+    const request = captured[0]!;
+    expect(request.url).toBe(
+      "https://generativelanguage.googleapis.com/v1beta/models/test-embedding-model:batchEmbedContents",
+    );
+    expect(request.body.requests).toEqual([
+      {
+        model: "models/test-embedding-model",
+        content: { parts: [{ text: "first text" }] },
+        outputDimensionality: 4,
+      },
+      {
+        model: "models/test-embedding-model",
+        content: { parts: [{ text: "second text" }] },
+        outputDimensionality: 4,
+      },
+    ]);
+  });
+
+  it("returns one unit-length vector per text in the declared dimension", async () => {
+    const { recorder } = recorderSpy();
+    const { impl } = fetchStub(200, embeddingFixture(4, 2));
+
+    const client = createGeminiEmbeddingClient({
+      modelId: "test-embedding-model",
+      apiKey: "test-key-not-real",
+      costRecorder: recorder,
+      fetchImpl: impl,
+      dimension: 4,
+    });
+    const vectors = await client.embed({ texts: ["a", "b"] });
+
+    expect(client.dimension).toBe(4);
+    expect(vectors).toEqual([
+      [1, 0, 0, 0],
+      [0, 1, 0, 0],
+    ]);
+  });
+
+  it("meters the batch as one embedding-operation row with estimated tokens", async () => {
+    const { recorded, recorder } = recorderSpy();
+    const { impl } = fetchStub(200, embeddingFixture(4, 2));
+
+    const client = createGeminiEmbeddingClient({
+      modelId: "test-embedding-model",
+      apiKey: "test-key-not-real",
+      costRecorder: recorder,
+      fetchImpl: impl,
+      dimension: 4,
+    });
+    // 8 + 8 chars → ceil(16 / 4) = 4 estimated tokens.
+    await client.embed({ texts: ["12345678", "12345678"], searchId: "s-1" });
+
+    expect(recorded).toEqual([
+      {
+        provider: "google",
+        modelId: "test-embedding-model",
+        operation: "embedding",
+        inputTokens: 4,
+        outputTokens: 0,
+        shopDomain: undefined,
+        searchId: "s-1",
+      },
+    ]);
+  });
+
+  it("embeds nothing and records nothing for an empty batch", async () => {
+    const { recorded, recorder } = recorderSpy();
+    const { captured, impl } = fetchStub(200, {});
+
+    const client = createGeminiEmbeddingClient({
+      modelId: "test-embedding-model",
+      apiKey: "test-key-not-real",
+      costRecorder: recorder,
+      fetchImpl: impl,
+    });
+    expect(await client.embed({ texts: [] })).toEqual([]);
+    expect(captured).toHaveLength(0);
+    expect(recorded).toHaveLength(0);
+  });
+
+  it("fails loudly on a dimension mismatch", async () => {
+    const { recorder } = recorderSpy();
+    const { impl } = fetchStub(200, embeddingFixture(8, 1));
+
+    const client = createGeminiEmbeddingClient({
+      modelId: "test-embedding-model",
+      apiKey: "test-key-not-real",
+      costRecorder: recorder,
+      fetchImpl: impl,
+      dimension: 4,
+    });
+    await expect(client.embed({ texts: ["a"] })).rejects.toThrow(
+      /dimension 8, expected 4/,
+    );
+  });
+
+  it("fails loudly when the embedding count does not match the text count", async () => {
+    const { recorder } = recorderSpy();
+    const { impl } = fetchStub(200, embeddingFixture(4, 1));
+
+    const client = createGeminiEmbeddingClient({
+      modelId: "test-embedding-model",
+      apiKey: "test-key-not-real",
+      costRecorder: recorder,
+      fetchImpl: impl,
+      dimension: 4,
+    });
+    await expect(client.embed({ texts: ["a", "b"] })).rejects.toThrow(
+      /1 embeddings for 2 texts/,
+    );
+  });
+});
