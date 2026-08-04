@@ -60,15 +60,21 @@ classic authorization-code-grant code paths. Sessions are persisted through
 
 ### Webhooks
 
-Five topics are registered in `shopify.app.toml` and handled under
+Eight topics are registered in `shopify.app.toml` and handled under
 `apps/shopify-app/app/routes/webhooks.*`: `app/uninstalled` (deletes the
-shop's persisted sessions), `app/scopes_update`, and the three mandatory GDPR
+shop's persisted sessions), `app/scopes_update`, the three mandatory GDPR
 compliance topics `customers/data_request`, `customers/redact`, and
-`shop/redact` (acknowledge-and-200 — no shopper data is stored yet). Every
-handler authenticates through the library's HMAC verification; signature and
-auth behavior are covered by offline unit tests with fixture payloads
-(`app/routes/webhooks.test.ts`, `app/routes/app.auth.test.ts`,
-`app/session-storage.test.ts`).
+`shop/redact` (acknowledge-and-200 — no shopper data is stored yet), and the
+three catalog-sync topics `products/create`, `products/update`, and
+`products/delete`, which keep the per-shop `CatalogProduct` snapshot current
+between full ingestions (`app/catalog/webhook-sync.server.ts`: payloads map
+through the same Shopify→snapshot mapping and content hash as ingestion,
+upserts are idempotent, and an out-of-order delivery with an older
+`updated_at` never overwrites a newer row). Every handler authenticates
+through the library's HMAC verification; signature and auth behavior are
+covered by offline unit tests with fixture payloads
+(`app/routes/webhooks.test.ts`, `app/routes/webhooks.products.test.ts`,
+`app/routes/app.auth.test.ts`, `app/session-storage.test.ts`).
 
 ## Data layer
 
