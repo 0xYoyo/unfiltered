@@ -58,6 +58,30 @@ model CatalogProduct {
   @@index([shopDomain])
 }
 
+// LLM-derived structured attributes for one snapshot row (YOY-22). Keyed by
+// the snapshot's contentHash so enrichment is cached: an unchanged product
+// re-enriches with zero LLM calls. status is "enriched" or "failed"; failed
+// rows keep the hash so a deterministic bad product is not retried until its
+// content changes.
+model ProductEnrichment {
+  id          String   @id @default(uuid())
+  shopDomain  String
+  productId   String
+  contentHash String
+  status      String
+  category    String?
+  colors      String[]
+  occasions   String[]
+  fit         String?
+  styleTags   String[]
+  seasons     String[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([shopDomain, productId])
+  @@index([shopDomain])
+}
+
 model Session {
   id            String    @id
   shop          String
