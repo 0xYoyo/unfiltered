@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import type { PrismaClient } from "@prisma/client";
 
 import type { ShopifyProductNode, SnapshotProduct } from "./mapping.server";
@@ -45,23 +46,75 @@ function productGid(payload: { id: number; admin_graphql_api_id?: string }): str
   return payload.admin_graphql_api_id ?? `gid://shopify/Product/${payload.id}`;
 }
 
+/** Named entities Shopify product HTML uses in practice; numeric forms are
+ * decoded generically, so this table only needs the symbolic names. */
+const NAMED_ENTITIES: Record<string, string> = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  nbsp: " ",
+  ndash: "–",
+  mdash: "—",
+  lsquo: "‘",
+  rsquo: "’",
+  ldquo: "“",
+  rdquo: "”",
+  hellip: "…",
+  bull: "•",
+  middot: "·",
+  copy: "©",
+  reg: "®",
+  trade: "™",
+  deg: "°",
+  times: "×",
+  frac12: "½",
+  frac14: "¼",
+  frac34: "¾",
+  agrave: "à",
+  acirc: "â",
+  ccedil: "ç",
+  eacute: "é",
+  egrave: "è",
+  ecirc: "ê",
+  ntilde: "ñ",
+  auml: "ä",
+  ouml: "ö",
+  uuml: "ü",
+  szlig: "ß",
+};
+
+/**
+ * Decode HTML entities in a single pass: decimal (`&#8212;`) and hex
+ * (`&#x2014;`) references generically, named references via the table above.
+ * One pass means double-encoded text (`&amp;lt;`) decodes exactly once, the
+ * way a real HTML-to-text conversion does; unrecognized names pass through.
+ */
+function decodeHtmlEntities(text: string): string {
+  return text.replace(
+    /&(?:#x([0-9a-f]+)|#(\d+)|([a-z][a-z0-9]*));/gi,
+    (match, hex: string | undefined, dec: string | undefined, named: string | undefined) => {
+      if (hex !== undefined || dec !== undefined) {
+        const codePoint = hex !== undefined ? parseInt(hex, 16) : parseInt(dec as string, 10);
+        return codePoint <= 0x10ffff ? String.fromCodePoint(codePoint) : match;
+      }
+      return NAMED_ENTITIES[(named as string).toLowerCase()] ?? match;
+    },
+  );
+}
+
 /**
  * Reduce `body_html` to the plain text the GraphQL `description` field
- * carries (tags stripped, whitespace collapsed), so a product synced via
- * webhook hashes identically to the same product ingested via GraphQL.
+ * carries (tags stripped, entities decoded, whitespace collapsed), so a
+ * product synced via webhook hashes identically to the same product ingested
+ * via GraphQL.
  */
 function htmlToPlainText(html: string | null): string {
   if (!html) {
     return "";
   }
-  return html
-    .replace(/<[^>]*>/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, " ")
+  return decodeHtmlEntities(html.replace(/<[^>]*>/g, " "))
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -137,17 +190,39 @@ export async function syncProductFromWebhook({
   payload: ProductWebhookPayload;
 }): Promise<WebhookSyncOutcome> {
   const productId = productGid(payload);
-  const existing = await db.catalogProduct.findUnique({
-    where: { shopDomain_productId: { shopDomain, productId } },
-    select: { contentHash: true, currencyCode: true, sourceUpdatedAt: true },
-  });
+  const findExisting = () =>
+    db.catalogProduct.findUnique({
+      where: { shopDomain_productId: { shopDomain, productId } },
+      select: { contentHash: true, currencyCode: true, sourceUpdatedAt: true },
+    });
 
-  const product = mapWebhookProduct(payload, existing?.currencyCode ?? "");
+  let existing = await findExisting();
 
   if (existing === null) {
-    await db.catalogProduct.create({ data: { shopDomain, ...product } });
-    return "created";
+    try {
+      await db.catalogProduct.create({
+        data: { shopDomain, ...mapWebhookProduct(payload, "") },
+      });
+      return "created";
+    } catch (error) {
+      if (
+        !(error instanceof Prisma.PrismaClientKnownRequestError) ||
+        error.code !== "P2002"
+      ) {
+        throw error;
+      }
+      // Lost a create race: a concurrent delivery for the same product
+      // inserted the row between our read and our create. The winner's row
+      // exists now, so re-read it and fall through to the update path.
+      existing = await findExisting();
+      if (existing === null) {
+        throw error;
+      }
+    }
   }
+
+  const product = mapWebhookProduct(payload, existing.currencyCode);
+
   if (product.sourceUpdatedAt < existing.sourceUpdatedAt) {
     return "skipped_stale";
   }

@@ -10,6 +10,7 @@ vi.mock("../db.server", async () => {
 
 import db from "../db.server";
 import type { ProductWebhookPayload } from "../catalog/webhook-sync.server";
+import { syncProductFromWebhook } from "../catalog/webhook-sync.server";
 import { action as createAction } from "./webhooks.products.create";
 import { action as deleteAction } from "./webhooks.products.delete";
 import { action as updateAction } from "./webhooks.products.update";
@@ -59,6 +60,30 @@ const snapshotRow = () =>
     },
   });
 
+/**
+ * A db whose first read observes the snapshot row as absent even though it
+ * exists, reproducing the moment a concurrent first delivery wins the create
+ * race between this delivery's read and its create.
+ */
+function raceLosingDb(): typeof db {
+  let missedFirstRead = false;
+  return {
+    catalogProduct: {
+      findUnique: (...args: Parameters<typeof db.catalogProduct.findUnique>) => {
+        if (!missedFirstRead) {
+          missedFirstRead = true;
+          return Promise.resolve(null);
+        }
+        return db.catalogProduct.findUnique(...args);
+      },
+      create: (...args: Parameters<typeof db.catalogProduct.create>) =>
+        db.catalogProduct.create(...args),
+      update: (...args: Parameters<typeof db.catalogProduct.update>) =>
+        db.catalogProduct.update(...args),
+    },
+  } as unknown as typeof db;
+}
+
 let logSpy: ReturnType<typeof vi.spyOn>;
 
 beforeEach(async () => {
@@ -92,6 +117,50 @@ describe("products/create webhook", () => {
       sourceUpdatedAt: new Date("2026-08-01T10:00:00Z"),
     });
     expect(row?.contentHash).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it("recovers when a concurrent first delivery wins the create race", async () => {
+    // Simulate the race deterministically: the winner's delivery has already
+    // created the row, but this delivery's first read still observed it as
+    // absent, so its create hits the unique constraint and must fall through
+    // to the update path instead of failing the webhook.
+    await createAction(
+      actionArgs(
+        webhookRequest({ topic: "products/create", shop: SHOP, payload: productPayload() }),
+      ),
+    );
+    const winner = await snapshotRow();
+
+    const outcome = await syncProductFromWebhook({
+      db: raceLosingDb(),
+      shopDomain: SHOP,
+      payload: productPayload() as unknown as ProductWebhookPayload,
+    });
+
+    expect(outcome).toBe("unchanged");
+    expect(await snapshotRow()).toEqual(winner);
+  });
+
+  it("applies a newer racing payload through the update path after losing the create race", async () => {
+    await createAction(
+      actionArgs(
+        webhookRequest({ topic: "products/create", shop: SHOP, payload: productPayload() }),
+      ),
+    );
+
+    const outcome = await syncProductFromWebhook({
+      db: raceLosingDb(),
+      shopDomain: SHOP,
+      payload: productPayload({
+        title: "Linen overshirt — natural",
+        updated_at: "2026-08-01T11:00:00Z",
+      }) as unknown as ProductWebhookPayload,
+    });
+
+    expect(outcome).toBe("updated");
+    const row = await snapshotRow();
+    expect(row?.title).toBe("Linen overshirt — natural");
+    expect(row?.sourceUpdatedAt).toEqual(new Date("2026-08-01T11:00:00Z"));
   });
 
   it("is idempotent: redelivering the same payload leaves the row untouched", async () => {
