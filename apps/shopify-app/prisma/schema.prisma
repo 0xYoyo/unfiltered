@@ -82,6 +82,25 @@ model ProductEnrichment {
   @@index([shopDomain])
 }
 
+// pgvector embedding for one snapshot row (YOY-23), keyed by the snapshot's
+// contentHash so embedding runs are incremental: an unchanged product re-runs
+// with zero embedding calls. The column is dimensionless "vector" because the
+// dimension is owned by the embedding-model configuration, not the schema;
+// all access goes through raw SQL in app/catalog/embed.server.ts, which casts
+// through the configured dimension so a mismatch fails loudly.
+model ProductEmbedding {
+  id          String                 @id @default(uuid())
+  shopDomain  String
+  productId   String
+  contentHash String
+  embedding   Unsupported("vector")
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+
+  @@unique([shopDomain, productId])
+  @@index([shopDomain])
+}
+
 model Session {
   id            String    @id
   shop          String
