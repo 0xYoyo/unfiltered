@@ -134,7 +134,8 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
       enrichmentEntries,
     );
     const attributesByProduct = new Map<string, ReturnType<typeof parseEnrichment>>();
-    for (const { sourceUpdatedAt: _s, ...product } of catalog) {
+    for (const { sourceUpdatedAt, ...product } of catalog) {
+      void sourceUpdatedAt; // not part of the enrichment input
       const completion = await enrichmentLlm.completeStructured({
         prompt: buildEnrichmentPrompt({
           ...product,
