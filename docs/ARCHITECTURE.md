@@ -97,14 +97,44 @@ passes with no `DATABASE_URL` set and no external Postgres.
 
 `packages/engine` (`@unfiltered/engine`) exports, from `src/index.ts`:
 
-- `version: string` — semantic version of the API contract (`"0.2.0"`).
+- `version: string` — semantic version of the API contract (`"0.3.0"`).
 - `interface EngineDocument` — `{ id: string; fields: Record<string, string> }`.
 - `interface SearchOptions` — `{ limit?: number; offset?: number }`.
 - `interface SearchHit` — `{ documentId: string; score: number }`.
 - `interface SearchResult` — `{ hits: SearchHit[]; totalCount: number; query: string }`.
 - `interface Engine` — `{ readonly version: string; search(query, options?): Promise<SearchResult> }`.
 - `createEngine(): Engine` — returns the stub implementation (every search
-  resolves to an empty result).
+  resolves to an empty result; the classic keyword path is M3).
+
+Query understanding (all LLM access through the `LlmClient` port):
+
+- `createQueryClassifier({ llm, timeoutMs?, cacheSize? }): QueryClassifier` —
+  routes a query to `"classic"` or `"ai"`: a deterministic heuristic layer
+  settles clearly-simple queries with zero LLM calls, everything else asks
+  the model (operation `"classification"`), cached by normalized query and
+  failing safe to `classic`.
+- `createIntentExtractor({ llm }): IntentExtractor` — turns free text into a
+  vendor-free `Intent` (category, price bounds with currency, color
+  inclusions/exclusions, occasion, size, availability requirement, soft
+  attributes) via the model (operation `"intent"`), with one retry on schema
+  violation and then a typed `IntentExtractionError`.
+
+Retrieval (the AI result path; data reached only through injected ports):
+
+- `interface RetrievalStore` — the store port the consumer implements over
+  its own database (the app: Postgres/pgvector in
+  `apps/shopify-app/app/search/retrieval-store.server.ts`). One
+  `query({ shopDomain, constraints, vector, limit })` call returns products
+  matching every hard constraint, ranked by cosine distance; constraints are
+  WHERE filters inside the store, never post-ranking.
+- `createRetriever({ embeddings, store, cacheSize? }): Retriever` —
+  `retrieve({ intent, shopDomain, limit?, searchId? })` maps the Intent's
+  hard constraints to store filters (`constraintsFromIntent`; size is
+  deliberately unmapped — no per-size inventory exists to filter on), embeds
+  the intent's descriptive signal (`composeQueryText`, metered as operation
+  `"embedding"` and cached for identical inputs), and returns
+  `{ hits: [{ productId, score }], appliedConstraints }` with
+  `score = 1 - cosine distance`.
 
 AI ports (vendor-free; implemented by provider adapter packages):
 
