@@ -39,6 +39,7 @@ export {
   composeQueryText,
   constraintsFromIntent,
   createRetriever,
+  EmptyQueryTextError,
   type AppliedConstraint,
   type RetrievalConstraints,
   type RetrievalHit,

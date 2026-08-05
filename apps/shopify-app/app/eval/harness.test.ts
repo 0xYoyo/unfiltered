@@ -3,10 +3,12 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 import { createTestDb } from "../testing/helpers.server";
 import {
+  findViolations,
   loadCatalog,
   loadGoldens,
   runEval,
   type EvalRunResult,
+  type Golden,
 } from "./harness.server";
 
 // The sparse-catalog quality harness (YOY-27): one deterministic offline eval
@@ -43,6 +45,54 @@ describe("eval fixtures (AC-1)", () => {
         expect(ids.has(id), `${golden.id} expects unknown product ${id}`).toBe(true);
       }
     }
+  });
+});
+
+describe("violation scoring covers occasion (YOY-29 AC-11)", () => {
+  const catalog = loadCatalog();
+  const product = catalog[0]!;
+  const golden: Golden = {
+    id: "occasion-probe",
+    language: "en",
+    query: "dress for a wedding",
+    hardConstraints: {
+      category: null,
+      priceMin: null,
+      priceMax: null,
+      colorsInclude: [],
+      colorsExclude: [],
+      occasion: "wedding",
+      availabilityRequired: false,
+    },
+    expectedProductIds: [product.productId],
+  };
+  const products = new Map(catalog.map((entry) => [entry.productId, entry]));
+
+  it("flags a returned product whose enrichment occasion misses the constraint", () => {
+    const enrichments = new Map([
+      [
+        product.productId,
+        { category: null, colors: [], occasions: ["Casual"] },
+      ],
+    ]);
+
+    const violations = findViolations(golden, product.productId, products, enrichments);
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0]).toContain("wedding");
+  });
+
+  it("accepts a product whose occasions satisfy the constraint, case-insensitively", () => {
+    const enrichments = new Map([
+      [
+        product.productId,
+        { category: null, colors: [], occasions: ["Wedding", "party"] },
+      ],
+    ]);
+
+    expect(
+      findViolations(golden, product.productId, products, enrichments),
+    ).toEqual([]);
   });
 });
 

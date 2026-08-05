@@ -201,7 +201,10 @@ describe("catalog embedding", () => {
       orderBy: { productId: "asc" },
     });
     rows.forEach((row, index) => {
-      expect(row.contentHash).toBe(snapshots[index]!.contentHash);
+      // The stored key is the composed-text hash (YOY-29 AC-6), so it moves
+      // when either the snapshot content or the enrichment state changes.
+      expect(row.contentHash).toMatch(/^[0-9a-f]{64}$/);
+      expect(row.contentHash).not.toBe(snapshots[index]!.contentHash);
       expect(row.embedding).toMatch(/^\[/);
     });
   });
@@ -290,7 +293,47 @@ describe("catalog embedding", () => {
       "gid://shopify/Product/1",
       "gid://shopify/Product/2",
     ]);
-    expect(rows[0]!.contentHash).toBe(retitled.contentHash);
+  });
+
+  it("re-embeds exactly the product whose enrichment landed after embedding (YOY-29 AC-6)", async () => {
+    await embedCatalog({ db, shopDomain: SHOP, embeddings: embeddingStub().client });
+
+    const snapshot = await db.catalogProduct.findFirstOrThrow({
+      where: { shopDomain: SHOP, productId: "gid://shopify/Product/1" },
+    });
+    await db.productEnrichment.create({
+      data: {
+        shopDomain: SHOP,
+        productId: snapshot.productId,
+        contentHash: snapshot.contentHash,
+        status: "enriched",
+        category: "dress",
+        colors: ["black"],
+        occasions: ["evening"],
+        fit: "regular",
+        styleTags: ["elegant"],
+        seasons: ["summer"],
+      },
+    });
+
+    const { client, calls } = embeddingStub();
+    const result = await embedCatalog({ db, shopDomain: SHOP, embeddings: client });
+
+    expect(result).toEqual({ embedded: 1, cached: 2, deleted: 0 });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.texts).toHaveLength(1);
+    expect(calls[0]!.texts[0]).toContain("elegant");
+    expect(calls[0]!.texts[0]).toContain("black");
+
+    // Unchanged catalog + unchanged enrichment: nothing left to embed.
+    const rerun = embeddingStub();
+    const unchanged = await embedCatalog({
+      db,
+      shopDomain: SHOP,
+      embeddings: rerun.client,
+    });
+    expect(unchanged).toEqual({ embedded: 0, cached: 3, deleted: 0 });
+    expect(rerun.calls).toHaveLength(0);
   });
 
   it("lands one embedding ledger row per batched call through a metered client", async () => {

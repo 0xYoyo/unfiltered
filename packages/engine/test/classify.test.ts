@@ -81,6 +81,10 @@ describe("model escalation (AC-2, AC-5)", () => {
     "elegant summer wedding dress, not black, under 400 ils",
     "שמלה אלגנטית לחתונה בקיץ לא שחור",
     "שמלת מקסי elegant לחתונה בקיץ",
+    // Price-bound numbers are not SKUs (YOY-29 AC-7): these short queries
+    // carry price intent and must reach the model, not the sku-pattern rule.
+    "dress under 400",
+    "שמלה עד 400",
   ];
 
   for (const query of aiFixtures) {

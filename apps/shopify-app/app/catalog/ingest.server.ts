@@ -16,6 +16,18 @@ export type AdminGraphql = (
 
 export const PRODUCTS_PAGE_SIZE = 100;
 
+/**
+ * Explicit bound on the `available` flag (YOY-29 AC-2): availability is
+ * derived from the first `VARIANTS_SAMPLE_SIZE` variants per product —
+ * Shopify's maximum page size — not from nested pagination. A product whose
+ * first 100 variants are all unavailable while a later variant is purchasable
+ * would be misreported as unavailable. Accepted as a documented bound:
+ * Shopify itself caps products at 100 variants unless the shop has opted into
+ * the higher-variant-limit beta, so the sample covers the whole variant list
+ * for the target catalogs.
+ */
+export const VARIANTS_SAMPLE_SIZE = 100;
+
 export const PRODUCTS_QUERY = `#graphql
   query CatalogIngestProducts($first: Int!, $after: String) {
     products(first: $first, after: $after) {
@@ -35,7 +47,7 @@ export const PRODUCTS_QUERY = `#graphql
           minVariantPrice { amount currencyCode }
           maxVariantPrice { amount currencyCode }
         }
-        variants(first: 100) {
+        variants(first: ${VARIANTS_SAMPLE_SIZE}) {
           nodes { availableForSale }
         }
         images(first: 20) {
@@ -136,9 +148,16 @@ export async function ingestCatalog({
     .map((row) => row.productId)
     .filter((productId) => !seen.has(productId));
   if (stale.length > 0) {
-    const { count } = await db.catalogProduct.deleteMany({
-      where: { shopDomain, productId: { in: stale } },
-    });
+    // Enrichment rows are keyed by shopDomain+productId with no FK cascade,
+    // so they must go in the same operation as the product (YOY-29 AC-5).
+    const [, { count }] = await db.$transaction([
+      db.productEnrichment.deleteMany({
+        where: { shopDomain, productId: { in: stale } },
+      }),
+      db.catalogProduct.deleteMany({
+        where: { shopDomain, productId: { in: stale } },
+      }),
+    ]);
     result.deleted = count;
   }
 

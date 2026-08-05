@@ -98,6 +98,17 @@ describe("model configuration", () => {
     });
   });
 
+  it("rejects a malformed GEMINI_EMBEDDING_DIMENSION naming the variable (YOY-29 AC-3)", () => {
+    for (const raw of ["not-a-number", "", "  ", "7.5", "-768", "0"]) {
+      expect(() =>
+        geminiModelsFromEnv({ GEMINI_EMBEDDING_DIMENSION: raw }),
+      ).toThrow(GeminiConfigError);
+      expect(() =>
+        geminiModelsFromEnv({ GEMINI_EMBEDDING_DIMENSION: raw }),
+      ).toThrow(/GEMINI_EMBEDDING_DIMENSION/);
+    }
+  });
+
   it("refuses to construct a client without an API key", () => {
     const { recorder } = recorderSpy();
     const previous = process.env.GEMINI_API_KEY;

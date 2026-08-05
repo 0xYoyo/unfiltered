@@ -171,6 +171,67 @@ describe("recorded extraction fixtures (AC-1, AC-3, AC-5)", () => {
   }
 });
 
+describe("INTENT_SCHEMA admits null optionals (YOY-29 AC-8)", () => {
+  // Minimal JSON Schema checker covering the constructs INTENT_SCHEMA uses:
+  // enough to prove the schema itself — as sent to the provider — accepts
+  // the recorded null-bearing answers, without leaning on parseIntent.
+  function conforms(schema: Record<string, unknown>, value: unknown): boolean {
+    const types = Array.isArray(schema.type) ? schema.type : [schema.type];
+    const matchesType = types.some((type) => {
+      switch (type) {
+        case "null":
+          return value === null;
+        case "string":
+          return typeof value === "string";
+        case "number":
+          return typeof value === "number";
+        case "boolean":
+          return typeof value === "boolean";
+        case "array":
+          return (
+            Array.isArray(value) &&
+            value.every((item) =>
+              conforms(schema.items as Record<string, unknown>, item),
+            )
+          );
+        case "object":
+          return typeof value === "object" && value !== null;
+        default:
+          return false;
+      }
+    });
+    if (!matchesType) {
+      return false;
+    }
+    if (types.includes("object") && typeof value === "object" && value !== null) {
+      const properties = (schema.properties ?? {}) as Record<
+        string,
+        Record<string, unknown>
+      >;
+      const record = value as Record<string, unknown>;
+      const required = (schema.required ?? []) as string[];
+      return (
+        required.every((key) => key in record) &&
+        Object.entries(record).every(
+          ([key, item]) => !(key in properties) || conforms(properties[key]!, item),
+        )
+      );
+    }
+    return true;
+  }
+
+  it("rejects a wrong-typed answer, proving the checker has teeth", () => {
+    expect(conforms(INTENT_SCHEMA, { ...scenarios[0]!.recorded, priceMax: "400" })).toBe(false);
+    expect(conforms(INTENT_SCHEMA, { colorsInclude: [] })).toBe(false);
+  });
+
+  for (const scenario of scenarios) {
+    it(`validates the recorded null-bearing answer for ${scenario.name}`, () => {
+      expect(conforms(INTENT_SCHEMA, scenario.recorded)).toBe(true);
+    });
+  }
+});
+
 describe("port call shape (AC-2, AC-4)", () => {
   it('calls the port with INTENT_SCHEMA and operation "intent"', async () => {
     const { llm, calls } = llmStub(scenarios[0]!.recorded);

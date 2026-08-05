@@ -5,6 +5,7 @@ import {
   composeQueryText,
   constraintsFromIntent,
   createRetriever,
+  EmptyQueryTextError,
   type EmbeddingClient,
   type EmbeddingRequest,
   type Intent,
@@ -203,6 +204,52 @@ describe("retrieve (AC-1, AC-3)", () => {
     await retriever.retrieve({ intent, shopDomain: "shop-a.myshopify.com" });
 
     expect(calls).toHaveLength(3);
+  });
+});
+
+describe("empty query text (YOY-29 AC-9)", () => {
+  it("rejects a constraints-only intent with EmptyQueryTextError and zero embedding calls", async () => {
+    const { embeddings, calls } = embeddingStub();
+    const { store, queries } = storeStub();
+    const retriever = createRetriever({ embeddings, store });
+    const constraintsOnly: Intent = {
+      category: undefined,
+      priceMin: undefined,
+      priceMax: 400,
+      currency: undefined,
+      colorsInclude: [],
+      colorsExclude: ["black"],
+      occasion: undefined,
+      size: undefined,
+      availabilityRequired: true,
+      softAttributes: [],
+    };
+
+    await expect(
+      retriever.retrieve({
+        intent: constraintsOnly,
+        shopDomain: "shop-a.myshopify.com",
+      }),
+    ).rejects.toBeInstanceOf(EmptyQueryTextError);
+    expect(calls).toHaveLength(0);
+    expect(queries).toHaveLength(0);
+  });
+});
+
+describe("score range (YOY-29 AC-10)", () => {
+  it("returns negative scores for distances above 1, per the documented [-1, 1] contract", async () => {
+    const { embeddings } = embeddingStub();
+    const { store } = storeStub([{ productId: "p1", distance: 1.75 }]);
+    const retriever = createRetriever({ embeddings, store });
+
+    const result = await retriever.retrieve({
+      intent,
+      shopDomain: "shop-a.myshopify.com",
+    });
+
+    expect(result.hits).toEqual([
+      { productId: "p1", score: expect.closeTo(-0.75) },
+    ]);
   });
 });
 

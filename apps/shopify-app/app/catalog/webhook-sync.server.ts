@@ -47,12 +47,19 @@ function productGid(payload: { id: number; admin_graphql_api_id?: string }): str
 }
 
 /** Named entities Shopify product HTML uses in practice; numeric forms are
- * decoded generically, so this table only needs the symbolic names. */
+ * decoded generically, so this table only needs the symbolic names. Lookup
+ * is case-sensitive the way HTML5 defines the references (YOY-29 AC-1):
+ * `&Eacute;` is É and `&eacute;` is é — two distinct names — and the spec's
+ * uppercase legacy forms (`&AMP;`, `&LT;`, …) are separate entries. */
 const NAMED_ENTITIES: Record<string, string> = {
   amp: "&",
+  AMP: "&",
   lt: "<",
+  LT: "<",
   gt: ">",
+  GT: ">",
   quot: '"',
+  QUOT: '"',
   apos: "'",
   nbsp: " ",
   ndash: "–",
@@ -65,41 +72,98 @@ const NAMED_ENTITIES: Record<string, string> = {
   bull: "•",
   middot: "·",
   copy: "©",
+  COPY: "©",
   reg: "®",
+  REG: "®",
   trade: "™",
+  TRADE: "™",
   deg: "°",
   times: "×",
   frac12: "½",
   frac14: "¼",
   frac34: "¾",
+  euro: "€",
+  pound: "£",
+  yen: "¥",
+  cent: "¢",
   agrave: "à",
+  Agrave: "À",
+  aacute: "á",
+  Aacute: "Á",
   acirc: "â",
-  ccedil: "ç",
-  eacute: "é",
-  egrave: "è",
-  ecirc: "ê",
-  ntilde: "ñ",
+  Acirc: "Â",
+  atilde: "ã",
+  Atilde: "Ã",
   auml: "ä",
+  Auml: "Ä",
+  aring: "å",
+  Aring: "Å",
+  aelig: "æ",
+  AElig: "Æ",
+  ccedil: "ç",
+  Ccedil: "Ç",
+  egrave: "è",
+  Egrave: "È",
+  eacute: "é",
+  Eacute: "É",
+  ecirc: "ê",
+  Ecirc: "Ê",
+  euml: "ë",
+  Euml: "Ë",
+  igrave: "ì",
+  Igrave: "Ì",
+  iacute: "í",
+  Iacute: "Í",
+  icirc: "î",
+  Icirc: "Î",
+  iuml: "ï",
+  Iuml: "Ï",
+  ntilde: "ñ",
+  Ntilde: "Ñ",
+  ograve: "ò",
+  Ograve: "Ò",
+  oacute: "ó",
+  Oacute: "Ó",
+  ocirc: "ô",
+  Ocirc: "Ô",
+  otilde: "õ",
+  Otilde: "Õ",
   ouml: "ö",
+  Ouml: "Ö",
+  oslash: "ø",
+  Oslash: "Ø",
+  ugrave: "ù",
+  Ugrave: "Ù",
+  uacute: "ú",
+  Uacute: "Ú",
+  ucirc: "û",
+  Ucirc: "Û",
   uuml: "ü",
+  Uuml: "Ü",
+  yacute: "ý",
+  Yacute: "Ý",
+  yuml: "ÿ",
   szlig: "ß",
 };
 
 /**
  * Decode HTML entities in a single pass: decimal (`&#8212;`) and hex
- * (`&#x2014;`) references generically, named references via the table above.
+ * (`&#x2014;`) references generically, named references via the table above,
+ * matched case-sensitively per HTML5 (YOY-29 AC-1) — `&Eacute;` and
+ * `&eacute;` differ in case and in meaning, and an invalid-case name like
+ * `&EACUTE;` stays literal, exactly as a browser leaves it.
  * One pass means double-encoded text (`&amp;lt;`) decodes exactly once, the
  * way a real HTML-to-text conversion does; unrecognized names pass through.
  */
 function decodeHtmlEntities(text: string): string {
   return text.replace(
-    /&(?:#x([0-9a-f]+)|#(\d+)|([a-z][a-z0-9]*));/gi,
+    /&(?:#[xX]([0-9a-fA-F]+)|#(\d+)|([a-zA-Z][a-zA-Z0-9]*));/g,
     (match, hex: string | undefined, dec: string | undefined, named: string | undefined) => {
       if (hex !== undefined || dec !== undefined) {
         const codePoint = hex !== undefined ? parseInt(hex, 16) : parseInt(dec as string, 10);
         return codePoint <= 0x10ffff ? String.fromCodePoint(codePoint) : match;
       }
-      return NAMED_ENTITIES[(named as string).toLowerCase()] ?? match;
+      return NAMED_ENTITIES[named as string] ?? match;
     },
   );
 }
@@ -255,8 +319,12 @@ export async function deleteProductFromWebhook({
   shopDomain: string;
   payload: ProductDeleteWebhookPayload;
 }): Promise<WebhookSyncOutcome> {
-  const { count } = await db.catalogProduct.deleteMany({
-    where: { shopDomain, productId: productGid(payload) },
-  });
+  // Enrichment rows are keyed by shopDomain+productId with no FK cascade,
+  // so they must go in the same operation as the product (YOY-29 AC-5).
+  const productId = productGid(payload);
+  const [, { count }] = await db.$transaction([
+    db.productEnrichment.deleteMany({ where: { shopDomain, productId } }),
+    db.catalogProduct.deleteMany({ where: { shopDomain, productId } }),
+  ]);
   return count > 0 ? "deleted" : "not_found";
 }

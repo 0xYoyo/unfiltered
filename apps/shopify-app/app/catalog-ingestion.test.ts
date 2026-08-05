@@ -2,7 +2,11 @@ import type { PrismaClient } from "@prisma/client";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import type { AdminGraphql } from "./catalog/ingest.server";
-import { PRODUCTS_QUERY, ingestCatalog } from "./catalog/ingest.server";
+import {
+  PRODUCTS_QUERY,
+  VARIANTS_SAMPLE_SIZE,
+  ingestCatalog,
+} from "./catalog/ingest.server";
 import type { ShopifyProductNode } from "./catalog/mapping.server";
 import { productNode } from "./catalog/mapping.test";
 import { createTestDb } from "./testing/helpers.server";
@@ -75,6 +79,14 @@ afterAll(async () => {
 });
 
 describe("catalog ingestion", () => {
+  it("samples availability from an explicit, documented variant bound (YOY-29 AC-2)", () => {
+    // The `available` flag reads at most VARIANTS_SAMPLE_SIZE variants; the
+    // query must embed exactly that constant so the bound can never drift
+    // silently away from its documentation.
+    expect(PRODUCTS_QUERY).toContain(`variants(first: ${VARIANTS_SAMPLE_SIZE})`);
+    expect(VARIANTS_SAMPLE_SIZE).toBe(100);
+  });
+
   it("snapshots a paginated catalog into per-shop rows", async () => {
     const { graphql, calls } = graphqlStub(fixtureCatalog(), 2);
 
@@ -145,6 +157,50 @@ describe("catalog ingestion", () => {
       ["gid://shopify/Product/2", "שמלת ערב שחורה"],
       ["gid://shopify/Product/4", "New arrival"],
     ]);
+  });
+
+  it("prunes a stale product's enrichment record with it (YOY-29 AC-5)", async () => {
+    await db.productEnrichment.deleteMany();
+    await ingestCatalog({
+      db,
+      shopDomain: SHOP,
+      graphql: graphqlStub(fixtureCatalog()).graphql,
+    });
+    for (const productId of ["gid://shopify/Product/1", "gid://shopify/Product/3"]) {
+      await db.productEnrichment.create({
+        data: {
+          shopDomain: SHOP,
+          productId,
+          contentHash: "hash",
+          status: "enriched",
+          category: "dress",
+          colors: [],
+          occasions: [],
+          fit: null,
+          styleTags: [],
+          seasons: [],
+        },
+      });
+    }
+
+    // Product 3 disappears from the catalog; its enrichment must go with it.
+    const result = await ingestCatalog({
+      db,
+      shopDomain: SHOP,
+      graphql: graphqlStub(fixtureCatalog().slice(0, 2)).graphql,
+    });
+
+    expect(result.deleted).toBe(1);
+    expect(
+      await db.productEnrichment.count({
+        where: { shopDomain: SHOP, productId: "gid://shopify/Product/3" },
+      }),
+    ).toBe(0);
+    expect(
+      await db.productEnrichment.count({
+        where: { shopDomain: SHOP, productId: "gid://shopify/Product/1" },
+      }),
+    ).toBe(1);
   });
 
   it("isolates shops: two ingested catalogs never cross-contaminate", async () => {
