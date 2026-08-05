@@ -1,0 +1,405 @@
+{
+  "modelId": "gemini-3.6-flash",
+  "entries": {
+    "elegant summer wedding dress, not black, under 400": {
+      "output": {
+        "category": "dress",
+        "priceMin": null,
+        "priceMax": 400,
+        "currency": null,
+        "colorsInclude": [],
+        "colorsExclude": [
+          "black"
+        ],
+        "occasion": "wedding",
+        "size": null,
+        "availabilityRequired": false,
+        "softAttributes": [
+          "elegant",
+          "summer"
+        ]
+      },
+      "inputTokens": 233,
+      "outputTokens": 53
+    },
+    "שמלה אלגנטית לחתונה בקיץ לא שחור עד 400": {
+      "output": {
+        "category": "dress",
+        "priceMin": null,
+        "priceMax": 400,
+        "currency": null,
+        "colorsInclude": [],
+        "colorsExclude": [
+          "black"
+        ],
+        "occasion": "wedding",
+        "size": null,
+        "availabilityRequired": false,
+        "softAttributes": [
+          "אלגנטית",
+          "קיץ"
+        ]
+      },
+      "inputTokens": 230,
+      "outputTokens": 53
+    },
+    "black evening gown for a formal gala": {
+      "output": {
+        "category": "dress",
+        "priceMin": null,
+        "priceMax": null,
+        "currency": null,
+        "colorsInclude": [
+          "black"
+        ],
+        "colorsExclude": [],
+        "occasion": "evening",
+        "size": null,
+        "availabilityRequired": false,
+        "softAttributes": [
+          "formal",
+          "gown"
+        ]
+      },
+      "inputTokens": 229,
+      "outputTokens": 53
+    },
+    "שמלת ערב שחורה עד 400": {
+      "output": {
+        "category": "dress",
+        "priceMin": null,
+        "priceMax": 400,
+        "currency": null,
+        "colorsInclude": [
+          "black"
+        ],
+        "colorsExclude": [],
+        "occasion": "evening",
+        "size": null,
+        "availabilityRequired": false,
+        "softAttributes": []
+      },
+      "inputTokens": 226,
+      "outputTokens": 49
+    },
+    "warm winter coat under 500, not black": {
+      "output": {
+        "category": "coat",
+        "priceMin": null,
+        "priceMax": 500,
+        "currency": null,
+        "colorsInclude": [],
+        "colorsExclude": [
+          "black"
+        ],
+        "occasion": null,
+        "size": null,
+        "availabilityRequired": false,
+        "softAttributes": [
+          "warm",
+          "winter"
+        ]
+      },
+      "inputTokens": 230,
+      "outputTokens": 51
+    },
+    "מעיל חם לחורף לא שחור עד 500": {
+      "output": {
+        "category": "coat",
+        "priceMin": null,
+        "priceMax": 500,
+        "currency": null,
+        "colorsInclude": [],
+        "colorsExclude": [
+          "black"
+        ],
+        "occasion": null,
+        "size": null,
+        "availabilityRequired": false,
+        "softAttributes": [
+          "חם",
+          "חורף"
+        ]
+      },
+      "inputTokens": 227,
+      "outputTokens": 50
+    },
+    "white sneakers for everyday wear": {
+      "output": {
+        "category": "shoes",
+        "priceMin": null,
+        "priceMax": null,
+        "currency": null,
+        "colorsInclude": [
+          "white"
+        ],
+        "colorsExclude": [],
+        "occasion": null,
+        "size": null,
+        "availabilityRequired": false,
+        "softAttributes": [
+          "sneakers",
+          "everyday"
+        ]
+      },
+      "inputTokens": 228,
+      "outputTokens": 53
+    },
+    "נעלי עקב elegant לערב": {
+      "output": {
+        "category": "shoes",
+        "priceMin": null,
+        "priceMax": null,
+        "currency": null,
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "occasion": "evening",
+        "size": null,
+        "availabilityRequired": false,
+        "softAttributes": [
+          "elegant",
+          "עקב"
+        ]
+      },
+      "inputTokens": 226,
+      "outputTokens": 51
+    },
+    "gold strappy sandals for a summer wedding under 250": {
+      "output": {
+        "category": "shoes",
+        "priceMin": null,
+        "priceMax": 250,
+        "currency": null,
+        "colorsInclude": [
+          "gold"
+        ],
+        "colorsExclude": [],
+        "occasion": "wedding",
+        "size": null,
+        "availabilityRequired": false,
+        "softAttributes": [
+          "strappy",
+          "sandals",
+          "summer"
+        ]
+      },
+      "inputTokens": 233,
+      "outputTokens": 56
+    },
+    "cozy cashmere sweater for cold winter evenings": {
+      "output": {
+        "category": "top",
+        "priceMin": null,
+        "priceMax": null,
+        "currency": null,
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "occasion": null,
+        "size": null,
+        "availabilityRequired": false,
+        "softAttributes": [
+          "cozy",
+          "cashmere",
+          "sweater",
+          "winter"
+        ]
+      },
+      "inputTokens": 232,
+      "outputTokens": 55
+    },
+    "סוודר חם לחורף": {
+      "output": {
+        "category": "top",
+        "priceMin": null,
+        "priceMax": null,
+        "currency": null,
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "occasion": null,
+        "size": null,
+        "availabilityRequired": false,
+        "softAttributes": [
+          "סוודר",
+          "חם",
+          "חורף"
+        ]
+      },
+      "inputTokens": 224,
+      "outputTokens": 50
+    },
+    "leather jacket for a night out, in stock": {
+      "output": {
+        "category": "coat",
+        "priceMin": null,
+        "priceMax": null,
+        "currency": null,
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "occasion": null,
+        "size": null,
+        "availabilityRequired": true,
+        "softAttributes": [
+          "leather",
+          "night out",
+          "edgy"
+        ]
+      },
+      "inputTokens": 230,
+      "outputTokens": 53
+    },
+    "party dress in stock under 400": {
+      "output": {
+        "category": "dress",
+        "priceMin": null,
+        "priceMax": 400,
+        "currency": null,
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "occasion": "party",
+        "size": null,
+        "availabilityRequired": true,
+        "softAttributes": []
+      },
+      "inputTokens": 228,
+      "outputTokens": 46
+    },
+    "שמלת מקסי לבנה לחתונה": {
+      "output": {
+        "category": "dress",
+        "priceMin": null,
+        "priceMax": null,
+        "currency": null,
+        "colorsInclude": [
+          "white"
+        ],
+        "colorsExclude": [],
+        "occasion": "wedding",
+        "size": null,
+        "availabilityRequired": false,
+        "softAttributes": [
+          "מקסי"
+        ]
+      },
+      "inputTokens": 226,
+      "outputTokens": 51
+    },
+    "מעיל winter אלגנטי בצבע camel": {
+      "output": {
+        "category": "coat",
+        "priceMin": null,
+        "priceMax": null,
+        "currency": null,
+        "colorsInclude": [
+          "camel"
+        ],
+        "colorsExclude": [],
+        "occasion": null,
+        "size": null,
+        "availabilityRequired": false,
+        "softAttributes": [
+          "elegant",
+          "winter"
+        ]
+      },
+      "inputTokens": 228,
+      "outputTokens": 52
+    },
+    "beige office skirt under 200": {
+      "output": {
+        "category": "skirt",
+        "priceMin": null,
+        "priceMax": 200,
+        "currency": null,
+        "colorsInclude": [
+          "beige"
+        ],
+        "colorsExclude": [],
+        "occasion": "office",
+        "size": null,
+        "availabilityRequired": false,
+        "softAttributes": []
+      },
+      "inputTokens": 227,
+      "outputTokens": 49
+    },
+    "חצאית מיני שחורה למסיבה": {
+      "output": {
+        "category": "skirt",
+        "priceMin": null,
+        "priceMax": null,
+        "currency": null,
+        "colorsInclude": [
+          "black"
+        ],
+        "colorsExclude": [],
+        "occasion": "party",
+        "size": null,
+        "availabilityRequired": false,
+        "softAttributes": [
+          "מיני"
+        ]
+      },
+      "inputTokens": 226,
+      "outputTokens": 50
+    },
+    "white linen summer pants for the beach under 200": {
+      "output": {
+        "category": "pants",
+        "priceMin": null,
+        "priceMax": 200,
+        "currency": null,
+        "colorsInclude": [
+          "white"
+        ],
+        "colorsExclude": [],
+        "occasion": "beach",
+        "size": null,
+        "availabilityRequired": false,
+        "softAttributes": [
+          "linen",
+          "summer"
+        ]
+      },
+      "inputTokens": 232,
+      "outputTokens": 52
+    },
+    "תיק ערב מנצנץ עד 250": {
+      "output": {
+        "category": "bag",
+        "priceMin": null,
+        "priceMax": 250,
+        "currency": null,
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "occasion": "evening",
+        "size": null,
+        "availabilityRequired": false,
+        "softAttributes": [
+          "מנצנץ"
+        ]
+      },
+      "inputTokens": 225,
+      "outputTokens": 48
+    },
+    "accessory אלגנטי לחתונה בצבע white": {
+      "output": {
+        "category": "accessory",
+        "priceMin": null,
+        "priceMax": null,
+        "currency": null,
+        "colorsInclude": [
+          "white"
+        ],
+        "colorsExclude": [],
+        "occasion": "wedding",
+        "size": null,
+        "availabilityRequired": false,
+        "softAttributes": [
+          "אלגנטי"
+        ]
+      },
+      "inputTokens": 229,
+      "outputTokens": 52
+    }
+  }
+}

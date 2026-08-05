@@ -1,0 +1,381 @@
+[
+  {
+    "id": "g01",
+    "language": "en",
+    "query": "elegant summer wedding dress, not black, under 400",
+    "expectedProductIds": [
+      "p01",
+      "p04",
+      "p08"
+    ],
+    "hardConstraints": {
+      "category": "dress",
+      "priceMin": null,
+      "priceMax": 400,
+      "colorsInclude": [],
+      "colorsExclude": [
+        "black"
+      ],
+      "occasion": "wedding",
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "g02",
+    "language": "he",
+    "query": "שמלה אלגנטית לחתונה בקיץ לא שחור עד 400",
+    "expectedProductIds": [
+      "p01",
+      "p04",
+      "p08"
+    ],
+    "hardConstraints": {
+      "category": "dress",
+      "priceMin": null,
+      "priceMax": 400,
+      "colorsInclude": [],
+      "colorsExclude": [
+        "black"
+      ],
+      "occasion": "wedding",
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "g03",
+    "language": "en",
+    "query": "black evening gown for a formal gala",
+    "expectedProductIds": [
+      "p02",
+      "p03"
+    ],
+    "hardConstraints": {
+      "category": "dress",
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [
+        "black"
+      ],
+      "colorsExclude": [],
+      "occasion": "evening",
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "g04",
+    "language": "he",
+    "query": "שמלת ערב שחורה עד 400",
+    "expectedProductIds": [
+      "p03"
+    ],
+    "hardConstraints": {
+      "category": "dress",
+      "priceMin": null,
+      "priceMax": 400,
+      "colorsInclude": [
+        "black"
+      ],
+      "colorsExclude": [],
+      "occasion": "evening",
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "g05",
+    "language": "en",
+    "query": "warm winter coat under 500, not black",
+    "expectedProductIds": [
+      "p14",
+      "p16"
+    ],
+    "hardConstraints": {
+      "category": "coat",
+      "priceMin": null,
+      "priceMax": 500,
+      "colorsInclude": [],
+      "colorsExclude": [
+        "black"
+      ],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "g06",
+    "language": "he",
+    "query": "מעיל חם לחורף לא שחור עד 500",
+    "expectedProductIds": [
+      "p14",
+      "p16"
+    ],
+    "hardConstraints": {
+      "category": "coat",
+      "priceMin": null,
+      "priceMax": 500,
+      "colorsInclude": [],
+      "colorsExclude": [
+        "black"
+      ],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "g07",
+    "language": "en",
+    "query": "white sneakers for everyday wear",
+    "expectedProductIds": [
+      "p21"
+    ],
+    "hardConstraints": {
+      "category": "shoes",
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [
+        "white"
+      ],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "g08",
+    "language": "mixed",
+    "query": "נעלי עקב elegant לערב",
+    "expectedProductIds": [
+      "p22",
+      "p30"
+    ],
+    "hardConstraints": {
+      "category": "shoes",
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": "evening",
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "g09",
+    "language": "en",
+    "query": "gold strappy sandals for a summer wedding under 250",
+    "expectedProductIds": [
+      "p23"
+    ],
+    "hardConstraints": {
+      "category": "shoes",
+      "priceMin": null,
+      "priceMax": 250,
+      "colorsInclude": [
+        "gold"
+      ],
+      "colorsExclude": [],
+      "occasion": "wedding",
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "g10",
+    "language": "en",
+    "query": "cozy cashmere sweater for cold winter evenings",
+    "expectedProductIds": [
+      "p34",
+      "p35"
+    ],
+    "hardConstraints": {
+      "category": "top",
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "g11",
+    "language": "he",
+    "query": "סוודר חם לחורף",
+    "expectedProductIds": [
+      "p34",
+      "p35"
+    ],
+    "hardConstraints": {
+      "category": "top",
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "g12",
+    "language": "en",
+    "query": "leather jacket for a night out, in stock",
+    "expectedProductIds": [
+      "p18"
+    ],
+    "hardConstraints": {
+      "category": "coat",
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": true
+    }
+  },
+  {
+    "id": "g13",
+    "language": "en",
+    "query": "party dress in stock under 400",
+    "expectedProductIds": [
+      "p07",
+      "p12"
+    ],
+    "hardConstraints": {
+      "category": "dress",
+      "priceMin": null,
+      "priceMax": 400,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": "party",
+      "availabilityRequired": true
+    }
+  },
+  {
+    "id": "g14",
+    "language": "he",
+    "query": "שמלת מקסי לבנה לחתונה",
+    "expectedProductIds": [
+      "p08"
+    ],
+    "hardConstraints": {
+      "category": "dress",
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [
+        "white"
+      ],
+      "colorsExclude": [],
+      "occasion": "wedding",
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "g15",
+    "language": "mixed",
+    "query": "מעיל winter אלגנטי בצבע camel",
+    "expectedProductIds": [
+      "p19"
+    ],
+    "hardConstraints": {
+      "category": "coat",
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [
+        "camel"
+      ],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "g16",
+    "language": "en",
+    "query": "beige office skirt under 200",
+    "expectedProductIds": [
+      "p43"
+    ],
+    "hardConstraints": {
+      "category": "skirt",
+      "priceMin": null,
+      "priceMax": 200,
+      "colorsInclude": [
+        "beige"
+      ],
+      "colorsExclude": [],
+      "occasion": "office",
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "g17",
+    "language": "he",
+    "query": "חצאית מיני שחורה למסיבה",
+    "expectedProductIds": [
+      "p44"
+    ],
+    "hardConstraints": {
+      "category": "skirt",
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [
+        "black"
+      ],
+      "colorsExclude": [],
+      "occasion": "party",
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "g18",
+    "language": "en",
+    "query": "white linen summer pants for the beach under 200",
+    "expectedProductIds": [
+      "p45"
+    ],
+    "hardConstraints": {
+      "category": "pants",
+      "priceMin": null,
+      "priceMax": 200,
+      "colorsInclude": [
+        "white"
+      ],
+      "colorsExclude": [],
+      "occasion": "beach",
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "g19",
+    "language": "he",
+    "query": "תיק ערב מנצנץ עד 250",
+    "expectedProductIds": [
+      "p52"
+    ],
+    "hardConstraints": {
+      "category": "bag",
+      "priceMin": null,
+      "priceMax": 250,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": "evening",
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "g20",
+    "language": "mixed",
+    "query": "accessory אלגנטי לחתונה בצבע white",
+    "expectedProductIds": [
+      "p59"
+    ],
+    "hardConstraints": {
+      "category": "accessory",
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [
+        "white"
+      ],
+      "colorsExclude": [],
+      "occasion": "wedding",
+      "availabilityRequired": false
+    }
+  }
+]
