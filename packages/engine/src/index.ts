@@ -8,7 +8,7 @@
  */
 
 /** Semantic version of the engine's public API contract. */
-export const version = "0.2.0";
+export const version = "0.3.0";
 
 export {
   CLASSIFICATION_SCHEMA,
@@ -33,6 +33,23 @@ export {
   type IntentExtractor,
   type IntentExtractorOptions,
 } from "./intent.js";
+
+export {
+  appliedConstraints,
+  composeQueryText,
+  constraintsFromIntent,
+  createRetriever,
+  type AppliedConstraint,
+  type RetrievalConstraints,
+  type RetrievalHit,
+  type RetrievalRequest,
+  type RetrievalResult,
+  type Retriever,
+  type RetrieverOptions,
+  type RetrievalStore,
+  type StoreQueryHit,
+  type StoreQueryRequest,
+} from "./retrieve.js";
 
 /** A single searchable document, as the consumer indexed it. */
 export interface EngineDocument {
