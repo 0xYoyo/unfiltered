@@ -10,6 +10,19 @@
 /** Semantic version of the engine's public API contract. */
 export const version = "0.2.0";
 
+export {
+  CLASSIFICATION_SCHEMA,
+  classifyByHeuristics,
+  createQueryClassifier,
+  normalizeQuery,
+  type ClassificationContext,
+  type ClassificationDecision,
+  type ClassificationReason,
+  type QueryClassifier,
+  type QueryClassifierOptions,
+  type QueryRoute,
+} from "./classify.js";
+
 /** A single searchable document, as the consumer indexed it. */
 export interface EngineDocument {
   /** Consumer-assigned stable identifier. */
