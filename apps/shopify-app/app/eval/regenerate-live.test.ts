@@ -207,7 +207,7 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
     const texts = [
       ...catalog.map((product) =>
         composeEmbeddingText(
-          product,
+          { ...product, contentHash: computeContentHash(product) },
           attributesByProduct.get(product.productId) ?? null,
         ),
       ),
