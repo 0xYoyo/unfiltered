@@ -23,6 +23,17 @@ export {
   type QueryRoute,
 } from "./classify.js";
 
+export {
+  createIntentExtractor,
+  INTENT_SCHEMA,
+  IntentExtractionError,
+  parseIntent,
+  type Intent,
+  type IntentExtractionContext,
+  type IntentExtractor,
+  type IntentExtractorOptions,
+} from "./intent.js";
+
 /** A single searchable document, as the consumer indexed it. */
 export interface EngineDocument {
   /** Consumer-assigned stable identifier. */
