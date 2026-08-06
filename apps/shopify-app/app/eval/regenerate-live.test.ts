@@ -17,6 +17,7 @@ import {
 import {
   createGeminiEmbeddingClient,
   createGeminiLlmClient,
+  GeminiApiError,
   geminiModelsFromEnv,
 } from "@unfiltered/provider-gemini";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -53,6 +54,47 @@ interface RecordedEntry {
   outputTokens: number;
 }
 
+// Free-tier Gemini keys rate-limit hard (YOY-28): every live call is paced by
+// a fixed delay, and a 429 backs off exponentially before giving up.
+const PACE_MS = 5_000;
+const LOG_EVERY = 10;
+const MAX_ATTEMPTS = 5;
+const INITIAL_BACKOFF_MS = 30_000;
+
+let liveCallCount = 0;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Pace, then run one live call, retrying 429s with exponential backoff. */
+async function paced<T>(call: () => Promise<T>): Promise<T> {
+  await sleep(PACE_MS);
+  liveCallCount += 1;
+  if (liveCallCount % LOG_EVERY === 0) {
+    console.log(`[regenerate-live] ${liveCallCount} live calls dispatched`);
+  }
+  let backoffMs = INITIAL_BACKOFF_MS;
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await call();
+    } catch (error) {
+      if (
+        !(error instanceof GeminiApiError) ||
+        error.status !== 429 ||
+        attempt >= MAX_ATTEMPTS
+      ) {
+        throw error;
+      }
+      console.log(
+        `[regenerate-live] 429 rate-limited; waiting ${backoffMs / 1000}s before retry (attempt ${attempt}/${MAX_ATTEMPTS})`,
+      );
+      await sleep(backoffMs);
+      backoffMs *= 2;
+    }
+  }
+}
+
 /** Wrap a CostRecorder so the last recorded usage is observable. */
 function captureUsage(inner: CostRecorder): {
   recorder: CostRecorder;
@@ -83,7 +125,7 @@ function captureCompletions(
 ): LlmClient {
   return {
     async completeStructured(request: StructuredCompletionRequest) {
-      const response = await inner.completeStructured(request);
+      const response = await paced(() => inner.completeStructured(request));
       const called = usage();
       entries[recordingKeyFromPrompt(request.prompt)] = {
         output: response,
@@ -162,7 +204,9 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
         usage.last,
         classificationEntries,
       ),
-      timeoutMs: 30_000,
+      // Generous: pacing and 429 backoff happen inside the wrapped llm call,
+      // so the classifier's own timeout must outlast a full retry ladder.
+      timeoutMs: 600_000,
     });
     for (const golden of goldens) {
       const decision = await classifier.classify(golden.query);
@@ -218,7 +262,7 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
     const BATCH = 100;
     for (let start = 0; start < unique.length; start += BATCH) {
       const batch = unique.slice(start, start + BATCH);
-      const batchVectors = await embeddings.embed({ texts: batch });
+      const batchVectors = await paced(() => embeddings.embed({ texts: batch }));
       batch.forEach((text, index) => {
         vectors[text] = batchVectors[index]!;
       });
@@ -239,5 +283,5 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
     expect(Object.keys(enrichmentEntries)).toHaveLength(catalog.length);
     expect(Object.keys(intentEntries)).toHaveLength(goldens.length);
     expect(Object.keys(vectors)).toHaveLength(unique.length);
-  }, 900_000);
+  }, 2_700_000);
 });
