@@ -151,6 +151,72 @@ describe("structured completion", () => {
     });
   });
 
+  it("translates nullable type arrays to Gemini's nullable form in responseSchema (YOY-28)", async () => {
+    const { recorder } = recorderSpy();
+    const { captured, impl } = fetchStub(200, completionFixture);
+
+    await llmClient(impl, recorder).completeStructured({
+      prompt: "Extract intent",
+      schema: {
+        type: "object",
+        properties: {
+          category: { type: ["string", "null"] },
+          priceMax: { type: ["number", "null"] },
+          colors: { type: "array", items: { type: ["string", "null"] } },
+          nested: {
+            type: "object",
+            properties: { size: { type: ["string", "null"] } },
+          },
+        },
+        required: ["category"],
+      },
+      operation: "intent",
+    });
+
+    const config = captured[0]!.body.generationConfig as {
+      responseSchema: unknown;
+    };
+    expect(config.responseSchema).toEqual({
+      type: "object",
+      properties: {
+        category: { type: "string", nullable: true },
+        priceMax: { type: "number", nullable: true },
+        colors: { type: "array", items: { type: "string", nullable: true } },
+        nested: {
+          type: "object",
+          properties: { size: { type: "string", nullable: true } },
+        },
+      },
+      required: ["category"],
+    });
+    // Gemini rejects type arrays anywhere in the schema — none may survive.
+    expect(JSON.stringify(config.responseSchema)).not.toContain('"type":[');
+  });
+
+  it("passes a schema with no null types through unchanged", async () => {
+    const { recorder } = recorderSpy();
+    const { captured, impl } = fetchStub(200, completionFixture);
+
+    const schema = {
+      type: "object",
+      properties: {
+        color: { type: "string" },
+        tags: { type: "array", items: { type: "string" } },
+      },
+      required: ["color"],
+    };
+    await llmClient(impl, recorder).completeStructured({
+      prompt: "p",
+      schema,
+      operation: "classification",
+    });
+
+    const config = captured[0]!.body.generationConfig as {
+      responseSchema: unknown;
+    };
+    expect(config.responseSchema).toEqual(schema);
+  });
+
   it("parses the JSON candidate into an object", async () => {
     const { recorder } = recorderSpy();
     const { impl } = fetchStub(200, completionFixture);

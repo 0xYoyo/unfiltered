@@ -149,6 +149,35 @@ async function postJson(
   return (await response.json()) as Record<string, unknown>;
 }
 
+/**
+ * Translate a JSON-Schema nullable union (`type: ["string", "null"]`) into
+ * Gemini's structured-output dialect (`type: "string", nullable: true`),
+ * recursively through the whole schema. Gemini's responseSchema rejects type
+ * arrays outright (YOY-28). Everything else passes through unchanged: the
+ * engine speaks JSON Schema; this adapter owns the vendor dialect.
+ */
+export function toGeminiResponseSchema(schema: unknown): unknown {
+  if (Array.isArray(schema)) {
+    return schema.map(toGeminiResponseSchema);
+  }
+  if (schema === null || typeof schema !== "object") {
+    return schema;
+  }
+  const translated: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(schema)) {
+    translated[key] = toGeminiResponseSchema(value);
+  }
+  const type = translated.type;
+  if (Array.isArray(type) && type.includes("null")) {
+    const nonNull = type.filter((entry) => entry !== "null");
+    if (nonNull.length === 1) {
+      translated.type = nonNull[0];
+      translated.nullable = true;
+    }
+  }
+  return translated;
+}
+
 interface GenerateContentResponse {
   candidates?: Array<{
     content?: { parts?: Array<{ text?: string }> };
@@ -178,7 +207,7 @@ export function createGeminiLlmClient(options: GeminiClientOptions): LlmClient {
           contents: [{ role: "user", parts: [{ text: request.prompt }] }],
           generationConfig: {
             responseMimeType: "application/json",
-            responseSchema: request.schema,
+            responseSchema: toGeminiResponseSchema(request.schema),
           },
         },
       )) as GenerateContentResponse;
