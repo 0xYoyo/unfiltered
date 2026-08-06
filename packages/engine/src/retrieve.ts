@@ -77,9 +77,23 @@ export interface AppliedConstraint {
 export interface RetrievalHit {
   /** Consumer-assigned product identifier. */
   productId: string;
-  /** Similarity score in (0, 1]; higher is more relevant. */
+  /**
+   * Similarity score `1 - cosine distance`, in [-1, 1]; higher is more
+   * relevant. Cosine distance spans [0, 2], so anti-correlated vectors score
+   * below zero — a valid hit, not a sentinel; consumers must not drop hits by
+   * `score > 0`.
+   */
   score: number;
 }
+
+/**
+ * The intent carries no descriptive signal to embed (no category, occasion,
+ * wanted colors, or soft attributes), so similarity ranking is undefined for
+ * it. The engine never embeds an empty string — a metered call with a
+ * provider-dependent, meaningless result. Callers decide the fallback, e.g.
+ * classic constraint-only search.
+ */
+export class EmptyQueryTextError extends Error {}
 
 /** The outcome of one retrieval. */
 export interface RetrievalResult {
@@ -184,9 +198,11 @@ export function composeQueryText(intent: Intent): string {
  *
  * Hard constraints travel to the store as filters; the store ranks the
  * filtered set by cosine distance, which is returned as `score = 1 -
- * distance` so higher is better. The query-side embedding call carries
- * operation "embedding" for metering (AC-3) and is cached by composed query
- * text, so identical intents embed once per retriever.
+ * distance` (range [-1, 1]) so higher is better. The query-side embedding
+ * call carries operation "embedding" for metering (AC-3) and is cached by
+ * composed query text, so identical intents embed once per retriever. An
+ * intent whose composed query text is empty rejects with
+ * EmptyQueryTextError before any embedding call (YOY-29 AC-9).
  */
 export function createRetriever(options: RetrieverOptions): Retriever {
   const cacheSize = options.cacheSize ?? DEFAULT_CACHE_SIZE;
@@ -221,8 +237,14 @@ export function createRetriever(options: RetrieverOptions): Retriever {
   return {
     async retrieve(request) {
       const constraints = constraintsFromIntent(request.intent);
+      const queryText = composeQueryText(request.intent);
+      if (queryText === "") {
+        throw new EmptyQueryTextError(
+          "intent has no descriptive signal to embed; similarity ranking is undefined",
+        );
+      }
       const vector = await embedQuery(
-        composeQueryText(request.intent),
+        queryText,
         request.shopDomain,
         request.searchId,
       );

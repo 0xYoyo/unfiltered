@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 import type { PrismaClient } from "@prisma/client";
 import type { EmbeddingClient } from "@unfiltered/engine";
@@ -111,6 +111,17 @@ function toVectorLiteral(vector: number[]): string {
   return `[${vector.join(",")}]`;
 }
 
+/**
+ * Freshness key stored per embedding row (YOY-29 AC-6): a hash of the exact
+ * composed text that was embedded, so the key covers enrichment state as well
+ * as snapshot content. An enrichment row landing or changing after the last
+ * run changes the composed text and therefore re-embeds exactly the affected
+ * products; an unchanged catalog+enrichment re-run still embeds nothing.
+ */
+function embeddedTextHash(text: string): string {
+  return createHash("sha256").update(text).digest("hex");
+}
+
 /** Outcome counts of one embedding run. */
 export interface EmbedResult {
   embedded: number;
@@ -120,9 +131,10 @@ export interface EmbedResult {
 
 /**
  * Embed one shop's catalog snapshot into pgvector, incrementally (AC-2):
- * only products whose contentHash has no matching ProductEmbedding row are
+ * only products whose composed-text hash (snapshot content plus enrichment
+ * state — YOY-29 AC-6) differs from the stored ProductEmbedding row are
  * embedded, products that left the snapshot lose their vectors, and a re-run
- * over an unchanged catalog performs zero embedding-port calls.
+ * over an unchanged catalog+enrichment performs zero embedding-port calls.
  *
  * Texts are embedded in batched calls through the engine's embedding port, so
  * a metered adapter lands one cost-ledger row per batch with the batch's
@@ -173,19 +185,21 @@ export async function embedCatalog({
     );
   }
 
-  const toEmbed = products.filter(
-    (product) => existingHashes.get(product.productId) !== product.contentHash,
+  const composed = products.map((product) => {
+    const text = composeEmbeddingText(
+      product,
+      attributesByProduct.get(product.productId) ?? null,
+    );
+    return { product, text, textHash: embeddedTextHash(text) };
+  });
+  const toEmbed = composed.filter(
+    (entry) => existingHashes.get(entry.product.productId) !== entry.textHash,
   );
 
   for (let start = 0; start < toEmbed.length; start += EMBED_BATCH_SIZE) {
     const batch = toEmbed.slice(start, start + EMBED_BATCH_SIZE);
     const vectors = await embeddings.embed({
-      texts: batch.map((product) =>
-        composeEmbeddingText(
-          product,
-          attributesByProduct.get(product.productId) ?? null,
-        ),
-      ),
+      texts: batch.map((entry) => entry.text),
       shopDomain,
     });
     if (vectors.length !== batch.length) {
@@ -196,7 +210,7 @@ export async function embedCatalog({
     for (const [index, vector] of vectors.entries()) {
       if (vector.length !== dimension) {
         throw new EmbeddingDimensionError(
-          `Embedding for product ${batch[index]!.productId} has dimension ${vector.length}, configuration expects ${dimension}`,
+          `Embedding for product ${batch[index]!.product.productId} has dimension ${vector.length}, configuration expects ${dimension}`,
         );
       }
       await db.$executeRawUnsafe(
@@ -209,8 +223,8 @@ export async function embedCatalog({
            "updatedAt" = CURRENT_TIMESTAMP`,
         randomUUID(),
         shopDomain,
-        batch[index]!.productId,
-        batch[index]!.contentHash,
+        batch[index]!.product.productId,
+        batch[index]!.textHash,
         toVectorLiteral(vector),
       );
     }

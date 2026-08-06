@@ -81,10 +81,25 @@ export function geminiModelsFromEnv(
       env.GEMINI_CLASSIFICATION_MODEL ?? DEFAULT_CLASSIFICATION_MODEL,
     intentModel: env.GEMINI_INTENT_MODEL ?? DEFAULT_INTENT_MODEL,
     embeddingModel: env.GEMINI_EMBEDDING_MODEL ?? DEFAULT_EMBEDDING_MODEL,
-    embeddingDimension: Number(
-      env.GEMINI_EMBEDDING_DIMENSION ?? DEFAULT_EMBEDDING_DIMENSION,
-    ),
+    embeddingDimension: parseEmbeddingDimension(env.GEMINI_EMBEDDING_DIMENSION),
   };
+}
+
+/**
+ * A malformed dimension must fail here, at configuration time, not surface
+ * later as NaN-sized requests (YOY-29 AC-3).
+ */
+function parseEmbeddingDimension(raw: string | undefined): number {
+  if (raw === undefined) {
+    return DEFAULT_EMBEDDING_DIMENSION;
+  }
+  const dimension = Number(raw);
+  if (raw.trim() === "" || !Number.isInteger(dimension) || dimension <= 0) {
+    throw new GeminiConfigError(
+      `GEMINI_EMBEDDING_DIMENSION must be a positive integer, got ${JSON.stringify(raw)}`,
+    );
+  }
+  return dimension;
 }
 
 interface ResolvedOptions {
@@ -208,13 +223,23 @@ interface BatchEmbedResponse {
 }
 
 /**
- * Estimate token count for embedding metering. `batchEmbedContents` returns
- * no usage metadata, so the ledger records a documented ~4-chars-per-token
- * estimate rather than dropping the call from metering entirely.
+ * Basis of the embedding token estimate (YOY-29 AC-4): `batchEmbedContents`
+ * returns no usage metadata, so metering falls back to the common ~4
+ * characters-per-token heuristic for Latin-script text. Error bound: roughly
+ * a factor of two — non-Latin scripts (Hebrew in this catalog) tokenize to
+ * fewer characters per token, so the estimate skews LOW for HE-heavy text.
+ * Replace with real usage metadata if the API ever provides it.
+ */
+export const ESTIMATED_CHARS_PER_TOKEN = 4;
+
+/**
+ * Estimate token count for embedding metering. See
+ * `ESTIMATED_CHARS_PER_TOKEN` for the estimate's basis and error bound; the
+ * call is recorded with this estimate rather than dropped from metering.
  */
 function estimateTokens(texts: string[]): number {
   const chars = texts.reduce((sum, text) => sum + text.length, 0);
-  return Math.ceil(chars / 4);
+  return Math.ceil(chars / ESTIMATED_CHARS_PER_TOKEN);
 }
 
 /**

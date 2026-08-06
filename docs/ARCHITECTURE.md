@@ -134,7 +134,12 @@ Retrieval (the AI result path; data reached only through injected ports):
   the intent's descriptive signal (`composeQueryText`, metered as operation
   `"embedding"` and cached for identical inputs), and returns
   `{ hits: [{ productId, score }], appliedConstraints }` with
-  `score = 1 - cosine distance`.
+  `score = 1 - cosine distance`. Cosine distance spans [0, 2], so scores span
+  [-1, 1]: anti-correlated vectors score below zero and are valid hits —
+  consumers must not filter by `score > 0`. An intent with no descriptive
+  signal (nothing for `composeQueryText` to embed) rejects with
+  `EmptyQueryTextError` before any embedding call; the caller picks the
+  fallback (e.g. classic constraint-only search).
 
 AI ports (vendor-free; implemented by provider adapter packages):
 
@@ -161,6 +166,15 @@ throw rather than metering $0) and appends one `AiCall` ledger row per call.
 The internal admin at `/internal/costs` renders ledger aggregates and is
 gated by `ADMIN_TOKEN` (`?token=` query parameter): without the exact token
 it answers 404, indistinguishable from a nonexistent route.
+
+Embedding calls are the one estimated entry in the ledger: Gemini
+`batchEmbedContents` returns no usage metadata, so the adapter meters input
+tokens as `ceil(chars / ESTIMATED_CHARS_PER_TOKEN)` with
+`ESTIMATED_CHARS_PER_TOKEN = 4` (`packages/provider-gemini/src/index.ts`) —
+the common Latin-script heuristic. Error bound: roughly a factor of two;
+non-Latin scripts (Hebrew) tokenize to fewer characters per token, so the
+estimate skews low for HE-heavy text. If the API ever returns real usage
+metadata for embeddings, it replaces the estimate.
 
 ## Test-location rule
 

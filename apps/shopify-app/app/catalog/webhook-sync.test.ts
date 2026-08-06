@@ -88,6 +88,45 @@ describe("webhook→snapshot mapping convergence with ingestion", () => {
     expect(snapshot.description).toBe("Café-style “wrap” – 30° wash &amp; dry");
   });
 
+  it("hashes case-variant named entities identically to the ingested description (YOY-29 AC-1)", () => {
+    const viaWebhook = mapWebhookProduct(
+      webhookPayload({
+        body_html: "<p>&Eacute;t&eacute; chic: &Ccedil;a va &agrave; l'&Ocirc;pera</p>",
+      }),
+      "ILS",
+    );
+    const viaIngestion = mapProductNode(
+      productNode({ description: "Été chic: Ça va à l'Ôpera" }),
+    );
+
+    expect(viaWebhook.description).toBe("Été chic: Ça va à l'Ôpera");
+    expect(viaWebhook.contentHash).toBe(viaIngestion.contentHash);
+  });
+
+  it("hashes previously out-of-table named entities identically to the ingested description (YOY-29 AC-1)", () => {
+    const viaWebhook = mapWebhookProduct(
+      webhookPayload({
+        body_html: "<p>Ma&ntilde;ana sale: 40&euro; / 35&pound; per piece &AMP; more</p>",
+      }),
+      "ILS",
+    );
+    const viaIngestion = mapProductNode(
+      productNode({ description: "Mañana sale: 40€ / 35£ per piece & more" }),
+    );
+
+    expect(viaWebhook.description).toBe("Mañana sale: 40€ / 35£ per piece & more");
+    expect(viaWebhook.contentHash).toBe(viaIngestion.contentHash);
+  });
+
+  it("leaves an invalid-case entity name literal, as a browser would", () => {
+    const snapshot = mapWebhookProduct(
+      webhookPayload({ body_html: "<p>Loud &EACUTE; marker</p>" }),
+      "ILS",
+    );
+
+    expect(snapshot.description).toBe("Loud &EACUTE; marker");
+  });
+
   it("passes unrecognized entities through unchanged", () => {
     const snapshot = mapWebhookProduct(
       webhookPayload({ body_html: "<p>Uses &unknownentity; markers</p>" }),

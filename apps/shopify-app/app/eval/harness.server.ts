@@ -111,12 +111,16 @@ export function loadGoldens(): Golden[] {
   return readJson<Golden[]>("goldens.json");
 }
 
-/** Check one returned product against a golden's hard constraints. */
-function findViolations(
+/** Check one returned product against a golden's hard constraints. Exported
+ * for the harness's own scoring tests (YOY-29 AC-11). */
+export function findViolations(
   golden: Golden,
   productId: string,
   products: Map<string, EvalProduct>,
-  enrichments: Map<string, { category: string | null; colors: string[] }>,
+  enrichments: Map<
+    string,
+    { category: string | null; colors: string[]; occasions: string[] }
+  >,
 ): string[] {
   const constraints = golden.hardConstraints;
   const product = products.get(productId);
@@ -138,6 +142,16 @@ function findViolations(
     const category = enrichment?.category?.toLowerCase() ?? null;
     if (category !== constraints.category.toLowerCase()) {
       violations.push(`${productId}: category "${category}" ≠ "${constraints.category}"`);
+    }
+  }
+  if (constraints.occasion !== null) {
+    const occasions = (enrichment?.occasions ?? []).map((occasion) =>
+      occasion.toLowerCase(),
+    );
+    if (!occasions.includes(constraints.occasion.toLowerCase())) {
+      violations.push(
+        `${productId}: occasions [${occasions.join(", ")}] miss "${constraints.occasion}"`,
+      );
     }
   }
   const colors = new Set(
@@ -211,7 +225,7 @@ export async function runEval(db: PrismaClient): Promise<EvalRunResult> {
   const enrichments = new Map(
     enrichmentRows.map((row) => [
       row.productId,
-      { category: row.category, colors: row.colors },
+      { category: row.category, colors: row.colors, occasions: row.occasions },
     ]),
   );
 

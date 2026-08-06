@@ -299,6 +299,42 @@ describe("products/delete webhook", () => {
     );
     expect(redelivery.status).toBe(200);
   });
+
+  it("removes the product's enrichment record with it (YOY-29 AC-5)", async () => {
+    await db.productEnrichment.deleteMany();
+    await createAction(
+      actionArgs(
+        webhookRequest({ topic: "products/create", shop: SHOP, payload: productPayload() }),
+      ),
+    );
+    await db.productEnrichment.create({
+      data: {
+        shopDomain: SHOP,
+        productId: PRODUCT_GID,
+        contentHash: (await snapshotRow())!.contentHash,
+        status: "enriched",
+        category: "shirt",
+        colors: ["beige"],
+        occasions: [],
+        fit: null,
+        styleTags: [],
+        seasons: [],
+      },
+    });
+
+    const response = await deleteAction(
+      actionArgs(
+        webhookRequest({ topic: "products/delete", shop: SHOP, payload: { id: 1096001 } }),
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(
+      await db.productEnrichment.count({
+        where: { shopDomain: SHOP, productId: PRODUCT_GID },
+      }),
+    ).toBe(0);
+  });
 });
 
 describe("product webhook HMAC verification", () => {

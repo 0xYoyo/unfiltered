@@ -72,6 +72,39 @@ export function normalizeQuery(query: string): string {
 /** A token that looks like a SKU / model number: has a digit, and is only letters, digits, and dashes. */
 const SKU_TOKEN = /^(?=.*\d)[\p{L}\p{N}-]+$/u;
 
+/** A bare number: SKU-looking only through its digits, with no letter evidence. */
+const PURE_NUMBER = /^\p{N}+$/u;
+
+/**
+ * Words and standalone currency symbols that mark the following bare number
+ * as a price bound ("dress under 400", "שמלה עד 400") rather than a model
+ * number — such queries carry natural-language intent and must escalate.
+ */
+const PRICE_MARKERS = new Set([
+  "under",
+  "over",
+  "below",
+  "above",
+  "עד",
+  "מעל",
+  "$",
+  "₪",
+  "€",
+]);
+
+/** SKU_TOKEN, except a bare number right after a price marker is a price bound, not a SKU. */
+function isSkuToken(tokens: string[], index: number): boolean {
+  const token = tokens[index]!;
+  if (!SKU_TOKEN.test(token)) {
+    return false;
+  }
+  return !(
+    PURE_NUMBER.test(token) &&
+    index > 0 &&
+    PRICE_MARKERS.has(tokens[index - 1]!)
+  );
+}
+
 /**
  * Deterministic fast path (AC-1): settle clearly-simple queries as `classic`
  * without touching the LLM port. Returns null when the heuristics cannot
@@ -79,7 +112,8 @@ const SKU_TOKEN = /^(?=.*\d)[\p{L}\p{N}-]+$/u;
  *
  * - empty query → classic (nothing to interpret)
  * - whole query wrapped in quotes → classic (exact-phrase intent)
- * - ≤4 tokens with a SKU/model-number-looking token → classic ("nike air max 90")
+ * - ≤4 tokens with a SKU/model-number-looking token → classic ("nike air max 90");
+ *   a bare number right after a price marker ("dress under 400") is not one
  * - ≤2 tokens → classic (too short to carry natural-language intent)
  */
 export function classifyByHeuristics(
@@ -92,7 +126,7 @@ export function classifyByHeuristics(
     return { route: "classic", reason: "quoted-phrase" };
   }
   const tokens = normalized.split(" ");
-  if (tokens.length <= 4 && tokens.some((token) => SKU_TOKEN.test(token))) {
+  if (tokens.length <= 4 && tokens.some((_, index) => isSkuToken(tokens, index))) {
     return { route: "classic", reason: "sku-pattern" };
   }
   if (tokens.length <= 2) {

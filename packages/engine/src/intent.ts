@@ -40,14 +40,17 @@ export interface Intent {
 export const INTENT_SCHEMA: JsonSchema = {
   type: "object",
   properties: {
-    category: { type: "string" },
-    priceMin: { type: "number" },
-    priceMax: { type: "number" },
-    currency: { type: "string" },
+    // Optional fields admit null so the schema matches real model answers,
+    // which return null for absent values (YOY-29 AC-8); a provider strictly
+    // enforcing the response schema must not reject or retry on them.
+    category: { type: ["string", "null"] },
+    priceMin: { type: ["number", "null"] },
+    priceMax: { type: ["number", "null"] },
+    currency: { type: ["string", "null"] },
     colorsInclude: { type: "array", items: { type: "string" } },
     colorsExclude: { type: "array", items: { type: "string" } },
-    occasion: { type: "string" },
-    size: { type: "string" },
+    occasion: { type: ["string", "null"] },
+    size: { type: ["string", "null"] },
     availabilityRequired: { type: "boolean" },
     softAttributes: { type: "array", items: { type: "string" } },
   },
