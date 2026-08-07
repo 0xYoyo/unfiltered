@@ -19,8 +19,9 @@ import {
   createGeminiLlmClient,
   GeminiApiError,
   geminiModelsFromEnv,
+  GeminiTimeoutError,
 } from "@unfiltered/provider-gemini";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { createPrismaCostRecorder } from "../ai/cost-recorder.server";
 import { composeEmbeddingText } from "../catalog/embed.server";
@@ -55,11 +56,67 @@ interface RecordedEntry {
 }
 
 // Free-tier Gemini keys rate-limit hard (YOY-28): every live call is paced by
-// a fixed delay, and a 429 backs off exponentially before giving up.
-const PACE_MS = 5_000;
+// a fixed delay, a 429 backs off exponentially before giving up, and transient
+// transport failures get a short fixed-backoff ladder of their own.
+const DEFAULT_PACE_MS = 5_000;
 const LOG_EVERY = 10;
 const MAX_ATTEMPTS = 5;
 const INITIAL_BACKOFF_MS = 30_000;
+const TRANSIENT_MAX_ATTEMPTS = 3;
+const TRANSIENT_BACKOFF_MS = 10_000;
+
+/**
+ * Per-call pacing from REGEN_PACE_MS (YOY-28 wrap-up item 4). The default
+ * stays free-tier-safe; Tier 1 keys can drop to ~500 for fast regens. A
+ * malformed value falls back to the default rather than silently hammering
+ * the API at pace 0 or NaN.
+ */
+export function resolvePaceMs(raw: string | undefined): number {
+  if (raw === undefined) {
+    return DEFAULT_PACE_MS;
+  }
+  const value = Number(raw);
+  if (raw.trim() === "" || !Number.isInteger(value) || value <= 0) {
+    console.warn(
+      `[regenerate-live] REGEN_PACE_MS=${JSON.stringify(raw)} is not a positive integer; using default ${DEFAULT_PACE_MS}ms`,
+    );
+    return DEFAULT_PACE_MS;
+  }
+  return value;
+}
+
+const PACE_MS = resolvePaceMs(process.env.REGEN_PACE_MS);
+
+const TRANSIENT_CODES = new Set([
+  "UND_ERR_HEADERS_TIMEOUT",
+  "ECONNRESET",
+  "ETIMEDOUT",
+]);
+
+function codeOf(value: unknown): string | undefined {
+  const code = (value as { code?: unknown } | null)?.code;
+  return typeof code === "string" ? code : undefined;
+}
+
+/**
+ * Transient transport failure worth retrying (YOY-28 wrap-up item 2): undici
+ * surfaces network trouble as TypeError("fetch failed", { cause }) or errors
+ * coded UND_ERR_HEADERS_TIMEOUT / ECONNRESET / ETIMEDOUT (the provider's
+ * GeminiTimeoutError carries ETIMEDOUT), sometimes only on the cause.
+ */
+export function isTransientNetworkError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  const code = codeOf(error) ?? codeOf(error.cause);
+  if (code !== undefined && TRANSIENT_CODES.has(code)) {
+    return true;
+  }
+  return (
+    (error instanceof TypeError && error.cause !== undefined) ||
+    error.message === "fetch failed"
+  );
+}
 
 let liveCallCount = 0;
 
@@ -67,7 +124,11 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/** Pace, then run one live call, retrying 429s with exponential backoff. */
+/**
+ * Pace, then run one live call, retrying 429s with exponential backoff and
+ * transient transport failures with a short fixed backoff. Everything else
+ * rethrows immediately.
+ */
 async function paced<T>(call: () => Promise<T>): Promise<T> {
   await sleep(PACE_MS);
   liveCallCount += 1;
@@ -75,22 +136,34 @@ async function paced<T>(call: () => Promise<T>): Promise<T> {
     console.log(`[regenerate-live] ${liveCallCount} live calls dispatched`);
   }
   let backoffMs = INITIAL_BACKOFF_MS;
-  for (let attempt = 1; ; attempt += 1) {
+  let rateLimitAttempts = 0;
+  let transientAttempts = 0;
+  for (;;) {
     try {
       return await call();
     } catch (error) {
-      if (
-        !(error instanceof GeminiApiError) ||
-        error.status !== 429 ||
-        attempt >= MAX_ATTEMPTS
-      ) {
+      if (error instanceof GeminiApiError && error.status === 429) {
+        rateLimitAttempts += 1;
+        if (rateLimitAttempts >= MAX_ATTEMPTS) {
+          throw error;
+        }
+        console.log(
+          `[regenerate-live] 429 rate-limited; waiting ${backoffMs / 1000}s before retry (attempt ${rateLimitAttempts}/${MAX_ATTEMPTS})`,
+        );
+        await sleep(backoffMs);
+        backoffMs *= 2;
+      } else if (isTransientNetworkError(error)) {
+        transientAttempts += 1;
+        if (transientAttempts >= TRANSIENT_MAX_ATTEMPTS) {
+          throw error;
+        }
+        console.log(
+          `[regenerate-live] transient network error (${(error as Error).message}); waiting ${TRANSIENT_BACKOFF_MS / 1000}s before retry (attempt ${transientAttempts}/${TRANSIENT_MAX_ATTEMPTS})`,
+        );
+        await sleep(TRANSIENT_BACKOFF_MS);
+      } else {
         throw error;
       }
-      console.log(
-        `[regenerate-live] 429 rate-limited; waiting ${backoffMs / 1000}s before retry (attempt ${attempt}/${MAX_ATTEMPTS})`,
-      );
-      await sleep(backoffMs);
-      backoffMs *= 2;
     }
   }
 }
@@ -147,6 +220,72 @@ function writeRecording(
     `${JSON.stringify({ modelId, entries }, null, 2)}\n`,
   );
 }
+
+// Offline coverage for the retry predicate and pacing knob — these run in
+// every `npm test`, live or not.
+describe("transient network error predicate", () => {
+  it("retries undici transport failures and coded timeouts", () => {
+    const fetchFailed = new TypeError("fetch failed", {
+      cause: new Error("socket hang up"),
+    });
+    const headersTimeout = Object.assign(new Error("headers timeout"), {
+      code: "UND_ERR_HEADERS_TIMEOUT",
+    });
+    const connReset = new TypeError("fetch failed", {
+      cause: Object.assign(new Error("read ECONNRESET"), {
+        code: "ECONNRESET",
+      }),
+    });
+    const timedOut = Object.assign(new Error("connect ETIMEDOUT"), {
+      code: "ETIMEDOUT",
+    });
+    for (const error of [fetchFailed, headersTimeout, connReset, timedOut]) {
+      expect(isTransientNetworkError(error), error.message).toBe(true);
+    }
+  });
+
+  it("retries the provider's GeminiTimeoutError via its ETIMEDOUT code", () => {
+    expect(
+      isTransientNetworkError(new GeminiTimeoutError("timed out", 60_000)),
+    ).toBe(true);
+  });
+
+  it("rethrows everything else immediately", () => {
+    const nonTransient = [
+      new GeminiApiError("Gemini API answered 500", 500, "boom"),
+      new GeminiApiError("Gemini API answered 429", 429, "quota"), // 429 has its own ladder
+      new Error("assertion failed"),
+      new TypeError("x is not a function"), // TypeError without cause is a code bug
+      "not even an error",
+    ];
+    for (const error of nonTransient) {
+      expect(isTransientNetworkError(error), String(error)).toBe(false);
+    }
+  });
+});
+
+describe("REGEN_PACE_MS resolution", () => {
+  it("defaults to 5000 when unset", () => {
+    expect(resolvePaceMs(undefined)).toBe(5_000);
+  });
+
+  it("accepts a positive integer", () => {
+    expect(resolvePaceMs("500")).toBe(500);
+  });
+
+  it("falls back to the default with a warning on malformed values", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      for (const raw of ["", "  ", "abc", "-1", "0", "2.5"]) {
+        expect(resolvePaceMs(raw), JSON.stringify(raw)).toBe(5_000);
+      }
+      expect(warn).toHaveBeenCalledTimes(6);
+      expect(warn.mock.calls[0]![0]).toMatch(/REGEN_PACE_MS/);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+});
 
 describe.runIf(live)("eval fixture regeneration (live)", () => {
   let db: PrismaClient;

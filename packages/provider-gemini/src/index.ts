@@ -35,6 +35,21 @@ export class GeminiApiError extends Error {
 /** The Gemini API answered 200 but the payload was not usable. */
 export class GeminiResponseError extends Error {}
 
+/**
+ * A request exceeded its abort timeout before headers arrived. Carries the
+ * conventional `ETIMEDOUT` code so callers' transport-error predicates (e.g.
+ * the live regeneration retry ladder) treat it like any network timeout.
+ */
+export class GeminiTimeoutError extends Error {
+  readonly code = "ETIMEDOUT";
+  constructor(
+    message: string,
+    readonly timeoutMs: number,
+  ) {
+    super(message);
+  }
+}
+
 export interface GeminiClientOptions {
   /** Provider model ID, e.g. from `geminiModelsFromEnv()`. Never hardcode. */
   modelId: string;
@@ -46,12 +61,22 @@ export interface GeminiClientOptions {
   fetchImpl?: typeof fetch;
   /** API base URL; defaults to the Google AI Studio endpoint. */
   baseUrl?: string;
+  /**
+   * Per-request abort timeout in milliseconds; defaults to
+   * `DEFAULT_REQUEST_TIMEOUT_MS`. A request that has not answered by then
+   * throws `GeminiTimeoutError` instead of waiting out undici's ~5-minute
+   * headers timeout.
+   */
+  requestTimeoutMs?: number;
 }
 
 export interface GeminiEmbeddingClientOptions extends GeminiClientOptions {
   /** Vector dimension to request; defaults to `DEFAULT_EMBEDDING_DIMENSION`. */
   dimension?: number;
 }
+
+/** Default per-request abort timeout (YOY-28 wrap-up item 3). */
+export const DEFAULT_REQUEST_TIMEOUT_MS = 60_000;
 
 /** Documented default model IDs; override via env, never in code. */
 export const DEFAULT_CLASSIFICATION_MODEL = "gemini-3.5-flash-lite";
@@ -108,6 +133,7 @@ interface ResolvedOptions {
   apiKey: string;
   fetchImpl: typeof fetch;
   baseUrl: string;
+  requestTimeoutMs: number;
 }
 
 function resolveOptions(options: GeminiClientOptions): ResolvedOptions {
@@ -123,6 +149,7 @@ function resolveOptions(options: GeminiClientOptions): ResolvedOptions {
     apiKey,
     fetchImpl: options.fetchImpl ?? fetch,
     baseUrl: options.baseUrl ?? DEFAULT_BASE_URL,
+    requestTimeoutMs: options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS,
   };
 }
 
@@ -131,14 +158,29 @@ async function postJson(
   path: string,
   body: unknown,
 ): Promise<Record<string, unknown>> {
-  const response = await resolved.fetchImpl(`${resolved.baseUrl}/${path}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-goog-api-key": resolved.apiKey,
-    },
-    body: JSON.stringify(body),
-  });
+  let response: Response;
+  try {
+    response = await resolved.fetchImpl(`${resolved.baseUrl}/${path}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": resolved.apiKey,
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(resolved.requestTimeoutMs),
+    });
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      (error.name === "TimeoutError" || error.name === "AbortError")
+    ) {
+      throw new GeminiTimeoutError(
+        `Gemini API ${path} timed out after ${resolved.requestTimeoutMs}ms`,
+        resolved.requestTimeoutMs,
+      );
+    }
+    throw error;
+  }
   if (!response.ok) {
     throw new GeminiApiError(
       `Gemini API ${path} answered ${response.status}`,
