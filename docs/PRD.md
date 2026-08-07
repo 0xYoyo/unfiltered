@@ -1,5 +1,6 @@
 # Unfiltered — PRD
-Version: 1 · Date: 2026-07-31
+Version: 2 · Date: 2026-08-07
+v2: vision enrichment promoted to a core capability and its own milestone; catalog-size caps added to tiers; cost & pricing operations codified. Decisions from the 2026-08-07 planning session, informed by measured M2 economics.
 
 Product type: B2B web SaaS, delivered as a Shopify app (self-serve). The
 engine is catalog-agnostic by design (feed + JS snippet) to keep a future
@@ -92,9 +93,26 @@ Numbered capabilities, each observable behavior:
     playground. "Built for Shopify" badge requirements are engineering
     constraints from milestone 1 (performance, embedded app standards),
     not a retrofit.
+14. **Vision enrichment at ingestion.** Every product's images (all
+    images, capped at 4 per product) are analyzed by an accuracy-tier
+    vision-capable model at ingestion and on image change (re-analysis
+    keyed on image content hash). Extraction is anchored: the prompt
+    receives the product's title, type, and text, and must describe ONLY
+    the item being sold, ignoring other garments, footwear, and jewelry
+    worn by models in the photos. Vision output merges into the same
+    enrichment schema (category, colors, occasions, fit, styleTags) plus
+    vision-only attributes (coverage — e.g. sleeve length, neckline,
+    garment length —, pattern, material appearance); text-derived values
+    win conflicts on factual fields, vision fills gaps. Changed
+    enrichment re-embeds automatically via the composed-text freshness
+    hash. This capability is standard on every plan — it is the
+    differentiator, not an add-on — with no setup fee; one-time indexing
+    cost is absorbed as COGS (measured ceiling: single-digit dollars per
+    1,000 products).
 
 ## 4. Explicitly out of v1 (Later)
-1. Image-input search ("a shoe like this Prada" + photo).
+1. Image-input search ("a shoe like this Prada" + photo). Reuses the
+   vision infrastructure built in the vision milestone.
 2. Conversational AI chat mode / sales-assistant widget (Cartally-style).
 3. Merchandising suite: pin/boost/demote/hide, bundles, recommendations
    (Boost's territory; consciously skipped).
@@ -154,7 +172,10 @@ the playground.
   ~$0.10–0.40 per 1M tokens); requirement: blended cost ≤ $2 per 1,000 AI
   searches, with routing (cheap model for most queries, better model for
   hard ones and for first-session magic). Fallback: second provider
-  configured; on total LLM failure, classic search serves.
+  configured; on total LLM failure, classic search serves. The provider
+  mix must include an accuracy-tier vision-capable model for ingestion
+  enrichment (capability 14); vision runs at ingestion only, never at
+  query time, so it does not affect per-search cost.
 - **Embeddings API** — same-provider or dedicated embedding model;
   cost negligible (~$0.02–0.13 per 1M tokens range).
 - **Vector store** — chosen at spec phase (managed with a free tier that
@@ -171,9 +192,10 @@ Model: subscription via Shopify Billing, priced on monthly AI searches
 (classic searches unlimited and free — honest because they cost ~nothing,
 and it reads well against Cartally's structure).
 
-Tiers: **$39** (10K AI searches) / **$99** (50K) / **$249** (200K);
-overage $2 per additional 1,000 AI searches; hard cap + fallback beyond a
-store-configurable ceiling. 14-day trial, card required, 1,000 AI-search
+Tiers: **$39** (10K AI searches, catalogs up to 1K products) / **$99**
+(50K, up to 5K products) / **$249** (200K, up to 20K products); larger
+catalogs are enterprise inquiries. Overage $2 per additional 1,000 AI
+searches; hard cap + fallback beyond a store-configurable ceiling. 14-day trial, card required, 1,000 AI-search
 trial cap. Anchors: Boost $29–299 (product-count based, free plan),
 Cartally $59/$209/$499 (+$1/1K overage), Searchanise from $19. Pricing is
 an experiment: v1 measures real cost-per-search, and tier limits/prices
@@ -190,6 +212,27 @@ Unit economics (stated assumptions, to be validated by measurement):
   pessimistic (30 stores): ~$1.2K; realistic (150 stores): ~$5.9K; good
   (500 stores): ~$19.5K — plus enterprise upsell path outside v1.
 - Payment infrastructure: none beyond Shopify Billing (deliberate).
+
+### Cost & pricing operations
+Tier limits and prices are revised only against measured evidence, at PRD
+version bumps. The machinery that makes revision evidence-based ships in
+v1:
+1. **Confidence-based routing (lite-first).** Intent extraction runs on the
+   lite tier first and escalates the same query to the accuracy tier on low
+   confidence or known-weak query classes (e.g. occasion-bearing queries,
+   per eval data). Target blended cost ≤ $0.60 per 1,000 AI searches. Any
+   routing change must pass the eval quality bar before shipping.
+2. **Semantic caching.** Beyond identical-query caching, intent results are
+   cached keyed on query-embedding similarity above a threshold, so
+   paraphrases of recent queries cost $0.
+3. **Required internal metrics from day one:** per-store cap-utilization
+   distribution, cache hit rate, blended cost per 1K per tier, and the
+   AI-vs-classic CTR delta per store (the guardrail that cost tuning never
+   degrades result quality).
+4. **Cap placement is an upsell mechanism, not a usage limit.** Overage
+   ($2 per 1K against ~$0.60–1.10 cost) means heavy users are profitable;
+   caps are positioned so growing stores hit them naturally, verified
+   against the utilization distribution at each revision.
 
 ## 9. Validation & go-to-market
 Channel research findings baked in: ~70% of app discovery starts with App
@@ -244,7 +287,9 @@ external analytics platform required.
   Mitigated by enrichment at ingestion (LLM-generated attribute tags per
   product) — factory decides technique; PRD requires that quality on
   sparse catalogs be tested in milestone 2 against a deliberately
-  low-quality test catalog.
+  low-quality test catalog. The strategic answer to sparse product text
+  is vision enrichment (capability 14, its own milestone): images carry
+  the attributes the text omits.
 - **Cost drift**: heavy AI usage at $249-tier scale can squeeze margin if
   routing is lazy. Mitigated by required cost measurement + caps.
 - **Platform dependence**: Shopify policy/API changes; accepted for v1.
@@ -263,11 +308,11 @@ external analytics platform required.
       method (blocks milestone 2 deploy).
 - [ ] Register a domain for the product + playground (blocks milestone 4;
       buy early, it's cheap).
-- [ ] Transactional email service account (blocks milestone 5).
+- [ ] Transactional email service account (blocks milestone 6).
 - [ ] Shopify App Store listing assets you must approve: app name check,
-      final copy, screenshots, demo video (blocks milestone 6 submission).
+      final copy, screenshots, demo video (blocks milestone 7 submission).
 - [ ] App Store review submission + responding to Shopify's review
-      feedback (days-to-weeks; start as soon as milestone 6 is ready).
+      feedback (days-to-weeks; start as soon as milestone 7 is ready).
 - [ ] Send the cold-outreach emails from your own address once tooling
       hands you the list + links (ongoing, post-launch).
 - [ ] Approve pricing tiers as configured in Shopify Billing before
@@ -284,13 +329,22 @@ external analytics platform required.
    refinement, fallback, EN+HE+RTL. (~10–14 issues)
 4. **Playground** — public page, seeded catalog, store-catalog-preload
    mode. (~4–6 issues)
-5. **Merchant dashboard + attribution + billing** — usage/query/CTR
+5. **Vision enrichment + cost routing** — vision analysis at ingestion
+   (all images, cap 4, accuracy tier, anchored anti-contamination prompt),
+   merge into enrichment schema + vision-only coverage attributes,
+   image-hash-keyed re-analysis, automatic re-embedding; contamination
+   test cases added to the eval harness (e.g. a hoodie shot with visible
+   sneakers and jewelry must not emit footwear/jewelry attributes);
+   confidence-based lite-first intent routing with accuracy-tier
+   escalation, eval bar re-verified on the routed blend; measured
+   vision cost per image recorded. (~6–10 issues)
+6. **Merchant dashboard + attribution + billing** — usage/query/CTR
    views, order attribution via webhooks, review-ask trigger, Shopify
    Billing tiers/trial/caps, abuse limits. (~10–14 issues)
-6. **Onboarding + listing + launch hardening** — activation-milestone
+7. **Onboarding + listing + launch hardening** — activation-milestone
    onboarding flow, first-session best-model behavior, Built-for-Shopify
    compliance pass, listing assets, GDPR webhooks, submission. (~8–12
    issues)
-7. **Outreach tooling** (post-submission, parallel with review) — fashion-
+8. **Outreach tooling** (post-submission, parallel with review) — fashion-
    store identification + per-store playground link generation. (~4–6
    issues)
