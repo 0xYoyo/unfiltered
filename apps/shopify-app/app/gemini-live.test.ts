@@ -15,6 +15,10 @@ import { createTestDb } from "./testing/helpers.server";
 //   LIVE_LLM_TESTS=1 GEMINI_API_KEY=... npm test
 const live = process.env.LIVE_LLM_TESTS === "1";
 
+// Real accuracy-tier calls legitimately exceed vitest's 5s default timeout
+// (YOY-28): give every live round-trip a generous minute.
+const LIVE_TEST_TIMEOUT_MS = 60_000;
+
 describe.runIf(live)("live Gemini round-trips (ledger-backed)", () => {
   const models = geminiModelsFromEnv();
   let db: PrismaClient;
@@ -61,6 +65,7 @@ describe.runIf(live)("live Gemini round-trips (ledger-backed)", () => {
       expect(rows[0]!.inputTokens).toBeGreaterThan(0);
       expect(rows[0]!.costUsd).toBeGreaterThan(0);
     },
+    LIVE_TEST_TIMEOUT_MS,
   );
 
   it("embeds one batch and lands it in the cost ledger", async () => {
@@ -83,5 +88,5 @@ describe.runIf(live)("live Gemini round-trips (ledger-backed)", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]!.modelId).toBe(models.embeddingModel);
     expect(rows[0]!.inputTokens).toBeGreaterThan(0);
-  });
+  }, LIVE_TEST_TIMEOUT_MS);
 });

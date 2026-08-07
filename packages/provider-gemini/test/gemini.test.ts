@@ -3,12 +3,14 @@ import { describe, expect, it } from "vitest";
 import type { AiCallUsage } from "@unfiltered/engine";
 import {
   DEFAULT_CLASSIFICATION_MODEL,
+  DEFAULT_REQUEST_TIMEOUT_MS,
   DEFAULT_EMBEDDING_DIMENSION,
   DEFAULT_EMBEDDING_MODEL,
   DEFAULT_INTENT_MODEL,
   GeminiApiError,
   GeminiConfigError,
   GeminiResponseError,
+  GeminiTimeoutError,
   createGeminiEmbeddingClient,
   createGeminiLlmClient,
   geminiModelsFromEnv,
@@ -308,6 +310,89 @@ describe("structured completion", () => {
     ).rejects.toMatchObject({ status: 429 });
     // A failed HTTP call consumed nothing meterable.
     expect(recorded).toHaveLength(0);
+  });
+});
+
+describe("request timeout", () => {
+  // A fetch stub that never answers on its own: it settles only when the
+  // abort signal fires, exactly like a hung socket under real fetch.
+  function hangingFetch() {
+    const signals: AbortSignal[] = [];
+    const impl = ((_url: unknown, init?: RequestInit) => {
+      const signal = init?.signal;
+      signals.push(signal!);
+      return new Promise<Response>((_resolve, reject) => {
+        signal?.addEventListener("abort", () => {
+          reject(signal.reason as Error);
+        });
+      });
+    }) as typeof fetch;
+    return { signals, impl };
+  }
+
+  it("aborts a hung request after requestTimeoutMs with GeminiTimeoutError", async () => {
+    const { recorded, recorder } = recorderSpy();
+    const { impl } = hangingFetch();
+
+    const client = createGeminiLlmClient({
+      modelId: "test-flash-model",
+      apiKey: "test-key-not-real",
+      costRecorder: recorder,
+      fetchImpl: impl,
+      requestTimeoutMs: 25,
+    });
+    const call = client.completeStructured({
+      prompt: "p",
+      schema: SCHEMA,
+      operation: "classification",
+    });
+
+    await expect(call).rejects.toThrow(GeminiTimeoutError);
+    await expect(
+      client.completeStructured({
+        prompt: "p",
+        schema: SCHEMA,
+        operation: "classification",
+      }),
+      // ETIMEDOUT is the contract transient-retry predicates key on.
+    ).rejects.toMatchObject({ code: "ETIMEDOUT", timeoutMs: 25 });
+    // A timed-out call never delivered usage — nothing to meter.
+    expect(recorded).toHaveLength(0);
+  });
+
+  it("aborts a hung embedding request the same way", async () => {
+    const { recorder } = recorderSpy();
+    const { impl } = hangingFetch();
+
+    const client = createGeminiEmbeddingClient({
+      modelId: "test-embedding-model",
+      apiKey: "test-key-not-real",
+      costRecorder: recorder,
+      fetchImpl: impl,
+      requestTimeoutMs: 25,
+    });
+    await expect(client.embed({ texts: ["a"] })).rejects.toThrow(
+      GeminiTimeoutError,
+    );
+  });
+
+  it("arms a timeout signal on every request even when none is configured", async () => {
+    const { recorder } = recorderSpy();
+    let seen: AbortSignal | null | undefined;
+    const impl = (async (_url: unknown, init?: RequestInit) => {
+      seen = init?.signal;
+      return new Response(JSON.stringify(completionFixture), { status: 200 });
+    }) as typeof fetch;
+
+    await llmClient(impl, recorder).completeStructured({
+      prompt: "p",
+      schema: SCHEMA,
+      operation: "classification",
+    });
+
+    expect(seen).toBeInstanceOf(AbortSignal);
+    expect(seen!.aborted).toBe(false);
+    expect(DEFAULT_REQUEST_TIMEOUT_MS).toBe(60_000);
   });
 });
 
