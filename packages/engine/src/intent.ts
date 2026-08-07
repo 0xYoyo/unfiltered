@@ -49,16 +49,24 @@ export const INTENT_SCHEMA: JsonSchema = {
     // Optional fields admit null so the schema matches real model answers,
     // which return null for absent values (YOY-29 AC-8); a provider strictly
     // enforcing the response schema must not reject or retry on them.
-    // category and occasion are pinned to the canonical taxonomy (YOY-31):
-    // the enum lists only the string tokens — null stays admitted via the
-    // type union, which the provider adapter maps to its nullable dialect.
-    category: { type: ["string", "null"], enum: [...CANONICAL_CATEGORIES] },
+    // category and occasion are pinned to the canonical taxonomy (YOY-31).
+    // The enum lists null alongside the string tokens (YOY-35 AC-6), so a
+    // strictly conforming validator accepts a null answer from the schema
+    // alone; the provider adapter re-expresses the union in its nullable
+    // dialect (string enum + nullable) without changing the request.
+    category: {
+      type: ["string", "null"],
+      enum: [...CANONICAL_CATEGORIES, null],
+    },
     priceMin: { type: ["number", "null"] },
     priceMax: { type: ["number", "null"] },
     currency: { type: ["string", "null"] },
     colorsInclude: { type: "array", items: { type: "string" } },
     colorsExclude: { type: "array", items: { type: "string" } },
-    occasion: { type: ["string", "null"], enum: [...CANONICAL_OCCASIONS] },
+    occasion: {
+      type: ["string", "null"],
+      enum: [...CANONICAL_OCCASIONS, null],
+    },
     size: { type: ["string", "null"] },
     availabilityRequired: { type: "boolean" },
     softAttributes: { type: "array", items: { type: "string" } },
@@ -108,9 +116,12 @@ function buildIntentPrompt(query: string): string {
     "  ISO 4217 code only when the query names or implies one.",
     "- colorsInclude: colors the shopper wants; colorsExclude: colors the",
     '  shopper rejects ("not black" → exclude black).',
-    "- occasion: the event or context the item is for, when stated. Must be",
-    `  one of: ${CANONICAL_OCCASIONS.join(", ")}. Use null when the query`,
-    '  states no occasion and "other" when it fits none of them.',
+    "- occasion: an event the shopper dresses FOR (a wedding, the office, a",
+    "  night out), when stated. Must be one of:",
+    `  ${CANONICAL_OCCASIONS.join(", ")}. Seasons and times of day`,
+    '  ("winter", "evenings") are never occasions — they are softAttributes.',
+    '  Use null when the query states no occasion and "other" when it fits',
+    "  none of them.",
     "- size: the requested size, when stated.",
     "- availabilityRequired: true only when the shopper asks for in-stock or",
     "  immediately available items.",

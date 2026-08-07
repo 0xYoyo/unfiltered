@@ -195,6 +195,41 @@ describe("structured completion", () => {
     expect(JSON.stringify(config.responseSchema)).not.toContain('"type":[');
   });
 
+  it("re-expresses a null-bearing enum through nullable, leaving the outgoing body as before (YOY-35 AC-6)", async () => {
+    const { recorder } = recorderSpy();
+    const { captured, impl } = fetchStub(200, completionFixture);
+
+    // The engine's strictly self-consistent enum-or-null form: null appears
+    // both in the type union and as an enum member.
+    await llmClient(impl, recorder).completeStructured({
+      prompt: "Extract intent",
+      schema: {
+        type: "object",
+        properties: {
+          category: {
+            type: ["string", "null"],
+            enum: ["dress", "coat", null],
+          },
+        },
+        required: [],
+      },
+      operation: "intent",
+    });
+
+    const config = captured[0]!.body.generationConfig as {
+      responseSchema: unknown;
+    };
+    // Identical Gemini request as before the enum carried null: string type,
+    // string-only enum, nullable flag.
+    expect(config.responseSchema).toEqual({
+      type: "object",
+      properties: {
+        category: { type: "string", enum: ["dress", "coat"], nullable: true },
+      },
+      required: [],
+    });
+  });
+
   it("passes a schema with no null types through unchanged", async () => {
     const { recorder } = recorderSpy();
     const { captured, impl } = fetchStub(200, completionFixture);

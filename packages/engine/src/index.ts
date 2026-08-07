@@ -37,6 +37,8 @@ export {
 export {
   CANONICAL_CATEGORIES,
   CANONICAL_OCCASIONS,
+  CATEGORY_GROUPS,
+  expandCategoryConstraint,
   normalizeCategory,
   normalizeOccasion,
   type CanonicalCategory,

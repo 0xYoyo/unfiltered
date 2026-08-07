@@ -96,6 +96,82 @@ describe("violation scoring covers occasion (YOY-29 AC-11)", () => {
   });
 });
 
+describe("violation scoring mirrors unknown-passes filtering (YOY-35 AC-2, AC-5)", () => {
+  const catalog = loadCatalog();
+  const product = catalog[0]!;
+  const products = new Map(catalog.map((entry) => [entry.productId, entry]));
+  const golden = (
+    overrides: Partial<Golden["hardConstraints"]>,
+  ): Golden => ({
+    id: "mirror-probe",
+    language: "en",
+    query: "probe",
+    hardConstraints: {
+      category: null,
+      priceMin: null,
+      priceMax: null,
+      colorsInclude: [],
+      colorsExclude: [],
+      occasion: null,
+      availabilityRequired: false,
+      ...overrides,
+    },
+    expectedProductIds: [product.productId],
+  });
+  const enrich = (
+    enrichment: { category: string | null; colors: string[]; occasions: string[] },
+  ) => new Map([[product.productId, enrichment]]);
+
+  it("does not flag empty enrichment occasions or colors against positive constraints", () => {
+    const sparse = enrich({ category: null, colors: [], occasions: [] });
+    expect(
+      findViolations(
+        golden({ occasion: "wedding", colorsInclude: ["red"] }),
+        product.productId,
+        products,
+        sparse,
+      ),
+    ).toEqual([]);
+  });
+
+  it("still flags stated-and-mismatched occasions and colors", () => {
+    const stated = enrich({
+      category: null,
+      colors: ["black"],
+      occasions: ["beach"],
+    });
+    const violations = findViolations(
+      golden({ occasion: "wedding", colorsInclude: ["red"] }),
+      product.productId,
+      products,
+      stated,
+    );
+    expect(violations).toHaveLength(2);
+  });
+
+  it("admits a category group's members for a parent constraint, exact for a child (AC-5)", () => {
+    const sneakers = enrich({ category: "sneakers", colors: [], occasions: [] });
+    const jewelry = enrich({ category: "jewelry", colors: [], occasions: [] });
+    // g07's and g20's shapes: shoes admits sneakers; accessories admits jewelry.
+    expect(
+      findViolations(golden({ category: "shoes" }), product.productId, products, sneakers),
+    ).toEqual([]);
+    expect(
+      findViolations(golden({ category: "accessories" }), product.productId, products, jewelry),
+    ).toEqual([]);
+    // A child constraint stays exact.
+    const shoes = enrich({ category: "shoes", colors: [], occasions: [] });
+    expect(
+      findViolations(golden({ category: "sneakers" }), product.productId, products, shoes),
+    ).toHaveLength(1);
+    // A category constraint still requires evidence: null category violates.
+    const unknown = enrich({ category: null, colors: [], occasions: [] });
+    expect(
+      findViolations(golden({ category: "dress" }), product.productId, products, unknown),
+    ).toHaveLength(1);
+  });
+});
+
 describe("eval run (AC-2, AC-3, AC-4, AC-6)", () => {
   let result: EvalRunResult;
 

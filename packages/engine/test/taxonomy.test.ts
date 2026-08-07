@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   CANONICAL_CATEGORIES,
   CANONICAL_OCCASIONS,
+  CATEGORY_GROUPS,
+  expandCategoryConstraint,
   normalizeCategory,
   normalizeOccasion,
 } from "../src/index.js";
@@ -76,6 +78,48 @@ describe("normalizeCategory (AC-4)", () => {
     expect(normalizeCategory("widget")).toBeNull();
     expect(normalizeCategory("")).toBeNull();
     expect(normalizeCategory("שמלה")).toBeNull(); // NG-1: no Hebrew tokens
+  });
+});
+
+describe("category groups (YOY-35 AC-5)", () => {
+  it("declares exactly the specified parent → members map", () => {
+    expect(CATEGORY_GROUPS).toEqual({
+      shoes: ["shoes", "sneakers", "boots"],
+      accessories: ["accessories", "jewelry"],
+      coat: ["coat", "jacket"],
+      jacket: ["jacket", "coat"],
+    });
+  });
+
+  it("expands a parent constraint to every member — the g07 and g20 shapes", () => {
+    // g07: a "shoes" constraint must admit the white sneakers.
+    expect(expandCategoryConstraint("shoes")).toEqual([
+      "shoes",
+      "sneakers",
+      "boots",
+    ]);
+    // g20: an "accessories" constraint must admit jewelry.
+    expect(expandCategoryConstraint("accessories")).toEqual([
+      "accessories",
+      "jewelry",
+    ]);
+    expect(expandCategoryConstraint(" Shoes ")).toEqual([
+      "shoes",
+      "sneakers",
+      "boots",
+    ]);
+  });
+
+  it("keeps coat ↔ jacket symmetric", () => {
+    expect(expandCategoryConstraint("coat")).toEqual(["coat", "jacket"]);
+    expect(expandCategoryConstraint("jacket")).toEqual(["jacket", "coat"]);
+  });
+
+  it("keeps child constraints exact — sneakers means sneakers", () => {
+    expect(expandCategoryConstraint("sneakers")).toEqual(["sneakers"]);
+    expect(expandCategoryConstraint("boots")).toEqual(["boots"]);
+    expect(expandCategoryConstraint("jewelry")).toEqual(["jewelry"]);
+    expect(expandCategoryConstraint("dress")).toEqual(["dress"]);
   });
 });
 

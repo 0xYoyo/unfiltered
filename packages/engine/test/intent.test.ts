@@ -205,14 +205,10 @@ describe("INTENT_SCHEMA admits null optionals (YOY-29 AC-8)", () => {
     if (!matchesType) {
       return false;
     }
-    // Enum tokens (YOY-31): a non-null value must be one of them. Null stays
-    // admitted through the type union — the provider adapter expresses it as
-    // its nullable dialect, not as an enum member.
-    if (
-      Array.isArray(schema.enum) &&
-      value !== null &&
-      !schema.enum.includes(value)
-    ) {
+    // Strict enum semantics (YOY-35 AC-6): the value — null included — must
+    // literally appear in the enum. The schema itself carries null as a
+    // member, so no null exemption is needed for a conforming validator.
+    if (Array.isArray(schema.enum) && !schema.enum.includes(value)) {
       return false;
     }
     if (types.includes("object") && typeof value === "object" && value !== null) {
@@ -247,11 +243,41 @@ describe("INTENT_SCHEMA admits null optionals (YOY-29 AC-8)", () => {
     expect(conforms(INTENT_SCHEMA, { ...valid, category: null, occasion: null })).toBe(true);
   });
 
+  it("admits null from the schema alone under strict enum semantics (YOY-35 AC-6)", () => {
+    // The checker grants no null exemption: an enum without null rejects it…
+    expect(
+      conforms({ type: ["string", "null"], enum: ["dress"] }, null),
+    ).toBe(false);
+    // …so null passing INTENT_SCHEMA proves the enum itself carries it.
+    const categorySchema = (
+      INTENT_SCHEMA.properties as Record<string, Record<string, unknown>>
+    ).category!;
+    expect(conforms(categorySchema, null)).toBe(true);
+    expect(categorySchema.enum).toContain(null);
+  });
+
   for (const scenario of scenarios) {
     it(`validates the recorded null-bearing answer for ${scenario.name}`, () => {
       expect(conforms(INTENT_SCHEMA, scenario.recorded)).toBe(true);
     });
   }
+});
+
+describe("temporal phrases are not occasions (YOY-35 AC-3)", () => {
+  it("prompts that seasons and times of day belong in softAttributes", async () => {
+    const { llm, calls } = llmStub(scenarios[3]!.recorded);
+    const extractor = createIntentExtractor({ llm });
+
+    // The recorded fixture for the temporal-phrase query ("rainy winter
+    // evenings") carries occasion null, and the extracted intent drops it.
+    const intent = await extractor.extract(scenarios[3]!.query);
+    expect(scenarios[3]!.recorded.occasion).toBeNull();
+    expect(intent.occasion).toBeUndefined();
+    expect(intent.softAttributes).toContain("rainy winter evenings");
+
+    expect(calls[0]!.prompt).toContain("an event the shopper dresses FOR");
+    expect(calls[0]!.prompt).toContain("never occasions");
+  });
 });
 
 describe("port call shape (AC-2, AC-4)", () => {

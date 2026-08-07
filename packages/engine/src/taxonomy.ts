@@ -41,6 +41,35 @@ export type CanonicalCategory = (typeof CANONICAL_CATEGORIES)[number];
 export type CanonicalOccasion = (typeof CANONICAL_OCCASIONS)[number];
 
 /**
+ * Category groups (YOY-35 AC-5): parent → members a PARENT constraint also
+ * matches. Matching is one-directional — a shopper asking for the parent
+ * ("shoes") accepts any member, but a child constraint ("sneakers") stays
+ * exact, so a child never appears as another child's member. coat ↔ jacket is
+ * a symmetric pair: each accepts the other.
+ */
+export const CATEGORY_GROUPS: Partial<
+  Record<CanonicalCategory, readonly CanonicalCategory[]>
+> = {
+  shoes: ["shoes", "sneakers", "boots"],
+  accessories: ["accessories", "jewelry"],
+  coat: ["coat", "jacket"],
+  jacket: ["jacket", "coat"],
+};
+
+/**
+ * Expand one category constraint into every category it matches: the group's
+ * members when the (normalized-case) constraint is a group parent, else just
+ * itself. Both retrieval's category filter and the eval's violation check
+ * expand through here, so filter and scorecard agree on what a constraint
+ * admits.
+ */
+export function expandCategoryConstraint(category: string): string[] {
+  const token = category.trim().toLowerCase();
+  const members = CATEGORY_GROUPS[token as CanonicalCategory];
+  return members === undefined ? [token] : [...members];
+}
+
+/**
  * Small synonym maps folding common near-misses into the canonical sets.
  * Keys are compared after lowercase/trim and again after singularizing, so
  * one singular entry ("sandal") also covers its plural ("sandals").
