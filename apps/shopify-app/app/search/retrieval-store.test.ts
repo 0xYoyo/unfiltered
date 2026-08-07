@@ -173,7 +173,7 @@ describe("hard constraints are filters, never preferences (AC-2)", () => {
     expect(ids).toEqual(["unenriched"]);
   });
 
-  it("requires enrichment evidence for positive color and category constraints", async () => {
+  it("still requires enrichment evidence for the category constraint", async () => {
     await seed(db, [
       { productId: "unenriched", vector: [1, 0, 0], enrichment: null },
       {
@@ -188,9 +188,6 @@ describe("hard constraints are filters, never preferences (AC-2)", () => {
       },
     ]);
 
-    expect(
-      await queryIds(db, { ...noConstraints(), colorsInclude: ["red"] }),
-    ).toEqual(["red-dress", "red-coat"]);
     expect(
       await queryIds(db, { ...noConstraints(), category: "Dress" }),
     ).toEqual(["red-dress"]);
@@ -215,6 +212,84 @@ describe("hard constraints are filters, never preferences (AC-2)", () => {
       occasion: "Wedding",
     });
     expect(ids).toEqual(["gala-gown"]);
+  });
+
+  it("passes unknowns through positive occasion and color constraints; stated mismatches still exclude (YOY-35 AC-1)", async () => {
+    await seed(db, [
+      // Legitimately sparse enrichment: category known, occasions/colors not.
+      {
+        productId: "sparse-dress",
+        vector: [1, 0, 0],
+        enrichment: { category: "dress", colors: [], occasions: [] },
+      },
+      // No enrichment row at all — equally unknown.
+      { productId: "unenriched", vector: [0.9, 0.1, 0], enrichment: null },
+      // Stated and mismatched on both attributes — still excluded.
+      {
+        productId: "black-beach-dress",
+        vector: [0.8, 0.2, 0],
+        enrichment: {
+          category: "dress",
+          colors: ["black"],
+          occasions: ["beach"],
+        },
+      },
+      // Stated and matching — included, of course.
+      {
+        productId: "red-wedding-dress",
+        vector: [0, 1, 0],
+        enrichment: {
+          category: "dress",
+          colors: ["red"],
+          occasions: ["wedding"],
+        },
+      },
+    ]);
+
+    const ids = await queryIds(db, {
+      ...noConstraints(),
+      colorsInclude: ["red"],
+      occasion: "wedding",
+    });
+    expect(ids).toEqual(["sparse-dress", "unenriched", "red-wedding-dress"]);
+  });
+
+  it("expands a parent category constraint through the taxonomy groups; child constraints stay exact (YOY-35 AC-5)", async () => {
+    await seed(db, [
+      {
+        productId: "white-sneakers",
+        vector: [1, 0, 0],
+        enrichment: { category: "sneakers", colors: ["white"] },
+      },
+      {
+        productId: "leather-boots",
+        vector: [0.9, 0.1, 0],
+        enrichment: { category: "boots" },
+      },
+      {
+        productId: "pearl-necklace",
+        vector: [0.8, 0.2, 0],
+        enrichment: { category: "jewelry" },
+      },
+      {
+        productId: "silk-dress",
+        vector: [0.7, 0.3, 0],
+        enrichment: { category: "dress" },
+      },
+    ]);
+
+    // g07's shape: a "shoes" constraint admits the sneakers (and boots).
+    expect(
+      await queryIds(db, { ...noConstraints(), category: "shoes" }),
+    ).toEqual(["white-sneakers", "leather-boots"]);
+    // g20's shape: an "accessories" constraint admits jewelry.
+    expect(
+      await queryIds(db, { ...noConstraints(), category: "accessories" }),
+    ).toEqual(["pearl-necklace"]);
+    // A child constraint stays exact: sneakers means sneakers.
+    expect(
+      await queryIds(db, { ...noConstraints(), category: "sneakers" }),
+    ).toEqual(["white-sneakers"]);
   });
 
   it("filters out unavailable products when availability is required", async () => {

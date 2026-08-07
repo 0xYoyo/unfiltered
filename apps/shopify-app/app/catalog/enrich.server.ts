@@ -76,6 +76,8 @@ export function buildEnrichmentPrompt(product: EnrichableProduct): string {
     `- category must be one of: ${CANONICAL_CATEGORIES.join(", ")}. Use`,
     '  "other" when none fits.',
     `- occasions may only contain: ${CANONICAL_OCCASIONS.join(", ")}.`,
+    "- colors: only colors the product text itself states. Never invent or",
+    "  infer a color; when the text states no color, colors must be [].",
     "Use empty strings/arrays for the other attributes when the text gives",
     "no evidence for them. Answer as JSON.",
     "",

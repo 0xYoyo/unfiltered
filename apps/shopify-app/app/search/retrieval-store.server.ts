@@ -4,6 +4,7 @@ import type {
   StoreQueryHit,
   StoreQueryRequest,
 } from "@unfiltered/engine";
+import { expandCategoryConstraint } from "@unfiltered/engine";
 
 /**
  * Postgres/pgvector implementation of the engine's RetrievalStore port.
@@ -16,10 +17,15 @@ import type {
  *
  * Attribute constraints (category, colors, occasion) compare against the
  * enrichment row, whose values are normalized lowercase English; constraint
- * values are lowercased in SQL to match. Missing enrichment is treated as
- * unknown: exclusions keep the product (nothing proves it carries an excluded
- * color), while positive attribute constraints drop it (nothing proves it
- * matches). Price and availability come from the catalog snapshot itself.
+ * values are lowercased in SQL to match. Hard filters enforce only what is
+ * KNOWN (YOY-35 AC-1): a positive occasion or colorsInclude constraint keeps
+ * products whose enrichment states no occasions/colors — absence of data is
+ * not a mismatch, and vector similarity ranks them — while a stated-and-
+ * mismatched value still excludes. Exclusions likewise keep unknowns (nothing
+ * proves an excluded color). Category stays evidence-required, expanded
+ * through the taxonomy's category groups (AC-5) so a parent constraint
+ * ("shoes") admits its members ("sneakers"). Price and availability come from
+ * the catalog snapshot itself.
  *
  * Vector comparisons cast both sides through the query vector's dimension, so
  * stored vectors of a different dimension fail loudly instead of comparing
@@ -57,19 +63,24 @@ export function createPgVectorRetrievalStore(db: PrismaClient): RetrievalStore {
         where.push(`p."available"`);
       }
       if (constraints.category !== undefined) {
-        where.push(`lower(en."category") = lower(${param(constraints.category)})`);
+        where.push(
+          `lower(en."category") IN (SELECT lower(v)
+             FROM json_array_elements_text(${param(JSON.stringify(expandCategoryConstraint(constraints.category)))}::json) v)`,
+        );
       }
       if (constraints.occasion !== undefined) {
         where.push(
-          `EXISTS (SELECT 1 FROM unnest(en."occasions") o
-             WHERE lower(o) = lower(${param(constraints.occasion)}))`,
+          `(COALESCE(cardinality(en."occasions"), 0) = 0
+             OR EXISTS (SELECT 1 FROM unnest(en."occasions") o
+               WHERE lower(o) = lower(${param(constraints.occasion)})))`,
         );
       }
       if (constraints.colorsInclude.length > 0) {
         where.push(
-          `EXISTS (SELECT 1 FROM unnest(en."colors") c
-             WHERE lower(c) IN (SELECT lower(v)
-               FROM json_array_elements_text(${param(JSON.stringify(constraints.colorsInclude))}::json) v))`,
+          `(COALESCE(cardinality(en."colors"), 0) = 0
+             OR EXISTS (SELECT 1 FROM unnest(en."colors") c
+               WHERE lower(c) IN (SELECT lower(v)
+                 FROM json_array_elements_text(${param(JSON.stringify(constraints.colorsInclude))}::json) v)))`,
         );
       }
       if (constraints.colorsExclude.length > 0) {

@@ -13,6 +13,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createPrismaCostRecorder } from "./ai/cost-recorder.server";
 import type { ProductAttributes } from "./catalog/enrich.server";
 import {
+  buildEnrichmentPrompt,
   ENRICHMENT_SCHEMA,
   enrichCatalog,
   parseEnrichment,
@@ -171,6 +172,46 @@ describe("ENRICHMENT_SCHEMA pins the canonical enums (YOY-31 AC-2, AC-7)", () =>
     for (const outOfSet of ["party", "gala", "office", ""]) {
       expect(occasionEnum).not.toContain(outOfSet);
     }
+  });
+});
+
+describe("colors are extracted, never invented (YOY-35 AC-4)", () => {
+  it("prompts that colors absent from the product text must not be invented", () => {
+    const prompt = buildEnrichmentPrompt({
+      productId: "p",
+      title: "Plain tee",
+      description: "",
+      tags: [],
+      productType: "T-Shirt",
+      imageAltTexts: [],
+      contentHash: "h",
+    });
+    expect(prompt).toContain("Never invent");
+    expect(prompt).toContain("colors must be []");
+  });
+
+  it("persists an empty colors array for a color-free product", async () => {
+    // Recorded fixture shape for color-free text: the schema-constrained
+    // model answers colors [] — and [] is stored, not padded.
+    const { llm } = llmStub((request) =>
+      request.prompt.includes("Plain tee")
+        ? recordedAttributes({ colors: [] })
+        : recordedAttributes(),
+    );
+
+    const result = await enrichCatalog({ db, shopDomain: SHOP, llm });
+
+    expect(result).toEqual({ enriched: 3, cached: 0, failed: 0 });
+    const row = await db.productEnrichment.findUniqueOrThrow({
+      where: {
+        shopDomain_productId: {
+          shopDomain: SHOP,
+          productId: "gid://shopify/Product/3",
+        },
+      },
+    });
+    expect(row.status).toBe("enriched");
+    expect(row.colors).toEqual([]);
   });
 });
 

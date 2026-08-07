@@ -7,6 +7,7 @@ import {
   createIntentExtractor,
   createQueryClassifier,
   createRetriever,
+  expandCategoryConstraint,
   type Intent,
   type RetrievalHit,
 } from "@unfiltered/engine";
@@ -112,7 +113,11 @@ export function loadGoldens(): Golden[] {
 }
 
 /** Check one returned product against a golden's hard constraints. Exported
- * for the harness's own scoring tests (YOY-29 AC-11). */
+ * for the harness's own scoring tests (YOY-29 AC-11). Mirrors the retrieval
+ * filter's semantics (YOY-35 AC-2): empty enrichment occasions/colors are
+ * unknown, not violations of positive constraints — only stated-and-mismatched
+ * values violate — and a category constraint admits its taxonomy group's
+ * members (AC-5), the same expansion retrieval filters through. */
 export function findViolations(
   golden: Golden,
   productId: string,
@@ -140,15 +145,19 @@ export function findViolations(
   }
   if (constraints.category !== null) {
     const category = enrichment?.category?.toLowerCase() ?? null;
-    if (category !== constraints.category.toLowerCase()) {
-      violations.push(`${productId}: category "${category}" ≠ "${constraints.category}"`);
+    const admitted = expandCategoryConstraint(constraints.category);
+    if (category === null || !admitted.includes(category)) {
+      violations.push(`${productId}: category "${category}" ∉ [${admitted.join(", ")}]`);
     }
   }
   if (constraints.occasion !== null) {
     const occasions = (enrichment?.occasions ?? []).map((occasion) =>
       occasion.toLowerCase(),
     );
-    if (!occasions.includes(constraints.occasion.toLowerCase())) {
+    if (
+      occasions.length > 0 &&
+      !occasions.includes(constraints.occasion.toLowerCase())
+    ) {
       violations.push(
         `${productId}: occasions [${occasions.join(", ")}] miss "${constraints.occasion}"`,
       );
@@ -164,6 +173,7 @@ export function findViolations(
   }
   if (
     constraints.colorsInclude.length > 0 &&
+    colors.size > 0 &&
     !constraints.colorsInclude.some((color) => colors.has(color.toLowerCase()))
   ) {
     violations.push(`${productId}: carries none of the required colors`);

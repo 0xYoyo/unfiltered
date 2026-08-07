@@ -195,8 +195,12 @@ async function postJson(
  * Translate a JSON-Schema nullable union (`type: ["string", "null"]`) into
  * Gemini's structured-output dialect (`type: "string", nullable: true`),
  * recursively through the whole schema. Gemini's responseSchema rejects type
- * arrays outright (YOY-28). Everything else passes through unchanged: the
- * engine speaks JSON Schema; this adapter owns the vendor dialect.
+ * arrays outright (YOY-28). A null admitted in an `enum` alongside the union
+ * (the engine's strictly self-consistent enum-or-null form, YOY-35 AC-6) is
+ * likewise re-expressed through `nullable` — the enum sent to Gemini lists
+ * only the string tokens, exactly as before the engine added null to it.
+ * Everything else passes through unchanged: the engine speaks JSON Schema;
+ * this adapter owns the vendor dialect.
  */
 export function toGeminiResponseSchema(schema: unknown): unknown {
   if (Array.isArray(schema)) {
@@ -215,6 +219,9 @@ export function toGeminiResponseSchema(schema: unknown): unknown {
     if (nonNull.length === 1) {
       translated.type = nonNull[0];
       translated.nullable = true;
+      if (Array.isArray(translated.enum) && translated.enum.includes(null)) {
+        translated.enum = translated.enum.filter((entry) => entry !== null);
+      }
     }
   }
   return translated;
