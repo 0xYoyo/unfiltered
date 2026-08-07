@@ -4,6 +4,10 @@ import type {
   LlmClient,
   StructuredCompletionRequest,
 } from "@unfiltered/engine";
+import {
+  CANONICAL_CATEGORIES,
+  CANONICAL_OCCASIONS,
+} from "@unfiltered/engine";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { createPrismaCostRecorder } from "./ai/cost-recorder.server";
@@ -116,6 +120,57 @@ describe("parseEnrichment", () => {
     const missingFit: Partial<ProductAttributes> = recordedAttributes();
     delete missingFit.fit;
     expect(parseEnrichment(missingFit)).toBeNull();
+  });
+
+  it("normalizes category and occasions into the canonical taxonomy (YOY-31 AC-4)", () => {
+    // Plural and synonym answers — the live-regeneration failure mode —
+    // converge onto canonical tokens instead of landing as free text.
+    expect(
+      parseEnrichment(recordedAttributes({ category: "Dresses" }))?.category,
+    ).toBe("dress");
+    expect(
+      parseEnrichment(recordedAttributes({ category: "outerwear" }))?.category,
+    ).toBe("coat");
+    expect(
+      parseEnrichment(recordedAttributes({ category: "accessory" }))?.category,
+    ).toBe("accessories");
+    expect(
+      parseEnrichment(
+        recordedAttributes({ occasions: ["party", "gala", "office"] }),
+      )?.occasions,
+    ).toEqual(["evening", "work"]);
+    // Unmappable values become "other" — the enrichment site's contract.
+    expect(
+      parseEnrichment(recordedAttributes({ category: "widget" }))?.category,
+    ).toBe("other");
+    expect(
+      parseEnrichment(recordedAttributes({ occasions: ["brunch"] }))?.occasions,
+    ).toEqual(["other"]);
+  });
+});
+
+describe("ENRICHMENT_SCHEMA pins the canonical enums (YOY-31 AC-2, AC-7)", () => {
+  const property = (name: string) =>
+    (ENRICHMENT_SCHEMA.properties as Record<string, Record<string, unknown>>)[
+      name
+    ]!;
+
+  it("rejects out-of-set category and occasion values", () => {
+    const categoryEnum = property("category").enum as string[];
+    const occasionEnum = (
+      property("occasions").items as Record<string, unknown>
+    ).enum as string[];
+    // Any conforming validator — Gemini's responseSchema included — must
+    // reject values outside these token lists, so a free-text answer takes
+    // the retry/failed path instead of landing in the store.
+    expect(categoryEnum).toEqual([...CANONICAL_CATEGORIES]);
+    expect(occasionEnum).toEqual([...CANONICAL_OCCASIONS]);
+    for (const outOfSet of ["dresses", "gown", "שמלה", ""]) {
+      expect(categoryEnum).not.toContain(outOfSet);
+    }
+    for (const outOfSet of ["party", "gala", "office", ""]) {
+      expect(occasionEnum).not.toContain(outOfSet);
+    }
   });
 });
 

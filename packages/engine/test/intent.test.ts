@@ -40,7 +40,9 @@ interface RecordedScenario {
 
 // The four AC-3 scenarios. `recorded` is the model's answer verbatim —
 // including null-for-absent optionals — and `expected` shows the hard/soft
-// split the retrieval layer will consume.
+// split the retrieval layer will consume. Since YOY-31 the response schema
+// pins category/occasion to the canonical taxonomy, so recorded answers carry
+// canonical English tokens regardless of the query's language.
 const scenarios: RecordedScenario[] = [
   {
     name: "EN query with price cap and color exclusion",
@@ -74,25 +76,25 @@ const scenarios: RecordedScenario[] = [
     name: "HE equivalent",
     query: "שמלה אלגנטית לחתונה בקיץ, לא שחור, עד 400",
     recorded: {
-      category: "שמלה",
+      category: "dress",
       priceMin: null,
       priceMax: 400,
       currency: null,
       colorsInclude: [],
       colorsExclude: ["שחור"],
-      occasion: "חתונה",
+      occasion: "wedding",
       size: null,
       availabilityRequired: false,
       softAttributes: ["אלגנטית", "קיץ"],
     },
     expected: {
-      category: "שמלה",
+      category: "dress",
       priceMin: undefined,
       priceMax: 400,
       currency: undefined,
       colorsInclude: [],
       colorsExclude: ["שחור"],
-      occasion: "חתונה",
+      occasion: "wedding",
       size: undefined,
       availabilityRequired: false,
       softAttributes: ["אלגנטית", "קיץ"],
@@ -102,25 +104,25 @@ const scenarios: RecordedScenario[] = [
     name: "mixed EN/HE query",
     query: "שמלת מקסי elegant לחתונה בקיץ במידה M במלאי",
     recorded: {
-      category: "שמלת מקסי",
+      category: "dress",
       priceMin: null,
       priceMax: null,
       currency: null,
       colorsInclude: [],
       colorsExclude: [],
-      occasion: "חתונה",
+      occasion: "wedding",
       size: "M",
       availabilityRequired: true,
       softAttributes: ["elegant", "קיץ"],
     },
     expected: {
-      category: "שמלת מקסי",
+      category: "dress",
       priceMin: undefined,
       priceMax: undefined,
       currency: undefined,
       colorsInclude: [],
       colorsExclude: [],
-      occasion: "חתונה",
+      occasion: "wedding",
       size: "M",
       availabilityRequired: true,
       softAttributes: ["elegant", "קיץ"],
@@ -203,6 +205,16 @@ describe("INTENT_SCHEMA admits null optionals (YOY-29 AC-8)", () => {
     if (!matchesType) {
       return false;
     }
+    // Enum tokens (YOY-31): a non-null value must be one of them. Null stays
+    // admitted through the type union — the provider adapter expresses it as
+    // its nullable dialect, not as an enum member.
+    if (
+      Array.isArray(schema.enum) &&
+      value !== null &&
+      !schema.enum.includes(value)
+    ) {
+      return false;
+    }
     if (types.includes("object") && typeof value === "object" && value !== null) {
       const properties = (schema.properties ?? {}) as Record<
         string,
@@ -223,6 +235,16 @@ describe("INTENT_SCHEMA admits null optionals (YOY-29 AC-8)", () => {
   it("rejects a wrong-typed answer, proving the checker has teeth", () => {
     expect(conforms(INTENT_SCHEMA, { ...scenarios[0]!.recorded, priceMax: "400" })).toBe(false);
     expect(conforms(INTENT_SCHEMA, { colorsInclude: [] })).toBe(false);
+  });
+
+  it("rejects out-of-set category and occasion values (YOY-31 AC-3, AC-7)", () => {
+    const valid = scenarios[0]!.recorded;
+    expect(conforms(INTENT_SCHEMA, { ...valid, category: "dresses" })).toBe(false);
+    expect(conforms(INTENT_SCHEMA, { ...valid, category: "שמלה" })).toBe(false);
+    expect(conforms(INTENT_SCHEMA, { ...valid, occasion: "gala" })).toBe(false);
+    // The canonical tokens and null all conform.
+    expect(conforms(INTENT_SCHEMA, { ...valid, category: "other" })).toBe(true);
+    expect(conforms(INTENT_SCHEMA, { ...valid, category: null, occasion: null })).toBe(true);
   });
 
   for (const scenario of scenarios) {
@@ -309,6 +331,26 @@ describe("parseIntent", () => {
     expect(parseIntent({ ...valid, colorsExclude: [7] })).toBeNull();
     expect(parseIntent({ ...valid, availabilityRequired: "no" })).toBeNull();
     expect(parseIntent({ ...valid, softAttributes: undefined })).toBeNull();
+  });
+
+  it("normalizes category and occasion into the canonical taxonomy (YOY-31 AC-4, AC-5)", () => {
+    const valid = scenarios[0]!.recorded;
+    // g03's shape: a raw "gown"/"gala" answer must converge onto the golden's
+    // documented dress/evening constraints, not the other way around.
+    const gown = parseIntent({ ...valid, category: "gown", occasion: "gala" });
+    expect(gown?.category).toBe("dress");
+    expect(gown?.occasion).toBe("evening");
+    const messy = parseIntent({ ...valid, category: " Dresses ", occasion: "Party" });
+    expect(messy?.category).toBe("dress");
+    expect(messy?.occasion).toBe("evening");
+    // Unmappable values and the "other" bucket drop the constraint entirely
+    // rather than hard-filtering on a token enrichment cannot carry.
+    const unmappable = parseIntent({ ...valid, category: "widget", occasion: "brunch" });
+    expect(unmappable?.category).toBeUndefined();
+    expect(unmappable?.occasion).toBeUndefined();
+    const other = parseIntent({ ...valid, category: "other", occasion: "other" });
+    expect(other?.category).toBeUndefined();
+    expect(other?.occasion).toBeUndefined();
   });
 
   it("normalizes missing optionals like nulls", () => {

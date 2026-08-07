@@ -6,6 +6,12 @@
  */
 
 import type { JsonSchema, LlmClient } from "./index.js";
+import {
+  CANONICAL_CATEGORIES,
+  CANONICAL_OCCASIONS,
+  normalizeCategory,
+  normalizeOccasion,
+} from "./taxonomy.js";
 
 /**
  * Structured intent extracted from one query. Optional fields are hard
@@ -43,13 +49,16 @@ export const INTENT_SCHEMA: JsonSchema = {
     // Optional fields admit null so the schema matches real model answers,
     // which return null for absent values (YOY-29 AC-8); a provider strictly
     // enforcing the response schema must not reject or retry on them.
-    category: { type: ["string", "null"] },
+    // category and occasion are pinned to the canonical taxonomy (YOY-31):
+    // the enum lists only the string tokens — null stays admitted via the
+    // type union, which the provider adapter maps to its nullable dialect.
+    category: { type: ["string", "null"], enum: [...CANONICAL_CATEGORIES] },
     priceMin: { type: ["number", "null"] },
     priceMax: { type: ["number", "null"] },
     currency: { type: ["string", "null"] },
     colorsInclude: { type: "array", items: { type: "string" } },
     colorsExclude: { type: "array", items: { type: "string" } },
-    occasion: { type: ["string", "null"] },
+    occasion: { type: ["string", "null"], enum: [...CANONICAL_OCCASIONS] },
     size: { type: ["string", "null"] },
     availabilityRequired: { type: "boolean" },
     softAttributes: { type: "array", items: { type: "string" } },
@@ -92,12 +101,16 @@ function buildIntentPrompt(query: string): string {
   return [
     "Extract structured shopping intent from this product search query.",
     "Split what the shopper said into hard constraints and soft attributes:",
-    "- category: the product type asked for, when stated.",
+    "- category: the product type asked for, when stated. Must be one of:",
+    `  ${CANONICAL_CATEGORIES.join(", ")}. Use null when the query states`,
+    '  no category and "other" when the stated category fits none of them.',
     "- priceMin / priceMax: numeric price bounds, when stated; currency as an",
     "  ISO 4217 code only when the query names or implies one.",
     "- colorsInclude: colors the shopper wants; colorsExclude: colors the",
     '  shopper rejects ("not black" → exclude black).',
-    "- occasion: the event or context the item is for, when stated.",
+    "- occasion: the event or context the item is for, when stated. Must be",
+    `  one of: ${CANONICAL_OCCASIONS.join(", ")}. Use null when the query`,
+    '  states no occasion and "other" when it fits none of them.',
     "- size: the requested size, when stated.",
     "- availabilityRequired: true only when the shopper asks for in-stock or",
     "  immediately available items.",
@@ -132,9 +145,28 @@ function isStringArray(value: unknown): value is string[] {
 }
 
 /**
+ * Fold one raw category/occasion answer into the canonical taxonomy (YOY-31
+ * AC-4): in-set-but-messy values ("Dresses", "gala") converge onto canonical
+ * tokens; unmappable values — and the explicit "other" bucket, which names no
+ * real constraint — drop to undefined so retrieval never hard-filters on a
+ * token the enrichment side cannot carry.
+ */
+function normalizedConstraint<T extends string>(
+  raw: string | undefined,
+  normalize: (value: string) => T | null,
+): T | undefined {
+  if (raw === undefined) {
+    return undefined;
+  }
+  const canonical = normalize(raw);
+  return canonical === null || canonical === "other" ? undefined : canonical;
+}
+
+/**
  * Validate a model answer against the Intent contract, normalizing absent
- * optionals (null or missing) to undefined. Returns null on any violation so
- * the extractor can retry.
+ * optionals (null or missing) to undefined and category/occasion into the
+ * canonical taxonomy. Returns null on any violation so the extractor can
+ * retry.
  */
 export function parseIntent(value: unknown): Intent | null {
   if (typeof value !== "object" || value === null) {
@@ -170,13 +202,13 @@ export function parseIntent(value: unknown): Intent | null {
   }
 
   return {
-    category: category ?? undefined,
+    category: normalizedConstraint(category ?? undefined, normalizeCategory),
     priceMin: priceMin ?? undefined,
     priceMax: priceMax ?? undefined,
     currency: currency ?? undefined,
     colorsInclude,
     colorsExclude,
-    occasion: occasion ?? undefined,
+    occasion: normalizedConstraint(occasion ?? undefined, normalizeOccasion),
     size: size ?? undefined,
     availabilityRequired,
     softAttributes,

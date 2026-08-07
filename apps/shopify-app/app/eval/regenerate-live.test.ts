@@ -32,7 +32,7 @@ import {
 } from "../catalog/enrich.server";
 import { computeContentHash } from "../catalog/mapping.server";
 import { createTestDb } from "../testing/helpers.server";
-import { loadCatalog, loadGoldens } from "./harness.server";
+import { loadCatalog, loadGoldens, runEval } from "./harness.server";
 import { recordingKeyFromPrompt } from "./replay.server";
 
 // Fixture regeneration (AC-5 of YOY-27): re-records every eval fixture output
@@ -422,5 +422,30 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
     expect(Object.keys(enrichmentEntries)).toHaveLength(catalog.length);
     expect(Object.keys(intentEntries)).toHaveLength(goldens.length);
     expect(Object.keys(vectors)).toHaveLength(unique.length);
+
+    // In-process re-score against the freshly written recordings (YOY-31
+    // AC-6). Vitest gives the offline harness suite no ordering guarantee
+    // relative to this file — it may score the OLD recordings, or even run
+    // before this test rewrites them — so a green offline suite in the same
+    // run proves nothing about the fresh recordings. Re-running the eval here,
+    // after every fixture is on disk, makes taxonomy drift fail the live run
+    // itself instead of the next offline run.
+    const evalDb = await createTestDb();
+    try {
+      const rescored = await runEval(evalDb);
+      const misses = rescored.perQuery
+        .filter((score) => score.firstExpectedRank === null)
+        .map((score) => score.golden.id);
+      expect(
+        rescored.hitRate,
+        `fresh recordings miss the bar; misses: ${misses.join(", ")}`,
+      ).toBeGreaterThanOrEqual(0.8);
+      expect(
+        rescored.perQuery.flatMap((score) => score.violations),
+      ).toEqual([]);
+      expect(rescored.perSearchCostPer1000Usd).toBeLessThanOrEqual(2.0);
+    } finally {
+      await evalDb.$disconnect();
+    }
   }, 2_700_000);
 });

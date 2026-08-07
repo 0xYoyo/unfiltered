@@ -35,6 +35,15 @@ export {
 } from "./intent.js";
 
 export {
+  CANONICAL_CATEGORIES,
+  CANONICAL_OCCASIONS,
+  normalizeCategory,
+  normalizeOccasion,
+  type CanonicalCategory,
+  type CanonicalOccasion,
+} from "./taxonomy.js";
+
+export {
   appliedConstraints,
   composeQueryText,
   constraintsFromIntent,
