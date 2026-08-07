@@ -5,141 +5,141 @@
       "output": {
         "route": "ai"
       },
-      "inputTokens": 103,
-      "outputTokens": 6
+      "inputTokens": 100,
+      "outputTokens": 11
     },
     "שמלה אלגנטית לחתונה בקיץ לא שחור עד 400": {
       "output": {
         "route": "ai"
       },
-      "inputTokens": 100,
-      "outputTokens": 6
+      "inputTokens": 108,
+      "outputTokens": 11
     },
     "black evening gown for a formal gala": {
       "output": {
         "route": "ai"
       },
-      "inputTokens": 99,
-      "outputTokens": 6
+      "inputTokens": 94,
+      "outputTokens": 11
     },
     "שמלת ערב שחורה עד 400": {
       "output": {
         "route": "ai"
       },
-      "inputTokens": 96,
-      "outputTokens": 6
+      "inputTokens": 99,
+      "outputTokens": 11
     },
     "warm winter coat under 500, not black": {
       "output": {
         "route": "ai"
       },
-      "inputTokens": 100,
-      "outputTokens": 6
+      "inputTokens": 98,
+      "outputTokens": 11
     },
     "מעיל חם לחורף לא שחור עד 500": {
       "output": {
         "route": "ai"
       },
-      "inputTokens": 97,
-      "outputTokens": 6
+      "inputTokens": 103,
+      "outputTokens": 11
     },
     "white sneakers for everyday wear": {
       "output": {
         "route": "ai"
       },
-      "inputTokens": 98,
-      "outputTokens": 6
+      "inputTokens": 92,
+      "outputTokens": 11
     },
     "נעלי עקב elegant לערב": {
       "output": {
         "route": "ai"
       },
-      "inputTokens": 96,
-      "outputTokens": 6
+      "inputTokens": 95,
+      "outputTokens": 11
     },
     "gold strappy sandals for a summer wedding under 250": {
       "output": {
         "route": "ai"
       },
-      "inputTokens": 103,
-      "outputTokens": 6
+      "inputTokens": 100,
+      "outputTokens": 11
     },
     "cozy cashmere sweater for cold winter evenings": {
       "output": {
         "route": "ai"
       },
-      "inputTokens": 102,
-      "outputTokens": 6
+      "inputTokens": 94,
+      "outputTokens": 11
     },
     "סוודר חם לחורף": {
       "output": {
         "route": "ai"
       },
-      "inputTokens": 94,
-      "outputTokens": 6
+      "inputTokens": 96,
+      "outputTokens": 11
     },
     "leather jacket for a night out, in stock": {
       "output": {
         "route": "ai"
       },
-      "inputTokens": 100,
-      "outputTokens": 6
+      "inputTokens": 96,
+      "outputTokens": 11
     },
     "party dress in stock under 400": {
       "output": {
         "route": "ai"
       },
-      "inputTokens": 98,
-      "outputTokens": 6
+      "inputTokens": 96,
+      "outputTokens": 11
     },
     "שמלת מקסי לבנה לחתונה": {
       "output": {
         "route": "ai"
       },
       "inputTokens": 96,
-      "outputTokens": 6
+      "outputTokens": 11
     },
     "מעיל winter אלגנטי בצבע camel": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 96,
+      "outputTokens": 11
+    },
+    "beige office skirt under 200": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 95,
+      "outputTokens": 11
+    },
+    "חצאית מיני שחורה למסיבה": {
       "output": {
         "route": "ai"
       },
       "inputTokens": 98,
       "outputTokens": 6
     },
-    "beige office skirt under 200": {
-      "output": {
-        "route": "ai"
-      },
-      "inputTokens": 97,
-      "outputTokens": 6
-    },
-    "חצאית מיני שחורה למסיבה": {
-      "output": {
-        "route": "ai"
-      },
-      "inputTokens": 96,
-      "outputTokens": 6
-    },
     "white linen summer pants for the beach under 200": {
       "output": {
         "route": "ai"
       },
-      "inputTokens": 102,
-      "outputTokens": 6
+      "inputTokens": 99,
+      "outputTokens": 11
     },
     "תיק ערב מנצנץ עד 250": {
       "output": {
         "route": "ai"
       },
-      "inputTokens": 95,
-      "outputTokens": 6
+      "inputTokens": 101,
+      "outputTokens": 11
     },
     "accessory אלגנטי לחתונה בצבע white": {
       "output": {
         "route": "ai"
       },
-      "inputTokens": 99,
-      "outputTokens": 6
+      "inputTokens": 97,
+      "outputTokens": 11
     }
   }
 }

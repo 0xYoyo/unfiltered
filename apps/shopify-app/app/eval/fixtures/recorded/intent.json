@@ -3,403 +3,393 @@
   "entries": {
     "elegant summer wedding dress, not black, under 400": {
       "output": {
-        "category": "dress",
-        "priceMin": null,
-        "priceMax": 400,
-        "currency": null,
         "colorsInclude": [],
         "colorsExclude": [
           "black"
         ],
-        "occasion": "wedding",
-        "size": null,
         "availabilityRequired": false,
         "softAttributes": [
           "elegant",
           "summer"
-        ]
+        ],
+        "category": "dress",
+        "currency": null,
+        "occasion": "wedding",
+        "priceMax": 400,
+        "priceMin": null,
+        "size": null
       },
-      "inputTokens": 233,
-      "outputTokens": 53
+      "inputTokens": 398,
+      "outputTokens": 102
     },
     "שמלה אלגנטית לחתונה בקיץ לא שחור עד 400": {
       "output": {
-        "category": "dress",
-        "priceMin": null,
-        "priceMax": 400,
-        "currency": null,
         "colorsInclude": [],
         "colorsExclude": [
           "black"
         ],
-        "occasion": "wedding",
-        "size": null,
         "availabilityRequired": false,
         "softAttributes": [
           "אלגנטית",
-          "קיץ"
-        ]
+          "בקיץ"
+        ],
+        "category": "dress",
+        "currency": "ILS",
+        "occasion": "wedding",
+        "priceMax": 400,
+        "priceMin": null,
+        "size": null
       },
-      "inputTokens": 230,
-      "outputTokens": 53
+      "inputTokens": 406,
+      "outputTokens": 55
     },
     "black evening gown for a formal gala": {
       "output": {
-        "category": "dress",
-        "priceMin": null,
-        "priceMax": null,
-        "currency": null,
         "colorsInclude": [
           "black"
         ],
         "colorsExclude": [],
-        "occasion": "evening",
-        "size": null,
         "availabilityRequired": false,
         "softAttributes": [
           "formal",
-          "gown"
-        ]
+          "gala"
+        ],
+        "category": "dress",
+        "currency": null,
+        "occasion": "evening",
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
       },
-      "inputTokens": 229,
-      "outputTokens": 53
+      "inputTokens": 392,
+      "outputTokens": 49
     },
     "שמלת ערב שחורה עד 400": {
       "output": {
-        "category": "dress",
-        "priceMin": null,
-        "priceMax": 400,
-        "currency": null,
         "colorsInclude": [
           "black"
         ],
         "colorsExclude": [],
-        "occasion": "evening",
-        "size": null,
         "availabilityRequired": false,
-        "softAttributes": []
+        "softAttributes": [],
+        "category": "dress",
+        "currency": null,
+        "occasion": "evening",
+        "priceMax": 400,
+        "priceMin": null,
+        "size": null
       },
-      "inputTokens": 226,
-      "outputTokens": 49
+      "inputTokens": 397,
+      "outputTokens": 48
     },
     "warm winter coat under 500, not black": {
       "output": {
-        "category": "coat",
-        "priceMin": null,
-        "priceMax": 500,
-        "currency": null,
         "colorsInclude": [],
         "colorsExclude": [
           "black"
         ],
-        "occasion": null,
-        "size": null,
         "availabilityRequired": false,
         "softAttributes": [
           "warm",
           "winter"
-        ]
+        ],
+        "category": "coat",
+        "currency": null,
+        "occasion": null,
+        "priceMax": 500,
+        "priceMin": null,
+        "size": null
       },
-      "inputTokens": 230,
-      "outputTokens": 51
+      "inputTokens": 396,
+      "outputTokens": 50
     },
     "מעיל חם לחורף לא שחור עד 500": {
       "output": {
-        "category": "coat",
-        "priceMin": null,
-        "priceMax": 500,
-        "currency": null,
         "colorsInclude": [],
         "colorsExclude": [
           "black"
         ],
-        "occasion": null,
-        "size": null,
         "availabilityRequired": false,
         "softAttributes": [
           "חם",
-          "חורף"
-        ]
+          "לחורף"
+        ],
+        "category": "coat",
+        "currency": null,
+        "occasion": null,
+        "priceMax": 500,
+        "priceMin": null,
+        "size": null
       },
-      "inputTokens": 227,
-      "outputTokens": 50
+      "inputTokens": 401,
+      "outputTokens": 103
     },
     "white sneakers for everyday wear": {
       "output": {
-        "category": "shoes",
-        "priceMin": null,
-        "priceMax": null,
-        "currency": null,
         "colorsInclude": [
           "white"
         ],
         "colorsExclude": [],
-        "occasion": null,
-        "size": null,
         "availabilityRequired": false,
-        "softAttributes": [
-          "sneakers",
-          "everyday"
-        ]
+        "softAttributes": [],
+        "category": "sneakers",
+        "occasion": "casual"
       },
-      "inputTokens": 228,
-      "outputTokens": 53
+      "inputTokens": 390,
+      "outputTokens": 28
     },
     "נעלי עקב elegant לערב": {
       "output": {
-        "category": "shoes",
-        "priceMin": null,
-        "priceMax": null,
-        "currency": null,
         "colorsInclude": [],
         "colorsExclude": [],
-        "occasion": "evening",
-        "size": null,
         "availabilityRequired": false,
         "softAttributes": [
-          "elegant",
-          "עקב"
-        ]
+          "נעלי עקב",
+          "elegant"
+        ],
+        "category": "shoes",
+        "currency": null,
+        "occasion": "evening",
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
       },
-      "inputTokens": 226,
-      "outputTokens": 51
+      "inputTokens": 393,
+      "outputTokens": 50
     },
     "gold strappy sandals for a summer wedding under 250": {
       "output": {
-        "category": "shoes",
-        "priceMin": null,
-        "priceMax": 250,
-        "currency": null,
         "colorsInclude": [
           "gold"
         ],
         "colorsExclude": [],
-        "occasion": "wedding",
-        "size": null,
         "availabilityRequired": false,
         "softAttributes": [
           "strappy",
-          "sandals",
           "summer"
-        ]
+        ],
+        "category": "shoes",
+        "currency": null,
+        "occasion": "wedding",
+        "priceMax": 250,
+        "priceMin": null,
+        "size": null
       },
-      "inputTokens": 233,
-      "outputTokens": 56
+      "inputTokens": 398,
+      "outputTokens": 51
     },
     "cozy cashmere sweater for cold winter evenings": {
       "output": {
-        "category": "top",
-        "priceMin": null,
-        "priceMax": null,
-        "currency": null,
         "colorsInclude": [],
         "colorsExclude": [],
-        "occasion": null,
-        "size": null,
         "availabilityRequired": false,
         "softAttributes": [
           "cozy",
           "cashmere",
-          "sweater",
-          "winter"
-        ]
+          "cold winter evenings"
+        ],
+        "category": "top",
+        "currency": null,
+        "occasion": null,
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
       },
-      "inputTokens": 232,
-      "outputTokens": 55
+      "inputTokens": 392,
+      "outputTokens": 53
     },
     "סוודר חם לחורף": {
       "output": {
-        "category": "top",
-        "priceMin": null,
-        "priceMax": null,
-        "currency": null,
         "colorsInclude": [],
         "colorsExclude": [],
-        "occasion": null,
-        "size": null,
         "availabilityRequired": false,
         "softAttributes": [
-          "סוודר",
           "חם",
           "חורף"
-        ]
+        ],
+        "category": "top",
+        "currency": null,
+        "occasion": null,
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
       },
-      "inputTokens": 224,
+      "inputTokens": 394,
       "outputTokens": 50
     },
     "leather jacket for a night out, in stock": {
       "output": {
-        "category": "coat",
-        "priceMin": null,
-        "priceMax": null,
-        "currency": null,
         "colorsInclude": [],
         "colorsExclude": [],
-        "occasion": null,
-        "size": null,
         "availabilityRequired": true,
         "softAttributes": [
-          "leather",
-          "night out",
-          "edgy"
-        ]
+          "leather"
+        ],
+        "category": "jacket",
+        "currency": null,
+        "occasion": "evening",
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
       },
-      "inputTokens": 230,
-      "outputTokens": 53
+      "inputTokens": 394,
+      "outputTokens": 45
     },
     "party dress in stock under 400": {
       "output": {
-        "category": "dress",
-        "priceMin": null,
-        "priceMax": 400,
-        "currency": null,
         "colorsInclude": [],
         "colorsExclude": [],
-        "occasion": "party",
-        "size": null,
         "availabilityRequired": true,
-        "softAttributes": []
+        "softAttributes": [
+          "party"
+        ],
+        "category": "dress",
+        "currency": null,
+        "occasion": "evening",
+        "priceMax": 400,
+        "priceMin": null,
+        "size": null
       },
-      "inputTokens": 228,
-      "outputTokens": 46
+      "inputTokens": 394,
+      "outputTokens": 48
     },
     "שמלת מקסי לבנה לחתונה": {
       "output": {
-        "category": "dress",
-        "priceMin": null,
-        "priceMax": null,
-        "currency": null,
         "colorsInclude": [
           "white"
         ],
         "colorsExclude": [],
-        "occasion": "wedding",
-        "size": null,
         "availabilityRequired": false,
         "softAttributes": [
           "מקסי"
-        ]
+        ],
+        "category": "dress",
+        "currency": null,
+        "occasion": "wedding",
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
       },
-      "inputTokens": 226,
-      "outputTokens": 51
+      "inputTokens": 394,
+      "outputTokens": 48
     },
     "מעיל winter אלגנטי בצבע camel": {
       "output": {
-        "category": "coat",
-        "priceMin": null,
-        "priceMax": null,
-        "currency": null,
         "colorsInclude": [
           "camel"
         ],
         "colorsExclude": [],
-        "occasion": null,
-        "size": null,
         "availabilityRequired": false,
         "softAttributes": [
-          "elegant",
-          "winter"
-        ]
+          "winter",
+          "אלגנטי"
+        ],
+        "category": "coat",
+        "currency": null,
+        "occasion": null,
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
       },
-      "inputTokens": 228,
-      "outputTokens": 52
+      "inputTokens": 394,
+      "outputTokens": 99
     },
     "beige office skirt under 200": {
       "output": {
-        "category": "skirt",
-        "priceMin": null,
-        "priceMax": 200,
-        "currency": null,
         "colorsInclude": [
           "beige"
         ],
         "colorsExclude": [],
-        "occasion": "office",
-        "size": null,
         "availabilityRequired": false,
-        "softAttributes": []
+        "softAttributes": [],
+        "category": "skirt",
+        "currency": null,
+        "occasion": "work",
+        "priceMax": 200,
+        "priceMin": null,
+        "size": null
       },
-      "inputTokens": 227,
-      "outputTokens": 49
+      "inputTokens": 393,
+      "outputTokens": 48
     },
     "חצאית מיני שחורה למסיבה": {
       "output": {
-        "category": "skirt",
-        "priceMin": null,
-        "priceMax": null,
-        "currency": null,
         "colorsInclude": [
           "black"
         ],
         "colorsExclude": [],
-        "occasion": "party",
-        "size": null,
         "availabilityRequired": false,
         "softAttributes": [
           "מיני"
-        ]
+        ],
+        "category": "skirt",
+        "currency": null,
+        "occasion": "evening",
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
       },
-      "inputTokens": 226,
-      "outputTokens": 50
+      "inputTokens": 396,
+      "outputTokens": 48
     },
     "white linen summer pants for the beach under 200": {
       "output": {
-        "category": "pants",
-        "priceMin": null,
-        "priceMax": 200,
-        "currency": null,
         "colorsInclude": [
           "white"
         ],
         "colorsExclude": [],
-        "occasion": "beach",
-        "size": null,
         "availabilityRequired": false,
         "softAttributes": [
           "linen",
           "summer"
-        ]
+        ],
+        "category": "pants",
+        "currency": null,
+        "occasion": "beach",
+        "priceMax": 200,
+        "priceMin": null,
+        "size": null
       },
-      "inputTokens": 232,
-      "outputTokens": 52
+      "inputTokens": 397,
+      "outputTokens": 87
     },
     "תיק ערב מנצנץ עד 250": {
       "output": {
-        "category": "bag",
-        "priceMin": null,
-        "priceMax": 250,
-        "currency": null,
         "colorsInclude": [],
         "colorsExclude": [],
-        "occasion": "evening",
-        "size": null,
         "availabilityRequired": false,
         "softAttributes": [
           "מנצנץ"
-        ]
+        ],
+        "category": "bag",
+        "currency": null,
+        "occasion": "evening",
+        "priceMax": 250,
+        "priceMin": null,
+        "size": null
       },
-      "inputTokens": 225,
-      "outputTokens": 48
+      "inputTokens": 399,
+      "outputTokens": 92
     },
     "accessory אלגנטי לחתונה בצבע white": {
       "output": {
-        "category": "accessory",
-        "priceMin": null,
-        "priceMax": null,
-        "currency": null,
         "colorsInclude": [
           "white"
         ],
         "colorsExclude": [],
-        "occasion": "wedding",
-        "size": null,
         "availabilityRequired": false,
         "softAttributes": [
           "אלגנטי"
-        ]
+        ],
+        "category": "accessories",
+        "currency": null,
+        "occasion": "wedding",
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
       },
-      "inputTokens": 229,
-      "outputTokens": 52
+      "inputTokens": 395,
+      "outputTokens": 48
     }
   }
 }
