@@ -1,6 +1,12 @@
 import type { PrismaClient } from "@prisma/client";
 import type { JsonSchema, LlmClient } from "@unfiltered/engine";
 import {
+  CANONICAL_CATEGORIES,
+  CANONICAL_OCCASIONS,
+  normalizeCategory,
+  normalizeOccasion,
+} from "@unfiltered/engine";
+import {
   createGeminiLlmClient,
   geminiModelsFromEnv,
 } from "@unfiltered/provider-gemini";
@@ -29,9 +35,15 @@ export interface ProductAttributes {
 export const ENRICHMENT_SCHEMA: JsonSchema = {
   type: "object",
   properties: {
-    category: { type: "string" },
+    // category and occasions are pinned to the canonical taxonomy (YOY-31):
+    // an out-of-set answer violates the response schema and takes the
+    // existing retry/failed path instead of landing free text in the store.
+    category: { type: "string", enum: [...CANONICAL_CATEGORIES] },
     colors: { type: "array", items: { type: "string" } },
-    occasions: { type: "array", items: { type: "string" } },
+    occasions: {
+      type: "array",
+      items: { type: "string", enum: [...CANONICAL_OCCASIONS] },
+    },
     fit: { type: "string" },
     styleTags: { type: "array", items: { type: "string" } },
     seasons: { type: "array", items: { type: "string" } },
@@ -60,8 +72,12 @@ export function buildEnrichmentPrompt(product: EnrichableProduct): string {
   return [
     "Extract structured attributes for this fashion e-commerce product.",
     "The product text may be in any language; answer with lowercase English",
-    "attribute values. Use empty strings/arrays for attributes the text",
-    "gives no evidence for. Answer as JSON.",
+    "attribute values.",
+    `- category must be one of: ${CANONICAL_CATEGORIES.join(", ")}. Use`,
+    '  "other" when none fits.',
+    `- occasions may only contain: ${CANONICAL_OCCASIONS.join(", ")}.`,
+    "Use empty strings/arrays for the other attributes when the text gives",
+    "no evidence for them. Answer as JSON.",
     "",
     `Title: ${product.title}`,
     `Description: ${product.description}`,
@@ -78,8 +94,13 @@ function isStringArray(value: unknown): value is string[] {
 }
 
 /**
- * Validate one model completion against the attribute schema. Returns null on
- * any shape violation — the caller owns retry/failure bookkeeping.
+ * Validate one model completion against the attribute schema and normalize
+ * category/occasions into the canonical taxonomy (YOY-31 AC-4) before
+ * anything is stored: in-set-but-messy answers ("Dresses", "gala") converge
+ * onto canonical tokens; unmappable values become "other" — never free text,
+ * so the retrieval side's hard filters always compare one vocabulary.
+ * Returns null on any shape violation — the caller owns retry/failure
+ * bookkeeping.
  */
 export function parseEnrichment(value: unknown): ProductAttributes | null {
   if (typeof value !== "object" || value === null) {
@@ -97,9 +118,15 @@ export function parseEnrichment(value: unknown): ProductAttributes | null {
     return null;
   }
   return {
-    category: record.category,
+    category: normalizeCategory(record.category) ?? "other",
     colors: record.colors,
-    occasions: record.occasions,
+    occasions: [
+      ...new Set(
+        record.occasions.map(
+          (occasion) => normalizeOccasion(occasion) ?? "other",
+        ),
+      ),
+    ],
     fit: record.fit,
     styleTags: record.styleTags,
     seasons: record.seasons,

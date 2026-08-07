@@ -243,7 +243,7 @@
       "priceMax": 400,
       "colorsInclude": [],
       "colorsExclude": [],
-      "occasion": "party",
+      "occasion": "evening",
       "availabilityRequired": true
     }
   },
@@ -300,7 +300,7 @@
         "beige"
       ],
       "colorsExclude": [],
-      "occasion": "office",
+      "occasion": "work",
       "availabilityRequired": false
     }
   },
@@ -319,7 +319,7 @@
         "black"
       ],
       "colorsExclude": [],
-      "occasion": "party",
+      "occasion": "evening",
       "availabilityRequired": false
     }
   },
@@ -367,7 +367,7 @@
       "p59"
     ],
     "hardConstraints": {
-      "category": "accessory",
+      "category": "accessories",
       "priceMin": null,
       "priceMax": null,
       "colorsInclude": [
