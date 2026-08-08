@@ -439,16 +439,32 @@ regardless of the beacon's outcome. Degradation is total silence: no
 recognizable search input means nothing mounts, and a failed or timed-out
 search request removes the widget so the theme's native search behaves
 exactly as without the app — no error UI ever. `init` is idempotent and
-never throws into the merchant's page. AI responses render their results as
-plain cards for now — chips, refinement, and AI-specific states land later
-in the M3 chain.
+never throws into the merchant's page.
+
+AI states (YOY-49): an AI-routed response renders its applied constraints
+as a chip row above the grid — one removable chip per constraint, labeled
+in English ("dress", "Under 400", "Not black", "In stock") with an
+accessible remove label. Removing a chip resends the last query carrying
+the held intent plus the dismissed chip (the endpoint's chip-removal
+contract — zero LLM calls server-side) and the whole overlay re-renders
+from the response. The widget holds the latest response's echoed `intent`
+in memory only (page-view lifetime, never persisted — NG-4): a follow-up
+typed into the bar rides it as `previousIntent` so the server refines
+rather than restarts, and each response's echo replaces the held one. A
+"New search" control clears the held intent, input, chips, and results; the
+next request carries no `previousIntent` field at all. AI zero-hits render
+a "Nothing matches all of these" message, the still-removable chip row, and
+the response's `closeMatches` as standard cards under a "Close matches"
+heading. Degraded responses (route classic, `degraded: true`) render as
+plain classic cards with no chips and no error messaging.
 
 UI tests are a separate lane from Vitest: Playwright
 (root `playwright.config.ts`, specs in `apps/shopify-app/widget/test-ui/`)
 starts the widget dev harness — the same Vite config serving
 `widget/index.html` (fake storefront with a theme-like search form and
 contract-shaped stubbed search/beacon endpoints selected via `?fixture=`:
-results, empty, error, timeout, delayed, beacon-missing),
+results, empty, error, timeout, delayed, beacon-missing, ai, ai-zero-hit,
+ai-delayed, degraded — plus a contract-correct chip-removal echo),
 `widget/no-search-form.html`, and `widget/hostile-css.html` (a deliberately
 hostile theme for the style-isolation tests) — and runs fully offline.
 `npm run test:ui` from the root is the single entry point, locally and in

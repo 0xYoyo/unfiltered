@@ -16,12 +16,43 @@ export interface ProxyResult {
   available: boolean;
 }
 
-/** The slice of the search response this issue renders (NG-1: cards only). */
+/** One applied-constraint chip as the proxy serves it. */
+export interface ProxyChip {
+  field:
+    | "category"
+    | "priceMin"
+    | "priceMax"
+    | "colorsInclude"
+    | "colorsExclude"
+    | "occasion"
+    | "availability";
+  value: string;
+}
+
+/**
+ * The proxy's echoed intent (YOY-49): held client-side between requests and
+ * sent back verbatim as `previousIntent` — the widget never reads inside it.
+ */
+export type ProxyIntent = Record<string, unknown>;
+
+/** The search response as the widget consumes it (YOY-46 contract). */
 export interface ProxySearchResponse {
   searchId: string;
   route: "classic" | "ai";
   degraded: boolean;
   results: ProxyResult[];
+  chips: ProxyChip[];
+  intent: ProxyIntent | null;
+  /** Classic near-misses; present only on AI zero-hit responses. */
+  closeMatches?: ProxyResult[];
+}
+
+/** Optional context a search request carries (YOY-49). */
+export interface SearchRequestContext {
+  /** The previous response's echoed intent, for refinement. */
+  previousIntent?: ProxyIntent;
+  /** Chip the shopper dismissed; requires `previousIntent`. */
+  removeChip?: ProxyChip;
 }
 
 export interface SearchClientOptions {
@@ -40,7 +71,11 @@ export interface SearchClient {
    * body that is not contract-shaped — the caller decides the degradation
    * (YOY-48 AC-2: the widget goes inert).
    */
-  search(query: string, sessionId: string): Promise<ProxySearchResponse>;
+  search(
+    query: string,
+    sessionId: string,
+    context?: SearchRequestContext,
+  ): Promise<ProxySearchResponse>;
   /**
    * Fire the click beacon and return immediately (AC-5): the request is
    * keepalive so it survives the navigation that follows, and any failure
@@ -61,14 +96,25 @@ export function createSearchClient(
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
   return {
-    async search(query, sessionId) {
+    async search(query, sessionId, context) {
       const controller = new AbortController();
       const timer = window.setTimeout(() => controller.abort(), timeoutMs);
       try {
         const response = await fetch(`${basePath}/search`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ query, sessionId }),
+          body: JSON.stringify({
+            query,
+            sessionId,
+            // previousIntent is OMITTED (not null) when nothing is held —
+            // "no previousIntent field" is the new-search contract (AC-5).
+            ...(context?.previousIntent !== undefined
+              ? { previousIntent: context.previousIntent }
+              : {}),
+            ...(context?.removeChip !== undefined
+              ? { removeChip: context.removeChip }
+              : {}),
+          }),
           signal: controller.signal,
         });
         if (!response.ok) {
@@ -79,7 +125,8 @@ export function createSearchClient(
           typeof body !== "object" ||
           body === null ||
           typeof body.searchId !== "string" ||
-          !Array.isArray(body.results)
+          !Array.isArray(body.results) ||
+          !Array.isArray(body.chips)
         ) {
           throw new Error("search response not contract-shaped");
         }

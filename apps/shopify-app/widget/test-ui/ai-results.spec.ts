@@ -1,0 +1,171 @@
+import { expect, test, type Page } from "@playwright/test";
+
+// AI results with chips, zero-hit state, and the refinement flow (YOY-49),
+// driven against the harness AI fixtures.
+
+const themeInput = (page: Page) => page.getByPlaceholder("Theme search");
+const chips = (page: Page) => page.getByTestId("unfiltered-widget-chip");
+const cards = (page: Page) => page.getByTestId("unfiltered-widget-card");
+
+const searchRequests = (page: Page) =>
+  page.evaluate(
+    () =>
+      (window as unknown as { __searchRequests: Record<string, unknown>[] })
+        .__searchRequests,
+  );
+
+/** The echoed intent of the harness AI fixture (wire shape). */
+const AI_INTENT = {
+  category: "dress",
+  priceMin: null,
+  priceMax: 400,
+  currency: "ILS",
+  colorsInclude: [],
+  colorsExclude: ["black"],
+  occasion: null,
+  size: null,
+  availabilityRequired: false,
+  softAttributes: ["elegant"],
+};
+
+test("AI responses render a chip row with remove controls and accessible labels (AC-1)", async ({
+  page,
+}) => {
+  await page.goto("/?fixture=ai");
+
+  await themeInput(page).fill("elegant dress");
+  await expect(cards(page)).toHaveCount(2);
+
+  await expect(page.getByTestId("unfiltered-widget-chips")).toBeVisible();
+  await expect(chips(page)).toHaveCount(3);
+  await expect(chips(page).nth(0)).toContainText("dress");
+  await expect(chips(page).nth(1)).toContainText("Under 400");
+  await expect(chips(page).nth(2)).toContainText("Not black");
+  await expect(chips(page).nth(1)).toHaveAttribute(
+    "aria-label",
+    "Remove filter: Under 400",
+  );
+});
+
+test("removing a chip sends the echoed intent + removed chip and re-renders (AC-2)", async ({
+  page,
+}) => {
+  await page.goto("/?fixture=ai");
+
+  await themeInput(page).fill("elegant dress");
+  await expect(chips(page)).toHaveCount(3);
+
+  await chips(page).filter({ hasText: "Under 400" }).click();
+
+  // Re-rendered from the removal response: chip gone, results recomputed.
+  await expect(chips(page)).toHaveCount(2);
+  await expect(chips(page).filter({ hasText: "Under 400" })).toHaveCount(0);
+  await expect(cards(page)).toHaveCount(3);
+  await expect(cards(page).nth(2)).toContainText("Unfiltered By Removal");
+
+  const requests = await searchRequests(page);
+  expect(requests).toHaveLength(2);
+  expect(requests[1]).toMatchObject({
+    query: "elegant dress",
+    previousIntent: AI_INTENT,
+    removeChip: { field: "priceMax", value: "400" },
+  });
+});
+
+test("AI zero-hits render the message, removable chips, and close matches (AC-3)", async ({
+  page,
+}) => {
+  await page.goto("/?fixture=ai-zero-hit");
+
+  await themeInput(page).fill("elegant dress under 400");
+
+  await expect(page.getByTestId("unfiltered-widget-zero-hit")).toBeVisible();
+  await expect(page.getByTestId("unfiltered-widget-zero-hit")).toContainText(
+    "Nothing matches all of these",
+  );
+  await expect(chips(page)).toHaveCount(3);
+
+  const closeMatches = page.getByTestId("unfiltered-widget-close-matches");
+  await expect(closeMatches).toBeVisible();
+  await expect(closeMatches.locator("h2")).toContainText("Close matches");
+  await expect(
+    closeMatches.getByTestId("unfiltered-widget-card"),
+  ).toHaveCount(1);
+  await expect(closeMatches).toContainText("Black Evening Dress");
+
+  // The chips are still removable in the zero-hit state: removing one
+  // issues the removal request and re-renders results.
+  await chips(page).filter({ hasText: "Under 400" }).click();
+  await expect(chips(page)).toHaveCount(2);
+  await expect(cards(page).first()).toBeVisible();
+});
+
+test("a follow-up query carries the held intent; the response's echo replaces it (AC-4)", async ({
+  page,
+}) => {
+  await page.goto("/?fixture=ai");
+
+  await themeInput(page).fill("elegant dress");
+  await expect(cards(page)).toHaveCount(2);
+
+  await themeInput(page).fill("same but cheaper");
+  await expect.poll(async () => (await searchRequests(page)).length).toBe(2);
+
+  const requests = await searchRequests(page);
+  expect("previousIntent" in requests[0]!).toBe(false);
+  expect(requests[1]!.previousIntent).toEqual(AI_INTENT);
+});
+
+test("new search clears intent, input, chips, and results; next query has no previousIntent (AC-5)", async ({
+  page,
+}) => {
+  await page.goto("/?fixture=ai");
+
+  await themeInput(page).fill("elegant dress");
+  await expect(chips(page)).toHaveCount(3);
+
+  await page.getByTestId("unfiltered-widget-new-search").click();
+  await expect(themeInput(page)).toHaveValue("");
+  await expect(chips(page)).toHaveCount(0);
+  await expect(cards(page)).toHaveCount(0);
+
+  await themeInput(page).fill("fresh query");
+  await expect.poll(async () => (await searchRequests(page)).length).toBe(2);
+  const requests = await searchRequests(page);
+  expect(requests[1]!.query).toBe("fresh query");
+  expect("previousIntent" in requests[1]!).toBe(false);
+});
+
+test("degraded responses render plain classic cards: no chips, no error text (AC-6)", async ({
+  page,
+}) => {
+  await page.goto("/?fixture=degraded");
+
+  await themeInput(page).fill("elegant dress");
+  await expect(cards(page)).toHaveCount(1);
+
+  await expect(chips(page)).toHaveCount(0);
+  await expect(page.getByTestId("unfiltered-widget-zero-hit")).toBeHidden();
+  await expect(page.getByTestId("unfiltered-widget-no-results")).toBeHidden();
+  const overlayText = await page
+    .getByTestId("unfiltered-widget-overlay")
+    .innerText();
+  expect(overlayText.toLowerCase()).not.toContain("error");
+});
+
+test("the AI loading indicator survives slow responses and the input stays responsive (AC-7)", async ({
+  page,
+}) => {
+  await page.goto("/?fixture=ai-delayed");
+
+  await themeInput(page).fill("elegant dress");
+  await expect(page.getByTestId("unfiltered-widget-loading")).toBeVisible();
+
+  // The input stays responsive mid-flight.
+  await themeInput(page).press("End");
+  await themeInput(page).pressSequentially(" for a wedding");
+  await expect(themeInput(page)).toHaveValue("elegant dress for a wedding");
+
+  await expect(cards(page).first()).toBeVisible();
+  await expect(page.getByTestId("unfiltered-widget-loading")).toBeHidden();
+});

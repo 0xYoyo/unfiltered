@@ -76,16 +76,125 @@
         intent: null,
       };
 
+      // AI-path fixtures (YOY-49): an AI response with chips and an echoed
+      // intent, its zero-hit variant with close matches, and a degraded
+      // classic response — all contract-shaped.
+      const AI_INTENT = {
+        category: "dress",
+        priceMin: null,
+        priceMax: 400,
+        currency: "ILS",
+        colorsInclude: [],
+        colorsExclude: ["black"],
+        occasion: null,
+        size: null,
+        availabilityRequired: false,
+        softAttributes: ["elegant"],
+      };
+
+      const AI_CHIPS = [
+        { field: "category", value: "dress" },
+        { field: "priceMax", value: "400" },
+        { field: "colorsExclude", value: "black" },
+      ];
+
+      const AI_RESPONSE = {
+        searchId: "harness-ai-1",
+        route: "ai",
+        degraded: false,
+        results: [
+          {
+            productId: "gid://shopify/Product/11",
+            title: "Silk Gown",
+            handle: "silk-gown",
+            imageUrl: PIXEL,
+            priceMin: 350,
+            priceMax: 350,
+            currencyCode: "ILS",
+            available: true,
+          },
+          {
+            productId: "gid://shopify/Product/12",
+            title: "Linen Dress",
+            handle: "linen-dress",
+            imageUrl: null,
+            priceMin: 220,
+            priceMax: 260,
+            currencyCode: "ILS",
+            available: true,
+          },
+        ],
+        chips: AI_CHIPS,
+        intent: AI_INTENT,
+      };
+
+      const AI_ZERO_HIT_RESPONSE = {
+        ...AI_RESPONSE,
+        searchId: "harness-ai-zero-1",
+        results: [],
+        closeMatches: [
+          {
+            productId: "gid://shopify/Product/21",
+            title: "Black Evening Dress",
+            handle: "black-evening-dress",
+            imageUrl: PIXEL,
+            priceMin: 480,
+            priceMax: 480,
+            currencyCode: "ILS",
+            available: true,
+          },
+        ],
+      };
+
+      const DEGRADED_RESPONSE = {
+        searchId: "harness-degraded-1",
+        route: "classic",
+        degraded: true,
+        results: RESULTS_RESPONSE.results.slice(0, 1),
+        chips: [],
+        intent: null,
+      };
+
       const jsonResponse = (body) =>
         new Response(JSON.stringify(body), {
           headers: { "Content-Type": "application/json" },
         });
 
+      // Contract-correct chip-removal echo: chips minus the removed one,
+      // the previousIntent echoed back, and a recomputed result set (a
+      // product the removed constraint had excluded appears).
+      const chipRemovalResponse = (request) => ({
+        ...AI_RESPONSE,
+        searchId: "harness-ai-removal-1",
+        chips: AI_CHIPS.filter(
+          (chip) =>
+            !(
+              chip.field === request.removeChip.field &&
+              chip.value === request.removeChip.value
+            ),
+        ),
+        intent: request.previousIntent,
+        results: [
+          ...AI_RESPONSE.results,
+          {
+            productId: "gid://shopify/Product/13",
+            title: "Unfiltered By Removal",
+            handle: "unfiltered-by-removal",
+            imageUrl: null,
+            priceMin: 500,
+            priceMax: 500,
+            currencyCode: "ILS",
+            available: true,
+          },
+        ],
+      });
+
       const realFetch = window.fetch.bind(window);
       window.fetch = (input, requestInit) => {
         const url = typeof input === "string" ? input : input.url;
         if (url.startsWith("/apps/unfiltered/search")) {
-          window.__searchRequests.push(JSON.parse(requestInit.body));
+          const request = JSON.parse(requestInit.body);
+          window.__searchRequests.push(request);
           if (fixture === "error") {
             return Promise.resolve(new Response(null, { status: 500 }));
           }
@@ -98,11 +207,21 @@
               );
             });
           }
-          const body =
-            fixture === "empty"
-              ? { ...RESULTS_RESPONSE, results: [] }
-              : RESULTS_RESPONSE;
-          if (fixture === "delayed") {
+          let body;
+          if (request.removeChip !== undefined) {
+            body = chipRemovalResponse(request);
+          } else if (fixture === "ai" || fixture === "ai-delayed") {
+            body = AI_RESPONSE;
+          } else if (fixture === "ai-zero-hit") {
+            body = AI_ZERO_HIT_RESPONSE;
+          } else if (fixture === "degraded") {
+            body = DEGRADED_RESPONSE;
+          } else if (fixture === "empty") {
+            body = { ...RESULTS_RESPONSE, results: [] };
+          } else {
+            body = RESULTS_RESPONSE;
+          }
+          if (fixture === "delayed" || fixture === "ai-delayed") {
             return new Promise((resolve) =>
               setTimeout(() => resolve(jsonResponse(body)), 500),
             );

@@ -1,5 +1,10 @@
 import { createOverlay, ROOT_TESTID } from "./overlay";
-import { createSearchClient } from "./search-client";
+import {
+  createSearchClient,
+  type ProxyChip,
+  type ProxyIntent,
+  type SearchRequestContext,
+} from "./search-client";
 import { getSessionId } from "./session";
 
 export { ROOT_TESTID };
@@ -83,11 +88,26 @@ export function init(config: WidgetConfig): void {
     let debounceTimer: number | undefined;
     let currentSearchId: string | null = null;
     let requestSequence = 0;
+    // Refinement memory (YOY-49 AC-4): the latest response's echoed intent,
+    // held in memory only — it lives exactly as long as this page view and
+    // never crosses browser sessions (NG-4). The last query text backs chip
+    // removal, whose request still needs a query by the endpoint contract.
+    let heldIntent: ProxyIntent | null = null;
+    let lastQuery = "";
 
     const overlay = createOverlay({
       locale: config.locale,
       shopDomain: config.shopDomain,
       onClose: () => overlay.close(),
+      onNewSearch: () => {
+        // AC-5: clear the held intent, the input, the chips, and the
+        // results; the next query is sent without previousIntent.
+        heldIntent = null;
+        lastQuery = "";
+        input.value = "";
+        overlay.showIdle();
+        input.focus();
+      },
     });
 
     /** AC-2: leave the page exactly as without the app, permanently. */
@@ -113,21 +133,44 @@ export function init(config: WidgetConfig): void {
       }
     };
 
-    const runSearch = async (query: string): Promise<void> => {
+    const runSearch = async (
+      query: string,
+      context?: SearchRequestContext,
+    ): Promise<void> => {
       const sequence = ++requestSequence;
       overlay.showLoading();
       try {
-        const response = await client.search(query, getSessionId());
+        const response = await client.search(query, getSessionId(), context);
         if (inert || sequence !== requestSequence) {
           return; // A newer keystroke superseded this request.
         }
         currentSearchId = response.searchId;
-        overlay.showResults(response.results, onCardClick);
+        lastQuery = query;
+        // The response's echoed intent replaces the held one (AC-4) — also
+        // when it is null (a classic response holds no intent to refine).
+        heldIntent = response.intent;
+        overlay.showResponse(response, { onCardClick, onChipRemove });
       } catch {
         if (sequence === requestSequence) {
           goInert();
         }
       }
+    };
+
+    /**
+     * Chip removal (AC-2): resend the last query carrying the held intent
+     * and the dismissed chip; the server recomputes without that constraint
+     * and the whole overlay re-renders from its response.
+     */
+    const onChipRemove = (chip: ProxyChip): void => {
+      if (inert || heldIntent === null) {
+        return;
+      }
+      window.clearTimeout(debounceTimer);
+      void runSearch(lastQuery, {
+        previousIntent: heldIntent,
+        removeChip: chip,
+      });
     };
 
     const onType = (): void => {
@@ -142,7 +185,13 @@ export function init(config: WidgetConfig): void {
         return;
       }
       debounceTimer = window.setTimeout(() => {
-        void runSearch(query);
+        // A follow-up refines: the held intent rides along (AC-4). After
+        // "new search" (or before any response) nothing is held and the
+        // request carries no previousIntent field (AC-5).
+        void runSearch(
+          query,
+          heldIntent !== null ? { previousIntent: heldIntent } : undefined,
+        );
       }, debounceMs);
     };
 
