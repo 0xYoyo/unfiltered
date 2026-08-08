@@ -10,7 +10,6 @@ import {
   createRetriever,
   expandCategoryConstraint,
   type Intent,
-  type RetrievalHit,
 } from "@unfiltered/engine";
 
 import { createPrismaCostRecorder } from "../ai/cost-recorder.server";
@@ -18,6 +17,10 @@ import { embedCatalog } from "../catalog/embed.server";
 import { enrichCatalog } from "../catalog/enrich.server";
 import { computeContentHash } from "../catalog/mapping.server";
 import { createPgTrgmClassicStore } from "../search/classic-store.server";
+import {
+  createSearchOrchestrator,
+  type ProductCard,
+} from "../search/orchestrator.server";
 import { createPgVectorRetrievalStore } from "../search/retrieval-store.server";
 import {
   createReplayEmbeddingClient,
@@ -27,10 +30,12 @@ import {
 } from "./replay.server";
 
 /**
- * The sparse-catalog eval harness (YOY-27): runs the full pipeline —
- * enrichment → embedding → classification → intent → retrieval — over the
- * fixture catalog from recorded LLM/embedding outputs, entirely offline and
- * deterministic, and scores every golden query against its expectations.
+ * The sparse-catalog eval harness (YOY-27): indexes the fixture catalog
+ * (enrichment → embedding) from recorded LLM/embedding outputs, then runs
+ * every golden query through the hybrid search orchestrator end to end
+ * (YOY-45 AC-8) — classification, intent, retrieval, and the classic keyword
+ * engine behind one call — entirely offline and deterministic, and scores
+ * each golden against its expectations.
  */
 
 const fixturesDir = join(
@@ -116,7 +121,7 @@ export interface QueryScore {
   route: string;
   routeReason: string;
   intent: Intent | null;
-  hits: RetrievalHit[];
+  hits: ProductCard[];
   /** 1-based rank of the first expected product in the top 10, or null. */
   firstExpectedRank: number | null;
   /** Constraint violations found in the top 10 (empty means clean). */
@@ -320,11 +325,18 @@ export async function runEval(db: PrismaClient): Promise<EvalRunResult> {
 
   const classifier = createQueryClassifier({ llm });
   const extractor = createIntentExtractor({ llm });
-  const retriever = createRetriever({
-    embeddings,
-    store: createPgVectorRetrievalStore(db),
+  // Goldens run through the orchestrator end to end (YOY-45 AC-8): the same
+  // routing and fallback ladder production takes, over the replay ports.
+  const orchestrator = createSearchOrchestrator({
+    db,
+    classifier,
+    extractor,
+    retriever: createRetriever({
+      embeddings,
+      store: createPgVectorRetrievalStore(db),
+    }),
+    classicStore: createPgTrgmClassicStore(db),
   });
-  const classicStore = createPgTrgmClassicStore(db);
 
   const products = new Map(catalog.map((product) => [product.productId, product]));
   const enrichmentRows = await db.productEnrichment.findMany({
@@ -340,26 +352,22 @@ export async function runEval(db: PrismaClient): Promise<EvalRunResult> {
   const perQuery: QueryScore[] = [];
   for (const golden of goldens) {
     const searchId = golden.id;
-    const decision = await classifier.classify(golden.query, {
+    const response = await orchestrator.runSearch({
+      query: golden.query,
       shopDomain,
       searchId,
+      limit: 10,
     });
-
-    let intent: Intent | null = null;
-    let hits: RetrievalHit[] = [];
-    if (decision.route === "ai") {
-      intent = await extractor.extract(golden.query, { shopDomain, searchId });
-      hits = (
-        await retriever.retrieve({ intent, shopDomain, limit: 10, searchId })
-      ).hits;
-    } else {
-      // Classic-routed goldens run the trigram keyword engine (YOY-41 AC-6):
-      // raw query in, ranked hits out, zero AI calls anywhere on the path.
-      hits = (
-        await classicStore.search({ shopDomain, query: golden.query, limit: 10 })
-      ).hits;
+    // The eval is offline and deterministic: a degraded response means a
+    // replay recording is missing or broken, and the silent fallback would
+    // otherwise let classic results masquerade as the AI path's quality.
+    if (response.degraded) {
+      throw new Error(
+        `eval: golden ${golden.id} degraded to classic — a replay recording is missing or failed`,
+      );
     }
 
+    const hits = response.hits;
     const rankIndex = hits.findIndex((hit) =>
       golden.expectedProductIds.includes(hit.productId),
     );
@@ -369,9 +377,9 @@ export async function runEval(db: PrismaClient): Promise<EvalRunResult> {
     const ledger = await db.aiCall.findMany({ where: { searchId } });
     perQuery.push({
       golden,
-      route: decision.route,
-      routeReason: decision.reason,
-      intent,
+      route: response.route,
+      routeReason: response.routeReason,
+      intent: response.intent,
       hits,
       firstExpectedRank: rankIndex === -1 ? null : rankIndex + 1,
       violations,

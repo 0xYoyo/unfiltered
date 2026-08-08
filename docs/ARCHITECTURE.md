@@ -202,6 +202,59 @@ AI ports (vendor-free; implemented by provider adapter packages):
 The app's `/healthz` route (`apps/shopify-app/app/routes/healthz.tsx`) calls
 `createEngine().search(...)` and proves the wiring end to end.
 
+## Hybrid search orchestrator and the fallback ladder (YOY-45)
+
+`apps/shopify-app/app/search/orchestrator.server.ts`
+(`createSearchOrchestrator({ db, classifier, extractor, retriever,
+classicStore })`) is the one server-side entry point behind the product's
+single search bar — a function, not an HTTP endpoint (the storefront API over
+the app proxy is a later issue). `runSearch({ query, shopDomain,
+previousIntent?, searchId?, limit? })` always resolves to one response shape:
+`{ searchId, route, routeReason, intent, hits, chips, degraded,
+closeMatches }`, where `hits` and `closeMatches` are display-ready product
+cards (`productId`, `title`, `handle`, `imageUrl`, `priceMin`/`priceMax`,
+`currencyCode`, `available`) hydrated from the `CatalogProduct` snapshot in
+hit order, and `chips` echoes the retrieval's applied constraints. One
+`searchId` is generated per search (unless the caller threads its own) and
+forwarded to every AI port call, so all `AiCall` rows serving one search
+share it. `previousIntent` is passed through to the extractor context
+unchanged; the orchestrator holds no session state.
+
+Routing: the classifier's heuristics settle clearly-simple queries instantly;
+everything else the LLM classifier decides. Classic-routed queries run the
+trigram keyword engine on the raw query and carry no chips. AI-routed queries
+run intent extraction → vector retrieval and return ranked hits plus chips
+derived from the applied constraints.
+
+The fallback ladder — every edge, top to bottom; no error shape from the AI
+path ever reaches the caller:
+
+1. **Classifier failure or timeout** — the classifier never rejects; it
+   answers `{ route: "classic", reason: "model-error" }`, which the
+   orchestrator serves as classic keyword results with `degraded: true`.
+2. **Any AI-path failure** — intent LLM error or timeout (the Gemini
+   adapter's `GeminiTimeoutError`/`GeminiApiError` taxonomy propagating
+   through the port), `IntentExtractionError`, embedding failure, retrieval
+   store error — yields classic keyword results for the raw query with
+   `degraded: true` and no chips. The catch is deliberately type-blind:
+   whatever threw, the shopper gets results.
+3. **`EmptyQueryTextError`** (intent has constraints but no descriptive text,
+   e.g. "not black under ₪400") is a designed edge, not a failure: the
+   orchestrator runs constraint-only classic search, KEEPS the chips for the
+   applied constraints, and does not set `degraded`.
+4. **AI zero-hits** — retrieval succeeded but nothing satisfied every
+   constraint: the response keeps the chips, an empty primary hit list, and
+   `closeMatches` from classic keyword search on the raw query.
+
+Classic-store errors are not caught: classic search is the ladder's floor and
+shares its database with everything else, so a failure there is an
+infrastructure outage that must surface to the caller's own error handling.
+
+The eval harness (`apps/shopify-app/app/eval/harness.server.ts`) routes every
+golden — classic and AI alike — through `runSearch`, and treats a `degraded`
+response as a hard error: offline replay must never let the silent fallback
+mask a broken recording as classic-quality results.
+
 ## AI cost metering
 
 Every AI call must be metered before any code capable of live LLM calls
