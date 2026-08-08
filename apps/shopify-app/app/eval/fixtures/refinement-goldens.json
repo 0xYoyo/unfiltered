@@ -1,0 +1,155 @@
+[
+  {
+    "id": "r01",
+    "language": "en",
+    "note": "comparative follow-up tightens the price bound, keeps category/occasion/exclusions",
+    "previousIntent": {
+      "category": "dress",
+      "priceMax": 400,
+      "colorsInclude": [],
+      "colorsExclude": ["black"],
+      "occasion": "wedding",
+      "availabilityRequired": false,
+      "softAttributes": ["elegant", "summer"]
+    },
+    "query": "same but cheaper",
+    "outcome": "refinement",
+    "expectedConstraints": {
+      "category": "dress",
+      "priceMin": null,
+      "priceMax": 250,
+      "colorsInclude": [],
+      "colorsExclude": ["black"],
+      "occasion": "wedding",
+      "availabilityRequired": false
+    },
+    "expectedSoftAttributes": ["elegant", "summer"]
+  },
+  {
+    "id": "r02",
+    "language": "he",
+    "note": "additive Hebrew follow-up keeps every prior constraint and adds a soft attribute",
+    "previousIntent": {
+      "category": "dress",
+      "priceMax": 400,
+      "colorsInclude": [],
+      "colorsExclude": ["black"],
+      "occasion": "wedding",
+      "availabilityRequired": false,
+      "softAttributes": ["אלגנטית", "בקיץ"]
+    },
+    "query": "בלי שרוולים",
+    "outcome": "refinement",
+    "expectedConstraints": {
+      "category": "dress",
+      "priceMin": null,
+      "priceMax": 400,
+      "colorsInclude": [],
+      "colorsExclude": ["black"],
+      "occasion": "wedding",
+      "availabilityRequired": false
+    },
+    "expectedSoftAttributes": ["אלגנטית", "בקיץ", "ללא שרוולים"]
+  },
+  {
+    "id": "r03",
+    "language": "en",
+    "note": "unrelated product query discards the previous intent entirely",
+    "previousIntent": {
+      "category": "dress",
+      "priceMax": 400,
+      "colorsInclude": [],
+      "colorsExclude": ["black"],
+      "occasion": "wedding",
+      "availabilityRequired": false,
+      "softAttributes": ["elegant", "summer"]
+    },
+    "query": "nike air max 90",
+    "outcome": "fresh",
+    "expectedConstraints": {
+      "category": "sneakers",
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    },
+    "expectedSoftAttributes": ["nike", "air max 90"]
+  },
+  {
+    "id": "r04",
+    "language": "he",
+    "note": "Hebrew color follow-up adds an inclusion without touching price or category",
+    "previousIntent": {
+      "category": "coat",
+      "priceMax": 500,
+      "colorsInclude": [],
+      "colorsExclude": ["black"],
+      "availabilityRequired": false,
+      "softAttributes": ["חם", "לחורף"]
+    },
+    "query": "בצבע אדום",
+    "outcome": "refinement",
+    "expectedConstraints": {
+      "category": "coat",
+      "priceMin": null,
+      "priceMax": 500,
+      "colorsInclude": ["red"],
+      "colorsExclude": ["black"],
+      "occasion": null,
+      "availabilityRequired": false
+    },
+    "expectedSoftAttributes": ["חם", "לחורף"]
+  },
+  {
+    "id": "r05",
+    "language": "mixed",
+    "note": "mixed EN/HE follow-up adds size and an availability requirement",
+    "previousIntent": {
+      "category": "dress",
+      "colorsInclude": ["black"],
+      "colorsExclude": [],
+      "occasion": "evening",
+      "availabilityRequired": false,
+      "softAttributes": ["formal", "gala"]
+    },
+    "query": "מידה M in stock only",
+    "outcome": "refinement",
+    "expectedConstraints": {
+      "category": "dress",
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": ["black"],
+      "colorsExclude": [],
+      "occasion": "evening",
+      "availabilityRequired": true
+    },
+    "expectedSize": "M",
+    "expectedSoftAttributes": ["formal", "gala"]
+  },
+  {
+    "id": "r06",
+    "language": "en",
+    "note": "follow-up on a fresh topic's intent adds a price cap and availability",
+    "previousIntent": {
+      "category": "sneakers",
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "availabilityRequired": false,
+      "softAttributes": ["nike", "air max 90"]
+    },
+    "query": "under 500 and only what is in stock",
+    "outcome": "refinement",
+    "expectedConstraints": {
+      "category": "sneakers",
+      "priceMin": null,
+      "priceMax": 500,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": true
+    },
+    "expectedSoftAttributes": ["nike", "air max 90"]
+  }
+]

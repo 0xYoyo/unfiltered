@@ -28,6 +28,12 @@ export interface RecordedCompletion {
 /** One operation's recorded completions, keyed by extracted request content. */
 export interface LlmRecording {
   modelId: string;
+  /**
+   * Where the outputs came from: `"live"` (recorded from the real model by
+   * the regenerate flow) or `"synthesized"` (hand-written in the vocabulary
+   * the prompts request, pending a live regeneration). Absent means live.
+   */
+  provenance?: "live" | "synthesized";
   entries: Record<string, RecordedCompletion>;
 }
 

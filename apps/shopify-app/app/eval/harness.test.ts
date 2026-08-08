@@ -6,6 +6,8 @@ import {
   findViolations,
   loadCatalog,
   loadGoldens,
+  loadRefinementGoldens,
+  refinementViolations,
   runEval,
   type EvalRunResult,
   type Golden,
@@ -45,6 +47,56 @@ describe("eval fixtures (AC-1)", () => {
         expect(ids.has(id), `${golden.id} expects unknown product ${id}`).toBe(true);
       }
     }
+  });
+});
+
+describe("refinement fixtures (YOY-42 AC-3)", () => {
+  it("ships at least six refinement goldens across EN, HE, and mixed", () => {
+    const refinements = loadRefinementGoldens();
+
+    expect(refinements.length).toBeGreaterThanOrEqual(6);
+    for (const language of ["en", "he", "mixed"] as const) {
+      expect(
+        refinements.filter((golden) => golden.language === language).length,
+        language,
+      ).toBeGreaterThan(0);
+    }
+    // Every golden states the three things a refinement case needs.
+    for (const golden of refinements) {
+      expect(golden.previousIntent, golden.id).toBeDefined();
+      expect(golden.query.length, golden.id).toBeGreaterThan(0);
+      expect(golden.expectedConstraints, golden.id).toBeDefined();
+    }
+  });
+
+  it("keys every follow-up query uniquely, base goldens included", () => {
+    // Replay recordings are keyed by the query line alone, so two goldens
+    // sharing a query text would replay one another's recorded answer.
+    const queries = [
+      ...loadGoldens().map((golden) => golden.query),
+      ...loadRefinementGoldens().map((golden) => golden.query),
+    ];
+    expect(new Set(queries).size).toBe(queries.length);
+  });
+
+  it("scores a constraint outcome against the golden, size included", () => {
+    const golden = loadRefinementGoldens().find((entry) => entry.id === "r01")!;
+    const merged = {
+      category: "dress",
+      priceMax: 250,
+      colorsInclude: [],
+      colorsExclude: ["black"],
+      occasion: "wedding",
+      availabilityRequired: false,
+      softAttributes: ["elegant", "summer"],
+    };
+
+    expect(refinementViolations(golden, merged)).toEqual([]);
+    // A dropped prior constraint and a wrong size both fail the golden.
+    expect(
+      refinementViolations(golden, { ...merged, occasion: undefined }),
+    ).toHaveLength(1);
+    expect(refinementViolations(golden, { ...merged, size: "M" })).toHaveLength(1);
   });
 });
 
@@ -205,6 +257,58 @@ describe("eval run (AC-2, AC-3, AC-4, AC-6)", () => {
   it("returns zero hard-constraint violations in any query's top 10 (AC-3)", () => {
     const violations = result.perQuery.flatMap((score) => score.violations);
     expect(violations).toEqual([]);
+  });
+
+  it("merges follow-up queries into the previous intent (YOY-42 AC-2, AC-3)", () => {
+    const score = (id: string) => {
+      const found = result.perRefinement.find((entry) => entry.golden.id === id);
+      expect(found, `refinement golden ${id} did not run`).toBeDefined();
+      return found!;
+    };
+
+    // Comparative follow-up: price tightens, everything else survives.
+    const cheaper = score("r01");
+    expect(cheaper.intent!.category).toBe("dress");
+    expect(cheaper.intent!.occasion).toBe("wedding");
+    expect(cheaper.intent!.colorsExclude).toEqual(["black"]);
+    expect(cheaper.intent!.priceMax).toBeLessThan(
+      cheaper.golden.previousIntent.priceMax!,
+    );
+
+    // Additive Hebrew follow-up: constraints preserved, new soft attribute.
+    const sleeveless = score("r02");
+    expect(sleeveless.intent!.category).toBe("dress");
+    expect(sleeveless.intent!.priceMax).toBe(400);
+    expect(sleeveless.intent!.occasion).toBe("wedding");
+    expect(sleeveless.intent!.softAttributes).toEqual(
+      expect.arrayContaining(sleeveless.golden.previousIntent.softAttributes),
+    );
+    expect(sleeveless.intent!.softAttributes.length).toBeGreaterThan(
+      sleeveless.golden.previousIntent.softAttributes.length,
+    );
+
+    // Topic change: nothing carries over from the previous intent.
+    const fresh = score("r03");
+    expect(fresh.intent!.category).toBe("sneakers");
+    expect(fresh.intent!.occasion).toBeUndefined();
+    expect(fresh.intent!.priceMax).toBeUndefined();
+    expect(fresh.intent!.colorsExclude).toEqual([]);
+    for (const attribute of fresh.golden.previousIntent.softAttributes) {
+      expect(fresh.intent!.softAttributes).not.toContain(attribute);
+    }
+
+    // Every golden's documented soft attributes hold too.
+    for (const entry of result.perRefinement) {
+      expect(entry.intent!.softAttributes, entry.golden.id).toEqual(
+        entry.golden.expectedSoftAttributes,
+      );
+    }
+  });
+
+  it("returns zero refinement constraint misses (YOY-42 AC-3)", () => {
+    expect(
+      result.perRefinement.flatMap((score) => score.violations),
+    ).toEqual([]);
   });
 
   it("keeps blended per-search cost within $2.00 per 1,000 AI searches (AC-4)", () => {
