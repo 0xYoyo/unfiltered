@@ -18,4 +18,5 @@ sensitive_paths:
   - "**/webhooks/**"
   - ".claude/**"
 
+slack_channel_id: C0BL7QBNER4
 max_fix_rounds: 2
