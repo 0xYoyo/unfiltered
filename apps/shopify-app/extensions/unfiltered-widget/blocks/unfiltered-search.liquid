@@ -1,0 +1,26 @@
+{% comment %}
+  Unfiltered search widget — app embed block (YOY-43 AC-1). Loads the built
+  widget bundle from this extension's assets and initializes it with the
+  storefront locale and shop domain. The widget scaffold renders its own
+  root + search input and does nothing else yet (NG-1).
+{% endcomment %}
+{{ 'unfiltered-widget.css' | asset_url | stylesheet_tag }}
+<script src="{{ 'unfiltered-widget.js' | asset_url }}" defer></script>
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    if (window.UnfilteredWidget) {
+      window.UnfilteredWidget.init({
+        locale: {{ request.locale.iso_code | json }},
+        shopDomain: {{ shop.permanent_domain | json }}
+      });
+    }
+  });
+</script>
+
+{% schema %}
+{
+  "name": "Unfiltered search",
+  "target": "body",
+  "settings": []
+}
+{% endschema %}

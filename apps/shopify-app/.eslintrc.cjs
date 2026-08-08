@@ -19,7 +19,8 @@ module.exports = {
     commonjs: true,
     es6: true,
   },
-  ignorePatterns: ["!**/.server", "!**/.client"],
+  // extensions/*/assets holds committed Vite build output (minified).
+  ignorePatterns: ["!**/.server", "!**/.client", "extensions/*/assets/"],
 
   // Base config
   extends: ["eslint:recommended"],

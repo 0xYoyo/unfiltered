@@ -76,8 +76,37 @@ ESLint runs per workspace via:
 npm run lint
 ```
 
-All three commands run in CI (`.github/workflows/ci.yml`) on every pull
+UI tests (Playwright) drive the storefront widget against its local dev
+harness — no Shopify and no network:
+
+```bash
+npm run test:ui
+```
+
+All four commands run in CI (`.github/workflows/ci.yml`) on every pull
 request and must pass before merge.
+
+## Storefront widget
+
+The storefront search widget lives in `apps/shopify-app/widget/`
+(TypeScript + CSS, bundled by Vite) and ships to themes through the theme
+app extension in `apps/shopify-app/extensions/unfiltered-widget/`: an app
+embed block loads the built assets and calls
+`window.UnfilteredWidget.init({ locale, shopDomain })` with the storefront
+locale and shop domain. Build the self-contained bundle into the extension's
+`assets/` (the output is committed):
+
+```bash
+npm run build:widget
+```
+
+For manual development, the same Vite config serves a fake storefront
+harness (theme-like search form + stubbed search endpoint, no Shopify):
+
+```bash
+npm run widget:harness --workspace app
+# http://127.0.0.1:4173 and /no-search-form.html
+```
 
 ## Run locally
 

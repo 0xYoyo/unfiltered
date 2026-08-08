@@ -1,0 +1,25 @@
+/* Storefront widget scaffold styles (YOY-43): just enough for the root and
+   its search input to be visible and testable. Real overlay design lands
+   with the M3 widget chain. */
+
+.unfiltered-widget {
+  box-sizing: border-box;
+  position: fixed;
+  inset-block-start: 16px;
+  inset-inline-end: 16px;
+  z-index: 2147483000;
+  padding: 8px;
+  background: #ffffff;
+  border: 1px solid #d0d0d0;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.unfiltered-widget__input {
+  box-sizing: border-box;
+  inline-size: 240px;
+  padding: 6px 10px;
+  font-size: 14px;
+  border: 1px solid #b0b0b0;
+  border-radius: 6px;
+}
