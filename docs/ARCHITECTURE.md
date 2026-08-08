@@ -80,8 +80,12 @@ covered by offline unit tests with fixture payloads
 
 Prisma on Postgres 18 with the pgvector extension
 (`apps/shopify-app/prisma/schema.prisma`, currently the template's `Session`
-model, the `AiCall` cost-metering ledger, and the `CatalogProduct` per-shop
-catalog snapshot (unique per `shopDomain` + `productId`, content-hashed for
+model, the `AiCall` cost-metering ledger, the write-only `SearchEvent` and
+`ClickEvent` shopper activity logs (YOY-47; one `SearchEvent` per proxy
+search — degraded, zero-hit, and throttled included — and one `ClickEvent`
+per verified click beacon, both indexed on `(shopDomain, createdAt)`;
+nothing reads them yet except the beacon's searchId validation), and the
+`CatalogProduct` per-shop catalog snapshot (unique per `shopDomain` + `productId`, content-hashed for
 idempotent re-ingestion via `app/catalog/ingest.server.ts`; also carries the
 display-only fields `handle` and `featuredImageUrl` (YOY-44) for result
 cards — deliberately outside `contentHash`, so ingestion and webhook sync
@@ -209,7 +213,8 @@ The app's `/healthz` route (`apps/shopify-app/app/routes/healthz.tsx`) calls
 classicStore })`) is the one server-side entry point behind the product's
 single search bar — a function; the HTTP surface over it is the app-proxy
 endpoint below (YOY-46). `runSearch({ query, shopDomain, previousIntent?,
-resolvedIntent?, searchId?, limit? })` always resolves to one response shape:
+resolvedIntent?, forceClassic?, searchId?, limit? })` always resolves to one
+response shape:
 `{ searchId, route, routeReason, intent, hits, chips, degraded,
 closeMatches }`, where `hits` and `closeMatches` are display-ready product
 cards (`productId`, `title`, `handle`, `imageUrl`, `priceMin`/`priceMax`,
@@ -222,7 +227,9 @@ unchanged; the orchestrator holds no session state. `resolvedIntent` (YOY-46
 chip removal) is an intent the caller already holds: the orchestrator skips
 classification and extraction — zero LLM calls — and enters the AI path at
 retrieval, with `routeReason: "resolved-intent"` and the same fallback
-ladder below it.
+ladder below it. `forceClassic` (YOY-47 throttle) skips the classifier
+entirely and serves classic keyword results with `degraded: true` and
+`routeReason: "throttled"` — also zero LLM calls.
 
 Routing: the classifier's heuristics settle clearly-simple queries instantly;
 everything else the LLM classifier decides. Classic-routed queries run the
@@ -325,6 +332,33 @@ no Shopify tokens or internal error details ever do:
 The serializer re-maps every field explicitly (`serializeProxySearchResponse`),
 so orchestrator-internal diagnostics like `routeReason` — and anything the
 orchestrator response grows later — cannot leak to a shopper.
+
+**Search logging (YOY-47).** Every search request — degraded, zero-hit, and
+throttled included — writes exactly one `SearchEvent` row (searchId, shop,
+sessionId, query, resolved route, degraded flag, latency, result count)
+through `app/search/events.server.ts`. The write is an observer: a logging
+failure is swallowed and logged server-side, never failing the shopper's
+response.
+
+**Click beacon (YOY-47).** `POST /apps/unfiltered/click`
+(`app/routes/apps.unfiltered.click.tsx`), signature-verified exactly like
+the search route. Body: `{ searchId, sessionId, productId, position }`. The
+searchId must name a `SearchEvent` of the signed shop — the body is
+shopper-controlled, so an unknown or foreign searchId answers `404` and
+writes nothing. Success answers `204` with an empty body and one
+`ClickEvent` row.
+
+**Per-session AI throttle (YOY-47).** `app/search/throttle.server.ts` keeps
+an in-process sliding one-minute window per `sessionId`. Once a session has
+run `SEARCH_AI_THROTTLE_PER_MINUTE` (default 10) AI-routed searches inside
+the window, further searches from it are forced onto the classic path with
+zero LLM calls — served `degraded: true` on the unchanged contract shape,
+and still logged. Classic-routed searches and chip-removal requests neither
+consume budget nor get forced (chip removal makes no classification or
+intent call to begin with). The state is deliberately in-process: the limit
+is per Node instance, so horizontal scaling multiplies the effective
+ceiling, and a restart clears the windows — accepted for now; a distributed
+store is a later milestone's concern.
 
 **Chip removal.** A request carrying the previous response's `intent` plus
 one `removeChip` (`field` + `value`) recomputes results without that

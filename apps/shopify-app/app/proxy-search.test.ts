@@ -38,12 +38,58 @@ vi.mock("./search/proxy.server", async (importOriginal) => {
   };
 });
 
+// Failure-injection seam for the search-event log: when armed, the REAL
+// writeSearchEvent runs against a store whose create rejects — Prisma's
+// delegates are proxy-backed, so vi.spyOn on them corrupts the client.
+const eventsSeam = vi.hoisted(() => ({ failNextSearchWrite: false }));
+vi.mock("./search/events.server", async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import("./search/events.server")>();
+  return {
+    ...original,
+    writeSearchEvent: (
+      dbArg: Parameters<typeof original.writeSearchEvent>[0],
+      event: Parameters<typeof original.writeSearchEvent>[1],
+    ) => {
+      if (eventsSeam.failNextSearchWrite) {
+        eventsSeam.failNextSearchWrite = false;
+        const poisoned = {
+          searchEvent: {
+            create: () => Promise.reject(new Error("log store down")),
+          },
+        };
+        return original.writeSearchEvent(poisoned as never, event);
+      }
+      return original.writeSearchEvent(dbArg, event);
+    },
+  };
+});
+
+// Replace the process-wide throttle singleton with a per-test instance so
+// throttle tests control the clock and limit; the default is permissive so
+// unrelated tests never trip it.
+const throttleSeam = vi.hoisted(() => ({
+  instance: undefined as
+    | import("./search/throttle.server").SessionThrottle
+    | undefined,
+}));
+vi.mock("./search/throttle.server", async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import("./search/throttle.server")>();
+  return {
+    ...original,
+    getSessionThrottle: () =>
+      throttleSeam.instance ?? original.createSessionThrottle(),
+  };
+});
+
 import db from "./db.server";
 import { createPrismaCostRecorder } from "./ai/cost-recorder.server";
 import { action } from "./routes/apps.unfiltered.search";
 import { createPgTrgmClassicStore } from "./search/classic-store.server";
 import { createSearchOrchestrator } from "./search/orchestrator.server";
 import { createPgVectorRetrievalStore } from "./search/retrieval-store.server";
+import { createSessionThrottle } from "./search/throttle.server";
 
 // Route tests for the app-proxy search endpoint (YOY-46): signed requests
 // built exactly the way Shopify signs proxy requests (HMAC-SHA256 over the
@@ -271,7 +317,10 @@ beforeEach(async () => {
   orchestratorSeam.build = () => {
     throw new Error("search ran before authentication");
   };
+  throttleSeam.instance = undefined;
   await db.aiCall.deleteMany();
+  await db.searchEvent.deleteMany();
+  await db.clickEvent.deleteMany();
   await db.productEnrichment.deleteMany();
   await db.$executeRawUnsafe(`DELETE FROM "ProductEmbedding"`);
   await db.catalogProduct.deleteMany();
@@ -546,5 +595,240 @@ describe("chip removal (AC-4)", () => {
         ["classification", "intent"].includes(row.operation),
       ),
     ).toEqual([]);
+  });
+});
+
+describe("search event logging (YOY-47 AC-2)", () => {
+  it("writes exactly one SearchEvent per search, including degraded and zero-hit", async () => {
+    await seed([{ productId: "sneaker-90", title: "nike 90" }]);
+
+    // Classic search.
+    installOrchestrator({ llm: fakeLlm({}) });
+    let response = await action(
+      actionArgs(proxyRequest({ payload: { query: "nike 90", sessionId: "log-1" } })),
+    );
+    let body = await response.json();
+    let events = await db.searchEvent.findMany({
+      where: { sessionId: "log-1" },
+    });
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      searchId: body.searchId,
+      shopDomain: SHOP,
+      sessionId: "log-1",
+      query: "nike 90",
+      route: "classic",
+      degraded: false,
+      resultCount: 1,
+    });
+    expect(events[0]!.latencyMs).toBeGreaterThanOrEqual(0);
+
+    // Degraded search (intent extraction fails).
+    installOrchestrator({
+      llm: fakeLlm({
+        classification: () => ({ route: "ai" }),
+        intent: () => {
+          throw new Error("boom");
+        },
+      }),
+    });
+    response = await action(
+      actionArgs(proxyRequest({ payload: { query: AI_QUERY, sessionId: "log-2" } })),
+    );
+    body = await response.json();
+    events = await db.searchEvent.findMany({ where: { sessionId: "log-2" } });
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      searchId: body.searchId,
+      route: "classic",
+      degraded: true,
+    });
+
+    // AI zero-hit search: resultCount counts primary hits, not closeMatches.
+    installOrchestrator({
+      llm: fakeLlm({
+        classification: () => ({ route: "ai" }),
+        intent: () => DRESS_INTENT,
+      }),
+    });
+    response = await action(
+      actionArgs(proxyRequest({ payload: { query: AI_QUERY, sessionId: "log-3" } })),
+    );
+    body = await response.json();
+    events = await db.searchEvent.findMany({ where: { sessionId: "log-3" } });
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      searchId: body.searchId,
+      route: "ai",
+      degraded: false,
+      resultCount: 0,
+    });
+  });
+
+  it("still answers the search when the event write fails", async () => {
+    await seed([{ productId: "sneaker-90", title: "nike 90" }]);
+    installOrchestrator({ llm: fakeLlm({}) });
+
+    eventsSeam.failNextSearchWrite = true;
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const response = await action(
+        actionArgs(
+          proxyRequest({ payload: { query: "nike 90", sessionId: "log-4" } }),
+        ),
+      );
+      expect(response.status).toBe(200);
+      const responseBody = await response.json();
+      expect(responseBody.results).toHaveLength(1);
+      // The failure was swallowed, logged, and the row simply lost.
+      expect(errorLog).toHaveBeenCalledTimes(1);
+      expect(
+        await db.searchEvent.count({ where: { sessionId: "log-4" } }),
+      ).toBe(0);
+    } finally {
+      errorLog.mockRestore();
+    }
+  });
+});
+
+describe("per-session AI throttle (YOY-47 AC-4, AC-5)", () => {
+  /** Fake LLM that counts invocations, answering the AI route + intent. */
+  function countingAiLlm() {
+    let calls = 0;
+    return {
+      llm: fakeLlm({
+        classification: () => {
+          calls += 1;
+          return { route: "ai" };
+        },
+        intent: () => {
+          calls += 1;
+          return DRESS_INTENT;
+        },
+      }),
+      invocations: () => calls,
+    };
+  }
+
+  const aiSeed = () =>
+    seed([
+      {
+        productId: "silk-gown",
+        title: "silk gown",
+        vector: [0.9, 0.1, 0],
+        category: "dress",
+        occasions: ["wedding"],
+      },
+    ]);
+
+  it("forces the search past the limit onto classic with zero LLM calls, still on contract, still logged", async () => {
+    await aiSeed();
+    let nowMs = 0;
+    throttleSeam.instance = createSessionThrottle({
+      limit: 2,
+      now: () => nowMs,
+    });
+    const counting = countingAiLlm();
+    installOrchestrator({ llm: counting.llm });
+
+    // Two AI searches consume the budget.
+    for (let i = 0; i < 2; i += 1) {
+      const response = await action(
+        actionArgs(proxyRequest({ payload: { query: AI_QUERY, sessionId: "t1" } })),
+      );
+      expect((await response.json()).route).toBe("ai");
+    }
+    const callsBefore = counting.invocations();
+    expect(callsBefore).toBeGreaterThan(0);
+
+    // The third is throttled: classic, degraded, no LLM invocation.
+    const response = await action(
+      actionArgs(proxyRequest({ payload: { query: AI_QUERY, sessionId: "t1" } })),
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(Object.keys(body).sort()).toEqual(CONTRACT_KEYS);
+    expect(body.route).toBe("classic");
+    expect(body.degraded).toBe(true);
+    expect(body.chips).toEqual([]);
+    expect(counting.invocations()).toBe(callsBefore);
+
+    // Throttled searches still log a SearchEvent (AC-5).
+    const events = await db.searchEvent.findMany({
+      where: { sessionId: "t1" },
+    });
+    expect(events).toHaveLength(3);
+    expect(events.filter((event) => event.degraded)).toHaveLength(1);
+
+    // The window sliding clear restores AI routing.
+    nowMs += 61_000;
+    const restored = await action(
+      actionArgs(proxyRequest({ payload: { query: AI_QUERY, sessionId: "t1" } })),
+    );
+    expect((await restored.json()).route).toBe("ai");
+  });
+
+  it("classic-routed searches do not consume the budget", async () => {
+    await aiSeed();
+    await seed([{ productId: "sneaker-90", title: "nike 90" }]);
+    throttleSeam.instance = createSessionThrottle({ limit: 1, now: () => 0 });
+    const counting = countingAiLlm();
+    installOrchestrator({ llm: counting.llm });
+
+    // A heuristic classic search first: no budget spent.
+    const classic = await action(
+      actionArgs(proxyRequest({ payload: { query: "nike 90", sessionId: "t2" } })),
+    );
+    expect((await classic.json()).route).toBe("classic");
+
+    // The AI budget of 1 is still available.
+    const ai = await action(
+      actionArgs(proxyRequest({ payload: { query: AI_QUERY, sessionId: "t2" } })),
+    );
+    expect((await ai.json()).route).toBe("ai");
+
+    // Now it is spent.
+    const throttled = await action(
+      actionArgs(proxyRequest({ payload: { query: AI_QUERY, sessionId: "t2" } })),
+    );
+    const throttledBody = await throttled.json();
+    expect(throttledBody.route).toBe("classic");
+    expect(throttledBody.degraded).toBe(true);
+  });
+
+  it("chip-removal requests are neither counted nor throttled", async () => {
+    await aiSeed();
+    throttleSeam.instance = createSessionThrottle({ limit: 1, now: () => 0 });
+    const counting = countingAiLlm();
+    const costRecorder = createPrismaCostRecorder(db);
+    installOrchestrator({
+      llm: counting.llm,
+      embeddings: fakeEmbeddings({ costRecorder }),
+    });
+
+    // Spend the whole budget.
+    await action(
+      actionArgs(proxyRequest({ payload: { query: AI_QUERY, sessionId: "t3" } })),
+    );
+    const callsBefore = counting.invocations();
+
+    // A chip-removal request still runs the AI path — no classification or
+    // intent call, so nothing to throttle and nothing counted.
+    const removal = await action(
+      actionArgs(
+        proxyRequest({
+          payload: {
+            query: AI_QUERY,
+            sessionId: "t3",
+            previousIntent: DRESS_INTENT,
+            removeChip: { field: "occasion", value: "wedding" },
+          },
+        }),
+      ),
+    );
+    const removalBody = await removal.json();
+    expect(removalBody.route).toBe("ai");
+    expect(removalBody.degraded).toBe(false);
+    expect(counting.invocations()).toBe(callsBefore);
   });
 });

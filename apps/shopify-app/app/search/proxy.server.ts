@@ -112,6 +112,43 @@ export function parseProxySearchBody(value: unknown): ProxySearchBody | null {
   return body;
 }
 
+/** The JSON body the widget's click beacon POSTs through the proxy (YOY-47). */
+export interface ClickBeaconBody {
+  /** The searchId of the response whose result was clicked. */
+  searchId: string;
+  /** Widget-generated session correlation ID. */
+  sessionId: string;
+  /** Clicked product. */
+  productId: string;
+  /** Zero-based position of the card in the rendered results. */
+  position: number;
+}
+
+/** Validate a click-beacon body; null on any violation (the route answers 400). */
+export function parseClickBeaconBody(value: unknown): ClickBeaconBody | null {
+  if (typeof value !== "object" || value === null) {
+    return null;
+  }
+  const { searchId, sessionId, productId, position } = value as Record<
+    string,
+    unknown
+  >;
+  if (
+    typeof searchId !== "string" ||
+    searchId === "" ||
+    typeof sessionId !== "string" ||
+    sessionId === "" ||
+    typeof productId !== "string" ||
+    productId === "" ||
+    typeof position !== "number" ||
+    !Number.isInteger(position) ||
+    position < 0
+  ) {
+    return null;
+  }
+  return { searchId, sessionId, productId, position };
+}
+
 /**
  * Drop one dismissed chip's constraint from an intent (YOY-46 AC-4). Pure
  * intent surgery — no model involved, which is what keeps the chip-removal

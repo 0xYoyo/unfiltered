@@ -57,11 +57,15 @@ import {
 const DEFAULT_LIMIT = 10;
 
 /**
- * Why the response took the route it did: the classifier's reason, or
+ * Why the response took the route it did: the classifier's reason,
  * "resolved-intent" when the caller supplied the intent itself (chip
- * removal, YOY-46) and no classification ran.
+ * removal, YOY-46) and no classification ran, or "throttled" when the
+ * caller forced the classic path (YOY-47) and no classification ran.
  */
-export type SearchRouteReason = ClassificationReason | "resolved-intent";
+export type SearchRouteReason =
+  | ClassificationReason
+  | "resolved-intent"
+  | "throttled";
 
 /** One orchestrated search request. */
 export interface SearchRequest {
@@ -82,6 +86,12 @@ export interface SearchRequest {
    * ladder below it. Mutually exclusive with `previousIntent`.
    */
   resolvedIntent?: Intent;
+  /**
+   * Force the classic path without consulting the classifier — zero LLM
+   * calls (YOY-47 throttle). The response is served `degraded: true` with
+   * reason "throttled". Takes precedence over `resolvedIntent`.
+   */
+  forceClassic?: boolean;
   /** Correlation ID to thread through every AI call; generated when absent. */
   searchId?: string;
   /** Maximum primary hits (and close matches) to return; defaults to 10. */
@@ -273,6 +283,13 @@ export function createSearchOrchestrator(
           closeMatches: [],
         };
       };
+
+      if (request.forceClassic === true) {
+        // Throttled (YOY-47): the caller has decided this session spent its
+        // AI budget — classic keyword results, zero LLM calls, degraded so
+        // the response is honest about not being the AI path.
+        return classicResponse("throttled", true);
+      }
 
       if (request.resolvedIntent !== undefined) {
         // Chip removal (YOY-46): the caller already holds the intent, so no
