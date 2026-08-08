@@ -7,7 +7,9 @@
   </head>
   <body>
     <!-- A fake storefront: theme-like markup with a standard search form,
-         served entirely locally (YOY-43 AC-4). -->
+         served entirely locally (YOY-43 AC-4, extended by YOY-48 with
+         contract-shaped fixtures for the search and click-beacon
+         endpoints). -->
     <header>
       <h1>Harness store</h1>
       <form action="/search" method="get" role="search">
@@ -21,27 +23,111 @@
     <script type="module">
       import { init } from "/src/main.ts";
 
-      // Stubbed search endpoint: requests to the app-proxy path resolve
-      // locally with a fixed payload, so widget dev never needs Shopify or
-      // the network. The scaffold widget makes no calls yet (NG-1); the stub
-      // is the harness contract later chain issues develop against.
+      // Stubbed proxy endpoints (YOY-48): requests to the app-proxy paths
+      // resolve locally with contract-shaped payloads, so widget dev and UI
+      // tests never need Shopify or the network. `?fixture=` selects the
+      // scenario; captured requests are exposed for test assertions —
+      // click beacons in sessionStorage, because the click navigates away.
+      const params = new URLSearchParams(window.location.search);
+      const fixture = params.get("fixture") ?? "results";
+
+      window.__searchRequests = [];
+
+      const PIXEL =
+        "data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==";
+
+      const RESULTS_RESPONSE = {
+        searchId: "harness-search-1",
+        route: "classic",
+        degraded: false,
+        results: [
+          {
+            productId: "gid://shopify/Product/1",
+            title: "Nike Air 90",
+            handle: "nike-air-90",
+            imageUrl: PIXEL,
+            priceMin: 100,
+            priceMax: 100,
+            currencyCode: "ILS",
+            available: true,
+          },
+          {
+            productId: "gid://shopify/Product/2",
+            title: "Runner Range",
+            handle: "runner-range",
+            imageUrl: null,
+            priceMin: 100,
+            priceMax: 150,
+            currencyCode: "ILS",
+            available: true,
+          },
+          {
+            productId: "gid://shopify/Product/3",
+            title: "Sold Out Boot",
+            handle: "sold-out-boot",
+            imageUrl: PIXEL,
+            priceMin: 200,
+            priceMax: 200,
+            currencyCode: "ILS",
+            available: false,
+          },
+        ],
+        chips: [],
+        intent: null,
+      };
+
+      const jsonResponse = (body) =>
+        new Response(JSON.stringify(body), {
+          headers: { "Content-Type": "application/json" },
+        });
+
       const realFetch = window.fetch.bind(window);
       window.fetch = (input, requestInit) => {
         const url = typeof input === "string" ? input : input.url;
-        if (url.startsWith("/apps/unfiltered")) {
-          return Promise.resolve(
-            new Response(JSON.stringify({ hits: [] }), {
-              headers: { "Content-Type": "application/json" },
-            }),
+        if (url.startsWith("/apps/unfiltered/search")) {
+          window.__searchRequests.push(JSON.parse(requestInit.body));
+          if (fixture === "error") {
+            return Promise.resolve(new Response(null, { status: 500 }));
+          }
+          if (fixture === "timeout") {
+            // Never answers, but honors the abort signal the way real fetch
+            // does — the widget's timeout depends on it.
+            return new Promise((resolve, reject) => {
+              requestInit.signal?.addEventListener("abort", () =>
+                reject(new DOMException("aborted", "AbortError")),
+              );
+            });
+          }
+          const body =
+            fixture === "empty"
+              ? { ...RESULTS_RESPONSE, results: [] }
+              : RESULTS_RESPONSE;
+          if (fixture === "delayed") {
+            return new Promise((resolve) =>
+              setTimeout(() => resolve(jsonResponse(body)), 500),
+            );
+          }
+          return Promise.resolve(jsonResponse(body));
+        }
+        if (url.startsWith("/apps/unfiltered/click")) {
+          const log = JSON.parse(
+            sessionStorage.getItem("harness:clickBeacons") ?? "[]",
           );
+          log.push(JSON.parse(requestInit.body));
+          sessionStorage.setItem("harness:clickBeacons", JSON.stringify(log));
+          if (fixture === "beacon-missing") {
+            return Promise.reject(new TypeError("beacon endpoint absent"));
+          }
+          return Promise.resolve(new Response(null, { status: 204 }));
         }
         return realFetch(input, requestInit);
       };
 
-      const params = new URLSearchParams(window.location.search);
       init({
         locale: params.get("locale") ?? "en",
         shopDomain: "harness.myshopify.com",
+        debounceMs: 50,
+        searchTimeoutMs: fixture === "timeout" ? 300 : 5000,
       });
     </script>
   </body>

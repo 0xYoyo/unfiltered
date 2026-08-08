@@ -1,24 +1,19 @@
 import { expect, test } from "@playwright/test";
 
-// UI test lane (YOY-43 AC-5): headless browser tests against the local
-// harness — no Shopify, no network. These are the repo's first UI tests and
-// the lane every later widget issue extends.
+// Mounting behavior (YOY-43 lane, updated by YOY-48): the widget mounts a
+// hidden overlay host when — and only when — the page has a recognizable
+// theme search input; with none it stays inert entirely.
 
-test("widget mounts: root testid present and search input focusable", async ({
+test("widget mounts a root with the overlay hidden until the input is used", async ({
   page,
 }) => {
   await page.goto("/");
 
-  const root = page.getByTestId("unfiltered-widget-root");
-  await expect(root).toBeVisible();
-
-  const input = root.getByRole("searchbox");
-  await expect(input).toBeVisible();
-  await input.focus();
-  await expect(input).toBeFocused();
+  await expect(page.getByTestId("unfiltered-widget-root")).toBeAttached();
+  await expect(page.getByTestId("unfiltered-widget-overlay")).toBeHidden();
 });
 
-test("init receives the storefront locale and shop domain (AC-1 contract)", async ({
+test("init receives the storefront locale and shop domain", async ({
   page,
 }) => {
   await page.goto("/?locale=he");
@@ -29,10 +24,9 @@ test("init receives the storefront locale and shop domain (AC-1 contract)", asyn
     "data-shop-domain",
     "harness.myshopify.com",
   );
-  await expect(root).toHaveAttribute("data-theme-search-form", "found");
 });
 
-test("mounts without console errors on a host page with no search form (AC-3)", async ({
+test("stays inert on a host page with no search input: no root, no errors (AC-2)", async ({
   page,
 }) => {
   const errors: string[] = [];
@@ -45,9 +39,7 @@ test("mounts without console errors on a host page with no search form (AC-3)", 
 
   await page.goto("/no-search-form.html");
 
-  const root = page.getByTestId("unfiltered-widget-root");
-  await expect(root).toBeVisible();
-  await expect(root).toHaveAttribute("data-theme-search-form", "absent");
+  await expect(page.getByTestId("unfiltered-widget-root")).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 
