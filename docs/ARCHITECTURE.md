@@ -207,9 +207,9 @@ The app's `/healthz` route (`apps/shopify-app/app/routes/healthz.tsx`) calls
 `apps/shopify-app/app/search/orchestrator.server.ts`
 (`createSearchOrchestrator({ db, classifier, extractor, retriever,
 classicStore })`) is the one server-side entry point behind the product's
-single search bar — a function, not an HTTP endpoint (the storefront API over
-the app proxy is a later issue). `runSearch({ query, shopDomain,
-previousIntent?, searchId?, limit? })` always resolves to one response shape:
+single search bar — a function; the HTTP surface over it is the app-proxy
+endpoint below (YOY-46). `runSearch({ query, shopDomain, previousIntent?,
+resolvedIntent?, searchId?, limit? })` always resolves to one response shape:
 `{ searchId, route, routeReason, intent, hits, chips, degraded,
 closeMatches }`, where `hits` and `closeMatches` are display-ready product
 cards (`productId`, `title`, `handle`, `imageUrl`, `priceMin`/`priceMax`,
@@ -218,7 +218,11 @@ hit order, and `chips` echoes the retrieval's applied constraints. One
 `searchId` is generated per search (unless the caller threads its own) and
 forwarded to every AI port call, so all `AiCall` rows serving one search
 share it. `previousIntent` is passed through to the extractor context
-unchanged; the orchestrator holds no session state.
+unchanged; the orchestrator holds no session state. `resolvedIntent` (YOY-46
+chip removal) is an intent the caller already holds: the orchestrator skips
+classification and extraction — zero LLM calls — and enters the AI path at
+retrieval, with `routeReason: "resolved-intent"` and the same fallback
+ladder below it.
 
 Routing: the classifier's heuristics settle clearly-simple queries instantly;
 everything else the LLM classifier decides. Classic-routed queries run the
@@ -254,6 +258,84 @@ The eval harness (`apps/shopify-app/app/eval/harness.server.ts`) routes every
 golden — classic and AI alike — through `runSearch`, and treats a `degraded`
 response as a hard error: offline replay must never let the silent fallback
 mask a broken recording as classic-quality results.
+
+## Storefront search API over the app proxy (YOY-46)
+
+The storefront widget reaches the orchestrator through a Shopify app proxy:
+`shopify.app.toml` routes `/apps/unfiltered/*` on the shop domain to the app
+(`[app_proxy]`, `prefix = "apps"`, `subpath = "unfiltered"`), so the endpoint
+is same-origin from the shopper's browser by construction — no CORS surface.
+The route is `apps/shopify-app/app/routes/apps.unfiltered.search.tsx`
+(`POST /apps/unfiltered/search`); parsing, serialization, and the production
+orchestrator wiring live in `apps/shopify-app/app/search/proxy.server.ts`.
+
+**Auth.** Every request is authenticated with
+`authenticate.public.appProxy`, which verifies Shopify's proxy signature over
+the query params. A missing or invalid signature is answered `401` with an
+empty body before any search code runs. The shop identity used for retrieval
+comes exclusively from the signature-verified query params (`shop`) — never
+from the request body, which a shopper controls. A malformed body is answered
+`400`, also with an empty body.
+
+**Request JSON.**
+
+```json
+{
+  "query": "elegant dress for a wedding",
+  "sessionId": "widget-generated-id",
+  "previousIntent": { "…": "the previous response's intent, echoed as-is" },
+  "removeChip": { "field": "occasion", "value": "wedding" }
+}
+```
+
+`query` and `sessionId` are required (`sessionId` is carried for later
+milestones; nothing is persisted — no query logging in this issue).
+`previousIntent` alone marks a refinement: it is passed to the intent
+extractor's context unchanged. `removeChip` (requires `previousIntent`) is
+chip removal, below.
+
+**Response JSON** — the exact contract, pinned by a shape test; no field
+beyond it appears in any response body, including on the degraded path, and
+no Shopify tokens or internal error details ever do:
+
+```json
+{
+  "searchId": "uuid",
+  "route": "classic | ai",
+  "degraded": false,
+  "results": [
+    {
+      "productId": "gid://shopify/Product/1",
+      "title": "…",
+      "handle": "…",
+      "imageUrl": "… | null",
+      "priceMin": 100,
+      "priceMax": 150,
+      "currencyCode": "ILS",
+      "available": true
+    }
+  ],
+  "chips": [{ "field": "occasion", "value": "wedding" }],
+  "intent": { "…": "full intent, absent optionals as null — or null" },
+  "closeMatches": [{ "…": "results shape; present only on AI zero-hits" }]
+}
+```
+
+`intent` is what the client echoes back as `previousIntent` on a follow-up.
+The serializer re-maps every field explicitly (`serializeProxySearchResponse`),
+so orchestrator-internal diagnostics like `routeReason` — and anything the
+orchestrator response grows later — cannot leak to a shopper.
+
+**Chip removal.** A request carrying the previous response's `intent` plus
+one `removeChip` (`field` + `value`) recomputes results without that
+constraint: the server drops the constraint from the intent
+(`removeChipFromIntent` — pure intent surgery; array-valued fields remove
+just the named value, `availability` clears the flag) and runs the
+orchestrator with `resolvedIntent`, which skips classification and
+extraction entirely. The round-trip makes zero LLM calls — no new `AiCall`
+rows with a `classification` or `intent` operation — and the response's chip
+list no longer carries the removed chip. Embedding calls (cached, estimated)
+still occur, as the adjusted intent is re-retrieved.
 
 ## AI cost metering
 
@@ -332,6 +414,7 @@ fails the suite if the engine's manifest or source ever references a
 
 ## Deferred components
 
-Real widget search behavior (endpoint calls, theme-search takeover, result
-rendering), merchant dashboard, billing, and deployment/hosting are all
-future milestones and intentionally absent from the current codebase.
+Real widget search behavior (calling the proxy endpoint, theme-search
+takeover, result rendering), merchant dashboard, billing, and
+deployment/hosting are all future milestones and intentionally absent from
+the current codebase.

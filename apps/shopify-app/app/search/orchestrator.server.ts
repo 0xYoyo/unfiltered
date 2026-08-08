@@ -56,6 +56,13 @@ import {
 
 const DEFAULT_LIMIT = 10;
 
+/**
+ * Why the response took the route it did: the classifier's reason, or
+ * "resolved-intent" when the caller supplied the intent itself (chip
+ * removal, YOY-46) and no classification ran.
+ */
+export type SearchRouteReason = ClassificationReason | "resolved-intent";
+
 /** One orchestrated search request. */
 export interface SearchRequest {
   /** Raw shopper query text. */
@@ -68,6 +75,13 @@ export interface SearchRequest {
    * (NG-2); the orchestrator holds no session state.
    */
   previousIntent?: Intent;
+  /**
+   * A fully resolved intent to search with as-is (YOY-46 chip removal): the
+   * orchestrator skips classification and extraction — no LLM call of any
+   * kind — and enters the AI path at retrieval, with the same fallback
+   * ladder below it. Mutually exclusive with `previousIntent`.
+   */
+  resolvedIntent?: Intent;
   /** Correlation ID to thread through every AI call; generated when absent. */
   searchId?: string;
   /** Maximum primary hits (and close matches) to return; defaults to 10. */
@@ -98,7 +112,7 @@ export interface SearchResponse {
    * later query log read it). On a degraded response this is the classifier's
    * reason for the original decision, not the fallback's.
    */
-  routeReason: ClassificationReason;
+  routeReason: SearchRouteReason;
   /** The extracted intent, when the AI path produced one (diagnostic). */
   intent: Intent | null;
   /** Ranked primary results. */
@@ -172,14 +186,8 @@ export function createSearchOrchestrator(
       const searchId = request.searchId ?? randomUUID();
       const limit = request.limit ?? DEFAULT_LIMIT;
 
-      // The classifier never rejects by contract: failures and timeouts come
-      // back as { route: "classic", reason: "model-error" }.
-      const decision = await classifier.classify(query, {
-        shopDomain,
-        searchId,
-      });
-
       const classicResponse = async (
+        routeReason: SearchRouteReason,
         degraded: boolean,
         intent: Intent | null = null,
       ): Promise<SearchResponse> => {
@@ -187,7 +195,7 @@ export function createSearchOrchestrator(
         return {
           searchId,
           route: "classic",
-          routeReason: decision.reason,
+          routeReason,
           intent,
           hits: await hydrateCards(shopDomain, result.hits),
           chips: [],
@@ -196,11 +204,97 @@ export function createSearchOrchestrator(
         };
       };
 
+      // Retrieval and everything below it on the ladder, shared by the
+      // extracted-intent path and the resolved-intent (chip removal) path.
+      const aiPath = async (
+        intent: Intent,
+        routeReason: SearchRouteReason,
+      ): Promise<SearchResponse> => {
+        let hits: Array<{ productId: string }>;
+        let chips: AppliedConstraint[];
+        try {
+          const retrieval = await retriever.retrieve({
+            intent,
+            shopDomain,
+            limit,
+            searchId,
+          });
+          hits = retrieval.hits;
+          chips = retrieval.appliedConstraints;
+        } catch (error) {
+          if (error instanceof EmptyQueryTextError) {
+            // AC-5: constraints without descriptive text. Constraint-only
+            // classic search, chips kept, not degraded — the response honors
+            // every constraint the shopper stated.
+            const constraints = constraintsFromIntent(intent);
+            const result = await classicStore.search({
+              shopDomain,
+              constraints,
+              limit,
+            });
+            return {
+              searchId,
+              route: "ai",
+              routeReason,
+              intent,
+              hits: await hydrateCards(shopDomain, result.hits),
+              chips: appliedConstraints(constraints),
+              degraded: false,
+              closeMatches: [],
+            };
+          }
+          return classicResponse(routeReason, true, intent);
+        }
+
+        if (hits.length === 0) {
+          // AC-6: retrieval worked, nothing satisfied every constraint. Keep
+          // the chips and offer classic keyword matches as close matches.
+          const close = await classicStore.search({ shopDomain, query, limit });
+          return {
+            searchId,
+            route: "ai",
+            routeReason,
+            intent,
+            hits: [],
+            chips,
+            degraded: false,
+            closeMatches: await hydrateCards(shopDomain, close.hits),
+          };
+        }
+
+        return {
+          searchId,
+          route: "ai",
+          routeReason,
+          intent,
+          hits: await hydrateCards(shopDomain, hits),
+          chips,
+          degraded: false,
+          closeMatches: [],
+        };
+      };
+
+      if (request.resolvedIntent !== undefined) {
+        // Chip removal (YOY-46): the caller already holds the intent, so no
+        // classification and no extraction — zero LLM calls on this path.
+        return aiPath(request.resolvedIntent, "resolved-intent");
+      }
+
+      // The classifier never rejects by contract: failures and timeouts come
+      // back as { route: "classic", reason: "model-error" }.
+      const decision = await classifier.classify(query, {
+        shopDomain,
+        searchId,
+      });
+
       if (decision.route === "classic") {
         // "model-error" means the model was needed and failed — served
         // classic, but flagged degraded (AC-4). Heuristic and model-decided
         // classic routes are the genuine article.
-        return classicResponse(decision.reason === "model-error");
+        return classicResponse(
+          decision.reason,
+          decision.reason === "model-error",
+        );
       }
 
       let intent: Intent;
@@ -211,71 +305,10 @@ export function createSearchOrchestrator(
           previousIntent: request.previousIntent,
         });
       } catch {
-        return classicResponse(true);
+        return classicResponse(decision.reason, true);
       }
 
-      let hits: Array<{ productId: string }>;
-      let chips: AppliedConstraint[];
-      try {
-        const retrieval = await retriever.retrieve({
-          intent,
-          shopDomain,
-          limit,
-          searchId,
-        });
-        hits = retrieval.hits;
-        chips = retrieval.appliedConstraints;
-      } catch (error) {
-        if (error instanceof EmptyQueryTextError) {
-          // AC-5: constraints without descriptive text. Constraint-only
-          // classic search, chips kept, not degraded — the response honors
-          // every constraint the shopper stated.
-          const constraints = constraintsFromIntent(intent);
-          const result = await classicStore.search({
-            shopDomain,
-            constraints,
-            limit,
-          });
-          return {
-            searchId,
-            route: "ai",
-            routeReason: decision.reason,
-            intent,
-            hits: await hydrateCards(shopDomain, result.hits),
-            chips: appliedConstraints(constraints),
-            degraded: false,
-            closeMatches: [],
-          };
-        }
-        return classicResponse(true, intent);
-      }
-
-      if (hits.length === 0) {
-        // AC-6: retrieval worked, nothing satisfied every constraint. Keep
-        // the chips and offer classic keyword matches as close matches.
-        const close = await classicStore.search({ shopDomain, query, limit });
-        return {
-          searchId,
-          route: "ai",
-          routeReason: decision.reason,
-          intent,
-          hits: [],
-          chips,
-          degraded: false,
-          closeMatches: await hydrateCards(shopDomain, close.hits),
-        };
-      }
-
-      return {
-        searchId,
-        route: "ai",
-        routeReason: decision.reason,
-        intent,
-        hits: await hydrateCards(shopDomain, hits),
-        chips,
-        degraded: false,
-        closeMatches: [],
-      };
+      return aiPath(intent, decision.reason);
     },
   };
 }
