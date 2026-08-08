@@ -377,5 +377,149 @@
       "occasion": "wedding",
       "availabilityRequired": false
     }
+  },
+  {
+    "id": "gc01",
+    "language": "en",
+    "query": "air zoom 90",
+    "expectedRoute": "classic",
+    "expectedProductIds": [
+      "p61"
+    ],
+    "hardConstraints": {
+      "category": null,
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "gc02",
+    "language": "en",
+    "query": "air zom 90",
+    "expectedRoute": "classic",
+    "expectedProductIds": [
+      "p61"
+    ],
+    "hardConstraints": {
+      "category": null,
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "gc03",
+    "language": "en",
+    "query": "aurora dress",
+    "expectedRoute": "classic",
+    "expectedProductIds": [
+      "p01"
+    ],
+    "hardConstraints": {
+      "category": null,
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "gc04",
+    "language": "en",
+    "query": "auroa dress",
+    "expectedRoute": "classic",
+    "expectedProductIds": [
+      "p01"
+    ],
+    "hardConstraints": {
+      "category": null,
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "gc05",
+    "language": "he",
+    "query": "שמלת ערב",
+    "expectedRoute": "classic",
+    "expectedProductIds": [
+      "p03"
+    ],
+    "hardConstraints": {
+      "category": null,
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "gc06",
+    "language": "he",
+    "query": "שמלת ערבב",
+    "expectedRoute": "classic",
+    "expectedProductIds": [
+      "p03"
+    ],
+    "hardConstraints": {
+      "category": null,
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "gc07",
+    "language": "en",
+    "query": "\"linen beach dress\"",
+    "expectedRoute": "classic",
+    "expectedProductIds": [
+      "p06"
+    ],
+    "hardConstraints": {
+      "category": null,
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "gc08",
+    "language": "he",
+    "query": "שמלת קיץ",
+    "expectedRoute": "classic",
+    "expectedProductIds": [
+      "p05"
+    ],
+    "hardConstraints": {
+      "category": null,
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    }
   }
 ]

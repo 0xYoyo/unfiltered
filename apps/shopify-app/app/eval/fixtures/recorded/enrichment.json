@@ -991,6 +991,18 @@
       },
       "inputTokens": 185,
       "outputTokens": 60
+    },
+    "Air Zoom 90 Sneakers": {
+      "output": {
+        "category": "sneakers",
+        "colors": [],
+        "occasions": [],
+        "fit": "cushioned",
+        "styleTags": [],
+        "seasons": []
+      },
+      "inputTokens": 130,
+      "outputTokens": 52
     }
   }
 }

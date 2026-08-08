@@ -17,6 +17,7 @@ import { createPrismaCostRecorder } from "../ai/cost-recorder.server";
 import { embedCatalog } from "../catalog/embed.server";
 import { enrichCatalog } from "../catalog/enrich.server";
 import { computeContentHash } from "../catalog/mapping.server";
+import { createPgTrgmClassicStore } from "../search/classic-store.server";
 import { createPgVectorRetrievalStore } from "../search/retrieval-store.server";
 import {
   createReplayEmbeddingClient,
@@ -73,6 +74,8 @@ export interface Golden {
   id: string;
   language: "en" | "he" | "mixed";
   query: string;
+  /** Route the classifier must resolve; absent means "ai" (YOY-41 AC-6). */
+  expectedRoute?: "classic" | "ai";
   hardConstraints: GoldenConstraints;
   expectedProductIds: string[];
 }
@@ -321,6 +324,7 @@ export async function runEval(db: PrismaClient): Promise<EvalRunResult> {
     embeddings,
     store: createPgVectorRetrievalStore(db),
   });
+  const classicStore = createPgTrgmClassicStore(db);
 
   const products = new Map(catalog.map((product) => [product.productId, product]));
   const enrichmentRows = await db.productEnrichment.findMany({
@@ -347,6 +351,12 @@ export async function runEval(db: PrismaClient): Promise<EvalRunResult> {
       intent = await extractor.extract(golden.query, { shopDomain, searchId });
       hits = (
         await retriever.retrieve({ intent, shopDomain, limit: 10, searchId })
+      ).hits;
+    } else {
+      // Classic-routed goldens run the trigram keyword engine (YOY-41 AC-6):
+      // raw query in, ranked hits out, zero AI calls anywhere on the path.
+      hits = (
+        await classicStore.search({ shopDomain, query: golden.query, limit: 10 })
       ).hits;
     }
 
@@ -398,10 +408,15 @@ export async function runEval(db: PrismaClient): Promise<EvalRunResult> {
   const perSearchTotal = allRows
     .filter((row) => row.searchId !== null)
     .reduce((sum, row) => sum + row.costUsd, 0);
-  // Every golden — first query or follow-up — is one shopper search, so the
-  // blend divides by all of them.
-  const searchCount = goldens.length + refinementGoldens.length;
-  const perSearchCostPer1000Usd = (perSearchTotal / searchCount) * 1000;
+  // Per AI search: every AI-routed golden and every refinement follow-up is
+  // one paying shopper search; classic-routed goldens spend nothing by
+  // construction (YOY-41 AC-5), so counting them in the denominator would
+  // understate the cost of the searches that do pay.
+  const aiSearchCount =
+    perQuery.filter((score) => score.route === "ai").length +
+    refinementGoldens.length;
+  const perSearchCostPer1000Usd =
+    aiSearchCount === 0 ? 0 : (perSearchTotal / aiSearchCount) * 1000;
 
   const hitCount = perQuery.filter((score) => score.firstExpectedRank !== null).length;
   const result: EvalRunResult = {

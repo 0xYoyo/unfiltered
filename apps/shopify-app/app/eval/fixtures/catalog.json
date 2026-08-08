@@ -892,5 +892,21 @@
     "available": true,
     "imageAltTexts": [],
     "sourceUpdatedAt": "2026-08-01T00:00:00.000Z"
+  },
+  {
+    "productId": "p61",
+    "title": "Air Zoom 90 Sneakers",
+    "description": "Cushioned everyday runner.",
+    "tags": [
+      "sneakers"
+    ],
+    "vendor": "eval-fixture",
+    "productType": "Sneakers",
+    "priceMin": 340,
+    "priceMax": 340,
+    "currencyCode": "ILS",
+    "available": true,
+    "imageAltTexts": [],
+    "sourceUpdatedAt": "2026-08-01T00:00:00.000Z"
   }
 ]

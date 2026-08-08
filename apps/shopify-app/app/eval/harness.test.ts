@@ -22,8 +22,8 @@ describe("eval fixtures (AC-1)", () => {
     const catalog = loadCatalog();
     const goldens = loadGoldens();
 
-    expect(catalog).toHaveLength(60);
-    expect(goldens).toHaveLength(20);
+    expect(catalog).toHaveLength(61);
+    expect(goldens).toHaveLength(28);
 
     // Deliberately sparse: descriptions are one-liners or empty, tags minimal.
     for (const product of catalog) {
@@ -233,6 +233,9 @@ describe("eval run (AC-2, AC-3, AC-4, AC-6)", () => {
 
   it("keeps the goldens' documented constraints in sync with the recorded intents", () => {
     for (const score of result.perQuery) {
+      if ((score.golden.expectedRoute ?? "ai") === "classic") {
+        continue; // classic goldens extract no intent by design (YOY-41)
+      }
       expect(score.intent, `${score.golden.id} produced no intent`).not.toBeNull();
       const mapped = constraintsFromIntent(score.intent!);
       expect(mapped, score.golden.id).toEqual({
@@ -244,6 +247,26 @@ describe("eval run (AC-2, AC-3, AC-4, AC-6)", () => {
         occasion: score.golden.hardConstraints.occasion ?? undefined,
         availableOnly: score.golden.hardConstraints.availabilityRequired,
       });
+    }
+  });
+
+  it("routes and scores the classic goldens through the keyword engine (YOY-41 AC-6)", () => {
+    const classic = result.perQuery.filter(
+      (score) => score.golden.expectedRoute === "classic",
+    );
+    expect(classic.length).toBeGreaterThanOrEqual(8);
+    // The specified mix: exact EN, EN typo, Hebrew, and SKU-like queries.
+    expect(classic.some((score) => score.golden.language === "en")).toBe(true);
+    expect(classic.some((score) => score.golden.language === "he")).toBe(true);
+    expect(classic.some((score) => /\d/.test(score.golden.query))).toBe(true);
+    for (const score of classic) {
+      expect(score.route, score.golden.id).toBe("classic");
+      expect(score.hits.length, score.golden.id).toBeGreaterThan(0);
+      // The expected product must appear in the top 5 classic results.
+      expect(score.firstExpectedRank, score.golden.id).not.toBeNull();
+      expect(score.firstExpectedRank!, score.golden.id).toBeLessThanOrEqual(5);
+      // A classic search issues zero LLM/embedding calls (AC-5).
+      expect(score.costUsd, score.golden.id).toBe(0);
     }
   });
 

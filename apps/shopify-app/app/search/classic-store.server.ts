@@ -1,0 +1,157 @@
+import type { PrismaClient } from "@prisma/client";
+import type {
+  ClassicSearchHit,
+  ClassicSearchRequest,
+  ClassicSearchResult,
+  ClassicSearchStore,
+  RetrievalConstraints,
+} from "@unfiltered/engine";
+import { expandCategoryConstraint, normalizeQuery } from "@unfiltered/engine";
+
+/**
+ * Postgres/pg_trgm implementation of the engine's ClassicSearchStore port
+ * (YOY-41): trigram keyword search over catalog_search_text(...) — the
+ * migration-owned function joining title, tags, vendor, productType, and
+ * imageAltTexts — with zero LLM/embedding calls anywhere on this path.
+ *
+ * Text ranking is word_similarity(query, search text): typo-tolerant for one-
+ * or two-edit misspellings in any script, `<%` filtered so the trigram GIN
+ * index drives the plan. The word-similarity threshold is lowered to 0.30
+ * via a transaction-local set_config, run in the same interactive
+ * transaction as the search so the setting cannot leak to other pooled
+ * connections.
+ *
+ * Constraint predicates mirror the pgvector RetrievalStore
+ * (retrieval-store.server.ts) verbatim — the two stores must never drift,
+ * because the orchestrator falls back from one to the other: unknown
+ * enrichment passes positive occasion/color constraints, category stays
+ * evidence-required and expands through the taxonomy's category groups, and
+ * a price cap compares against `priceMin`. Constraint-only requests (no
+ * query text) filter without ranking and score every hit 0, ordered
+ * deterministically by productId.
+ */
+
+/** word_similarity floor for a row to count as a keyword match. */
+const WORD_SIMILARITY_THRESHOLD = 0.3;
+
+const DEFAULT_LIMIT = 10;
+
+/**
+ * The searchable-text expression; must match the migration's index exactly.
+ * Exported for the EXPLAIN test proving the index serves this expression.
+ */
+export const SEARCH_TEXT = `catalog_search_text(p."title", p."tags", p."vendor", p."productType", p."imageAltTexts")`;
+
+const NO_CONSTRAINTS: RetrievalConstraints = {
+  colorsInclude: [],
+  colorsExclude: [],
+  availableOnly: false,
+};
+
+/** Build the SQL and bind params for one search. */
+function buildClassicSearchSql(request: ClassicSearchRequest): {
+  sql: string;
+  params: unknown[];
+} {
+  const constraints = request.constraints ?? NO_CONSTRAINTS;
+  const query = normalizeQuery(request.query ?? "");
+  const limit = request.limit ?? DEFAULT_LIMIT;
+  if (!Number.isInteger(limit) || limit <= 0) {
+    throw new RangeError(`limit must be a positive integer, got ${limit}`);
+  }
+
+  const params: unknown[] = [request.shopDomain];
+  const where: string[] = [`p."shopDomain" = $1`];
+  const param = (value: unknown): string => {
+    params.push(value);
+    return `$${params.length}`;
+  };
+
+  let select: string;
+  let orderBy: string;
+  if (query !== "") {
+    const queryParam = param(query);
+    where.push(`${queryParam} <% ${SEARCH_TEXT}`);
+    select = `word_similarity(${queryParam}, ${SEARCH_TEXT})::float8 AS score`;
+    orderBy = `score DESC, p."productId" ASC`;
+  } else {
+    select = `0::float8 AS score`;
+    orderBy = `p."productId" ASC`;
+  }
+
+  if (constraints.priceMax !== undefined) {
+    // Violates the cap when even its cheapest variant is above it.
+    where.push(`p."priceMin" <= ${param(constraints.priceMax)}`);
+  }
+  if (constraints.priceMin !== undefined) {
+    where.push(`p."priceMax" >= ${param(constraints.priceMin)}`);
+  }
+  if (constraints.availableOnly) {
+    where.push(`p."available"`);
+  }
+  if (constraints.category !== undefined) {
+    where.push(
+      `lower(en."category") IN (SELECT lower(v)
+         FROM json_array_elements_text(${param(JSON.stringify(expandCategoryConstraint(constraints.category)))}::json) v)`,
+    );
+  }
+  if (constraints.occasion !== undefined) {
+    where.push(
+      `(COALESCE(cardinality(en."occasions"), 0) = 0
+         OR EXISTS (SELECT 1 FROM unnest(en."occasions") o
+           WHERE lower(o) = lower(${param(constraints.occasion)})))`,
+    );
+  }
+  if (constraints.colorsInclude.length > 0) {
+    where.push(
+      `(COALESCE(cardinality(en."colors"), 0) = 0
+         OR EXISTS (SELECT 1 FROM unnest(en."colors") c
+           WHERE lower(c) IN (SELECT lower(v)
+             FROM json_array_elements_text(${param(JSON.stringify(constraints.colorsInclude))}::json) v)))`,
+    );
+  }
+  if (constraints.colorsExclude.length > 0) {
+    where.push(
+      `NOT EXISTS (SELECT 1 FROM unnest(COALESCE(en."colors", '{}')) c
+         WHERE lower(c) IN (SELECT lower(v)
+           FROM json_array_elements_text(${param(JSON.stringify(constraints.colorsExclude))}::json) v))`,
+    );
+  }
+
+  const sql = `SELECT p."productId", ${select}
+     FROM "CatalogProduct" p
+     LEFT JOIN "ProductEnrichment" en
+       ON en."shopDomain" = p."shopDomain" AND en."productId" = p."productId"
+      AND en."status" = 'enriched'
+     WHERE ${where.join("\n       AND ")}
+     ORDER BY ${orderBy}
+     LIMIT ${limit}`;
+  return { sql, params };
+}
+
+export function createPgTrgmClassicStore(db: PrismaClient): ClassicSearchStore {
+  return {
+    async search(request: ClassicSearchRequest): Promise<ClassicSearchResult> {
+      const { sql, params } = buildClassicSearchSql(request);
+      // Same interactive transaction: the threshold set_config is
+      // transaction-local (is_local = true) and the search must see it.
+      const [, rows] = await db.$transaction([
+        db.$queryRawUnsafe(
+          `SELECT set_config('pg_trgm.word_similarity_threshold', '${WORD_SIMILARITY_THRESHOLD}', true)`,
+        ),
+        db.$queryRawUnsafe<Array<{ productId: string; score: number }>>(
+          sql,
+          ...params,
+        ),
+      ]);
+      return {
+        hits: (rows as Array<{ productId: string; score: number }>).map(
+          (row): ClassicSearchHit => ({
+            productId: row.productId,
+            score: row.score,
+          }),
+        ),
+      };
+    },
+  };
+}
