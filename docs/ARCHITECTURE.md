@@ -83,13 +83,14 @@ Prisma on Postgres 18 with the pgvector extension
 model, the `AiCall` cost-metering ledger, and the `CatalogProduct` per-shop
 catalog snapshot (unique per `shopDomain` + `productId`, content-hashed for
 idempotent re-ingestion via `app/catalog/ingest.server.ts`); the baseline migration runs
-`CREATE EXTENSION IF NOT EXISTS vector`). The app knows only a Postgres connection string: `DATABASE_URL`
+`CREATE EXTENSION IF NOT EXISTS vector`, and the classic-search migration
+`CREATE EXTENSION IF NOT EXISTS pg_trgm`). The app knows only a Postgres connection string: `DATABASE_URL`
 from a gitignored `.env` (a managed Neon database in dev), documented in
 `.env.example`. SQLite is gone.
 
 Tests never require a live database: `createTestDb()`
 (`apps/shopify-app/app/testing/helpers.server.ts`) spins up an in-process
-embedded Postgres (PGlite) with pgvector loaded, applies the committed
+embedded Postgres (PGlite) with pgvector and pg_trgm loaded, applies the committed
 migration SQL, and hands Prisma a driver adapter for it — so `npm test`
 passes with no `DATABASE_URL` set and no external Postgres.
 
@@ -97,14 +98,15 @@ passes with no `DATABASE_URL` set and no external Postgres.
 
 `packages/engine` (`@unfiltered/engine`) exports, from `src/index.ts`:
 
-- `version: string` — semantic version of the API contract (`"0.3.0"`).
+- `version: string` — semantic version of the API contract (`"0.4.0"`).
 - `interface EngineDocument` — `{ id: string; fields: Record<string, string> }`.
 - `interface SearchOptions` — `{ limit?: number; offset?: number }`.
 - `interface SearchHit` — `{ documentId: string; score: number }`.
 - `interface SearchResult` — `{ hits: SearchHit[]; totalCount: number; query: string }`.
 - `interface Engine` — `{ readonly version: string; search(query, options?): Promise<SearchResult> }`.
 - `createEngine(): Engine` — returns the stub implementation (every search
-  resolves to an empty result; the classic keyword path is M3).
+  resolves to an empty result; real search runs through the classification /
+  retrieval / classic-search ports below).
 
 Query understanding (all LLM access through the `LlmClient` port):
 
@@ -140,6 +142,35 @@ Retrieval (the AI result path; data reached only through injected ports):
   signal (nothing for `composeQueryText` to embed) rejects with
   `EmptyQueryTextError` before any embedding call; the caller picks the
   fallback (e.g. classic constraint-only search).
+
+Classic keyword search (the zero-LLM result path; YOY-41):
+
+- `interface ClassicSearchStore` — the keyword-search port the consumer
+  implements over its own database. One
+  `search({ shopDomain, query?, constraints?, limit? })` call returns
+  `{ hits: [{ productId, score }] }` — ranked keyword hits, score in [0, 1],
+  higher is better. A request with constraints and no query text is
+  constraint-only mode: results are filtered without text ranking and every
+  hit scores 0. A classic search never issues an LLM or embedding call, so
+  it writes no `AiCall` rows.
+- The app's implementation (`apps/shopify-app/app/search/classic-store.server.ts`,
+  `createPgTrgmClassicStore`) is Postgres/pg_trgm trigram search. The
+  `20260808160000_pg_trgm_classic_search` migration enables the `pg_trgm`
+  extension, defines `catalog_search_text(...)` — the lowercased join of
+  `CatalogProduct`'s keyword fields (title, tags, vendor, productType,
+  imageAltTexts) — and creates a trigram GIN index over that expression;
+  classic queries filter with `query <% catalog_search_text(...)` (word
+  similarity, threshold lowered to 0.30 transaction-locally) and rank by
+  `word_similarity(query, ...)`, so the index serves the plan and one- or
+  two-edit typos ("nkie air max") still find the intended product, in
+  English and Hebrew alike. Constraint predicates mirror the pgvector store
+  verbatim: unknown enrichment passes positive occasion/color constraints,
+  category is evidence-required and expands through the taxonomy's category
+  groups, and a price cap compares against `priceMin`.
+- The eval harness routes goldens marked `expectedRoute: "classic"` through
+  this store (≥8 classic goldens: exact EN, EN typo, Hebrew, and SKU-like
+  queries) and asserts the expected product ranks in the top 5 at zero AI
+  cost; the per-1,000-searches cost bar divides over AI-routed goldens only.
 
 AI ports (vendor-free; implemented by provider adapter packages):
 

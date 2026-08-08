@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { PGlite } from "@electric-sql/pglite";
+import { pg_trgm } from "@electric-sql/pglite/contrib/pg_trgm";
 import { vector } from "@electric-sql/pglite-pgvector";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPGlite } from "pglite-prisma-adapter";
@@ -17,7 +18,7 @@ const appRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
  * Postgres server is ever needed.
  */
 export async function createTestDb(): Promise<PrismaClient> {
-  const pglite = new PGlite({ extensions: { vector } });
+  const pglite = new PGlite({ extensions: { vector, pg_trgm } });
   // pglite-prisma-adapter pins @prisma/driver-adapter-utils@6.10.1 while
   // @prisma/client ships its own copy, so TS sees two structurally identical
   // but nominally distinct adapter types.

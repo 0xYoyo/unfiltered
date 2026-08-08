@@ -8,7 +8,14 @@
  */
 
 /** Semantic version of the engine's public API contract. */
-export const version = "0.3.0";
+export const version = "0.4.0";
+
+export {
+  type ClassicSearchHit,
+  type ClassicSearchRequest,
+  type ClassicSearchResult,
+  type ClassicSearchStore,
+} from "./classic.js";
 
 export {
   CLASSIFICATION_SCHEMA,

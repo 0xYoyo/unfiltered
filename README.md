@@ -22,7 +22,7 @@ npm-workspaces monorepo with three workspaces:
 | Workspace | Purpose |
 | --- | --- |
 | `apps/shopify-app` | Embedded Shopify app (official Shopify React Router + TypeScript template). Consumes the engine as a client. |
-| `packages/engine` | Catalog-agnostic search engine with a versioned, typed public API. Currently a stub implementation plus vendor-free AI ports (LLM, embedding, cost metering). |
+| `packages/engine` | Catalog-agnostic search engine with a versioned, typed public API: query classification, intent extraction, vector retrieval, and classic keyword search — all data and AI access through vendor-free ports (LLM, embedding, cost metering, retrieval store, classic-search store). |
 | `packages/provider-gemini` | Google AI Studio (Gemini) adapter implementing the engine's LLM and embedding ports, metered through the cost-recorder port. |
 
 ## Setup
