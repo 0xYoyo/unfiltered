@@ -13,7 +13,7 @@ describe("healthz loader", () => {
     expect(body).toEqual({
       status: "ok",
       engine: {
-        version: "0.3.0",
+        version: "0.4.0",
         search: {
           hits: [],
           totalCount: 0,
