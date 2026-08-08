@@ -10,9 +10,12 @@
     "test": "vitest run",
     "lint": "npm run lint --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "build": "npm run build --workspaces --if-present"
+    "build": "npm run build --workspaces --if-present",
+    "build:widget": "npm run build:widget --workspace app",
+    "test:ui": "playwright test"
   },
   "devDependencies": {
+    "@playwright/test": "^1.56.1",
     "@typescript-eslint/eslint-plugin": "^7.18.0",
     "@typescript-eslint/parser": "^7.18.0",
     "vitest": "^3.2.4"

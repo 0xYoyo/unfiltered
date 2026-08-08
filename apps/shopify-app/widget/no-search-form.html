@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Unfiltered widget harness — no theme search form</title>
+  </head>
+  <body>
+    <!-- A host page with no recognizable theme search form: mounting must
+         still succeed without throwing (YOY-43 AC-3). -->
+    <main>
+      <p>This fake storefront has no search form at all.</p>
+    </main>
+    <script type="module">
+      import { init } from "/src/main.ts";
+
+      init({ locale: "en", shopDomain: "harness.myshopify.com" });
+    </script>
+  </body>
+</html>

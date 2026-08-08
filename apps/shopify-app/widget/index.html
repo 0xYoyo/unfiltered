@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Unfiltered widget harness</title>
+  </head>
+  <body>
+    <!-- A fake storefront: theme-like markup with a standard search form,
+         served entirely locally (YOY-43 AC-4). -->
+    <header>
+      <h1>Harness store</h1>
+      <form action="/search" method="get" role="search">
+        <input type="search" name="q" placeholder="Theme search" />
+        <button type="submit">Search</button>
+      </form>
+    </header>
+    <main>
+      <p>Fake product grid placeholder.</p>
+    </main>
+    <script type="module">
+      import { init } from "/src/main.ts";
+
+      // Stubbed search endpoint: requests to the app-proxy path resolve
+      // locally with a fixed payload, so widget dev never needs Shopify or
+      // the network. The scaffold widget makes no calls yet (NG-1); the stub
+      // is the harness contract later chain issues develop against.
+      const realFetch = window.fetch.bind(window);
+      window.fetch = (input, requestInit) => {
+        const url = typeof input === "string" ? input : input.url;
+        if (url.startsWith("/apps/unfiltered")) {
+          return Promise.resolve(
+            new Response(JSON.stringify({ hits: [] }), {
+              headers: { "Content-Type": "application/json" },
+            }),
+          );
+        }
+        return realFetch(input, requestInit);
+      };
+
+      const params = new URLSearchParams(window.location.search);
+      init({
+        locale: params.get("locale") ?? "en",
+        shopDomain: "harness.myshopify.com",
+      });
+    </script>
+  </body>
+</html>

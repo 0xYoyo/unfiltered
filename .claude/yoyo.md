@@ -18,5 +18,11 @@ sensitive_paths:
   - "**/webhooks/**"
   - ".claude/**"
 
+ui_paths:
+  - apps/shopify-app/extensions/
+  - apps/shopify-app/widget/
+
+ui_test_command: npm run test:ui
+
 slack_channel_id: C0BL7QBNER4
 max_fix_rounds: 2

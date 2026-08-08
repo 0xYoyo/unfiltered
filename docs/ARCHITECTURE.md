@@ -205,16 +205,45 @@ the rule (`app/routes/webhooks.test.ts`, `app.auth.test.ts`,
 tests live; a test outside those globs silently never runs, so new test
 locations must be added there deliberately.
 
+## Storefront widget and UI test lane
+
+The storefront search widget (YOY-43 scaffold) is plain TypeScript + CSS in
+`apps/shopify-app/widget/src/`, built by Vite
+(`apps/shopify-app/widget/vite.config.ts`) into a self-contained IIFE bundle
+and stylesheet emitted — and committed — under the theme app extension's
+assets (`apps/shopify-app/extensions/unfiltered-widget/assets/`; rebuild with
+`npm run build:widget` from the root). The extension's app embed block
+(`blocks/unfiltered-search.liquid`, `target: body`) loads those assets and
+calls `window.UnfilteredWidget.init({ locale, shopDomain })` with the
+storefront locale and the shop's permanent domain. `init` is idempotent,
+mounts a root element with the stable test id `unfiltered-widget-root` and a
+visible search input, tolerates host pages with no recognizable theme search
+form, and never throws into the merchant's page. The scaffold performs no
+real search yet — no endpoint calls and no theme-search interception; those
+land later in the M3 chain.
+
+UI tests are a separate lane from Vitest: Playwright
+(root `playwright.config.ts`, specs in `apps/shopify-app/widget/test-ui/`)
+starts the widget dev harness — the same Vite config serving
+`widget/index.html` (fake storefront with a theme-like search form and a
+stubbed search endpoint) and `widget/no-search-form.html` — and runs fully
+offline. `npm run test:ui` from the root is the single entry point, locally
+and in CI; `.claude/yoyo.md` records it as `ui_test_command` with
+`ui_paths` covering the widget and extension directories, so every future
+UI-touching pull request must extend this lane.
+
 ## Quality gates
 
 Vitest, ESLint, and `tsc --noEmit` run from the root as `npm test`,
 `npm run lint`, and `npm run typecheck`; `.github/workflows/ci.yml` runs all
-three on every pull request. The engine-boundary rule is mechanically
-enforced by `packages/engine/test/boundary.test.ts`, which fails the suite if
-the engine's manifest or source ever references a `@shopify/*` package.
+three on every pull request, plus the `ui` job running `npm run test:ui`
+(Playwright, Chromium) against the widget harness. The engine-boundary rule
+is mechanically enforced by `packages/engine/test/boundary.test.ts`, which
+fails the suite if the engine's manifest or source ever references a
+`@shopify/*` package.
 
 ## Deferred components
 
-Real search logic, vector store, catalog ingestion, merchant dashboard,
-billing, and deployment/hosting are all future milestones and intentionally
-absent from the current codebase.
+Real widget search behavior (endpoint calls, theme-search takeover, result
+rendering), merchant dashboard, billing, and deployment/hosting are all
+future milestones and intentionally absent from the current codebase.
