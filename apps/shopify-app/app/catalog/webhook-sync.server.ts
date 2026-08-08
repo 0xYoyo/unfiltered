@@ -13,6 +13,7 @@ export interface ProductWebhookPayload {
   id: number;
   admin_graphql_api_id?: string;
   title: string;
+  handle: string;
   body_html: string | null;
   vendor: string | null;
   product_type: string | null;
@@ -26,6 +27,8 @@ export interface ProductWebhookPayload {
     inventory_management: string | null;
   }>;
   images: Array<{ alt: string | null }>;
+  /** The product's featured image, when it has one. */
+  image: { src: string | null } | null;
 }
 
 /** `products/delete` delivers only the numeric product ID. */
@@ -214,6 +217,7 @@ export function mapWebhookProduct(
   const node: ShopifyProductNode = {
     id: productGid(payload),
     title: payload.title,
+    handle: payload.handle,
     description: htmlToPlainText(payload.body_html),
     tags: payload.tags
       .split(",")
@@ -232,6 +236,10 @@ export function mapWebhookProduct(
       })),
     },
     images: { nodes: payload.images.map((image) => ({ altText: image.alt })) },
+    featuredImage:
+      payload.image?.src != null && payload.image.src !== ""
+        ? { url: payload.image.src }
+        : null,
   };
   return mapProductNode(node);
 }
@@ -257,7 +265,13 @@ export async function syncProductFromWebhook({
   const findExisting = () =>
     db.catalogProduct.findUnique({
       where: { shopDomain_productId: { shopDomain, productId } },
-      select: { contentHash: true, currencyCode: true, sourceUpdatedAt: true },
+      select: {
+        contentHash: true,
+        currencyCode: true,
+        sourceUpdatedAt: true,
+        handle: true,
+        featuredImageUrl: true,
+      },
     });
 
   let existing = await findExisting();
@@ -291,6 +305,23 @@ export async function syncProductFromWebhook({
     return "skipped_stale";
   }
   if (product.contentHash === existing.contentHash) {
+    // Searchable content unchanged — but the display-only fields (handle,
+    // featuredImageUrl) sit outside contentHash (YOY-44 AC-4), so an update
+    // that changed only them must still land on the row (AC-3).
+    if (
+      product.handle !== existing.handle ||
+      product.featuredImageUrl !== existing.featuredImageUrl
+    ) {
+      await db.catalogProduct.update({
+        where: { shopDomain_productId: { shopDomain, productId } },
+        data: {
+          handle: product.handle,
+          featuredImageUrl: product.featuredImageUrl,
+          sourceUpdatedAt: product.sourceUpdatedAt,
+        },
+      });
+      return "updated";
+    }
     if (product.sourceUpdatedAt > existing.sourceUpdatedAt) {
       await db.catalogProduct.update({
         where: { shopDomain_productId: { shopDomain, productId } },

@@ -38,6 +38,7 @@ export const PRODUCTS_QUERY = `#graphql
       nodes {
         id
         title
+        handle
         description
         tags
         vendor
@@ -53,6 +54,7 @@ export const PRODUCTS_QUERY = `#graphql
         images(first: 20) {
           nodes { altText }
         }
+        featuredImage { url }
       }
     }
   }
@@ -117,20 +119,23 @@ export async function ingestCatalog({
 
   const existing = await db.catalogProduct.findMany({
     where: { shopDomain },
-    select: { productId: true, contentHash: true },
+    select: {
+      productId: true,
+      contentHash: true,
+      handle: true,
+      featuredImageUrl: true,
+    },
   });
-  const existingHashes = new Map(
-    existing.map((row) => [row.productId, row.contentHash]),
-  );
+  const existingRows = new Map(existing.map((row) => [row.productId, row]));
 
   const result: IngestResult = { created: 0, updated: 0, unchanged: 0, deleted: 0 };
 
   for (const product of snapshot) {
-    const knownHash = existingHashes.get(product.productId);
-    if (knownHash === undefined) {
+    const known = existingRows.get(product.productId);
+    if (known === undefined) {
       await db.catalogProduct.create({ data: { shopDomain, ...product } });
       result.created += 1;
-    } else if (knownHash !== product.contentHash) {
+    } else if (known.contentHash !== product.contentHash) {
       await db.catalogProduct.update({
         where: {
           shopDomain_productId: { shopDomain, productId: product.productId },
@@ -139,6 +144,25 @@ export async function ingestCatalog({
       });
       result.updated += 1;
     } else {
+      // Searchable content unchanged. The display-only fields (handle,
+      // featuredImageUrl) sit outside contentHash (YOY-44 AC-4), so refresh
+      // them here when they drifted — this is also how a repeat full ingest
+      // backfills rows created before the fields existed (AC-5) — without
+      // dirtying the hash or triggering re-enrichment.
+      if (
+        known.handle !== product.handle ||
+        known.featuredImageUrl !== product.featuredImageUrl
+      ) {
+        await db.catalogProduct.update({
+          where: {
+            shopDomain_productId: { shopDomain, productId: product.productId },
+          },
+          data: {
+            handle: product.handle,
+            featuredImageUrl: product.featuredImageUrl,
+          },
+        });
+      }
       result.unchanged += 1;
     }
   }

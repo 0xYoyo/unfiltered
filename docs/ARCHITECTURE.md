@@ -82,7 +82,11 @@ Prisma on Postgres 18 with the pgvector extension
 (`apps/shopify-app/prisma/schema.prisma`, currently the template's `Session`
 model, the `AiCall` cost-metering ledger, and the `CatalogProduct` per-shop
 catalog snapshot (unique per `shopDomain` + `productId`, content-hashed for
-idempotent re-ingestion via `app/catalog/ingest.server.ts`); the baseline migration runs
+idempotent re-ingestion via `app/catalog/ingest.server.ts`; also carries the
+display-only fields `handle` and `featuredImageUrl` (YOY-44) for result
+cards — deliberately outside `contentHash`, so ingestion and webhook sync
+refresh them even when searchable content is unchanged, and a display-only
+change never triggers re-enrichment or re-embedding); the baseline migration runs
 `CREATE EXTENSION IF NOT EXISTS vector`, and the classic-search migration
 `CREATE EXTENSION IF NOT EXISTS pg_trgm`). The app knows only a Postgres connection string: `DATABASE_URL`
 from a gitignored `.env` (a managed Neon database in dev), documented in

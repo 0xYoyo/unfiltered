@@ -47,6 +47,11 @@ model CatalogProduct {
   currencyCode    String
   available       Boolean
   imageAltTexts   String[]
+  // Display-only snapshot fields (YOY-44): storefront handle and featured
+  // image for result cards. Deliberately OUTSIDE contentHash — a change here
+  // must not dirty the searchable content or trigger re-enrichment.
+  handle          String   @default("")
+  featuredImageUrl String?
   sourceUpdatedAt DateTime
   // SHA-256 over the searchable fields; unchanged hash means the row is
   // untouched on re-ingestion.
