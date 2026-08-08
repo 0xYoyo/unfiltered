@@ -1,0 +1,102 @@
+{
+  "modelId": "gemini-3.6-flash",
+  "provenance": "synthesized",
+  "entries": {
+    "same but cheaper": {
+      "output": {
+        "category": "dress",
+        "priceMin": null,
+        "priceMax": 250,
+        "currency": null,
+        "colorsInclude": [],
+        "colorsExclude": ["black"],
+        "occasion": "wedding",
+        "size": null,
+        "availabilityRequired": false,
+        "softAttributes": ["elegant", "summer"]
+      },
+      "inputTokens": 561,
+      "outputTokens": 98
+    },
+    "בלי שרוולים": {
+      "output": {
+        "category": "dress",
+        "priceMin": null,
+        "priceMax": 400,
+        "currency": null,
+        "colorsInclude": [],
+        "colorsExclude": ["black"],
+        "occasion": "wedding",
+        "size": null,
+        "availabilityRequired": false,
+        "softAttributes": ["אלגנטית", "בקיץ", "ללא שרוולים"]
+      },
+      "inputTokens": 574,
+      "outputTokens": 71
+    },
+    "nike air max 90": {
+      "output": {
+        "category": "sneakers",
+        "priceMin": null,
+        "priceMax": null,
+        "currency": null,
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "occasion": null,
+        "size": null,
+        "availabilityRequired": false,
+        "softAttributes": ["nike", "air max 90"]
+      },
+      "inputTokens": 563,
+      "outputTokens": 52
+    },
+    "בצבע אדום": {
+      "output": {
+        "category": "coat",
+        "priceMin": null,
+        "priceMax": 500,
+        "currency": null,
+        "colorsInclude": ["red"],
+        "colorsExclude": ["black"],
+        "occasion": null,
+        "size": null,
+        "availabilityRequired": false,
+        "softAttributes": ["חם", "לחורף"]
+      },
+      "inputTokens": 566,
+      "outputTokens": 64
+    },
+    "מידה M in stock only": {
+      "output": {
+        "category": "dress",
+        "priceMin": null,
+        "priceMax": null,
+        "currency": null,
+        "colorsInclude": ["black"],
+        "colorsExclude": [],
+        "occasion": "evening",
+        "size": "M",
+        "availabilityRequired": true,
+        "softAttributes": ["formal", "gala"]
+      },
+      "inputTokens": 559,
+      "outputTokens": 60
+    },
+    "under 500 and only what is in stock": {
+      "output": {
+        "category": "sneakers",
+        "priceMin": null,
+        "priceMax": 500,
+        "currency": null,
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "occasion": null,
+        "size": null,
+        "availabilityRequired": true,
+        "softAttributes": ["nike", "air max 90"]
+      },
+      "inputTokens": 552,
+      "outputTokens": 55
+    }
+  }
+}

@@ -25,6 +25,26 @@ npm-workspaces monorepo with three workspaces:
 | `packages/engine` | Catalog-agnostic search engine with a versioned, typed public API. Currently a stub implementation plus vendor-free AI ports (LLM, embedding, cost metering). |
 | `packages/provider-gemini` | Google AI Studio (Gemini) adapter implementing the engine's LLM and embedding ports, metered through the cost-recorder port. |
 
+## Follow-up queries (refinement)
+
+After a result set, "same but cheaper" or "בלי שרוולים" means *modify that
+search*, not start a new one. The engine's intent extractor takes the previous
+query's intent as optional per-call context:
+
+```ts
+const refined = await extractor.extract("same but cheaper", { previousIntent });
+```
+
+With it, the model returns either the previous intent with the new query's
+deltas applied — every constraint and soft attribute the query did not touch
+preserved — or, when the shopper changed topic ("nike air max 90"), a
+completely fresh intent with nothing carried over. Either way the answer is a
+full `Intent`, never a patch. The engine stores nothing between calls: the
+caller supplies `previousIntent`, and only one is ever considered. Called
+without it, extraction behaves exactly as before. See
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full contract and
+`apps/shopify-app/app/eval/` for the refinement goldens that pin the behavior.
+
 ## Setup
 
 Requires Node.js `>=20.19 <22 || >=22.12`.

@@ -89,11 +89,24 @@ export class IntentExtractionError extends Error {}
 export interface IntentExtractionContext {
   shopDomain?: string;
   searchId?: string;
+  /**
+   * Intent extracted from the shopper's previous query in the same search
+   * session, when the caller has one (YOY-42). Its presence turns the call
+   * into a refinement: the model returns either that intent with the new
+   * query's deltas applied, or a completely fresh intent when the query
+   * changed topic — always a full Intent, never a patch. The engine holds no
+   * session state; where a previous intent is kept between requests is the
+   * caller's concern.
+   */
+  previousIntent?: Intent;
 }
 
 export interface IntentExtractor {
   /**
-   * Extract structured intent from one free-text query. Rejects with
+   * Extract structured intent from one free-text query. With
+   * `context.previousIntent` the query is treated as a follow-up: the answer
+   * is that intent with the query's deltas applied, or a fresh intent when
+   * the shopper changed topic — a full Intent either way. Rejects with
    * IntentExtractionError when the model violates the schema twice; port
    * errors (network, provider) propagate unchanged.
    */
@@ -105,7 +118,41 @@ export interface IntentExtractorOptions {
   llm: LlmClient;
 }
 
-function buildIntentPrompt(query: string): string {
+/**
+ * Serialize a previous intent for the prompt. Indented JSON on purpose: every
+ * line of the block is indented, so none of it can look like the `Query:` line
+ * the eval replay keys recordings by (YOY-42 AC-4).
+ */
+function serializePreviousIntent(intent: Intent): string {
+  return JSON.stringify(intent, null, 2);
+}
+
+/**
+ * Refinement instructions, appended only when the caller supplies a previous
+ * intent. Without one the prompt stays byte-for-byte what it was before
+ * YOY-42, so recordings and caches keyed on it remain valid.
+ */
+function refinementSection(previousIntent: Intent): string[] {
+  return [
+    "",
+    "This shopper already searched once. The intent extracted from their",
+    "previous query is below. Decide which of two things the new query is:",
+    "- a REFINEMENT of that search (it adjusts, adds, or removes constraints:",
+    '  "same but cheaper", "in red", "without sleeves"): return the previous',
+    "  intent with exactly those deltas applied, keeping every constraint and",
+    "  soft attribute the new query did not touch. A comparative like",
+    '  "cheaper" tightens the existing price bound rather than clearing it.',
+    "- a TOPIC CHANGE (it names a different product or search altogether):",
+    "  discard the previous intent entirely and extract the new query alone,",
+    "  carrying nothing over.",
+    "Either way, answer with a complete intent in the same JSON shape — never",
+    "a patch, never a reference to what changed.",
+    "",
+    `Previous intent: ${serializePreviousIntent(previousIntent)}`,
+  ];
+}
+
+function buildIntentPrompt(query: string, previousIntent?: Intent): string {
   return [
     "Extract structured shopping intent from this product search query.",
     "Split what the shopper said into hard constraints and soft attributes:",
@@ -132,6 +179,7 @@ function buildIntentPrompt(query: string): string {
     "normalized catalog vocabulary; softAttributes may stay in the shopper's",
     "language. Omit optional fields the query does not state; never invent",
     "constraints. Answer as JSON.",
+    ...(previousIntent === undefined ? [] : refinementSection(previousIntent)),
     "",
     `Query: ${query}`,
   ].join("\n");
@@ -242,7 +290,7 @@ export function createIntentExtractor(
     context?: IntentExtractionContext,
   ): Promise<Intent | null> {
     const completion = await options.llm.completeStructured({
-      prompt: buildIntentPrompt(query),
+      prompt: buildIntentPrompt(query, context?.previousIntent),
       schema: INTENT_SCHEMA,
       operation: "intent",
       shopDomain: context?.shopDomain,
