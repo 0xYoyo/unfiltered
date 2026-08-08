@@ -377,30 +377,50 @@ locations must be added there deliberately.
 
 ## Storefront widget and UI test lane
 
-The storefront search widget (YOY-43 scaffold) is plain TypeScript + CSS in
-`apps/shopify-app/widget/src/`, built by Vite
-(`apps/shopify-app/widget/vite.config.ts`) into a self-contained IIFE bundle
-and stylesheet emitted — and committed — under the theme app extension's
-assets (`apps/shopify-app/extensions/unfiltered-widget/assets/`; rebuild with
-`npm run build:widget` from the root). The extension's app embed block
-(`blocks/unfiltered-search.liquid`, `target: body`) loads those assets and
-calls `window.UnfilteredWidget.init({ locale, shopDomain })` with the
-storefront locale and the shop's permanent domain. `init` is idempotent,
-mounts a root element with the stable test id `unfiltered-widget-root` and a
-visible search input, tolerates host pages with no recognizable theme search
-form, and never throws into the merchant's page. The scaffold performs no
-real search yet — no endpoint calls and no theme-search interception; those
-land later in the M3 chain.
+The storefront search widget (YOY-43 scaffold, YOY-48 takeover) is plain
+TypeScript + CSS in `apps/shopify-app/widget/src/`, built by Vite
+(`apps/shopify-app/widget/vite.config.ts`) into one self-contained IIFE
+bundle emitted — and committed — under the theme app extension's assets
+(`apps/shopify-app/extensions/unfiltered-widget/assets/`; rebuild with
+`npm run build:widget` from the root). The stylesheet ships inside the
+bundle: all widget DOM lives in an open shadow root and the CSS is injected
+there as a `<style>` element, so theme CSS cannot break the overlay layout
+and widget CSS cannot leak onto host elements, while inheritable typography
+(font-family, color) still flows in from the host page. The extension's app
+embed block (`blocks/unfiltered-search.liquid`, `target: body`) loads the
+bundle and calls `window.UnfilteredWidget.init({ locale, shopDomain })`.
+
+Widget behavior (YOY-48): `init` locates the theme's own search input
+(`input[type="search"]`, or a `/search`-action form's `q` input) and takes
+it over — focus or typing opens a results overlay, typing is debounced into
+`POST /apps/unfiltered/search` (query + a sessionStorage-held per-session
+sessionId), and results render as product cards: image or placeholder,
+title, price formatted with the currency code (a range when
+priceMin ≠ priceMax), and a sold-out marker. While the overlay is open the
+theme's native search submission is suppressed; a close control and Escape
+both dismiss it, retaining the query text. Clicking a card fires a
+fire-and-forget keepalive beacon to `POST /apps/unfiltered/click`
+(searchId, productId, position) and navigates to `/products/{handle}`
+regardless of the beacon's outcome. Degradation is total silence: no
+recognizable search input means nothing mounts, and a failed or timed-out
+search request removes the widget so the theme's native search behaves
+exactly as without the app — no error UI ever. `init` is idempotent and
+never throws into the merchant's page. AI responses render their results as
+plain cards for now — chips, refinement, and AI-specific states land later
+in the M3 chain.
 
 UI tests are a separate lane from Vitest: Playwright
 (root `playwright.config.ts`, specs in `apps/shopify-app/widget/test-ui/`)
 starts the widget dev harness — the same Vite config serving
-`widget/index.html` (fake storefront with a theme-like search form and a
-stubbed search endpoint) and `widget/no-search-form.html` — and runs fully
-offline. `npm run test:ui` from the root is the single entry point, locally
-and in CI; `.claude/yoyo.md` records it as `ui_test_command` with
-`ui_paths` covering the widget and extension directories, so every future
-UI-touching pull request must extend this lane.
+`widget/index.html` (fake storefront with a theme-like search form and
+contract-shaped stubbed search/beacon endpoints selected via `?fixture=`:
+results, empty, error, timeout, delayed, beacon-missing),
+`widget/no-search-form.html`, and `widget/hostile-css.html` (a deliberately
+hostile theme for the style-isolation tests) — and runs fully offline.
+`npm run test:ui` from the root is the single entry point, locally and in
+CI; `.claude/yoyo.md` records it as `ui_test_command` with `ui_paths`
+covering the widget and extension directories, so every future UI-touching
+pull request must extend this lane.
 
 ## Quality gates
 

@@ -1,10 +1,11 @@
 {% comment %}
-  Unfiltered search widget — app embed block (YOY-43 AC-1). Loads the built
-  widget bundle from this extension's assets and initializes it with the
-  storefront locale and shop domain. The widget scaffold renders its own
-  root + search input and does nothing else yet (NG-1).
+  Unfiltered search widget — app embed block (YOY-43 AC-1, YOY-48). Loads
+  the built widget bundle from this extension's assets and initializes it
+  with the storefront locale and shop domain. The widget takes over the
+  theme's search input and renders results in a shadow-DOM overlay; its
+  styles ship inside the bundle (injected into the shadow root), so there
+  is no separate stylesheet to load.
 {% endcomment %}
-{{ 'unfiltered-widget.css' | asset_url | stylesheet_tag }}
 <script src="{{ 'unfiltered-widget.js' | asset_url }}" defer></script>
 <script>
   document.addEventListener("DOMContentLoaded", function () {
