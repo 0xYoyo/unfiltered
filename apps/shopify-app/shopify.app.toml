@@ -8,6 +8,14 @@ embedded = true
 [auth]
 redirect_urls = [ "https://shopify.dev/apps/default-app-home/api/auth" ]
 
+# Storefront app proxy: shopper-facing requests to /apps/unfiltered/* on the
+# shop domain are forwarded here with Shopify's proxy signature. Handled by:
+# /app/routes/apps.unfiltered.search.tsx
+[app_proxy]
+url = "https://shopify.dev/apps/default-app-home"
+prefix = "apps"
+subpath = "unfiltered"
+
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
 scopes = "write_products"
