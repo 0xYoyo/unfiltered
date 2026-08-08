@@ -106,6 +106,40 @@ model ProductEmbedding {
   @@index([shopDomain])
 }
 
+// Shopper search log (YOY-47): exactly one row per proxy search request —
+// including degraded, zero-hit, and throttled searches — for the dashboard
+// and attribution work of later milestones. Write-only in this milestone.
+model SearchEvent {
+  id          String   @id @default(uuid())
+  searchId    String
+  shopDomain  String
+  sessionId   String
+  query       String
+  route       String
+  degraded    Boolean
+  latencyMs   Int
+  resultCount Int
+  createdAt   DateTime @default(now())
+
+  @@index([shopDomain, createdAt])
+  // The click beacon validates its searchId against this table.
+  @@index([searchId])
+}
+
+// Shopper click log (YOY-47): one row per click-beacon call whose searchId
+// was verified to belong to the signed shop. Write-only in this milestone.
+model ClickEvent {
+  id         String   @id @default(uuid())
+  searchId   String
+  shopDomain String
+  sessionId  String
+  productId  String
+  position   Int
+  createdAt  DateTime @default(now())
+
+  @@index([shopDomain, createdAt])
+}
+
 model Session {
   id            String    @id
   shop          String
