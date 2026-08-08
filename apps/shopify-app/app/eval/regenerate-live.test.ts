@@ -32,7 +32,12 @@ import {
 } from "../catalog/enrich.server";
 import { computeContentHash } from "../catalog/mapping.server";
 import { createTestDb } from "../testing/helpers.server";
-import { loadCatalog, loadGoldens, runEval } from "./harness.server";
+import {
+  loadCatalog,
+  loadGoldens,
+  loadRefinementGoldens,
+  runEval,
+} from "./harness.server";
 import { recordingKeyFromPrompt } from "./replay.server";
 
 // Fixture regeneration (AC-5 of YOY-27): re-records every eval fixture output
@@ -217,7 +222,7 @@ function writeRecording(
 ): void {
   writeFileSync(
     join(recordedDir, file),
-    `${JSON.stringify({ modelId, entries }, null, 2)}\n`,
+    `${JSON.stringify({ modelId, provenance: "live", entries }, null, 2)}\n`,
   );
 }
 
@@ -380,6 +385,36 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
     }
     writeRecording("intent.json", models.intentModel, intentEntries);
 
+    // Refinement intents (YOY-42): the same extractor, each call carrying the
+    // golden's previous intent. Recorded into their own file so the base
+    // goldens' recordings stay a clean per-query set, and so a run that fails
+    // here cannot half-rewrite intent.json.
+    const refinementEntries: Record<string, RecordedEntry> = {};
+    const refinementExtractor = createIntentExtractor({
+      llm: captureCompletions(
+        createGeminiLlmClient({
+          modelId: models.intentModel,
+          costRecorder: usage.recorder,
+        }),
+        usage.last,
+        refinementEntries,
+      ),
+    });
+    for (const golden of loadRefinementGoldens()) {
+      await refinementExtractor.extract(golden.query, {
+        previousIntent: golden.previousIntent,
+      });
+      expect(
+        refinementEntries[golden.query],
+        `${golden.id} refinement intent recorded`,
+      ).toBeDefined();
+    }
+    writeRecording(
+      "intent-refinement.json",
+      models.intentModel,
+      refinementEntries,
+    );
+
     // Embeddings: every product composed text (with the fresh enrichment
     // attributes) and every query text derived from the fresh intents.
     const embeddings = createGeminiEmbeddingClient({
@@ -442,6 +477,9 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
       ).toBeGreaterThanOrEqual(0.8);
       expect(
         rescored.perQuery.flatMap((score) => score.violations),
+      ).toEqual([]);
+      expect(
+        rescored.perRefinement.flatMap((score) => score.violations),
       ).toEqual([]);
       expect(rescored.perSearchCostPer1000Usd).toBeLessThanOrEqual(2.0);
     } finally {

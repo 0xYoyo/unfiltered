@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 
 import type { PrismaClient } from "@prisma/client";
 import {
+  constraintsFromIntent,
   createIntentExtractor,
   createQueryClassifier,
   createRetriever,
@@ -79,6 +80,36 @@ export interface Golden {
   expectedProductIds: string[];
 }
 
+/**
+ * One refinement golden (YOY-42): the intent from the shopper's previous
+ * query, the follow-up query, and the constraint outcome the extractor must
+ * produce for it. `outcome` documents which behavior the golden pins — a
+ * refinement of the previous intent, or a fresh intent after a topic change.
+ */
+export interface RefinementGolden {
+  id: string;
+  language: "en" | "he" | "mixed";
+  /** What this golden demonstrates, for the scorecard and review. */
+  note: string;
+  previousIntent: Intent;
+  query: string;
+  outcome: "refinement" | "fresh";
+  expectedConstraints: GoldenConstraints;
+  /** Expected size constraint, when the follow-up states or preserves one. */
+  expectedSize?: string;
+  /** Soft attributes the merged intent must carry, in order. */
+  expectedSoftAttributes: string[];
+}
+
+/** The scorecard row for one refinement golden. */
+export interface RefinementScore {
+  golden: RefinementGolden;
+  intent: Intent | null;
+  /** Constraint outcomes that missed the golden's expectation (empty is clean). */
+  violations: string[];
+  costUsd: number;
+}
+
 /** The scorecard row for one golden query. */
 export interface QueryScore {
   golden: Golden;
@@ -97,6 +128,12 @@ export interface QueryScore {
 export interface EvalRunResult {
   catalogSize: number;
   perQuery: QueryScore[];
+  /** One row per refinement golden (YOY-42). */
+  perRefinement: RefinementScore[];
+  /** Constraint-outcome misses across every refinement golden. */
+  refinementViolationCount: number;
+  /** True when any replayed intent recording is hand-written, not live. */
+  synthesizedIntentRecordings: boolean;
   /** Fraction of goldens with an expected product in the top 10. */
   hitRate: number;
   /** Total constraint violations across every query's top 10. */
@@ -113,6 +150,41 @@ export function loadCatalog(): EvalProduct[] {
 
 export function loadGoldens(): Golden[] {
   return readJson<Golden[]>("goldens.json");
+}
+
+export function loadRefinementGoldens(): RefinementGolden[] {
+  return readJson<RefinementGolden[]>("refinement-goldens.json");
+}
+
+/**
+ * Score one refinement golden: the merged intent's hard constraints — the
+ * ones retrieval would filter on — against the outcome the golden documents.
+ * Soft attributes are not filters and are asserted by the harness tests, not
+ * counted here.
+ */
+export function refinementViolations(
+  golden: RefinementGolden,
+  intent: Intent,
+): string[] {
+  const expected = golden.expectedConstraints;
+  const actual = constraintsFromIntent(intent);
+  const violations: string[] = [];
+  const compare = (field: string, got: unknown, want: unknown): void => {
+    if (JSON.stringify(got ?? null) !== JSON.stringify(want ?? null)) {
+      violations.push(
+        `${golden.id}: ${field} ${JSON.stringify(got ?? null)} ≠ expected ${JSON.stringify(want ?? null)}`,
+      );
+    }
+  };
+  compare("category", actual.category, expected.category);
+  compare("priceMin", actual.priceMin, expected.priceMin);
+  compare("priceMax", actual.priceMax, expected.priceMax);
+  compare("colorsInclude", actual.colorsInclude, expected.colorsInclude);
+  compare("colorsExclude", actual.colorsExclude, expected.colorsExclude);
+  compare("occasion", actual.occasion, expected.occasion);
+  compare("availableOnly", actual.availableOnly, expected.availabilityRequired);
+  compare("size", intent.size, golden.expectedSize);
+  return violations;
 }
 
 /** Check one returned product against a golden's hard constraints. Exported
@@ -189,10 +261,32 @@ export async function runEval(db: PrismaClient): Promise<EvalRunResult> {
   const shopDomain = "eval-shop.example.com";
   const catalog = loadCatalog();
   const goldens = loadGoldens();
+  const refinementGoldens = loadRefinementGoldens();
+  // Refinement extractions are ordinary "intent" port calls, so their
+  // recordings merge into the intent recording the replay client looks up.
+  // They live in their own file to keep their provenance visible (YOY-42): a
+  // key present in both would silently replay the wrong answer, so a
+  // collision is an error rather than a precedence rule.
+  const intentRecording = readJson<LlmRecording>("recorded", "intent.json");
+  const refinementRecording = readJson<LlmRecording>(
+    "recorded",
+    "intent-refinement.json",
+  );
+  const collisions = Object.keys(refinementRecording.entries).filter(
+    (key) => key in intentRecording.entries,
+  );
+  if (collisions.length > 0) {
+    throw new Error(
+      `eval: refinement recordings collide with base intent recordings on ${collisions.join(", ")}`,
+    );
+  }
   const recordings: Record<string, LlmRecording> = {
     enrichment: readJson<LlmRecording>("recorded", "enrichment.json"),
     classification: readJson<LlmRecording>("recorded", "classification.json"),
-    intent: readJson<LlmRecording>("recorded", "intent.json"),
+    intent: {
+      modelId: intentRecording.modelId,
+      entries: { ...intentRecording.entries, ...refinementRecording.entries },
+    },
   };
   const embeddingRecording = readJson<EmbeddingRecording>(
     "recorded",
@@ -285,6 +379,25 @@ export async function runEval(db: PrismaClient): Promise<EvalRunResult> {
     });
   }
 
+  // Refinement goldens (YOY-42): one intent call each, with the previous
+  // intent supplied by the golden — no classification or retrieval, because a
+  // follow-up is scored on the constraints it merges, not on ranking.
+  const perRefinement: RefinementScore[] = [];
+  for (const golden of refinementGoldens) {
+    const intent = await extractor.extract(golden.query, {
+      shopDomain,
+      searchId: golden.id,
+      previousIntent: golden.previousIntent,
+    });
+    const ledger = await db.aiCall.findMany({ where: { searchId: golden.id } });
+    perRefinement.push({
+      golden,
+      intent,
+      violations: refinementViolations(golden, intent),
+      costUsd: ledger.reduce((sum, row) => sum + row.costUsd, 0),
+    });
+  }
+
   // Cost split (AC-4): rows with a searchId serve one search (classification,
   // intent, query embedding); rows without one are the one-time indexing cost
   // (enrichment, catalog embedding).
@@ -295,10 +408,13 @@ export async function runEval(db: PrismaClient): Promise<EvalRunResult> {
   const perSearchTotal = allRows
     .filter((row) => row.searchId !== null)
     .reduce((sum, row) => sum + row.costUsd, 0);
-  // Per AI search: classic-routed goldens spend nothing by construction
-  // (YOY-41 AC-5), so counting them in the denominator would understate the
-  // cost of the searches that do pay.
-  const aiSearchCount = perQuery.filter((score) => score.route === "ai").length;
+  // Per AI search: every AI-routed golden and every refinement follow-up is
+  // one paying shopper search; classic-routed goldens spend nothing by
+  // construction (YOY-41 AC-5), so counting them in the denominator would
+  // understate the cost of the searches that do pay.
+  const aiSearchCount =
+    perQuery.filter((score) => score.route === "ai").length +
+    refinementGoldens.length;
   const perSearchCostPer1000Usd =
     aiSearchCount === 0 ? 0 : (perSearchTotal / aiSearchCount) * 1000;
 
@@ -306,6 +422,14 @@ export async function runEval(db: PrismaClient): Promise<EvalRunResult> {
   const result: EvalRunResult = {
     catalogSize: catalog.length,
     perQuery,
+    perRefinement,
+    refinementViolationCount: perRefinement.reduce(
+      (sum, score) => sum + score.violations.length,
+      0,
+    ),
+    synthesizedIntentRecordings:
+      intentRecording.provenance === "synthesized" ||
+      refinementRecording.provenance === "synthesized",
     hitRate: hitCount / goldens.length,
     violationCount: perQuery.reduce((sum, score) => sum + score.violations.length, 0),
     oneTimeCostUsd,
@@ -344,7 +468,37 @@ function printScorecard(result: EvalRunResult): void {
   }
   lines.push(
     "",
+    "refinement goldens — follow-up query merged into the previous intent",
+    "id  | lang  | outcome    | viol | cost USD | what it pins",
+    "----+-------+------------+------+----------+-------------",
+  );
+  for (const score of result.perRefinement) {
+    lines.push(
+      [
+        score.golden.id.padEnd(3),
+        score.golden.language.padEnd(5),
+        score.golden.outcome.padEnd(10),
+        String(score.violations.length).padStart(4),
+        score.costUsd.toFixed(6).padStart(8),
+        score.golden.note,
+      ].join(" | "),
+    );
+    for (const violation of score.violations) {
+      lines.push(`  VIOLATION: ${violation}`);
+    }
+  }
+  if (result.synthesizedIntentRecordings) {
+    lines.push(
+      "",
+      "NOTE: some replayed intent recordings are synthesized, not live model",
+      "output — regenerate them (LIVE_LLM_TESTS=1) before trusting these rows",
+      "as evidence of model behavior.",
+    );
+  }
+  lines.push(
+    "",
     `hit rate (expected product in top 10): ${(result.hitRate * 100).toFixed(0)}% (bar: ≥80%)`,
+    `refinement constraint misses: ${result.refinementViolationCount} (bar: 0)`,
     `hard-constraint violations in any top 10: ${result.violationCount} (bar: 0)`,
     `one-time indexing cost (enrichment + embedding, ${result.catalogSize} products): $${result.oneTimeCostUsd.toFixed(4)}`,
     `blended per-search cost per 1,000 AI searches: $${result.perSearchCostPer1000Usd.toFixed(2)} (bar: ≤ $2.00)`,

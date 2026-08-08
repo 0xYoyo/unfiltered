@@ -305,6 +305,68 @@ describe("port call shape (AC-2, AC-4)", () => {
   });
 });
 
+describe("refinement context (YOY-42 AC-1, AC-4)", () => {
+  const previousIntent: Intent = scenarios[0]!.expected;
+
+  it("leaves the prompt untouched when no previous intent is supplied", async () => {
+    const { llm, calls } = llmStub(scenarios[0]!.recorded, scenarios[0]!.recorded);
+    const extractor = createIntentExtractor({ llm });
+
+    await extractor.extract(scenarios[0]!.query);
+    await extractor.extract(scenarios[0]!.query, { shopDomain: "s.example" });
+
+    // A context without previousIntent is the pre-YOY-42 prompt, byte for
+    // byte — recordings and caches keyed on it stay valid.
+    expect(calls[1]!.prompt).toBe(calls[0]!.prompt);
+    expect(calls[0]!.prompt).not.toContain("Previous intent:");
+    expect(calls[0]!.prompt.endsWith(`\nQuery: ${scenarios[0]!.query}`)).toBe(true);
+  });
+
+  it("asks for a merged-or-fresh full intent when a previous intent is supplied", async () => {
+    const { llm, calls } = llmStub(scenarios[0]!.recorded);
+    const extractor = createIntentExtractor({ llm });
+
+    await extractor.extract("same but cheaper", { previousIntent });
+
+    const prompt = calls[0]!.prompt;
+    expect(prompt).toContain("REFINEMENT");
+    expect(prompt).toContain("TOPIC CHANGE");
+    expect(prompt).toContain('"category": "dress"');
+    expect(prompt).toContain('"colorsExclude": [');
+    // The schema and operation are unchanged: refinement is a prompt-level
+    // contract, not a new port call shape.
+    expect(calls[0]!.schema).toBe(INTENT_SCHEMA);
+    expect(calls[0]!.operation).toBe("intent");
+  });
+
+  it("keeps the query line last and unambiguous for replay keying (AC-4)", async () => {
+    const { llm, calls } = llmStub(scenarios[0]!.recorded);
+    const extractor = createIntentExtractor({ llm });
+
+    await extractor.extract("same but cheaper", { previousIntent });
+
+    const prompt = calls[0]!.prompt;
+    expect(prompt.endsWith("\nQuery: same but cheaper")).toBe(true);
+    // Exactly one line can key a recording, even with the serialized previous
+    // intent in the prompt: its lines are all indented.
+    const keyLines = prompt.split("\n").filter((line) => /^(?:Title|Query): /.test(line));
+    expect(keyLines).toEqual(["Query: same but cheaper"]);
+  });
+
+  it("carries the previous intent into the retry attempt too", async () => {
+    const { llm, calls } = llmStub(
+      { colorsInclude: "not-an-array" },
+      scenarios[0]!.recorded,
+    );
+    const extractor = createIntentExtractor({ llm });
+
+    await extractor.extract("same but cheaper", { previousIntent });
+
+    expect(calls).toHaveLength(2);
+    expect(calls[1]!.prompt).toBe(calls[0]!.prompt);
+  });
+});
+
 describe("schema validation and retry (AC-2)", () => {
   it("retries once on a schema violation, then returns the valid answer", async () => {
     const { llm, calls } = llmStub(

@@ -23,10 +23,16 @@ zero network calls, identical ledger shape to a live run.
 - `fixtures/goldens.json` — 20 golden natural-language queries (EN, HE,
   mixed), each with expected product IDs and the hard constraints its results
   are checked against.
+- `fixtures/refinement-goldens.json` — 6 follow-up queries (EN, HE, mixed),
+  each with the previous query's intent and the constraint outcome the merged
+  intent must produce (YOY-42). They run intent extraction only: a follow-up
+  is scored on what it does to the constraints, not on ranking.
 - `fixtures/recorded/` — recorded model outputs the harness replays:
   `enrichment.json` (keyed by product title), `classification.json` (keyed by
-  normalized query), `intent.json` (keyed by raw query), `embeddings.json`
-  (keyed by exact embedded text).
+  normalized query), `intent.json` and `intent-refinement.json` (keyed by raw
+  query), `embeddings.json` (keyed by exact embedded text). Each recording
+  file declares its `provenance`; the two intent files are merged at replay
+  time and a key present in both is an error.
 
 ## Pass bar (enforced as failing tests)
 
@@ -53,7 +59,17 @@ never in CI, which holds no key (NG-2):
     LIVE_LLM_TESTS=1 GEMINI_API_KEY=... npx vitest run apps/shopify-app/app/eval/regenerate-live.test.ts
 
 Afterwards, re-run `npm test` to prove the harness still clears the bar on
-the fresh recordings, then commit the changed JSONs. The currently committed
-recordings are synthesized (deterministic feature-hash vectors and
-hand-labeled attributes/intents in the same vocabulary the prompts request);
-regeneration replaces them with real model outputs wholesale.
+the fresh recordings, then commit the changed JSONs.
+
+Provenance of what is committed today:
+
+- `enrichment.json`, `classification.json`, `intent.json`, `embeddings.json` —
+  live Gemini output, recorded by the regenerate flow (YOY-28).
+- `intent-refinement.json` — **synthesized** (`"provenance": "synthesized"`):
+  hand-written in the vocabulary the refinement prompt requests, because the
+  regenerate flow needs a live API key that CI and the build loop do not hold.
+  It proves the refinement plumbing and scoring end to end, not the model's
+  own refinement quality. The eval scorecard prints a NOTE whenever any
+  replayed intent recording is synthesized. Regenerating (above) re-records
+  these six follow-ups against the live model and flips the file's provenance
+  to `live`; that run is what turns the refinement rows into real evidence.

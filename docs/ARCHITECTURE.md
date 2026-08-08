@@ -120,6 +120,19 @@ Query understanding (all LLM access through the `LlmClient` port):
   inclusions/exclusions, occasion, size, availability requirement, soft
   attributes) via the model (operation `"intent"`), with one retry on schema
   violation and then a typed `IntentExtractionError`.
+- Refinement (`extract(query, { previousIntent })`): a follow-up query is
+  extracted against the intent of the previous one. The prompt asks the model
+  to decide between a **refinement** — the previous intent with only the new
+  query's deltas applied, every untouched constraint and soft attribute
+  preserved, a comparative like "cheaper" tightening the existing bound — and
+  a **topic change**, where the previous intent is discarded whole. The answer
+  is always a complete `Intent` conforming to `INTENT_SCHEMA`, never a patch;
+  the schema, the operation, and the retry ladder are unchanged. The engine
+  holds no session state: `previousIntent` is supplied per call, and where a
+  caller keeps it between requests is the caller's decision. Omitting it
+  leaves the prompt byte-for-byte what it was before refinement existed, so
+  recordings and caches keyed on it stay valid. Only one previous intent is
+  ever considered — this is a refinement contract, not a chat history.
 
 Retrieval (the AI result path; data reached only through injected ports):
 
