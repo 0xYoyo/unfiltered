@@ -105,6 +105,80 @@ describe("catalog ingestion", () => {
     expect(rows[2]?.available).toBe(false);
   });
 
+  it("stores the display snapshot: handle and featuredImageUrl (YOY-44 AC-2)", async () => {
+    await ingestCatalog({
+      db,
+      shopDomain: SHOP,
+      graphql: graphqlStub([
+        productNode({ id: "gid://shopify/Product/1" }),
+        productNode({ id: "gid://shopify/Product/2", featuredImage: null }),
+      ]).graphql,
+    });
+
+    const rows = await db.catalogProduct.findMany({ orderBy: { productId: "asc" } });
+    expect(rows[0]?.handle).toBe("linen-summer-dress");
+    expect(rows[0]?.featuredImageUrl).toBe(
+      "https://cdn.example.com/linen-dress.jpg",
+    );
+    // A product with no featured image stores null, not "".
+    expect(rows[1]?.featuredImageUrl).toBeNull();
+  });
+
+  it("backfills display fields on repeat ingest without re-enriching (YOY-44 AC-4/AC-5)", async () => {
+    await db.productEnrichment.deleteMany();
+    // First ingest predates the display fields: no handle, no image.
+    await ingestCatalog({
+      db,
+      shopDomain: SHOP,
+      graphql: graphqlStub([
+        productNode({
+          id: "gid://shopify/Product/1",
+          handle: "",
+          featuredImage: null,
+        }),
+      ]).graphql,
+    });
+    const before = (await db.catalogProduct.findMany())[0]!;
+    expect(before.handle).toBe("");
+    await db.productEnrichment.create({
+      data: {
+        shopDomain: SHOP,
+        productId: "gid://shopify/Product/1",
+        contentHash: before.contentHash,
+        status: "enriched",
+        category: "dress",
+        colors: [],
+        occasions: [],
+        fit: null,
+        styleTags: [],
+        seasons: [],
+      },
+    });
+    const enrichmentBefore = await db.productEnrichment.findMany();
+
+    // Repeat full ingest, now with the display fields present.
+    const rerun = await ingestCatalog({
+      db,
+      shopDomain: SHOP,
+      graphql: graphqlStub([productNode({ id: "gid://shopify/Product/1" })]).graphql,
+    });
+
+    // Searchable content unchanged: no update/create counted, no duplicates.
+    expect(rerun).toEqual({ created: 0, updated: 0, unchanged: 1, deleted: 0 });
+    const after = await db.catalogProduct.findMany();
+    expect(after).toHaveLength(1);
+    expect(after[0]?.id).toBe(before.id);
+    // Display fields backfilled, contentHash identical.
+    expect(after[0]?.handle).toBe("linen-summer-dress");
+    expect(after[0]?.featuredImageUrl).toBe(
+      "https://cdn.example.com/linen-dress.jpg",
+    );
+    expect(after[0]?.contentHash).toBe(before.contentHash);
+    // Enrichment untouched: same rows, same hash, same updatedAt.
+    expect(await db.productEnrichment.findMany()).toEqual(enrichmentBefore);
+    await db.productEnrichment.deleteMany();
+  });
+
   it("is idempotent: an unchanged catalog re-ingests with zero writes", async () => {
     const { graphql } = graphqlStub(fixtureCatalog());
     await ingestCatalog({ db, shopDomain: SHOP, graphql });

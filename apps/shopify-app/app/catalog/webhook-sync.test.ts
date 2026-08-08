@@ -10,6 +10,7 @@ function productNode(overrides: Partial<ShopifyProductNode> = {}): ShopifyProduc
   return {
     id: "gid://shopify/Product/1",
     title: "Linen summer dress",
+    handle: "linen-summer-dress",
     description: "Lightweight linen dress for warm days.",
     tags: ["dress", "summer"],
     vendor: "Test Vendor",
@@ -21,6 +22,7 @@ function productNode(overrides: Partial<ShopifyProductNode> = {}): ShopifyProduc
     },
     variants: { nodes: [{ availableForSale: true }] },
     images: { nodes: [{ altText: "Model wearing linen dress" }] },
+    featuredImage: { url: "https://cdn.example.com/linen-dress.jpg" },
     ...overrides,
   };
 }
@@ -33,6 +35,7 @@ function webhookPayload(
     id: 1,
     admin_graphql_api_id: "gid://shopify/Product/1",
     title: "Linen summer dress",
+    handle: "linen-summer-dress",
     body_html: "<p>Lightweight linen dress for warm days.</p>",
     vendor: "Test Vendor",
     product_type: "Dress",
@@ -47,6 +50,7 @@ function webhookPayload(
       },
     ],
     images: [{ alt: "Model wearing linen dress" }],
+    image: { src: "https://cdn.example.com/linen-dress.jpg" },
     ...overrides,
   };
 }

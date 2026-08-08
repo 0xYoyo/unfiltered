@@ -8,6 +8,7 @@ export function productNode(
 ): ShopifyProductNode {
   return {
     title: "Linen summer dress",
+    handle: "linen-summer-dress",
     description: "Lightweight linen dress for warm days.",
     tags: ["dress", "summer"],
     vendor: "Test Vendor",
@@ -19,6 +20,7 @@ export function productNode(
     },
     variants: { nodes: [{ availableForSale: true }] },
     images: { nodes: [{ altText: "Model wearing linen dress" }] },
+    featuredImage: { url: "https://cdn.example.com/linen-dress.jpg" },
     ...overrides,
   };
 }

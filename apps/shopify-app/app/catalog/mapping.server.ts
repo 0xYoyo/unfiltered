@@ -7,6 +7,7 @@ import { createHash } from "node:crypto";
 export interface ShopifyProductNode {
   id: string;
   title: string;
+  handle: string;
   description: string | null;
   tags: string[];
   vendor: string | null;
@@ -18,6 +19,7 @@ export interface ShopifyProductNode {
   };
   variants: { nodes: Array<{ availableForSale: boolean }> };
   images: { nodes: Array<{ altText: string | null }> };
+  featuredImage: { url: string } | null;
 }
 
 /** One snapshot row, before persistence (no DB identity, no shop). */
@@ -33,6 +35,10 @@ export interface SnapshotProduct {
   currencyCode: string;
   available: boolean;
   imageAltTexts: string[];
+  /** Storefront handle for result-card links (display-only, YOY-44). */
+  handle: string;
+  /** Featured-image URL for result cards (display-only, YOY-44). */
+  featuredImageUrl: string | null;
   sourceUpdatedAt: Date;
   contentHash: string;
 }
@@ -41,10 +47,16 @@ export interface SnapshotProduct {
  * Content hash over exactly the searchable fields, in fixed order, so an
  * unchanged product maps to an unchanged hash regardless of field ordering
  * in the API response. sourceUpdatedAt is deliberately excluded: a touched
- * timestamp with identical content must not dirty the row.
+ * timestamp with identical content must not dirty the row. The display-only
+ * fields (handle, featuredImageUrl) are excluded too (YOY-44 AC-4): a
+ * display change alone must not dirty the searchable content and must not
+ * trigger re-enrichment or re-embedding.
  */
 export function computeContentHash(
-  product: Omit<SnapshotProduct, "contentHash" | "sourceUpdatedAt">,
+  product: Omit<
+    SnapshotProduct,
+    "contentHash" | "sourceUpdatedAt" | "handle" | "featuredImageUrl"
+  >,
 ): string {
   return createHash("sha256")
     .update(
@@ -87,6 +99,8 @@ export function mapProductNode(node: ShopifyProductNode): SnapshotProduct {
   };
   return {
     ...withoutHash,
+    handle: node.handle,
+    featuredImageUrl: node.featuredImage?.url ?? null,
     sourceUpdatedAt: new Date(node.updatedAt),
     contentHash: computeContentHash(withoutHash),
   };

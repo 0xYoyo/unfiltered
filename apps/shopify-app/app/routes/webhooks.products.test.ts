@@ -49,6 +49,8 @@ function productPayload(
       },
     ],
     images: [{ alt: "Model wearing linen overshirt" }, { alt: null }],
+    image: { src: "https://cdn.example.com/overshirt.jpg" },
+    handle: "linen-overshirt",
     ...overrides,
   };
 }
@@ -248,6 +250,77 @@ describe("products/update webhook", () => {
     const row = await snapshotRow();
     expect(row?.title).toBe("Linen overshirt");
     expect(row?.sourceUpdatedAt).toEqual(new Date("2026-08-01T10:00:00Z"));
+  });
+
+  it("stores handle and featuredImageUrl from the payload (YOY-44 AC-3)", async () => {
+    const row = await snapshotRow();
+    expect(row?.handle).toBe("linen-overshirt");
+    expect(row?.featuredImageUrl).toBe("https://cdn.example.com/overshirt.jpg");
+  });
+
+  it("updates the row when only the featured image changes, with unchanged contentHash (YOY-44 AC-3/AC-4)", async () => {
+    const before = await snapshotRow();
+
+    await updateAction(
+      actionArgs(
+        webhookRequest({
+          topic: "products/update",
+          shop: SHOP,
+          payload: productPayload({
+            image: { src: "https://cdn.example.com/overshirt-v2.jpg" },
+            updated_at: "2026-08-01T11:00:00Z",
+          }),
+        }),
+      ),
+    );
+
+    const after = await snapshotRow();
+    expect(after?.featuredImageUrl).toBe(
+      "https://cdn.example.com/overshirt-v2.jpg",
+    );
+    expect(after?.contentHash).toBe(before?.contentHash);
+    expect(after?.sourceUpdatedAt).toEqual(new Date("2026-08-01T11:00:00Z"));
+  });
+
+  it("updates the row when only the handle changes, with unchanged contentHash (YOY-44 AC-3/AC-4)", async () => {
+    const before = await snapshotRow();
+
+    await updateAction(
+      actionArgs(
+        webhookRequest({
+          topic: "products/update",
+          shop: SHOP,
+          payload: productPayload({
+            handle: "linen-overshirt-natural",
+            updated_at: "2026-08-01T11:00:00Z",
+          }),
+        }),
+      ),
+    );
+
+    const after = await snapshotRow();
+    expect(after?.handle).toBe("linen-overshirt-natural");
+    expect(after?.contentHash).toBe(before?.contentHash);
+  });
+
+  it("still drops a stale delivery even when its display fields differ", async () => {
+    await updateAction(
+      actionArgs(
+        webhookRequest({
+          topic: "products/update",
+          shop: SHOP,
+          payload: productPayload({
+            handle: "stale-handle",
+            image: { src: "https://cdn.example.com/stale.jpg" },
+            updated_at: "2026-08-01T09:00:00Z",
+          }),
+        }),
+      ),
+    );
+
+    const row = await snapshotRow();
+    expect(row?.handle).toBe("linen-overshirt");
+    expect(row?.featuredImageUrl).toBe("https://cdn.example.com/overshirt.jpg");
   });
 
   it("preserves the ingested currency code, which webhook payloads never carry", async () => {
