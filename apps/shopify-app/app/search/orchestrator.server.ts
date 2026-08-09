@@ -42,7 +42,14 @@ import {
  *   asked for, so `degraded` stays false.
  * - AI zero-hits: retrieval succeeded but matched nothing. The response
  *   keeps the chips, an empty primary hit list, and close matches from
- *   classic keyword search on the raw query.
+ *   classic keyword search on the raw query. When keyword backfill finds
+ *   nothing either — a Hebrew query against an EN catalog leaves trigram
+ *   search empty-handed (YOY-52 AC-16) — close matches fall back to
+ *   relaxed-constraint vector retrieval: the same cached query embedding,
+ *   first with only the category constraint kept, then fully unconstrained,
+ *   so the zero-hit state renders nearest-neighbor rescues cross-language.
+ *   This fallback is best-effort: a failure inside it leaves close matches
+ *   empty rather than degrading the response.
  *
  * Classic-store errors are NOT caught: classic search is the ladder's floor
  * and shares its database with everything else, so there is nothing left to
@@ -214,6 +221,46 @@ export function createSearchOrchestrator(
         };
       };
 
+      /**
+       * Relaxed-constraint close matches (YOY-52 AC-16): re-query the vector
+       * store with the intent's cached embedding — the query text composes
+       * from the same intent, so no further embedding call happens — first
+       * keeping only the category constraint (the shopper's most defining
+       * ask), then fully unconstrained. Best-effort: any failure returns no
+       * close matches rather than degrading the zero-hit response.
+       */
+      const relaxedCloseMatches = async (
+        intent: Intent,
+        limit: number,
+      ): Promise<Array<{ productId: string }>> => {
+        const unconstrained = {
+          colorsInclude: [],
+          colorsExclude: [],
+          availableOnly: false,
+        };
+        const ladders =
+          intent.category !== undefined
+            ? [{ ...unconstrained, category: intent.category }, unconstrained]
+            : [unconstrained];
+        for (const constraintsOverride of ladders) {
+          try {
+            const relaxed = await retriever.retrieve({
+              intent,
+              shopDomain,
+              limit,
+              searchId,
+              constraintsOverride,
+            });
+            if (relaxed.hits.length > 0) {
+              return relaxed.hits;
+            }
+          } catch {
+            return [];
+          }
+        }
+        return [];
+      };
+
       // Retrieval and everything below it on the ladder, shared by the
       // extracted-intent path and the resolved-intent (chip removal) path.
       const aiPath = async (
@@ -258,8 +305,14 @@ export function createSearchOrchestrator(
 
         if (hits.length === 0) {
           // AC-6: retrieval worked, nothing satisfied every constraint. Keep
-          // the chips and offer classic keyword matches as close matches.
+          // the chips and offer classic keyword matches as close matches;
+          // when the keyword engine finds nothing either, relax the vector
+          // search instead (YOY-52 AC-16).
           const close = await classicStore.search({ shopDomain, query, limit });
+          const closeHits: Array<{ productId: string }> =
+            close.hits.length > 0
+              ? close.hits
+              : await relaxedCloseMatches(intent, limit);
           return {
             searchId,
             route: "ai",
@@ -268,7 +321,7 @@ export function createSearchOrchestrator(
             hits: [],
             chips,
             degraded: false,
-            closeMatches: await hydrateCards(shopDomain, close.hits),
+            closeMatches: await hydrateCards(shopDomain, closeHits),
           };
         }
 

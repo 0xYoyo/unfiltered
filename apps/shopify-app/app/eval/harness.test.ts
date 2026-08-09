@@ -339,6 +339,18 @@ describe("eval run (AC-2, AC-3, AC-4, AC-6)", () => {
     expect(result.perSearchCostPer1000Usd).toBeLessThanOrEqual(2.0);
   });
 
+  it("blends only full-path AI searches; refinement cost is its own line (YOY-52 AC-2)", () => {
+    // The blended denominator counts exactly the goldens that ran the full
+    // per-search path (classification, intent, query embedding, retrieval).
+    expect(result.blendedAiSearchCount).toBe(
+      result.perQuery.filter((score) => score.route === "ai").length,
+    );
+    // Intent-only refinement follow-ups are excluded from the blend and
+    // reported separately — they cost real money, just not full-path money.
+    expect(result.refinementCostPer1000Usd).toBeGreaterThan(0);
+    expect(result.perRefinement.length).toBeGreaterThan(0);
+  });
+
   it("reports the one-time indexing cost separately from per-search cost (AC-4)", () => {
     expect(result.oneTimeCostUsd).toBeGreaterThan(0);
   });

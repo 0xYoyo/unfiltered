@@ -151,6 +151,33 @@ describe("typo-tolerant keyword search (AC-2, AC-3)", () => {
     expect(await searchIds(db, { query: "crimson gown" })).toContain("tagged");
   });
 
+  it("ranks title matches above tag/alt-text-only matches, typos included (YOY-52 AC-13)", async () => {
+    await seed(db, [
+      { productId: "board-1", title: "Powder Snowboard", productType: "Boards" },
+      { productId: "board-2", title: "Snowboard Deluxe", productType: "Boards" },
+      {
+        // The live-run shape: a non-board matching only through secondary
+        // fields must never outrank an actual board.
+        productId: "gift-card",
+        title: "Gift Card",
+        tags: ["snowboard", "snowboard-gift"],
+        imageAltTexts: ["snowboard gift card art"],
+      },
+    ]);
+
+    for (const query of ["snowboard", "snowbaord"]) {
+      const ids = await searchIds(db, { query });
+      expect(ids, query).toContain("gift-card"); // still findable…
+      const giftRank = ids.indexOf("gift-card");
+      for (const board of ["board-1", "board-2"]) {
+        expect(ids, query).toContain(board);
+        expect(ids.indexOf(board), `${query}: ${board} vs gift-card`).toBeLessThan(
+          giftRank,
+        );
+      }
+    }
+  });
+
   it("scores hits in (0, 1], most relevant first", async () => {
     const result = await createPgTrgmClassicStore(db).search({
       shopDomain: SHOP,

@@ -483,6 +483,135 @@ describe("AI zero-hits keep chips and offer close matches (AC-6)", () => {
   });
 });
 
+describe("zero-hit close matches fall back to relaxed vector retrieval (YOY-52 AC-16)", () => {
+  /** The live-run shape: a Hebrew query against an EN catalog. */
+  const HEBREW_QUERY = "שמלת כלה ורודה אלגנטית";
+  const PINK_DRESS_INTENT = {
+    ...DRESS_INTENT,
+    colorsInclude: ["pink"],
+    softAttributes: ["elegant"],
+  };
+
+  /** Embedding client that counts embed() calls, answering a fixed vector. */
+  function countingEmbeddings() {
+    let calls = 0;
+    const embeddings: EmbeddingClient = {
+      dimension: 3,
+      async embed(request) {
+        calls += 1;
+        return request.texts.map(() => [1, 0, 0]);
+      },
+    };
+    return { embeddings, embedCalls: () => calls };
+  }
+
+  it("serves category-relaxed close matches when keyword backfill is empty, with no extra embedding call", async () => {
+    const db = await createTestDb();
+    await seed(db, [
+      // Both dresses state a non-pink color, so the colorsInclude constraint
+      // excludes them from primary hits; the Hebrew query matches no EN text,
+      // so classic keyword backfill is empty too.
+      {
+        productId: "black-gown",
+        title: "Black Evening Gown",
+        vector: [0.9, 0.1, 0],
+        enrichment: { category: "dress", colors: ["black"], occasions: ["wedding"] },
+      },
+      {
+        productId: "ivory-dress",
+        title: "Ivory Maxi Dress",
+        vector: [0.8, 0.2, 0],
+        enrichment: { category: "dress", colors: ["ivory"], occasions: [] },
+      },
+      // Same-shop non-dress with an embedding: category relaxation must
+      // still respect the category, so this never appears at rung one.
+      {
+        productId: "wool-coat",
+        title: "Wool Winter Coat",
+        vector: [1, 0, 0],
+        enrichment: { category: "coat", colors: [], occasions: [] },
+      },
+    ]);
+    const counting = countingEmbeddings();
+    const orchestrator = buildOrchestrator(db, {
+      llm: fakeLlm({
+        classification: () => ({ route: "ai" }),
+        intent: () => PINK_DRESS_INTENT,
+      }),
+      embeddings: counting.embeddings,
+    });
+
+    const response = await orchestrator.runSearch({
+      query: HEBREW_QUERY,
+      shopDomain: SHOP,
+    });
+
+    expect(response.route).toBe("ai");
+    expect(response.degraded).toBe(false);
+    expect(response.hits).toEqual([]);
+    expect(response.chips.length).toBeGreaterThan(0);
+    // Close matches came from vector retrieval with only the category kept:
+    // nearest dress first, the coat excluded.
+    expect(response.closeMatches.map((hit) => hit.productId)).toEqual([
+      "black-gown",
+      "ivory-dress",
+    ]);
+    // The relaxed re-query reused the cached query embedding.
+    expect(counting.embedCalls()).toBe(1);
+  });
+
+  it("falls to fully unconstrained retrieval when the category itself matches nothing", async () => {
+    const db = await createTestDb();
+    await seed(db, [
+      // No dress anywhere: rung one (category kept) finds nothing, rung two
+      // (unconstrained embedding-nearest) rescues with what exists.
+      {
+        productId: "wool-coat",
+        title: "Wool Winter Coat",
+        vector: [0.9, 0.1, 0],
+        enrichment: { category: "coat", colors: [], occasions: [] },
+      },
+    ]);
+    const orchestrator = buildOrchestrator(db, {
+      llm: fakeLlm({
+        classification: () => ({ route: "ai" }),
+        intent: () => PINK_DRESS_INTENT,
+      }),
+    });
+
+    const response = await orchestrator.runSearch({
+      query: HEBREW_QUERY,
+      shopDomain: SHOP,
+    });
+
+    expect(response.hits).toEqual([]);
+    expect(response.closeMatches.map((hit) => hit.productId)).toEqual([
+      "wool-coat",
+    ]);
+  });
+
+  it("leaves close matches empty — not degraded — when even relaxed retrieval finds nothing", async () => {
+    const db = await createTestDb();
+    // Empty catalog: nothing to rescue with; the zero-hit contract holds.
+    const orchestrator = buildOrchestrator(db, {
+      llm: fakeLlm({
+        classification: () => ({ route: "ai" }),
+        intent: () => PINK_DRESS_INTENT,
+      }),
+    });
+
+    const response = await orchestrator.runSearch({
+      query: HEBREW_QUERY,
+      shopDomain: SHOP,
+    });
+
+    expect(response.route).toBe("ai");
+    expect(response.degraded).toBe(false);
+    expect(response.hits).toEqual([]);
+    expect(response.closeMatches).toEqual([]);
+  });
+});
+
 describe("searchId threading (AC-7)", () => {
   it("threads one generated searchId through every AiCall row of an AI search", async () => {
     const db = await createTestDb();
