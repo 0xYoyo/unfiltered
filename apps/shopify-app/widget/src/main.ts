@@ -274,6 +274,25 @@ export function init(config: WidgetConfig): void {
       true,
     );
 
+    /**
+     * Explicit search request (YOY-52 AC-14): Enter or the theme's submit
+     * button while the widget owns the input runs the current query NOW,
+     * skipping the pending debounce — the live run showed the magnifier as
+     * a dead control. Navigation stays suppressed by the callers.
+     */
+    const searchNow = (): void => {
+      window.clearTimeout(debounceTimer);
+      const query = input.value.trim();
+      if (query === "") {
+        overlay.showIdle();
+        return;
+      }
+      void runSearch(
+        query,
+        heldIntent !== null ? { previousIntent: heldIntent } : undefined,
+      );
+    };
+
     // Enter must neither submit the theme's form nor feed a theme keydown
     // listener that navigates to /search itself, while the overlay is open
     // (AC-1/YOY-60 AC-3); once inert or closed, Enter submits natively.
@@ -286,6 +305,7 @@ export function init(config: WidgetConfig): void {
         event.stopPropagation();
         if (event.key === "Enter" && overlay.isOpen()) {
           event.preventDefault();
+          searchNow();
         }
         if (event.key === "Escape" && overlay.isOpen()) {
           // Mirrors the document-level Escape handler below, which this
@@ -300,8 +320,9 @@ export function init(config: WidgetConfig): void {
     );
 
     // The magnifier is a submit button: suppress the form's native
-    // navigation to /search while the overlay is open, wherever the
-    // submit originates.
+    // navigation to /search while the overlay is open, wherever the submit
+    // originates — and run the search it asked for immediately (YOY-52
+    // AC-14) instead of leaving the button a no-op.
     document.addEventListener(
       "submit",
       (event) => {
@@ -311,6 +332,7 @@ export function init(config: WidgetConfig): void {
         if (overlay.isOpen()) {
           event.preventDefault();
           event.stopPropagation();
+          searchNow();
         }
       },
       true,

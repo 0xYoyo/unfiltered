@@ -108,6 +108,36 @@ test("an over-timeout search leaves the widget functional for the next query (YO
   await expect(noResults(page)).toBeHidden();
 });
 
+test("the magnifier fires an immediate search, skipping the debounce, without navigating (YOY-52 AC-14)", async ({
+  page,
+}) => {
+  // A debounce far beyond the test's own timeout: any search that lands
+  // before it can only have come from the immediate path.
+  await page.goto("/?debounce=30000");
+
+  await themeInput(page).focus();
+  await expect(overlay(page)).toBeVisible();
+  await themeInput(page).fill("nike");
+  await page.locator('form[role="search"] button[type="submit"]').click();
+
+  await expect(cards(page).first()).toBeVisible({ timeout: 5000 });
+  expect(new URL(page.url()).pathname).toBe("/");
+  await expect(overlay(page)).toBeVisible();
+});
+
+test("Enter fires an immediate search the same way (YOY-52 AC-14)", async ({
+  page,
+}) => {
+  await page.goto("/?debounce=30000");
+
+  await themeInput(page).fill("nike");
+  await themeInput(page).press("Enter");
+
+  await expect(cards(page).first()).toBeVisible({ timeout: 5000 });
+  expect(new URL(page.url()).pathname).toBe("/");
+  await expect(overlay(page)).toBeVisible();
+});
+
 test("typing renders cards: image, placeholder, title, price range, sold-out (AC-3)", async ({
   page,
 }) => {
