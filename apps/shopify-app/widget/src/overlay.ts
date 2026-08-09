@@ -44,6 +44,12 @@ export interface Overlay {
   showLoading(): void;
   /** Clear to the empty-input state: no cards, no chips, no messages. */
   showIdle(): void;
+  /**
+   * Resolve a failed/timed-out search to a quiet no-results state (YOY-61
+   * AC-4): stale cards and chips are cleared so nothing pretends to answer
+   * the failed query, and no error language is shown.
+   */
+  showFailure(): void;
   /** Render one search response: cards, chips, and empty states. */
   showResponse(response: ProxySearchResponse, handlers: ResponseHandlers): void;
   /** Remove the widget from the page entirely (inert degradation). */
@@ -259,6 +265,10 @@ export function createOverlay(options: OverlayOptions): Overlay {
       grid.replaceChildren();
       closeMatches.hidden = true;
       closeMatchesGrid.replaceChildren();
+    },
+    showFailure() {
+      this.showIdle();
+      noResults.hidden = false;
     },
     showResponse(response, handlers) {
       loading.hidden = true;

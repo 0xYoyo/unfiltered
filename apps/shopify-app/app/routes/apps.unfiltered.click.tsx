@@ -22,7 +22,18 @@ import { authenticate } from "../shopify.server";
  * the verified query params only. The beacon's searchId must name a search
  * this shop actually ran, else 404 and no row — the beacon fields are
  * shopper-controlled and must not write into another shop's log.
+ *
+ * Every response — every status — carries `Cache-Control: no-store` (YOY-52
+ * AC-9): the beacon rides GET, and its responses must never be cached.
  */
+
+function emptyResponse(status: number): Response {
+  return new Response(null, {
+    status,
+    headers: { "Cache-Control": "no-store" },
+  });
+}
+
 async function handleClick(
   request: Request,
   parse: (request: Request) => Promise<ClickBeaconBody | null>,
@@ -32,10 +43,10 @@ async function handleClick(
     await authenticate.public.appProxy(request);
     shop = new URL(request.url).searchParams.get("shop");
   } catch {
-    return new Response(null, { status: 401 });
+    return emptyResponse(401);
   }
   if (shop === null || shop === "") {
-    return new Response(null, { status: 401 });
+    return emptyResponse(401);
   }
 
   let body: ClickBeaconBody | null;
@@ -45,7 +56,7 @@ async function handleClick(
     body = null;
   }
   if (body === null) {
-    return new Response(null, { status: 400 });
+    return emptyResponse(400);
   }
 
   const recorded = await writeClickEvent(db, {
@@ -56,9 +67,9 @@ async function handleClick(
     position: body.position,
   });
   if (!recorded) {
-    return new Response(null, { status: 404 });
+    return emptyResponse(404);
   }
-  return new Response(null, { status: 204 });
+  return emptyResponse(204);
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) =>

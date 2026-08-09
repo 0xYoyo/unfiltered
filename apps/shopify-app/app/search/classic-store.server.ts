@@ -75,7 +75,9 @@ function buildClassicSearchSql(request: ClassicSearchRequest): {
   }
 
   const params: unknown[] = [request.shopDomain];
-  const where: string[] = [`p."shopDomain" = $1`];
+  // status guard (YOY-61 AC-3): defense in depth — ingestion should never
+  // store a non-active product, but one that exists anyway must not serve.
+  const where: string[] = [`p."shopDomain" = $1`, `p."status" = 'ACTIVE'`];
   const param = (value: unknown): string => {
     params.push(value);
     return `$${params.length}`;

@@ -23,7 +23,7 @@ describe("eval fixtures (AC-1)", () => {
     const goldens = loadGoldens();
 
     expect(catalog).toHaveLength(61);
-    expect(goldens).toHaveLength(28);
+    expect(goldens).toHaveLength(31);
 
     // Deliberately sparse: descriptions are one-liners or empty, tags minimal.
     for (const product of catalog) {

@@ -59,6 +59,41 @@ describe("createSessionThrottle", () => {
     expect(throttle.shouldThrottle("s1")).toBe(true);
     expect(throttle.shouldThrottle("s2")).toBe(false);
   });
+
+  it("sweeps abandoned sessions once their window slides clear (YOY-52 AC-6)", () => {
+    const clock = fakeClock();
+    const throttle = createSessionThrottle({
+      windowMs: 60_000,
+      now: clock.now,
+      sweepEvery: 10,
+    });
+
+    // Many one-shot sessions that never revisit.
+    for (let i = 0; i < 100; i += 1) {
+      throttle.recordAiSearch(`abandoned-${i}`);
+    }
+    expect(throttle.sessionCount()).toBe(100);
+
+    // Their windows slide clear; per-session pruning alone would never see
+    // them again. The next sweepEvery-th call collects every expired entry.
+    clock.advance(61_000);
+    for (let i = 0; i < 10; i += 1) {
+      throttle.shouldThrottle("active");
+    }
+    expect(throttle.sessionCount()).toBe(0);
+
+    // A still-active session survives the sweep.
+    throttle.recordAiSearch("active");
+    clock.advance(30_000);
+    for (let i = 0; i < 100; i += 1) {
+      throttle.recordAiSearch(`abandoned-b-${i}`);
+    }
+    clock.advance(31_000); // active's entry is now expired too, batch b's not
+    for (let i = 0; i < 10; i += 1) {
+      throttle.shouldThrottle("probe");
+    }
+    expect(throttle.sessionCount()).toBe(100);
+  });
 });
 
 describe("throttleLimitFromEnv", () => {

@@ -61,8 +61,20 @@ test("an inert widget hands the input back: native predictive search and Enter n
 }) => {
   await page.goto("/native-predictive.html?fixture=error");
 
-  // The failing endpoint drives the widget inert and it removes itself.
+  // Three consecutive failed searches drive the widget inert and it removes
+  // itself (YOY-61 AC-4: a single failure only shows a quiet fallback).
+  // Clearing between searches resets the overlay to idle, so the no-results
+  // message reappearing proves each failure was processed in turn.
+  const failed = page.getByTestId("unfiltered-widget-no-results");
   await themeInput(page).fill("nike");
+  await expect(failed).toBeVisible();
+  await themeInput(page).fill("");
+  await expect(failed).toBeHidden();
+  await themeInput(page).fill("nike two");
+  await expect(failed).toBeVisible();
+  await themeInput(page).fill("");
+  await expect(failed).toBeHidden();
+  await themeInput(page).fill("nike three");
   await expect(page.getByTestId("unfiltered-widget-root")).toHaveCount(0);
 
   // The theme's own predictive dropdown now renders — proving the fixture

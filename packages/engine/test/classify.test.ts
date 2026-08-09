@@ -57,10 +57,13 @@ describe("heuristic fast path (AC-1, AC-5)", () => {
     ['"linen midi dress"', "quoted-phrase"],
     ["nike air max 90", "sku-pattern"],
     ["SM-1234-XL", "sku-pattern"],
+    ["SB-2024", "sku-pattern"],
+    ["900", "sku-pattern"],
     ["מכנסי ג'ינס 501", "sku-pattern"],
-    ["red dress", "short-query"],
+    ["snowboard", "short-query"],
     ["שמלה", "short-query"],
     ["נעלי ספורט", "short-query"],
+    ["aurora dress", "short-query"],
   ];
 
   for (const [query, reason] of classicFixtures) {
@@ -85,6 +88,15 @@ describe("model escalation (AC-2, AC-5)", () => {
     // carry price intent and must reach the model, not the sku-pattern rule.
     "dress under 400",
     "שמלה עד 400",
+    // Constraint-shaped queries across the live-run misroute triggers
+    // (YOY-61 AC-1): 2-word color+noun — EN and HE — and digit-bearing
+    // price bounds with the Hebrew prepositional prefix. None of these may
+    // be settled classic by the short-query or sku-pattern rules.
+    "blue snowboard",
+    "סנובורד כחול",
+    "blue snowboard under 900",
+    "סנובורד כחול מתחת ל-900",
+    "red dress",
   ];
 
   for (const query of aiFixtures) {

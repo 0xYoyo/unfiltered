@@ -35,6 +35,8 @@ interface SeedProduct {
   priceMin?: number;
   priceMax?: number;
   available?: boolean;
+  /** Shopify product status; defaults to ACTIVE like the schema. */
+  status?: string;
   shopDomain?: string;
   /** undefined seeds no enrichment row (an unenriched product). */
   enrichment?: {
@@ -60,6 +62,7 @@ async function seed(db: PrismaClient, products: SeedProduct[]): Promise<void> {
         priceMax: product.priceMax ?? product.priceMin ?? 100,
         currencyCode: "ILS",
         available: product.available ?? true,
+        status: product.status ?? "ACTIVE",
         imageAltTexts: product.imageAltTexts ?? [],
         sourceUpdatedAt: new Date("2026-01-01T00:00:00Z"),
         contentHash: `hash-${product.productId}`,
@@ -176,6 +179,22 @@ describe("typo-tolerant keyword search (AC-2, AC-3)", () => {
         );
       }
     }
+  });
+
+  it("never serves a non-active product row, even at an exact title match (YOY-61 AC-3)", async () => {
+    await seed(db, [
+      {
+        productId: "archived-nike",
+        title: "Nike Air Max 90 Archived",
+        status: "ARCHIVED",
+      },
+      { productId: "draft-nike", title: "Nike Air Max 90 Draft", status: "DRAFT" },
+    ]);
+
+    const ids = await searchIds(db, { query: "nike air max 90" });
+    expect(ids).toContain("nike");
+    expect(ids).not.toContain("archived-nike");
+    expect(ids).not.toContain("draft-nike");
   });
 
   it("scores hits in (0, 1], most relevant first", async () => {

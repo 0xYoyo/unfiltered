@@ -46,7 +46,9 @@ export function createPgVectorRetrievalStore(db: PrismaClient): RetrievalStore {
       }
 
       const params: unknown[] = [shopDomain, `[${vector.join(",")}]`];
-      const where: string[] = [`e."shopDomain" = $1`];
+      // status guard (YOY-61 AC-3): defense in depth — ingestion should never
+      // store a non-active product, but one that exists anyway must not serve.
+      const where: string[] = [`e."shopDomain" = $1`, `p."status" = 'ACTIVE'`];
       const param = (value: unknown): string => {
         params.push(value);
         return `$${params.length}`;
