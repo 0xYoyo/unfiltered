@@ -1,6 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
+import { CANONICAL_CATEGORIES, CANONICAL_OCCASIONS } from "@unfiltered/engine";
 
 import {
+  HEBREW_CATEGORY_DISPLAY,
+  HEBREW_OCCASION_DISPLAY,
   STRING_CATALOG,
   WIDGET_LOCALES,
   type WidgetLocale,
@@ -28,6 +31,24 @@ test("the string catalog has complete, non-empty EN and HE sets (AC-1)", () => {
     for (const [key, value] of Object.entries(STRING_CATALOG[locale])) {
       expect(value.trim(), `${locale}.${key} must not be empty`).not.toBe("");
     }
+  }
+});
+
+test("every canonical category and occasion has a Hebrew display entry (YOY-52 AC-7)", () => {
+  // The engine owns the canonical sets; the widget owns only their Hebrew
+  // display. Importing the canonical arrays here means adding a new
+  // canonical value fails this suite until its Hebrew string exists —
+  // and removing a display entry fails it immediately. The color list
+  // stays widget-owned (YOY-50 AC-4) and is deliberately not tied.
+  for (const category of CANONICAL_CATEGORIES) {
+    const display = HEBREW_CATEGORY_DISPLAY[category];
+    expect(display, `category "${category}" needs a Hebrew display`).toBeDefined();
+    expect(display!.trim(), `category "${category}" display must not be empty`).not.toBe("");
+  }
+  for (const occasion of CANONICAL_OCCASIONS) {
+    const display = HEBREW_OCCASION_DISPLAY[occasion];
+    expect(display, `occasion "${occasion}" needs a Hebrew display`).toBeDefined();
+    expect(display!.trim(), `occasion "${occasion}" display must not be empty`).not.toBe("");
   }
 });
 
