@@ -147,6 +147,14 @@ export interface EvalRunResult {
   oneTimeCostUsd: number;
   /** Blended per-search cost projected per 1,000 searches, USD. */
   perSearchCostPer1000Usd: number;
+  /**
+   * The blended figure's denominator (YOY-52 AC-2): AI-routed goldens that
+   * ran the full per-search path. Refinement goldens run an intent call
+   * only, so they are excluded from the blend and reported separately.
+   */
+  blendedAiSearchCount: number;
+  /** Intent-only refinement cost projected per 1,000 follow-ups, USD. */
+  refinementCostPer1000Usd: number;
 }
 
 export function loadCatalog(): EvalProduct[] {
@@ -413,18 +421,37 @@ export async function runEval(db: PrismaClient): Promise<EvalRunResult> {
   const oneTimeCostUsd = allRows
     .filter((row) => row.searchId === null)
     .reduce((sum, row) => sum + row.costUsd, 0);
-  const perSearchTotal = allRows
-    .filter((row) => row.searchId !== null)
-    .reduce((sum, row) => sum + row.costUsd, 0);
-  // Per AI search: every AI-routed golden and every refinement follow-up is
-  // one paying shopper search; classic-routed goldens spend nothing by
+  // Refinement goldens run an intent call only — no classification, no query
+  // embedding, no retrieval — so blending them in would understate what a
+  // production follow-up search costs (YOY-52 AC-2). The blend covers only
+  // the AI-routed goldens that ran the full per-search path; refinement cost
+  // is reported as its own line. Classic-routed goldens spend nothing by
   // construction (YOY-41 AC-5), so counting them in the denominator would
   // understate the cost of the searches that do pay.
-  const aiSearchCount =
-    perQuery.filter((score) => score.route === "ai").length +
-    refinementGoldens.length;
+  const refinementSearchIds = new Set(
+    refinementGoldens.map((golden) => golden.id),
+  );
+  const perSearchTotal = allRows
+    .filter(
+      (row) => row.searchId !== null && !refinementSearchIds.has(row.searchId),
+    )
+    .reduce((sum, row) => sum + row.costUsd, 0);
+  const refinementTotal = allRows
+    .filter(
+      (row) => row.searchId !== null && refinementSearchIds.has(row.searchId),
+    )
+    .reduce((sum, row) => sum + row.costUsd, 0);
+  const blendedAiSearchCount = perQuery.filter(
+    (score) => score.route === "ai",
+  ).length;
   const perSearchCostPer1000Usd =
-    aiSearchCount === 0 ? 0 : (perSearchTotal / aiSearchCount) * 1000;
+    blendedAiSearchCount === 0
+      ? 0
+      : (perSearchTotal / blendedAiSearchCount) * 1000;
+  const refinementCostPer1000Usd =
+    refinementGoldens.length === 0
+      ? 0
+      : (refinementTotal / refinementGoldens.length) * 1000;
 
   const hitCount = perQuery.filter((score) => score.firstExpectedRank !== null).length;
   const result: EvalRunResult = {
@@ -442,6 +469,8 @@ export async function runEval(db: PrismaClient): Promise<EvalRunResult> {
     violationCount: perQuery.reduce((sum, score) => sum + score.violations.length, 0),
     oneTimeCostUsd,
     perSearchCostPer1000Usd,
+    blendedAiSearchCount,
+    refinementCostPer1000Usd,
   };
   printScorecard(result);
   return result;
@@ -509,7 +538,8 @@ function printScorecard(result: EvalRunResult): void {
     `refinement constraint misses: ${result.refinementViolationCount} (bar: 0)`,
     `hard-constraint violations in any top 10: ${result.violationCount} (bar: 0)`,
     `one-time indexing cost (enrichment + embedding, ${result.catalogSize} products): $${result.oneTimeCostUsd.toFixed(4)}`,
-    `blended per-search cost per 1,000 AI searches: $${result.perSearchCostPer1000Usd.toFixed(2)} (bar: ≤ $2.00)`,
+    `blended per-search cost per 1,000 AI searches (${result.blendedAiSearchCount} full-path searches): $${result.perSearchCostPer1000Usd.toFixed(2)} (bar: ≤ $2.00)`,
+    `refinement-only intent cost per 1,000 follow-ups (reported separately, not blended): $${result.refinementCostPer1000Usd.toFixed(2)}`,
     "",
   );
   console.log(lines.join("\n"));

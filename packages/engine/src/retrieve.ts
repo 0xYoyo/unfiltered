@@ -112,6 +112,13 @@ export interface RetrievalRequest {
   limit?: number;
   /** Correlation ID tying together every call serving one search. */
   searchId?: string;
+  /**
+   * Hard filters to apply INSTEAD of the intent's own constraints (YOY-52
+   * AC-16): relaxed-constraint fallbacks re-rank by the same query embedding
+   * — the text still composes from the intent, so the cached vector is
+   * reused with zero further embedding calls — while filtering by this set.
+   */
+  constraintsOverride?: RetrievalConstraints;
 }
 
 export interface Retriever {
@@ -236,7 +243,8 @@ export function createRetriever(options: RetrieverOptions): Retriever {
 
   return {
     async retrieve(request) {
-      const constraints = constraintsFromIntent(request.intent);
+      const constraints =
+        request.constraintsOverride ?? constraintsFromIntent(request.intent);
       const queryText = composeQueryText(request.intent);
       if (queryText === "") {
         throw new EmptyQueryTextError(

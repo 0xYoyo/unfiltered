@@ -14,9 +14,10 @@ import { expandCategoryConstraint, normalizeQuery } from "@unfiltered/engine";
  * migration-owned function joining title, tags, vendor, productType, and
  * imageAltTexts — with zero LLM/embedding calls anywhere on this path.
  *
- * Text ranking is word_similarity(query, search text): typo-tolerant for one-
- * or two-edit misspellings in any script, `<%` filtered so the trigram GIN
- * index drives the plan. The word-similarity threshold is lowered to 0.30
+ * Text ranking is title-dominant word similarity (YOY-52 AC-13): a weighted
+ * sum of word_similarity against the title and against the full search text,
+ * typo-tolerant for one- or two-edit misspellings in any script, `<%`
+ * filtered on the full search text so the trigram GIN index drives the plan. The word-similarity threshold is lowered to 0.30
  * via a transaction-local set_config, run in the same interactive
  * transaction as the search so the setting cannot leak to other pooled
  * connections.
@@ -33,6 +34,19 @@ import { expandCategoryConstraint, normalizeQuery } from "@unfiltered/engine";
 
 /** word_similarity floor for a row to count as a keyword match. */
 const WORD_SIMILARITY_THRESHOLD = 0.3;
+
+/**
+ * Ranking weights (YOY-52 AC-13): title similarity must dominate — the M3
+ * live run ranked "Gift Card" above actual snowboards for "snowbaord" via
+ * tag/alt-text matches. A pure title match scores at least TITLE_WEIGHT
+ * while a pure secondary-field match tops out at SECONDARY_WEIGHT, so a
+ * title match always outranks a tags/vendor/type/alt-text-only match. The
+ * `<%` candidate filter stays on the full search text, so the trigram GIN
+ * index still drives the plan and secondary-field-only matches remain
+ * findable — they just rank below title matches.
+ */
+const TITLE_WEIGHT = 0.7;
+const SECONDARY_WEIGHT = 0.3;
 
 const DEFAULT_LIMIT = 10;
 
@@ -74,7 +88,8 @@ function buildClassicSearchSql(request: ClassicSearchRequest): {
   if (query !== "") {
     const queryParam = param(query);
     where.push(`${queryParam} <% ${SEARCH_TEXT}`);
-    select = `word_similarity(${queryParam}, ${SEARCH_TEXT})::float8 AS score`;
+    select = `(${TITLE_WEIGHT} * word_similarity(${queryParam}, p."title")
+        + ${SECONDARY_WEIGHT} * word_similarity(${queryParam}, ${SEARCH_TEXT}))::float8 AS score`;
     orderBy = `score DESC, p."productId" ASC`;
   } else {
     select = `0::float8 AS score`;
