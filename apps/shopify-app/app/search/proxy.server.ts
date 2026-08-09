@@ -112,6 +112,44 @@ export function parseProxySearchBody(value: unknown): ProxySearchBody | null {
   return body;
 }
 
+/**
+ * Parse a search request from GET query parameters — the transport the
+ * widget actually uses (YOY-60 AC-1: the proxy edge rejects browser POSTs,
+ * which carry `Origin`; GET forwards). Object-valued fields travel as JSON
+ * inside their parameter, mirroring the widget's `buildSearchParams`;
+ * validation is delegated to `parseProxySearchBody` so both transports
+ * enforce the identical contract. Shopify's own signed proxy parameters
+ * (shop, timestamp, signature, …) ride the same query string and are
+ * simply not read here.
+ */
+export function parseProxySearchParams(
+  params: URLSearchParams,
+): ProxySearchBody | null {
+  const query = params.get("query");
+  const sessionId = params.get("sessionId");
+  if (query === null || sessionId === null) {
+    return null;
+  }
+  const record: Record<string, unknown> = { query, sessionId };
+  const previousIntent = params.get("previousIntent");
+  if (previousIntent !== null) {
+    try {
+      record.previousIntent = JSON.parse(previousIntent);
+    } catch {
+      return null;
+    }
+  }
+  const removeChip = params.get("removeChip");
+  if (removeChip !== null) {
+    try {
+      record.removeChip = JSON.parse(removeChip);
+    } catch {
+      return null;
+    }
+  }
+  return parseProxySearchBody(record);
+}
+
 /** The JSON body the widget's click beacon POSTs through the proxy (YOY-47). */
 export interface ClickBeaconBody {
   /** The searchId of the response whose result was clicked. */
@@ -147,6 +185,36 @@ export function parseClickBeaconBody(value: unknown): ClickBeaconBody | null {
     return null;
   }
   return { searchId, sessionId, productId, position };
+}
+
+/**
+ * Parse a click beacon from GET query parameters (YOY-60): the mirror of
+ * the widget's `buildClickParams`, delegating validation to
+ * `parseClickBeaconBody`. `position` travels as a decimal string; anything
+ * that is not a whole non-negative number fails validation there.
+ */
+export function parseClickBeaconParams(
+  params: URLSearchParams,
+): ClickBeaconBody | null {
+  const searchId = params.get("searchId");
+  const sessionId = params.get("sessionId");
+  const productId = params.get("productId");
+  const position = params.get("position");
+  if (
+    searchId === null ||
+    sessionId === null ||
+    productId === null ||
+    position === null ||
+    position.trim() === ""
+  ) {
+    return null;
+  }
+  return parseClickBeaconBody({
+    searchId,
+    sessionId,
+    productId,
+    position: Number(position),
+  });
 }
 
 /**

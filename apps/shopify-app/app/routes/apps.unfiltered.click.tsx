@@ -1,21 +1,32 @@
-import type { ActionFunctionArgs } from "react-router";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 
 import db from "../db.server";
 import { writeClickEvent } from "../search/events.server";
-import { parseClickBeaconBody } from "../search/proxy.server";
+import {
+  parseClickBeaconBody,
+  parseClickBeaconParams,
+  type ClickBeaconBody,
+} from "../search/proxy.server";
 import { authenticate } from "../shopify.server";
 
 /**
  * The click beacon (YOY-47), under the same app proxy as the search
- * endpoint: the widget POSTs a clicked result's searchId/productId/position
- * to /apps/unfiltered/click, fire-and-forget.
+ * endpoint: the widget reports a clicked result's searchId/productId/
+ * position to /apps/unfiltered/click, fire-and-forget. The widget rides
+ * GET query parameters (YOY-60 AC-1 — browser POSTs cannot pass the proxy
+ * edge), served by the loader; the action keeps the JSON-POST contract for
+ * signed server-side callers. Also served at the remainder path /click
+ * (YOY-60 AC-2, see routes/click.tsx).
  *
  * Auth mirrors the search route: proxy signature or 401, shop identity from
- * the verified query params only. The body's searchId must name a search
- * this shop actually ran, else 404 and no row — the body is
+ * the verified query params only. The beacon's searchId must name a search
+ * this shop actually ran, else 404 and no row — the beacon fields are
  * shopper-controlled and must not write into another shop's log.
  */
-export const action = async ({ request }: ActionFunctionArgs) => {
+async function handleClick(
+  request: Request,
+  parse: (request: Request) => Promise<ClickBeaconBody | null>,
+): Promise<Response> {
   let shop: string | null;
   try {
     await authenticate.public.appProxy(request);
@@ -27,9 +38,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return new Response(null, { status: 401 });
   }
 
-  let body;
+  let body: ClickBeaconBody | null;
   try {
-    body = parseClickBeaconBody(await request.json());
+    body = await parse(request);
   } catch {
     body = null;
   }
@@ -48,4 +59,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return new Response(null, { status: 404 });
   }
   return new Response(null, { status: 204 });
-};
+}
+
+export const loader = async ({ request }: LoaderFunctionArgs) =>
+  handleClick(request, (req) =>
+    Promise.resolve(parseClickBeaconParams(new URL(req.url).searchParams)),
+  );
+
+export const action = async ({ request }: ActionFunctionArgs) =>
+  handleClick(request, async (req) => parseClickBeaconBody(await req.json()));
