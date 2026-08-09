@@ -12,7 +12,7 @@ redirect_urls = [ "https://shopify.dev/apps/default-app-home/api/auth" ]
 # shop domain are forwarded here with Shopify's proxy signature. Handled by:
 # /app/routes/apps.unfiltered.search.tsx
 [app_proxy]
-url = "https://shopify.dev/apps/default-app-home"
+url = "https://shopify.dev/apps/unfiltered"
 prefix = "apps"
 subpath = "unfiltered"
 
