@@ -24,5 +24,11 @@ jobs:
         with:
           node-version: 22
       - run: npm ci
+      # Bundle-drift guard (YOY-52 AC-3): the widget's built assets are
+      # committed and byte-reproducible; a PR that edits widget/src/ without
+      # running build:widget would ship stale assets to themes. Rebuilding
+      # here and failing on any diff makes drift impossible to merge.
+      - run: npm run build:widget
+      - run: git diff --exit-code -- apps/shopify-app/extensions/unfiltered-widget/assets/
       - run: npx playwright install --with-deps chromium
       - run: npm run test:ui
