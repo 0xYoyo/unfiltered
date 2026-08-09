@@ -31,7 +31,19 @@ import { authenticate } from "../shopify.server";
  * identity comes exclusively from the signature-verified query params —
  * never from the request body or client-set params, which a shopper
  * controls.
+ *
+ * Every response — every status — carries `Cache-Control: no-store` (YOY-52
+ * AC-9): the widget transport is GET, and per-shopper search responses must
+ * never land in a shared or browser cache.
  */
+
+/** Response headers common to every proxy response, whatever the status. */
+export const PROXY_RESPONSE_HEADERS = { "Cache-Control": "no-store" } as const;
+
+function emptyResponse(status: number): Response {
+  return new Response(null, { status, headers: PROXY_RESPONSE_HEADERS });
+}
+
 async function handleSearch(
   request: Request,
   parse: (request: Request) => Promise<ProxySearchBody | null>,
@@ -43,10 +55,10 @@ async function handleSearch(
     await authenticate.public.appProxy(request);
     shop = new URL(request.url).searchParams.get("shop");
   } catch {
-    return new Response(null, { status: 401 });
+    return emptyResponse(401);
   }
   if (shop === null || shop === "") {
-    return new Response(null, { status: 401 });
+    return emptyResponse(401);
   }
 
   let body: ProxySearchBody | null;
@@ -56,7 +68,7 @@ async function handleSearch(
     body = null;
   }
   if (body === null) {
-    return new Response(null, { status: 400 });
+    return emptyResponse(400);
   }
 
   // Chip removal: pure intent surgery, then straight to retrieval — no
@@ -73,43 +85,63 @@ async function handleSearch(
   const throttled =
     resolvedIntent === undefined && throttle.shouldThrottle(body.sessionId);
 
-  const orchestrator = createProxySearchOrchestrator(db);
-  const startedAt = Date.now();
-  const response = await orchestrator.runSearch(
-    throttled
-      ? { query: body.query, shopDomain: shop, forceClassic: true }
-      : resolvedIntent !== undefined
-        ? { query: body.query, shopDomain: shop, resolvedIntent }
-        : {
-            query: body.query,
-            shopDomain: shop,
-            ...(body.previousIntent !== undefined
-              ? { previousIntent: body.previousIntent }
-              : {}),
-          },
-  );
-  const latencyMs = Date.now() - startedAt;
+  // Containment (YOY-52 AC-4): a failure below the orchestrator's own
+  // fallback ladder — construction included — must never surface framework
+  // error details to a shopper. Same empty-body style as the 401/400 above.
+  try {
+    const orchestrator = createProxySearchOrchestrator(db);
+    const startedAt = Date.now();
+    const response = await orchestrator.runSearch(
+      throttled
+        ? { query: body.query, shopDomain: shop, forceClassic: true }
+        : resolvedIntent !== undefined
+          ? { query: body.query, shopDomain: shop, resolvedIntent }
+          : {
+              query: body.query,
+              shopDomain: shop,
+              ...(body.previousIntent !== undefined
+                ? { previousIntent: body.previousIntent }
+                : {}),
+            },
+    );
+    const latencyMs = Date.now() - startedAt;
 
-  // Only genuinely AI-routed searches consume throttle budget: classic
-  // routes, chip removal, and throttled responses do not (YOY-47 AC-4).
-  if (resolvedIntent === undefined && !throttled && response.route === "ai") {
-    throttle.recordAiSearch(body.sessionId);
+    // Budget is consumed whenever the classifier decided the AI route (YOY-52
+    // AC-5) — an AI-classified search that degraded to classic after intent
+    // extraction or retrieval failed (route "classic", degraded, routeReason
+    // "model") spent real LLM calls and counts. Heuristic and model-decided
+    // classic searches ("short-query", "sku-pattern", non-degraded "model",
+    // "model-error") consume nothing; chip removal and throttled responses
+    // stay exempt (YOY-47 AC-4).
+    const aiDecided =
+      response.route === "ai" ||
+      (response.degraded && response.routeReason === "model");
+    if (resolvedIntent === undefined && !throttled && aiDecided) {
+      throttle.recordAiSearch(body.sessionId);
+    }
+
+    // Exactly one SearchEvent per search — degraded, zero-hit, and throttled
+    // included; a write failure never fails the response (YOY-47 AC-2/AC-5).
+    await writeSearchEvent(db, {
+      searchId: response.searchId,
+      shopDomain: shop,
+      sessionId: body.sessionId,
+      query: body.query,
+      route: response.route,
+      degraded: response.degraded,
+      latencyMs,
+      resultCount: response.hits.length,
+    });
+
+    return Response.json(serializeProxySearchResponse(response), {
+      headers: PROXY_RESPONSE_HEADERS,
+    });
+  } catch (error) {
+    if (error instanceof Response) {
+      throw error;
+    }
+    return emptyResponse(500);
   }
-
-  // Exactly one SearchEvent per search — degraded, zero-hit, and throttled
-  // included; a write failure never fails the response (YOY-47 AC-2/AC-5).
-  await writeSearchEvent(db, {
-    searchId: response.searchId,
-    shopDomain: shop,
-    sessionId: body.sessionId,
-    query: body.query,
-    route: response.route,
-    degraded: response.degraded,
-    latencyMs,
-    resultCount: response.hits.length,
-  });
-
-  return Response.json(serializeProxySearchResponse(response));
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) =>

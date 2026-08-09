@@ -16,11 +16,14 @@ export { ROOT_TESTID };
  * search endpoint, while the theme's native search-results navigation is
  * suppressed only while the overlay is open.
  *
- * Degradation contract (AC-2): no recognizable theme search input, a failed
- * or timed-out search request, or any unexpected DOM failure leaves the
- * theme's native search exactly as it was without the app. The widget
- * removes itself rather than showing error UI — the shopper never sees an
- * error caused by us.
+ * Degradation contract (AC-2, refined by YOY-61 AC-4): no recognizable
+ * theme search input, an unexpected DOM failure, or repeated consecutive
+ * search failures leave the theme's native search exactly as it was without
+ * the app. A SINGLE slow or failed search never destroys the widget — it
+ * resolves to a quiet no-results state and the next search runs normally;
+ * only structural failure (cannot mount, or every search failing in a row)
+ * makes the widget remove itself. The shopper never sees an error caused by
+ * us either way.
  */
 
 /** Configuration the theme app embed block passes into `init`. */
@@ -38,6 +41,13 @@ export interface WidgetConfig {
 }
 
 const DEFAULT_DEBOUNCE_MS = 200;
+
+/**
+ * Consecutive hard search failures (HTTP error, network failure, timeout,
+ * malformed body) before the widget concludes the failure is structural and
+ * goes inert (YOY-61 AC-4). Any successful response resets the count.
+ */
+export const MAX_CONSECUTIVE_FAILURES = 3;
 
 /**
  * The theme's search input, by the common storefront patterns: a dedicated
@@ -97,6 +107,7 @@ export function init(config: WidgetConfig): void {
     let debounceTimer: number | undefined;
     let currentSearchId: string | null = null;
     let requestSequence = 0;
+    let consecutiveFailures = 0;
     // Refinement memory (YOY-49 AC-4): the latest response's echoed intent,
     // held in memory only — it lives exactly as long as this page view and
     // never crosses browser sessions (NG-4). The last query text backs chip
@@ -154,6 +165,7 @@ export function init(config: WidgetConfig): void {
         if (inert || sequence !== requestSequence) {
           return; // A newer keystroke superseded this request.
         }
+        consecutiveFailures = 0;
         currentSearchId = response.searchId;
         lastQuery = query;
         // The response's echoed intent replaces the held one (AC-4) — also
@@ -161,8 +173,19 @@ export function init(config: WidgetConfig): void {
         heldIntent = response.intent;
         overlay.showResponse(response, { onCardClick, onChipRemove });
       } catch {
-        if (sequence === requestSequence) {
+        if (inert || sequence !== requestSequence) {
+          return; // A newer keystroke superseded this request.
+        }
+        // Failure containment (YOY-61 AC-4): one slow or failed search
+        // resolves to a quiet no-results state and the widget stays alive
+        // for the next query. Self-removal is reserved for structural
+        // failure — every search failing in a row — preserving YOY-48
+        // AC-2's inert-hands-back-the-input behavior when it does fire.
+        consecutiveFailures += 1;
+        if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
           goInert();
+        } else {
+          overlay.showFailure();
         }
       }
     };

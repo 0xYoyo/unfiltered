@@ -38,6 +38,8 @@ interface SeedProduct {
   priceMin?: number;
   priceMax?: number;
   available?: boolean;
+  /** Shopify product status; defaults to ACTIVE like the schema. */
+  status?: string;
   /** null seeds no enrichment row (an unenriched product). */
   enrichment?: {
     category?: string | null;
@@ -62,6 +64,7 @@ async function seed(db: PrismaClient, products: SeedProduct[]): Promise<void> {
         priceMax: product.priceMax ?? product.priceMin ?? 100,
         currencyCode: "ILS",
         available: product.available ?? true,
+        status: product.status ?? "ACTIVE",
         imageAltTexts: [],
         sourceUpdatedAt: new Date("2026-01-01T00:00:00Z"),
         contentHash: `hash-${product.productId}`,
@@ -127,6 +130,18 @@ describe("hard constraints are filters, never preferences (AC-2)", () => {
 
     const ids = await queryIds(db, { ...noConstraints(), priceMax: 400 });
     expect(ids).toEqual(["affordable-dress"]);
+  });
+
+  it("never returns a non-active product row, even at perfect similarity (YOY-61 AC-3)", async () => {
+    await seed(db, [
+      // Identical to the query vector — but archived/draft: must never serve.
+      { productId: "archived", vector: [1, 0, 0], status: "ARCHIVED" },
+      { productId: "draft", vector: [1, 0, 0], status: "DRAFT" },
+      { productId: "active", vector: [0.6, 0.8, 0] },
+    ]);
+
+    const ids = await queryIds(db, noConstraints());
+    expect(ids).toEqual(["active"]);
   });
 
   it("respects a lower price bound the same way", async () => {

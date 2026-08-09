@@ -15,11 +15,13 @@ or a deployed environment (the CLI tunnels to your machine).
    npm install
    ```
 
-3. Install the Shopify CLI globally (the app template expects it on PATH):
-
-   ```bash
-   npm install -g @shopify/cli@latest
-   ```
+3. The Shopify CLI is a pinned devDependency of the app workspace
+   (`@shopify/cli` in `apps/shopify-app/package.json`) and is installed by
+   the `npm install` above — no global install, no `@latest` drift; version
+   bumps happen via PR. Every CLI-invoking npm script passes `--path .`, so
+   app-directory resolution is explicit. Invoke the CLI through the npm
+   scripts (`npm --workspace app run dev`), or directly as
+   `npm --workspace app exec shopify -- <command> --path apps/shopify-app`.
 
 4. `apps/shopify-app/shopify.web.toml` must exist (it is committed in this
    repository). Without it the CLI treats the repo root as the app root and
@@ -75,6 +77,9 @@ or a deployed environment (the CLI tunnels to your machine).
    psql "$DATABASE_URL" \
      -c 'SELECT id, shop, "isOnline" FROM "Session";'
    ```
+
+   (`psql` optional — `npm --workspace app run prisma -- studio` browses the
+   same `Session` table.)
 
    Expect at least one row with `shop = unfiltered-dev.myshopify.com`.
 

@@ -17,11 +17,22 @@
 const WINDOW_MS = 60_000;
 const DEFAULT_LIMIT = 10;
 
+/**
+ * Calls between opportunistic full-map sweeps (YOY-52 AC-6). Same-session
+ * revisits prune their own entry on every call; the sweep exists for
+ * abandoned shopper-controlled sessionIds that would otherwise accumulate
+ * unboundedly. Amortized: one sweep per SWEEP_EVERY calls keeps the map
+ * proportional to window-active sessions at O(1) average cost per call.
+ */
+const SWEEP_EVERY = 1_000;
+
 export interface SessionThrottle {
   /** True when this session's window budget is already spent. */
   shouldThrottle(sessionId: string): boolean;
   /** Record one LLM-backed (AI-routed) search against the session's window. */
   recordAiSearch(sessionId: string): void;
+  /** Sessions currently held in the map (diagnostic; tests assert the bound). */
+  sessionCount(): number;
 }
 
 export interface SessionThrottleOptions {
@@ -31,6 +42,8 @@ export interface SessionThrottleOptions {
   windowMs?: number;
   /** Clock seam for tests; defaults to Date.now. */
   now?: () => number;
+  /** Calls between opportunistic full sweeps; tests shrink it. */
+  sweepEvery?: number;
 }
 
 export function createSessionThrottle(
@@ -39,7 +52,9 @@ export function createSessionThrottle(
   const limit = options.limit ?? DEFAULT_LIMIT;
   const windowMs = options.windowMs ?? WINDOW_MS;
   const now = options.now ?? Date.now;
+  const sweepEvery = options.sweepEvery ?? SWEEP_EVERY;
   const windows = new Map<string, number[]>();
+  let callsSinceSweep = 0;
 
   function prune(sessionId: string): number[] {
     const cutoff = now() - windowMs;
@@ -55,14 +70,38 @@ export function createSessionThrottle(
     return kept;
   }
 
+  /**
+   * Opportunistic full-map sweep (YOY-52 AC-6): every `sweepEvery` calls,
+   * drop every session whose window slid clear — abandoned sessionIds never
+   * revisit, so per-session pruning alone would leak them forever.
+   */
+  function maybeSweep(): void {
+    callsSinceSweep += 1;
+    if (callsSinceSweep < sweepEvery) {
+      return;
+    }
+    callsSinceSweep = 0;
+    const cutoff = now() - windowMs;
+    for (const [sessionId, timestamps] of windows) {
+      if (!timestamps.some((timestamp) => timestamp > cutoff)) {
+        windows.delete(sessionId);
+      }
+    }
+  }
+
   return {
     shouldThrottle(sessionId: string): boolean {
+      maybeSweep();
       return prune(sessionId).length >= limit;
     },
     recordAiSearch(sessionId: string): void {
+      maybeSweep();
       const kept = prune(sessionId);
       kept.push(now());
       windows.set(sessionId, kept);
+    },
+    sessionCount(): number {
+      return windows.size;
     },
   };
 }

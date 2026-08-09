@@ -8,6 +8,21 @@ import { expect, test, type Page } from "@playwright/test";
 const themeInput = (page: Page) => page.locator('input[type="search"]');
 const overlay = (page: Page) => page.getByTestId("unfiltered-widget-overlay");
 const cards = (page: Page) => page.getByTestId("unfiltered-widget-card");
+const noResults = (page: Page) =>
+  page.getByTestId("unfiltered-widget-no-results");
+
+/**
+ * Run one search that the fixture will fail, deterministically: clearing the
+ * input first resets the overlay to idle (hiding any earlier no-results
+ * message), so the message reappearing proves THIS search's failure was
+ * processed before the caller moves on.
+ */
+async function runFailingSearch(page: Page, query: string): Promise<void> {
+  await themeInput(page).fill("");
+  await expect(noResults(page)).toBeHidden();
+  await themeInput(page).fill(query);
+  await expect(noResults(page)).toBeVisible({ timeout: 5000 });
+}
 
 test("focusing or typing opens the overlay and suppresses native search while open (AC-1)", async ({
   page,
@@ -27,35 +42,70 @@ test("focusing or typing opens the overlay and suppresses native search while op
   await expect(overlay(page)).toBeVisible();
 });
 
-test("a failing search endpoint degrades silently: no error UI, native search restored (AC-2)", async ({
+test("a single failed search resolves to a quiet no-results state and the widget stays alive (YOY-61 AC-4)", async ({
   page,
 }) => {
   await page.goto("/?fixture=error");
 
   await themeInput(page).fill("nike");
-  // The widget removes itself entirely — no overlay, no error message —
-  // and hands the theme back its own placeholder (YOY-50).
+  // One failure never removes the widget: the loading state resolves to the
+  // quiet no-results message, with no error language anywhere.
+  await expect(noResults(page)).toBeVisible();
+  await expect(page.getByTestId("unfiltered-widget-root")).toHaveCount(1);
+  await expect(overlay(page)).toBeVisible();
+});
+
+test("repeated consecutive failures degrade silently: no error UI, native search restored (AC-2, YOY-61 AC-4)", async ({
+  page,
+}) => {
+  await page.goto("/?fixture=error");
+
+  // Three consecutive hard failures are structural: the widget removes
+  // itself entirely — no overlay, no error message — and hands the theme
+  // back its own placeholder (YOY-50).
+  await runFailingSearch(page, "nike");
+  await runFailingSearch(page, "nike two");
+  await themeInput(page).fill("");
+  await themeInput(page).fill("nike three");
   await expect(page.getByTestId("unfiltered-widget-root")).toHaveCount(0);
   await expect(themeInput(page)).toHaveAttribute("placeholder", "Theme search");
 
   // Native search now behaves exactly as without the app.
   await themeInput(page).press("Enter");
   await page.waitForURL(/\/search\?/);
-  expect(new URL(page.url()).searchParams.get("q")).toBe("nike");
+  expect(new URL(page.url()).searchParams.get("q")).toBe("nike three");
 });
 
-test("a timed-out search endpoint degrades the same way (AC-2)", async ({
+test("repeated timed-out searches degrade the same way (AC-2, YOY-61 AC-4)", async ({
   page,
 }) => {
   await page.goto("/?fixture=timeout");
 
-  await themeInput(page).fill("nike");
+  await runFailingSearch(page, "nike");
+  await runFailingSearch(page, "nike two");
+  await themeInput(page).fill("");
+  await themeInput(page).fill("nike three");
   await expect(page.getByTestId("unfiltered-widget-root")).toHaveCount(0, {
     timeout: 5000,
   });
 
   await themeInput(page).press("Enter");
   await page.waitForURL(/\/search\?/);
+});
+
+test("an over-timeout search leaves the widget functional for the next query (YOY-61 AC-4)", async ({
+  page,
+}) => {
+  await page.goto("/?fixture=slow-then-fast");
+
+  // First search outlives the timeout override: quiet fallback, no removal.
+  await runFailingSearch(page, "nike");
+  await expect(page.getByTestId("unfiltered-widget-root")).toHaveCount(1);
+
+  // The next search runs normally and renders cards.
+  await themeInput(page).fill("nike again");
+  await expect(cards(page).first()).toBeVisible();
+  await expect(noResults(page)).toBeHidden();
 });
 
 test("the magnifier fires an immediate search, skipping the debounce, without navigating (YOY-52 AC-14)", async ({

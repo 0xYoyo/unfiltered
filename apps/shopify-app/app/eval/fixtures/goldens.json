@@ -521,5 +521,64 @@
       "occasion": null,
       "availabilityRequired": false
     }
+  },
+  {
+    "id": "g21",
+    "language": "he",
+    "query": "שמלה שחורה",
+    "expectedProductIds": [
+      "p02",
+      "p03"
+    ],
+    "hardConstraints": {
+      "category": "dress",
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [
+        "black"
+      ],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "g22",
+    "language": "en",
+    "query": "black dress",
+    "expectedProductIds": [
+      "p02",
+      "p03"
+    ],
+    "hardConstraints": {
+      "category": "dress",
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [
+        "black"
+      ],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "g23",
+    "language": "he",
+    "query": "שמלה שחורה מתחת ל-400",
+    "expectedProductIds": [
+      "p03"
+    ],
+    "hardConstraints": {
+      "category": "dress",
+      "priceMin": null,
+      "priceMax": 400,
+      "colorsInclude": [
+        "black"
+      ],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    }
   }
 ]

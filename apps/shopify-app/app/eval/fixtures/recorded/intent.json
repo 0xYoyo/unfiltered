@@ -1,5 +1,6 @@
 {
   "modelId": "gemini-3.6-flash",
+  "provenance": "synthesized",
   "entries": {
     "elegant summer wedding dress, not black, under 400": {
       "output": {
@@ -390,6 +391,60 @@
       },
       "inputTokens": 395,
       "outputTokens": 48
+    },
+    "שמלה שחורה": {
+      "output": {
+        "colorsInclude": [
+          "black"
+        ],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [],
+        "category": "dress",
+        "currency": null,
+        "occasion": null,
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 390,
+      "outputTokens": 60
+    },
+    "black dress": {
+      "output": {
+        "colorsInclude": [
+          "black"
+        ],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [],
+        "category": "dress",
+        "currency": null,
+        "occasion": null,
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 390,
+      "outputTokens": 60
+    },
+    "שמלה שחורה מתחת ל-400": {
+      "output": {
+        "colorsInclude": [
+          "black"
+        ],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [],
+        "category": "dress",
+        "currency": null,
+        "occasion": null,
+        "priceMax": 400,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 390,
+      "outputTokens": 60
     }
   }
 }

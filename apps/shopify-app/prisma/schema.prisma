@@ -46,6 +46,11 @@ model CatalogProduct {
   priceMax        Float
   currencyCode    String
   available       Boolean
+  // Shopify product status (YOY-61 AC-3). Ingestion and webhook sync only
+  // ever write ACTIVE products, so this stays "ACTIVE" in practice; both
+  // search stores still filter on it as defense in depth — a non-active row
+  // that reaches the table by any other path must never be served.
+  status          String   @default("ACTIVE")
   imageAltTexts   String[]
   // Display-only snapshot fields (YOY-44): storefront handle and featured
   // image for result cards. Deliberately OUTSIDE contentHash — a change here

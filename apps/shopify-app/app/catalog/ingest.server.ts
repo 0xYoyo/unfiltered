@@ -43,6 +43,7 @@ export const PRODUCTS_QUERY = `#graphql
         tags
         vendor
         productType
+        status
         updatedAt
         priceRangeV2 {
           minVariantPrice { amount currencyCode }
@@ -103,8 +104,12 @@ async function fetchAllProducts(graphql: AdminGraphql): Promise<ShopifyProductNo
 /**
  * Snapshot one shop's full catalog into CatalogProduct rows. Idempotent by
  * content hash: unchanged products are untouched, changed ones updated,
- * products gone from Shopify are deleted from the snapshot. All writes are
- * scoped to `shopDomain`; other shops' rows are never read or modified.
+ * products gone from Shopify are deleted from the snapshot. Only ACTIVE
+ * products are indexed (YOY-61 AC-2): archived and draft products are
+ * excluded from the snapshot, so any previously ingested non-active rows
+ * fall into the stale set below and are deleted — a shopper must never see
+ * a product whose storefront page is a 404. All writes are scoped to
+ * `shopDomain`; other shops' rows are never read or modified.
  */
 export async function ingestCatalog({
   db,
@@ -115,7 +120,9 @@ export async function ingestCatalog({
   shopDomain: string;
   graphql: AdminGraphql;
 }): Promise<IngestResult> {
-  const snapshot = (await fetchAllProducts(graphql)).map(mapProductNode);
+  const snapshot = (await fetchAllProducts(graphql))
+    .filter((node) => node.status === undefined || node.status === "ACTIVE")
+    .map(mapProductNode);
 
   const existing = await db.catalogProduct.findMany({
     where: { shopDomain },
@@ -172,10 +179,15 @@ export async function ingestCatalog({
     .map((row) => row.productId)
     .filter((productId) => !seen.has(productId));
   if (stale.length > 0) {
-    // Enrichment rows are keyed by shopDomain+productId with no FK cascade,
-    // so they must go in the same operation as the product (YOY-29 AC-5).
-    const [, { count }] = await db.$transaction([
+    // Enrichment and embedding rows are keyed by shopDomain+productId with no
+    // FK cascade, so they must go in the same operation as the product
+    // (YOY-29 AC-5, YOY-61 AC-2 — a leftover embedding row would keep a
+    // deleted or non-active product retrievable).
+    const [, , { count }] = await db.$transaction([
       db.productEnrichment.deleteMany({
+        where: { shopDomain, productId: { in: stale } },
+      }),
+      db.productEmbedding.deleteMany({
         where: { shopDomain, productId: { in: stale } },
       }),
       db.catalogProduct.deleteMany({
