@@ -128,6 +128,22 @@
         intent: AI_INTENT,
       };
 
+      // Localization fixture (YOY-50 AC-4): every chip field the display
+      // maps cover, plus a color outside the canonical list ("chartreuse")
+      // that must render exactly as extracted.
+      const AI_LOCALIZED_RESPONSE = {
+        ...AI_RESPONSE,
+        searchId: "harness-ai-localized-1",
+        chips: [
+          { field: "category", value: "dress" },
+          { field: "priceMax", value: "400" },
+          { field: "colorsExclude", value: "black" },
+          { field: "colorsInclude", value: "chartreuse" },
+          { field: "occasion", value: "evening" },
+          { field: "availability", value: "true" },
+        ],
+      };
+
       const AI_ZERO_HIT_RESPONSE = {
         ...AI_RESPONSE,
         searchId: "harness-ai-zero-1",
@@ -212,6 +228,8 @@
             body = chipRemovalResponse(request);
           } else if (fixture === "ai" || fixture === "ai-delayed") {
             body = AI_RESPONSE;
+          } else if (fixture === "ai-localized") {
+            body = AI_LOCALIZED_RESPONSE;
           } else if (fixture === "ai-zero-hit") {
             body = AI_ZERO_HIT_RESPONSE;
           } else if (fixture === "degraded") {

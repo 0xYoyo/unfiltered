@@ -4,6 +4,7 @@ import type {
   ProxyResult,
   ProxySearchResponse,
 } from "./search-client";
+import { getStrings, resolveLocale } from "./strings";
 import styles from "./widget.css?inline";
 
 /**
@@ -58,10 +59,17 @@ export interface OverlayOptions {
 }
 
 export function createOverlay(options: OverlayOptions): Overlay {
+  const locale = resolveLocale(options.locale);
+  const strings = getStrings(options.locale);
+
   const host = document.createElement("div");
   host.setAttribute("data-testid", ROOT_TESTID);
   host.setAttribute("data-locale", options.locale);
   host.setAttribute("data-shop-domain", options.shopDomain);
+  // Hebrew chrome mirrors the whole overlay (YOY-50 AC-3): dir on the root
+  // flips every logical property in widget.css, so the chip row, grid,
+  // controls, and text alignment flow right-to-left with no RTL stylesheet.
+  host.setAttribute("dir", locale === "he" ? "rtl" : "ltr");
   // Inline display guard: broad host rules like `div { display: none }`
   // must not be able to hide the widget's mount point (AC-7).
   host.style.display = "block";
@@ -76,7 +84,7 @@ export function createOverlay(options: OverlayOptions): Overlay {
   overlay.className = "overlay";
   overlay.setAttribute("data-testid", OVERLAY_TESTID);
   overlay.setAttribute("role", "dialog");
-  overlay.setAttribute("aria-label", "Search results");
+  overlay.setAttribute("aria-label", strings.searchResults);
   overlay.hidden = true;
 
   const bar = document.createElement("div");
@@ -85,13 +93,13 @@ export function createOverlay(options: OverlayOptions): Overlay {
   newSearch.type = "button";
   newSearch.className = "new-search";
   newSearch.setAttribute("data-testid", NEW_SEARCH_TESTID);
-  newSearch.textContent = "New search";
+  newSearch.textContent = strings.newSearch;
   newSearch.addEventListener("click", () => options.onNewSearch());
   const close = document.createElement("button");
   close.type = "button";
   close.className = "close";
   close.setAttribute("data-testid", CLOSE_TESTID);
-  close.setAttribute("aria-label", "Close search");
+  close.setAttribute("aria-label", strings.closeSearch);
   close.textContent = "×";
   close.addEventListener("click", () => options.onClose());
   bar.append(newSearch, close);
@@ -100,25 +108,25 @@ export function createOverlay(options: OverlayOptions): Overlay {
   chipsRow.className = "chips";
   chipsRow.setAttribute("data-testid", CHIPS_TESTID);
   chipsRow.setAttribute("role", "list");
-  chipsRow.setAttribute("aria-label", "Applied filters");
+  chipsRow.setAttribute("aria-label", strings.appliedFilters);
   chipsRow.hidden = true;
 
   const loading = document.createElement("div");
   loading.className = "status";
   loading.setAttribute("data-testid", LOADING_TESTID);
-  loading.textContent = "Searching…";
+  loading.textContent = strings.loading;
   loading.hidden = true;
 
   const noResults = document.createElement("div");
   noResults.className = "status";
   noResults.setAttribute("data-testid", NO_RESULTS_TESTID);
-  noResults.textContent = "No results";
+  noResults.textContent = strings.noResults;
   noResults.hidden = true;
 
   const zeroHit = document.createElement("div");
   zeroHit.className = "status";
   zeroHit.setAttribute("data-testid", ZERO_HIT_TESTID);
-  zeroHit.textContent = "Nothing matches all of these";
+  zeroHit.textContent = strings.zeroHit;
   zeroHit.hidden = true;
 
   const grid = document.createElement("div");
@@ -131,7 +139,7 @@ export function createOverlay(options: OverlayOptions): Overlay {
   closeMatches.hidden = true;
   const closeMatchesHeading = document.createElement("h2");
   closeMatchesHeading.className = "close-matches-heading";
-  closeMatchesHeading.textContent = "Close matches";
+  closeMatchesHeading.textContent = strings.closeMatchesHeading;
   const closeMatchesGrid = document.createElement("div");
   closeMatchesGrid.className = "grid";
   closeMatches.append(closeMatchesHeading, closeMatchesGrid);
@@ -164,13 +172,18 @@ export function createOverlay(options: OverlayOptions): Overlay {
       anchor.appendChild(image);
     }
 
+    // dir="auto" isolates each title and price bidi-wise (AC-3): Latin
+    // product text inside an RTL overlay keeps its own direction and stays
+    // readable, and vice versa in LTR chrome.
     const title = document.createElement("div");
     title.className = "card-title";
+    title.dir = "auto";
     title.textContent = result.title;
     anchor.appendChild(title);
 
     const price = document.createElement("div");
     price.className = "card-price";
+    price.dir = "auto";
     price.textContent = formatPrice(
       result.priceMin,
       result.priceMax,
@@ -181,7 +194,7 @@ export function createOverlay(options: OverlayOptions): Overlay {
     if (!result.available) {
       const soldOut = document.createElement("span");
       soldOut.className = "card-sold-out";
-      soldOut.textContent = "Sold out";
+      soldOut.textContent = strings.soldOut;
       anchor.appendChild(soldOut);
     }
 
@@ -193,9 +206,10 @@ export function createOverlay(options: OverlayOptions): Overlay {
 
   function chipElement(
     chip: ProxyChip,
+    currency: string | undefined,
     onChipRemove: ResponseHandlers["onChipRemove"],
   ): HTMLElement {
-    const label = chipLabel(chip);
+    const label = chipLabel(chip, { locale, currency });
     const button = document.createElement("button");
     button.type = "button";
     button.className = "chip";
@@ -203,7 +217,10 @@ export function createOverlay(options: OverlayOptions): Overlay {
     button.setAttribute("data-chip-field", chip.field);
     button.setAttribute("data-chip-value", chip.value);
     button.setAttribute("role", "listitem");
-    button.setAttribute("aria-label", `Remove filter: ${label}`);
+    button.setAttribute(
+      "aria-label",
+      strings.removeFilter.replace("{label}", label),
+    );
 
     const text = document.createElement("span");
     text.textContent = label;
@@ -250,8 +267,18 @@ export function createOverlay(options: OverlayOptions): Overlay {
       // carry no chips by the endpoint contract (AC-6), so this hides the
       // row for them naturally.
       const chips = response.route === "ai" ? response.chips : [];
+      // Hebrew price chips carry the currency (YOY-50 AC-4), read from the
+      // response's echoed intent — display-only; the intent itself still
+      // round-trips verbatim.
+      const currency =
+        response.intent !== null &&
+        typeof response.intent["currency"] === "string"
+          ? response.intent["currency"]
+          : undefined;
       chipsRow.replaceChildren(
-        ...chips.map((chip) => chipElement(chip, handlers.onChipRemove)),
+        ...chips.map((chip) =>
+          chipElement(chip, currency, handlers.onChipRemove),
+        ),
       );
       chipsRow.hidden = chips.length === 0;
 

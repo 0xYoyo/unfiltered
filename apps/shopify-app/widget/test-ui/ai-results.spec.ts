@@ -3,7 +3,9 @@ import { expect, test, type Page } from "@playwright/test";
 // AI results with chips, zero-hit state, and the refinement flow (YOY-49),
 // driven against the harness AI fixtures.
 
-const themeInput = (page: Page) => page.getByPlaceholder("Theme search");
+// The widget owns the input's placeholder while active (YOY-50 AC-1), so
+// tests locate the theme input structurally rather than by placeholder.
+const themeInput = (page: Page) => page.locator('input[type="search"]');
 const chips = (page: Page) => page.getByTestId("unfiltered-widget-chip");
 const cards = (page: Page) => page.getByTestId("unfiltered-widget-card");
 
