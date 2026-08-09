@@ -12,6 +12,11 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? "github" : "list",
+  expect: {
+    // Visual baselines (YOY-50 AC-5): absorb sub-perceptual antialiasing
+    // jitter between runs; a mirrored or restrung overlay still fails.
+    toHaveScreenshot: { maxDiffPixelRatio: 0.01 },
+  },
   use: {
     baseURL: "http://127.0.0.1:4173",
     trace: "on-first-retry",

@@ -3,7 +3,9 @@ import { expect, test, type Page } from "@playwright/test";
 // Theme search takeover + instant classic results (YOY-48), driven against
 // the harness fixtures. Each AC's verify steps live here as assertions.
 
-const themeInput = (page: Page) => page.getByPlaceholder("Theme search");
+// The widget owns the input's placeholder while active (YOY-50 AC-1), so
+// tests locate the theme input structurally rather than by placeholder.
+const themeInput = (page: Page) => page.locator('input[type="search"]');
 const overlay = (page: Page) => page.getByTestId("unfiltered-widget-overlay");
 const cards = (page: Page) => page.getByTestId("unfiltered-widget-card");
 
@@ -31,8 +33,10 @@ test("a failing search endpoint degrades silently: no error UI, native search re
   await page.goto("/?fixture=error");
 
   await themeInput(page).fill("nike");
-  // The widget removes itself entirely — no overlay, no error message.
+  // The widget removes itself entirely — no overlay, no error message —
+  // and hands the theme back its own placeholder (YOY-50).
   await expect(page.getByTestId("unfiltered-widget-root")).toHaveCount(0);
+  await expect(themeInput(page)).toHaveAttribute("placeholder", "Theme search");
 
   // Native search now behaves exactly as without the app.
   await themeInput(page).press("Enter");

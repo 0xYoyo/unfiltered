@@ -6,6 +6,7 @@ import {
   type SearchRequestContext,
 } from "./search-client";
 import { getSessionId } from "./session";
+import { getStrings } from "./strings";
 
 export { ROOT_TESTID };
 
@@ -78,6 +79,14 @@ export function init(config: WidgetConfig): void {
     }
     const input: HTMLInputElement = foundInput;
 
+    // The input placeholder is widget chrome (YOY-50 AC-1/AC-2): the
+    // catalog owns it in both locales while the widget is active. Going
+    // inert restores the theme's own placeholder — the page must end
+    // exactly as without the app (YOY-48 AC-2).
+    const strings = getStrings(config.locale);
+    const themePlaceholder = input.placeholder;
+    input.placeholder = strings.inputPlaceholder;
+
     const client = createSearchClient({
       basePath: config.proxyBasePath,
       timeoutMs: config.searchTimeoutMs,
@@ -114,6 +123,7 @@ export function init(config: WidgetConfig): void {
     const goInert = (): void => {
       inert = true;
       window.clearTimeout(debounceTimer);
+      input.placeholder = themePlaceholder;
       overlay.destroy();
     };
 
