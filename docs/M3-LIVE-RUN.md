@@ -44,8 +44,19 @@ Conventions used below:
 - `TUNNEL_HOST` is the `*.trycloudflare.com` (or similar) host printed by
   `shopify app dev`.
 - Database snippets use `psql` with the Neon `DATABASE_URL` from
-  `apps/shopify-app/.env`. If you prefer a UI over `psql`, `npm --workspace
-  app run prisma -- studio` browses the same tables.
+  `apps/shopify-app/.env`. `psql` is NOT required: the committed
+  Prisma-based evidence script reads the same rows —
+  from `apps/shopify-app`, after `set -a && source .env && set +a`:
+
+  ```bash
+  npx tsx scripts/evidence.mts counts             # index size (step 7)
+  npx tsx scripts/evidence.mts searches 5         # SearchEvent log (Part 3)
+  npx tsx scripts/evidence.mts costs SEARCH_ID    # AiCall rows per search
+  npx tsx scripts/evidence.mts clicks 5           # ClickEvent log (step 15)
+  ```
+
+  If you prefer a UI, `npm --workspace app run prisma -- studio` browses
+  the same tables.
 
 ## Part 1 — Deploy the extension and enable the embed
 
@@ -59,6 +70,12 @@ Conventions used below:
 
    **Expected outcome:** `npm install` completes; the three variables are
    present in `apps/shopify-app/.env` (which is gitignored — never commit it).
+
+   Before Part 2, open the embedded app once — dev-store admin → Apps →
+   unfiltered. The offline `Session` access token goes stale across
+   multi-day gaps and only an embedded-app load refreshes it (hit live on
+   2026-08-09); skipping this leaves Part 2's Admin API calls failing with
+   auth errors until the app is opened.
 
 2. Start the dev server and tunnel:
 
