@@ -298,28 +298,32 @@ Copy this section into the PR (or fill it in place on the runbook branch)
 when executing the run. The issue (YOY-51) is complete only when a passing
 run is recorded here.
 
-- **Date:**
-- **Executed by:**
-- **Tunnel host:**
-- **Dev-catalog size (products):**
-- **One-time indexing cost (from `/internal/costs`):**
+- **Date:** 2026-08-09
+- **Executed by:** Yoyo (Parts 1–2, steps 9, 10, 15); steps 11–18 agent-executed
+- **Tunnel host:** repeated-ensures-plaza-arrange.trycloudflare.com (run 1; each restart mints a new tunnel — step 16 ran on sentence-radio-curious-ict, step 17 on section-disclaimers-fireplace-web)
+- **Dev-catalog size (products):** 18
+- **One-time indexing cost (from `/internal/costs`):** $0.004396
+
+_Steps 11–18 were agent-executed under user supervision after in-run defects made continued manual execution unproductive; all evidence is from the live dev store._
 
 | # | Scenario | Result | Evidence (paste rows / observations) |
 |---|---|---|---|
-| 2–3 | Dev server + `/healthz` 0.4.0 | ☐ PASS / ☐ FAIL | |
-| 4 | App embed enabled, widget mounts | ☐ PASS / ☐ FAIL | |
-| 6–7 | Ingest / enrich / embed counts equal, failed = 0 | ☐ PASS / ☐ FAIL | |
-| 9 | EN classic query | ☐ PASS / ☐ FAIL | |
-| 10 | EN typo query | ☐ PASS / ☐ FAIL | |
-| 11 | Hebrew AI query — chips, RTL, `AiCall` rows | ☐ PASS / ☐ FAIL | |
-| 12 | Chip removal — no intent/classification calls | ☐ PASS / ☐ FAIL | |
-| 13 | Refinement — previousIntent honored | ☐ PASS / ☐ FAIL | |
-| 14 | AI zero-hit — message + chips + close matches | ☐ PASS / ☐ FAIL | |
-| 15 | Click beacon — `ClickEvent` row | ☐ PASS / ☐ FAIL | |
-| 16 | Forced fallback — silent classic, degraded log | ☐ PASS / ☐ FAIL | |
-| 17 | Throttle — 4th search degraded, window clears | ☐ PASS / ☐ FAIL | |
-| 18 | Clean `git status` after the run | ☐ PASS / ☐ FAIL | |
+| 2–3 | Dev server + `/healthz` 0.4.0 | PASS | `{"status":"ok","engine":{"version":"0.4.0",...}}` on the tunnel host; proxy `Using URL` ends in `/apps/unfiltered`. (Start required `--path .` — see YOY-52 AC-8.) |
+| 4 | App embed enabled, widget mounts | PASS | Embed toggled on and saved; `unfiltered-widget.js` loads; focusing the theme search input opens the shadow-DOM overlay. |
+| 6–7 | Ingest / enrich / embed counts equal, failed = 0 | PASS | `ingest/enrich/embed` = 18/18/18, `failed: 0`; counts query returned products=18, enriched=18, embedded=18; `/internal/costs` renders the AiCall ledger, one-time cost $0.004396. |
+| 9 | EN classic query | PASS | `snowboard` → overlay cards, no chip row; `route=classic degraded=f resultCount>0`, zero AiCall rows. |
+| 10 | EN typo query | PASS | `snobroad` → intended snowboards still appear via pg_trgm; `route=classic results=10` (searchId `d1bd4c0d…`). Finding: "Gift Card" ranked #1 above actual boards → YOY-52 AC-13. Result set also exposed draft/archived products → YOY-61 (2). |
+| 11 | Hebrew AI query — chips, RTL, `AiCall` rows | FAIL | (a) Digit-bearing runbook query shape misroutes to classic — YOY-61 (1). Digit-free 2-word `סנובורד כחול` ALSO heuristic-routes classic: `route=classic degraded=f results=0`, zero AiCalls (searchIds `fba7934a…`, `b4d2aa60…`) — misroute is not digit-only. (b) Digit-free constraint-rich `סנובורד כחול מתחת למאתיים` routed ai server-side (searchId `9c0a4875…`, 9853ms, classification+intent+embedding AiCalls) but the widget aborts searches at its 5s client timeout (`search-client.ts DEFAULT_TIMEOUT_MS`) and went permanently inert (`goInert` self-removal) — at current live AI latency (YOY-52 AC-12) no AI response can ever render. Chips evidence was collected under a labeled client-side `searchTimeoutMs=30000` override: `route=ai degraded=f results=1 latency=24477ms` (searchId `8487feaa…`), Hebrew RTL chrome (`dir="rtl"`, `docLang=he`), chips rendered: `עד 200` (priceMax=200) + `כחול` (colorsInclude=blue). |
+| 12 | Chip removal — no intent/classification calls | PASS | Clicked the color chip's ×: chip gone, `עד 200` retained, results 1→3. New SearchEvent `58f2c2d5…` `route=ai degraded=f results=3 latency=1056ms`, AiCalls = embedding only ($3e-7) — no intent/classification. (Run under the step-11 timeout override.) |
+| 13 | Refinement — previousIntent honored | FAIL | `אותו דבר אבל יותר זול` (digit-free) → `route=ai results=3 latency=18267ms` (searchId `6d7848c5…`, classification+intent+embedding). previousIntent honored: the price-free follow-up echoed the held `priceMax=200` chip. But the bound was NOT tightened (200 → 200; result set unchanged) — the "tightened price bound" expectation failed. |
+| 14 | AI zero-hit — message + chips + close matches | FAIL | `שמלת כלה ורודה` (digit-free) → zero-hit message shown ("שום פריט לא מתאים לכל הסינונים"), removable chips rendered (`שמלה`/`ורוד`/`חתונה`), `route=ai results=0 latency=16091ms` (searchId `f40cb940…`, intent AiCalls present). Close-matches section stayed empty/hidden: classic keyword backfill returns 0 for Hebrew text against the EN catalog (same gap YOY-61 (1) records), so the close-matches expectation failed. |
+| 15 | Click beacon — `ClickEvent` row | PASS | ClickEvent written for searchId `d1bd4c0d…`, product `gid://shopify/Product/8029965779019`, position 4. Finding: the clicked product was "The Archived Snowboard" and navigation landed on a storefront 404 — archived/draft products indexed and served, filed as YOY-61 (2). |
+| 16 | Forced fallback — silent classic, degraded log | PASS | Restarted with `GEMINI_API_KEY=invalid-key-m3-test` as an env-var prefix (`.env` untouched). AI-shaped query `סנובורד כחול מתחת למאתיים` → no chips, no error UI, widget stays live; SearchEvent `26d57fa6…` `route=classic degraded=t latency=642ms`, zero AiCall rows. (resultCount=0 is the known Hebrew-vs-EN-catalog classic gap, not error UI.) |
+| 17 | Throttle — 4th search degraded, window clears | PASS | Restarted with `SEARCH_AI_THROTTLE_PER_MINUTE=3`, one browser session, four digit-free Hebrew AI queries (כחול/אדום/שחור/ירוק) completing 18:06:19–18:06:47Z: q1 `bd13605a…` ai, q2 `8dd2dff0…` ai, q3 `47fb5b98…` ai (all chips rendered), q4 `43357016…` `route=classic degraded=t results=0 latency=378ms`, **zero** AiCall rows. After 65s idle, q5 `סנובורד סגול מתחת למאתיים` → `1bca4c31…` `route=ai` with chips (window cleared). |
+| 18 | Clean `git status` after the run | PASS | Dev server stopped (throttle override not left running), no background processes. Deleted throwaway `m3-evidence.mts` (and the leftover Part-2 `m3-index.mts`); restored the dev-CLI's uncommitted `uid` addition to `shopify.extension.toml`. `git status --porcelain` empty. |
 
 **Findings filed (defects observed during the run, as Linear issues):**
 
-- _none / YOY-NNN …_
+- YOY-60 — shop-domain proxy edge 400s browser POSTs; fixed in-run (GET transport + remainder paths + `--path` proxy URL), PRs #40/#41, Done.
+- YOY-61 — (1) NL queries misroute to classic (digit-bearing per the filed evidence; this run adds that a digit-free 2-word Hebrew query misroutes too) and (2) archived/draft products indexed and served (404 on click). Open, Urgent.
+- YOY-52 ACs 8–14 — appended from this run: CLI `--path` pinning + doc reality (AC-8), proxy `Cache-Control: no-store` (AC-9), duplicate-`shop`-param probe (AC-10), extension `locales/` ENOENT noise (AC-11), live AI latency 8–24s vs <2s target (AC-12 — this run adds: the widget's 5s client abort turns that latency into permanent widget self-removal on every AI search), classic ranking title-dominance / Gift-Card-first (AC-13), magnifier no-op while overlay open (AC-14).
