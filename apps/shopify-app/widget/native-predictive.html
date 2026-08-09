@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Unfiltered widget harness — native predictive search</title>
+    <style>
+      .predictive-search__results {
+        position: absolute;
+        background: #111;
+        color: #fff;
+        padding: 1rem;
+        min-width: 20rem;
+      }
+      .predictive-search__results[hidden] {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Real-theme search markup (YOY-60 AC-4): the dev store's theme wraps
+         its search form in a predictive-search custom element that listens
+         DIRECTLY on the input — 'input' renders a SUGGESTIONS dropdown over
+         anything below it, 'focus' reopens it, and Enter navigates to the
+         theme's /search results page by script as well as by form submit.
+         The M3 live run proved the widget suppressed none of it; this
+         fixture pins the suppression in CI. -->
+    <header>
+      <h1>Native predictive store</h1>
+      <predictive-search>
+        <form action="/search" method="get" role="search">
+          <input
+            type="search"
+            name="q"
+            placeholder="Theme search"
+            autocomplete="off"
+          />
+          <button type="submit" aria-label="Search">🔍</button>
+        </form>
+        <div
+          class="predictive-search__results"
+          data-testid="native-predictive-results"
+          hidden
+        ></div>
+      </predictive-search>
+    </header>
+    <main>
+      <p>Fake product grid placeholder.</p>
+    </main>
+    <script>
+      // The theme's own component, registered and bound BEFORE the widget
+      // initializes — adversarial ordering: the widget may not rely on
+      // winning a race to attach listeners first.
+      class PredictiveSearch extends HTMLElement {
+        connectedCallback() {
+          this.input = this.querySelector('input[type="search"]');
+          this.results = this.querySelector("[data-testid]");
+          this.input.addEventListener("input", () => this.render());
+          this.input.addEventListener("focus", () => this.render());
+          this.input.addEventListener("keydown", (event) => {
+            if (event.key === "Enter") {
+              // Some themes navigate by script rather than form submit.
+              window.location.assign(
+                "/search?q=" + encodeURIComponent(this.input.value),
+              );
+            }
+          });
+        }
+        render() {
+          if (this.input.value === "") {
+            this.results.hidden = true;
+            return;
+          }
+          this.results.textContent =
+            "SUGGESTIONS: " + this.input.value + " · stock · price";
+          this.results.hidden = false;
+        }
+      }
+      customElements.define("predictive-search", PredictiveSearch);
+    </script>
+    <script type="module">
+      import { init } from "/src/main.ts";
+
+      // Contract-shaped stub endpoints, GET transport (YOY-60), matching
+      // index.html's stub shape; `?fixture=error` drives the widget inert
+      // so the test can prove native predictive search comes back.
+      const params = new URLSearchParams(window.location.search);
+      const fixture = params.get("fixture") ?? "results";
+
+      const realFetch = window.fetch.bind(window);
+      window.fetch = (input, requestInit) => {
+        const url = typeof input === "string" ? input : input.url;
+        if (url.startsWith("/apps/unfiltered/search")) {
+          if (fixture === "error") {
+            return Promise.resolve(new Response(null, { status: 500 }));
+          }
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                searchId: "native-predictive-search-1",
+                route: "classic",
+                degraded: false,
+                results: [
+                  {
+                    productId: "gid://shopify/Product/1",
+                    title: "Nike Air 90",
+                    handle: "nike-air-90",
+                    imageUrl: null,
+                    priceMin: 100,
+                    priceMax: 100,
+                    currencyCode: "ILS",
+                    available: true,
+                  },
+                ],
+                chips: [],
+                intent: null,
+              }),
+              { headers: { "Content-Type": "application/json" } },
+            ),
+          );
+        }
+        if (url.startsWith("/apps/unfiltered/click")) {
+          return Promise.resolve(new Response(null, { status: 204 }));
+        }
+        return realFetch(input, requestInit);
+      };
+
+      init({
+        locale: params.get("locale") ?? "en",
+        shopDomain: "harness.myshopify.com",
+        debounceMs: 50,
+      });
+    </script>
+  </body>
+</html>

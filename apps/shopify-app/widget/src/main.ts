@@ -205,20 +205,93 @@ export function init(config: WidgetConfig): void {
       }, debounceMs);
     };
 
-    input.addEventListener("focus", () => {
-      if (!inert) {
+    // Native predictive-search suppression (YOY-60 AC-3): themes attach
+    // their predictive-search listeners directly to this input (or its
+    // ancestors), rendering a native suggestions dropdown over our overlay
+    // and navigating to /search on Enter. While the widget owns the input,
+    // its handling runs from document-level CAPTURE listeners that stop
+    // propagation before the theme's listeners ever fire — target-phase
+    // and bubble listeners included. Once inert, every handler returns
+    // without touching the event, restoring native behavior untouched
+    // (YOY-48 AC-2).
+    // `focus` does not bubble but capture still descends to the target, so
+    // this shields listeners attached directly to the input; the `focusin`
+    // twin shields delegated ancestor listeners.
+    document.addEventListener(
+      "focus",
+      (event) => {
+        if (inert || event.target !== input) {
+          return;
+        }
+        event.stopPropagation();
         overlay.open();
-      }
-    });
-    input.addEventListener("input", onType);
+      },
+      true,
+    );
+    document.addEventListener(
+      "focusin",
+      (event) => {
+        if (inert || event.target !== input) {
+          return;
+        }
+        event.stopPropagation();
+      },
+      true,
+    );
 
-    // Suppress the theme's native search navigation only while the overlay
-    // is open (AC-1); once inert or closed, Enter submits natively (AC-2).
-    input.form?.addEventListener("submit", (event) => {
-      if (!inert && overlay.isOpen()) {
-        event.preventDefault();
-      }
-    });
+    document.addEventListener(
+      "input",
+      (event) => {
+        if (inert || event.target !== input) {
+          return;
+        }
+        event.stopPropagation();
+        onType();
+      },
+      true,
+    );
+
+    // Enter must neither submit the theme's form nor feed a theme keydown
+    // listener that navigates to /search itself, while the overlay is open
+    // (AC-1/YOY-60 AC-3); once inert or closed, Enter submits natively.
+    document.addEventListener(
+      "keydown",
+      (event) => {
+        if (inert || event.target !== input) {
+          return;
+        }
+        event.stopPropagation();
+        if (event.key === "Enter" && overlay.isOpen()) {
+          event.preventDefault();
+        }
+        if (event.key === "Escape" && overlay.isOpen()) {
+          // Mirrors the document-level Escape handler below, which this
+          // stopPropagation would otherwise starve while the input has
+          // focus: preventDefault stops the browser clearing a
+          // type="search" input (AC-6).
+          event.preventDefault();
+          overlay.close();
+        }
+      },
+      true,
+    );
+
+    // The magnifier is a submit button: suppress the form's native
+    // navigation to /search while the overlay is open, wherever the
+    // submit originates.
+    document.addEventListener(
+      "submit",
+      (event) => {
+        if (inert || input.form === null || event.target !== input.form) {
+          return;
+        }
+        if (overlay.isOpen()) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+      },
+      true,
+    );
 
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape" && !inert && overlay.isOpen()) {

@@ -15,6 +15,29 @@ manual: follow the numbered steps in order and fill the evidence template at
 the end. Defects found along the way are filed as Linear findings, not fixed
 in this document's PR.
 
+## Known proxy-edge constraint (YOY-60)
+
+The first execution of this run (2026-08-09) found Shopify's shop-domain
+app-proxy edge rejecting every proxy **POST that carries an `Origin` header**
+with a bodied 400 before forwarding — and browsers attach `Origin` to every
+fetch POST, so no browser POST can ride the proxy at all (header bisection:
+`Origin` alone flips forwarded→rejected; GET with `Origin` forwards fine).
+This was observed on the password-protected dev store; whether an unlocked
+production store behaves the same is unproven, so the widget does not bet on
+it: **both the search request and the click beacon ride GET with query
+parameters** (`widget/src/search-client.ts`), which forwards in every
+observed case. Two related mappings to know when probing:
+
+- Shopify forwards `/apps/unfiltered/*` to `app_proxy.url` + the path
+  **remainder** — and the dev CLI pushes the bare tunnel root as the proxy
+  URL, so in dev the forwarded paths are `{tunnel}/search` and
+  `{tunnel}/click`. The app serves those remainder paths (and the full
+  `/apps/unfiltered/*` paths) with identical signed handlers.
+- The theme's native predictive search is suppressed by the widget while it
+  owns the input (capture-phase interception); if a native SUGGESTIONS
+  dropdown appears over the overlay, the widget is not mounted or has gone
+  inert.
+
 Conventions used below:
 
 - Run every command from the **repo root** unless a step says otherwise.

@@ -2,6 +2,13 @@
  * Client for the app-proxy endpoints (YOY-46 contract, consumed here per
  * YOY-48 NG-3: no server changes, the widget speaks the existing contract).
  * Same-origin by construction — the proxy lives on the shop domain.
+ *
+ * Transport is GET with query parameters (YOY-60 AC-1): Shopify's
+ * shop-domain app-proxy edge rejects any proxy POST carrying an `Origin`
+ * header with a bodied 400 before forwarding, and browsers attach `Origin`
+ * to every fetch POST — so no browser POST can ride the proxy. GET with the
+ * same `Origin` header forwards fine (header-bisection evidence on the
+ * YOY-60 issue), so both the search request and the click beacon ride GET.
  */
 
 /** One result card as the proxy serves it. */
@@ -65,6 +72,44 @@ export interface SearchClientOptions {
 const DEFAULT_BASE_PATH = "/apps/unfiltered";
 const DEFAULT_TIMEOUT_MS = 5000;
 
+/**
+ * Serialize one search request onto the wire. Objects (previousIntent,
+ * removeChip) travel as JSON inside their query parameter; the parse layer
+ * (`parseProxySearchParams`) is the exact mirror, and the YOY-60 contract
+ * test pins this pair with no stub between them.
+ */
+export function buildSearchParams(
+  query: string,
+  sessionId: string,
+  context?: SearchRequestContext,
+): URLSearchParams {
+  const params = new URLSearchParams({ query, sessionId });
+  // previousIntent is OMITTED (not null) when nothing is held —
+  // "no previousIntent field" is the new-search contract (YOY-49 AC-5).
+  if (context?.previousIntent !== undefined) {
+    params.set("previousIntent", JSON.stringify(context.previousIntent));
+  }
+  if (context?.removeChip !== undefined) {
+    params.set("removeChip", JSON.stringify(context.removeChip));
+  }
+  return params;
+}
+
+/** Serialize one click beacon onto the wire; mirrored by `parseClickBeaconParams`. */
+export function buildClickParams(beacon: {
+  searchId: string;
+  sessionId: string;
+  productId: string;
+  position: number;
+}): URLSearchParams {
+  return new URLSearchParams({
+    searchId: beacon.searchId,
+    sessionId: beacon.sessionId,
+    productId: beacon.productId,
+    position: String(beacon.position),
+  });
+}
+
 export interface SearchClient {
   /**
    * Run one search. Rejects on HTTP failure, network failure, timeout, or a
@@ -100,21 +145,9 @@ export function createSearchClient(
       const controller = new AbortController();
       const timer = window.setTimeout(() => controller.abort(), timeoutMs);
       try {
-        const response = await fetch(`${basePath}/search`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            query,
-            sessionId,
-            // previousIntent is OMITTED (not null) when nothing is held —
-            // "no previousIntent field" is the new-search contract (AC-5).
-            ...(context?.previousIntent !== undefined
-              ? { previousIntent: context.previousIntent }
-              : {}),
-            ...(context?.removeChip !== undefined
-              ? { removeChip: context.removeChip }
-              : {}),
-          }),
+        const params = buildSearchParams(query, sessionId, context);
+        const response = await fetch(`${basePath}/search?${params}`, {
+          method: "GET",
           signal: controller.signal,
         });
         if (!response.ok) {
@@ -138,10 +171,9 @@ export function createSearchClient(
 
     sendClickBeacon(beacon) {
       try {
-        void fetch(`${basePath}/click`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(beacon),
+        const params = buildClickParams(beacon);
+        void fetch(`${basePath}/click?${params}`, {
+          method: "GET",
           keepalive: true,
         }).catch(() => {
           // Fire-and-forget by contract.

@@ -1,28 +1,41 @@
-import type { ActionFunctionArgs } from "react-router";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 
 import db from "../db.server";
 import { writeSearchEvent } from "../search/events.server";
 import {
   createProxySearchOrchestrator,
   parseProxySearchBody,
+  parseProxySearchParams,
   removeChipFromIntent,
   serializeProxySearchResponse,
+  type ProxySearchBody,
 } from "../search/proxy.server";
 import { getSessionThrottle } from "../search/throttle.server";
 import { authenticate } from "../shopify.server";
 
 /**
  * The storefront search endpoint (YOY-46), reached only through the Shopify
- * app proxy configured in shopify.app.toml: the widget POSTs to
- * /apps/unfiltered/search on the shop domain and Shopify forwards it here
- * with the proxy signature.
+ * app proxy: the widget requests /apps/unfiltered/search on the shop domain
+ * and Shopify forwards it here with the proxy signature.
+ *
+ * The widget's transport is GET with query parameters (YOY-60 AC-1) — the
+ * proxy edge rejects browser POSTs, which always carry `Origin` — served by
+ * the loader. The action keeps the original JSON-POST contract for signed
+ * server-side callers. Shopify forwards to `{app_proxy.url}/{remainder}`,
+ * and the dev CLI pushes the bare tunnel root as the proxy URL, so the same
+ * handlers are also served at the remainder path /search (YOY-60 AC-2, see
+ * routes/search.tsx).
  *
  * Auth is the proxy signature alone: a missing or invalid signature is
  * answered 401 with an empty body before any search code runs. The shop
  * identity comes exclusively from the signature-verified query params —
- * never from the request body, which a shopper controls.
+ * never from the request body or client-set params, which a shopper
+ * controls.
  */
-export const action = async ({ request }: ActionFunctionArgs) => {
+async function handleSearch(
+  request: Request,
+  parse: (request: Request) => Promise<ProxySearchBody | null>,
+): Promise<Response> {
   let shop: string | null;
   try {
     // Validates the signature over the proxy query params; throws a
@@ -36,9 +49,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return new Response(null, { status: 401 });
   }
 
-  let body;
+  let body: ProxySearchBody | null;
   try {
-    body = parseProxySearchBody(await request.json());
+    body = await parse(request);
   } catch {
     body = null;
   }
@@ -97,4 +110,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   });
 
   return Response.json(serializeProxySearchResponse(response));
-};
+}
+
+export const loader = async ({ request }: LoaderFunctionArgs) =>
+  handleSearch(request, (req) =>
+    Promise.resolve(parseProxySearchParams(new URL(req.url).searchParams)),
+  );
+
+export const action = async ({ request }: ActionFunctionArgs) =>
+  handleSearch(request, async (req) => parseProxySearchBody(await req.json()));

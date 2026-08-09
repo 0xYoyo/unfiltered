@@ -209,7 +209,20 @@
       window.fetch = (input, requestInit) => {
         const url = typeof input === "string" ? input : input.url;
         if (url.startsWith("/apps/unfiltered/search")) {
-          const request = JSON.parse(requestInit.body);
+          // The widget rides GET query params (YOY-60): reconstruct the
+          // request object from the URL the way the server's parse layer
+          // does, keeping test assertions shape-identical.
+          const params = new URL(url, window.location.origin).searchParams;
+          const request = {
+            query: params.get("query"),
+            sessionId: params.get("sessionId"),
+          };
+          if (params.has("previousIntent")) {
+            request.previousIntent = JSON.parse(params.get("previousIntent"));
+          }
+          if (params.has("removeChip")) {
+            request.removeChip = JSON.parse(params.get("removeChip"));
+          }
           window.__searchRequests.push(request);
           if (fixture === "error") {
             return Promise.resolve(new Response(null, { status: 500 }));
@@ -250,7 +263,13 @@
           const log = JSON.parse(
             sessionStorage.getItem("harness:clickBeacons") ?? "[]",
           );
-          log.push(JSON.parse(requestInit.body));
+          const params = new URL(url, window.location.origin).searchParams;
+          log.push({
+            searchId: params.get("searchId"),
+            sessionId: params.get("sessionId"),
+            productId: params.get("productId"),
+            position: Number(params.get("position")),
+          });
           sessionStorage.setItem("harness:clickBeacons", JSON.stringify(log));
           if (fixture === "beacon-missing") {
             return Promise.reject(new TypeError("beacon endpoint absent"));
