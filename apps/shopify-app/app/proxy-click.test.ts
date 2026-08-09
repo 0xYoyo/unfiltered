@@ -100,6 +100,22 @@ describe("click beacon auth", () => {
   });
 });
 
+describe("cache suppression (YOY-52 AC-9)", () => {
+  it("carries Cache-Control: no-store on a recorded 204 and on a 401", async () => {
+    const recorded = await action(
+      actionArgs(beaconRequest({ payload: validPayload })),
+    );
+    expect(recorded.status).toBe(204);
+    expect(recorded.headers.get("Cache-Control")).toBe("no-store");
+
+    const unsigned = await action(
+      actionArgs(beaconRequest({ payload: validPayload, omitSignature: true })),
+    );
+    expect(unsigned.status).toBe(401);
+    expect(unsigned.headers.get("Cache-Control")).toBe("no-store");
+  });
+});
+
 describe("click beacon recording (AC-3)", () => {
   it("records a ClickEvent and answers 204 with an empty body", async () => {
     const response = await action(

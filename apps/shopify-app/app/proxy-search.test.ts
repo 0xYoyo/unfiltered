@@ -534,6 +534,61 @@ describe("the response contract (AC-3, AC-5)", () => {
   });
 });
 
+describe("unexpected-failure containment (YOY-52 AC-4)", () => {
+  it("answers 500 with an empty body when runSearch throws below the fallback ladder", async () => {
+    orchestratorSeam.build = () => ({
+      runSearch: () => {
+        throw new Error("secret-internal-failure-detail");
+      },
+    });
+
+    const response = await action(
+      actionArgs(proxyRequest({ payload: { query: AI_QUERY, sessionId: "s1" } })),
+    );
+
+    expect(response.status).toBe(500);
+    expect(await response.text()).toBe("");
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+  });
+
+  it("answers 500 with an empty body when orchestrator construction itself throws", async () => {
+    orchestratorSeam.build = () => {
+      throw new Error("GEMINI_API_KEY is not configured");
+    };
+
+    const response = await action(
+      actionArgs(proxyRequest({ payload: { query: AI_QUERY, sessionId: "s1" } })),
+    );
+
+    expect(response.status).toBe(500);
+    expect(await response.text()).toBe("");
+  });
+});
+
+describe("cache suppression (YOY-52 AC-9)", () => {
+  it("carries Cache-Control: no-store on a signed 200 and on a 401", async () => {
+    await seed([{ productId: "sneaker-90", title: "nike 90" }]);
+    installOrchestrator({ llm: fakeLlm({}) });
+
+    const ok = await action(
+      actionArgs(proxyRequest({ payload: { query: "nike 90", sessionId: "s1" } })),
+    );
+    expect(ok.status).toBe(200);
+    expect(ok.headers.get("Cache-Control")).toBe("no-store");
+
+    const unsigned = await action(
+      actionArgs(
+        proxyRequest({
+          payload: { query: "nike 90", sessionId: "s1" },
+          omitSignature: true,
+        }),
+      ),
+    );
+    expect(unsigned.status).toBe(401);
+    expect(unsigned.headers.get("Cache-Control")).toBe("no-store");
+  });
+});
+
 describe("chip removal (AC-4)", () => {
   it("recomputes without the removed constraint, drops its chip, and makes zero LLM calls", async () => {
     await seed([
@@ -794,6 +849,70 @@ describe("per-session AI throttle (YOY-47 AC-4, AC-5)", () => {
     const throttledBody = await throttled.json();
     expect(throttledBody.route).toBe("classic");
     expect(throttledBody.degraded).toBe(true);
+  });
+
+  it("counts a degraded AI-classified search toward the budget (YOY-52 AC-5)", async () => {
+    await aiSeed();
+    throttleSeam.instance = createSessionThrottle({ limit: 1, now: () => 0 });
+    installOrchestrator({
+      llm: fakeLlm({
+        classification: () => ({ route: "ai" }),
+        intent: () => {
+          throw new Error("extractor down");
+        },
+      }),
+    });
+
+    // The classifier decided AI; the extractor failed and the response
+    // degraded to classic — real LLM spend happened, so budget is consumed.
+    const degraded = await action(
+      actionArgs(proxyRequest({ payload: { query: AI_QUERY, sessionId: "t4" } })),
+    );
+    const degradedBody = await degraded.json();
+    expect(degradedBody.route).toBe("classic");
+    expect(degradedBody.degraded).toBe(true);
+
+    // The next AI-shaped query from that session is throttled: forced
+    // classic with zero LLM calls (the fake would answer, but is not asked).
+    const counting = countingAiLlm();
+    installOrchestrator({ llm: counting.llm });
+    const throttled = await action(
+      actionArgs(proxyRequest({ payload: { query: AI_QUERY, sessionId: "t4" } })),
+    );
+    const throttledBody = await throttled.json();
+    expect(throttledBody.route).toBe("classic");
+    expect(throttledBody.degraded).toBe(true);
+    expect(counting.invocations()).toBe(0);
+  });
+
+  it("a model-decided classic search still consumes nothing, degraded or not (YOY-52 AC-5)", async () => {
+    await aiSeed();
+    await seed([{ productId: "sneaker-90", title: "nike 90" }]);
+    throttleSeam.instance = createSessionThrottle({ limit: 1, now: () => 0 });
+
+    // The model itself fails: classic + degraded with reason "model-error" —
+    // the classifier never decided the AI route, so no budget is consumed.
+    installOrchestrator({
+      llm: fakeLlm({
+        classification: () => {
+          throw new Error("classifier down");
+        },
+      }),
+    });
+    const modelError = await action(
+      actionArgs(proxyRequest({ payload: { query: AI_QUERY, sessionId: "t5" } })),
+    );
+    const modelErrorBody = await modelError.json();
+    expect(modelErrorBody.route).toBe("classic");
+    expect(modelErrorBody.degraded).toBe(true);
+
+    // The full budget of 1 is still available for a genuine AI search.
+    const counting = countingAiLlm();
+    installOrchestrator({ llm: counting.llm });
+    const ai = await action(
+      actionArgs(proxyRequest({ payload: { query: AI_QUERY, sessionId: "t5" } })),
+    );
+    expect((await ai.json()).route).toBe("ai");
   });
 
   it("chip-removal requests are neither counted nor throttled", async () => {
