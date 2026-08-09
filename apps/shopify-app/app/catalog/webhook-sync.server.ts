@@ -19,6 +19,12 @@ export interface ProductWebhookPayload {
   product_type: string | null;
   /** Comma-separated in webhook payloads, unlike the GraphQL string list. */
   tags: string;
+  /**
+   * "active" | "archived" | "draft". A non-active status removes the product
+   * from the snapshot (YOY-61 AC-2) — archiving fires `products/update`, not
+   * `products/delete`. Absent in older payloads and treated as active.
+   */
+  status?: string;
   updated_at: string;
   variants: Array<{
     price: string;
@@ -262,6 +268,20 @@ export async function syncProductFromWebhook({
   payload: ProductWebhookPayload;
 }): Promise<WebhookSyncOutcome> {
   const productId = productGid(payload);
+
+  // Non-active products leave the snapshot (YOY-61 AC-2): archiving or
+  // drafting fires `products/update` with the new status, and serving the
+  // product afterwards means 404s on click. Same deletion set as
+  // `products/delete` — enrichment and embedding rows go with the product.
+  if (payload.status !== undefined && payload.status !== "active") {
+    const [, , { count }] = await db.$transaction([
+      db.productEnrichment.deleteMany({ where: { shopDomain, productId } }),
+      db.productEmbedding.deleteMany({ where: { shopDomain, productId } }),
+      db.catalogProduct.deleteMany({ where: { shopDomain, productId } }),
+    ]);
+    return count > 0 ? "deleted" : "not_found";
+  }
+
   const findExisting = () =>
     db.catalogProduct.findUnique({
       where: { shopDomain_productId: { shopDomain, productId } },
@@ -350,11 +370,13 @@ export async function deleteProductFromWebhook({
   shopDomain: string;
   payload: ProductDeleteWebhookPayload;
 }): Promise<WebhookSyncOutcome> {
-  // Enrichment rows are keyed by shopDomain+productId with no FK cascade,
-  // so they must go in the same operation as the product (YOY-29 AC-5).
+  // Enrichment and embedding rows are keyed by shopDomain+productId with no
+  // FK cascade, so they must go in the same operation as the product
+  // (YOY-29 AC-5, YOY-61 AC-2).
   const productId = productGid(payload);
-  const [, { count }] = await db.$transaction([
+  const [, , { count }] = await db.$transaction([
     db.productEnrichment.deleteMany({ where: { shopDomain, productId } }),
+    db.productEmbedding.deleteMany({ where: { shopDomain, productId } }),
     db.catalogProduct.deleteMany({ where: { shopDomain, productId } }),
   ]);
   return count > 0 ? "deleted" : "not_found";

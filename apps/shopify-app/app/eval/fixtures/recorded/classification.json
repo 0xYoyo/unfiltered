@@ -1,5 +1,6 @@
 {
   "modelId": "gemini-3.5-flash-lite",
+  "provenance": "synthesized",
   "entries": {
     "elegant summer wedding dress, not black, under 400": {
       "output": {
@@ -139,6 +140,27 @@
         "route": "ai"
       },
       "inputTokens": 97,
+      "outputTokens": 11
+    },
+    "שמלה שחורה": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 100,
+      "outputTokens": 11
+    },
+    "black dress": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 100,
+      "outputTokens": 11
+    },
+    "שמלה שחורה מתחת ל-400": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 100,
       "outputTokens": 11
     }
   }

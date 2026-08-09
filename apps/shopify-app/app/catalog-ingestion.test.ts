@@ -277,6 +277,73 @@ describe("catalog ingestion", () => {
     ).toBe(1);
   });
 
+  it("indexes only ACTIVE products and deletes non-active rows on repeat ingest (YOY-61 AC-2)", async () => {
+    await db.productEnrichment.deleteMany();
+    await db.$executeRawUnsafe(`DELETE FROM "ProductEmbedding"`);
+    // First sync: product 3 is still ACTIVE and gets indexed and enriched.
+    await ingestCatalog({
+      db,
+      shopDomain: SHOP,
+      graphql: graphqlStub(fixtureCatalog()).graphql,
+    });
+    await db.productEnrichment.create({
+      data: {
+        shopDomain: SHOP,
+        productId: "gid://shopify/Product/3",
+        contentHash: "hash",
+        status: "enriched",
+        category: "top",
+        colors: [],
+        occasions: [],
+        fit: null,
+        styleTags: [],
+        seasons: [],
+      },
+    });
+    await db.$executeRawUnsafe(
+      `INSERT INTO "ProductEmbedding"
+         ("id", "shopDomain", "productId", "contentHash", "embedding", "updatedAt")
+       VALUES ('emb-3', $1, 'gid://shopify/Product/3', 'hash', $2::vector(3), CURRENT_TIMESTAMP)`,
+      SHOP,
+      "[1,0,0]",
+    );
+
+    // Mixed-status catalog: product 3 archived, a draft product appears.
+    const mixed = [
+      productNode({ id: "gid://shopify/Product/1", status: "ACTIVE" }),
+      fixtureCatalog()[1]!,
+      productNode({ id: "gid://shopify/Product/3", status: "ARCHIVED" }),
+      productNode({ id: "gid://shopify/Product/4", status: "DRAFT" }),
+    ];
+    const result = await ingestCatalog({
+      db,
+      shopDomain: SHOP,
+      graphql: graphqlStub(mixed).graphql,
+    });
+
+    // The archived product is reported deleted; the draft one never lands.
+    expect(result.deleted).toBe(1);
+    expect(result.created).toBe(0);
+    const rows = await db.catalogProduct.findMany({ where: { shopDomain: SHOP } });
+    expect(rows.map((row) => row.productId).sort()).toEqual([
+      "gid://shopify/Product/1",
+      "gid://shopify/Product/2",
+    ]);
+    // Enrichment AND embedding rows go with the product (defense against a
+    // leftover embedding keeping the product retrievable).
+    expect(
+      await db.productEnrichment.count({
+        where: { shopDomain: SHOP, productId: "gid://shopify/Product/3" },
+      }),
+    ).toBe(0);
+    const embeddings = await db.$queryRawUnsafe<Array<{ count: bigint }>>(
+      `SELECT count(*)::int8 AS count FROM "ProductEmbedding"
+        WHERE "shopDomain" = $1 AND "productId" = 'gid://shopify/Product/3'`,
+      SHOP,
+    );
+    expect(Number(embeddings[0]!.count)).toBe(0);
+  });
+
   it("isolates shops: two ingested catalogs never cross-contaminate", async () => {
     await ingestCatalog({
       db,

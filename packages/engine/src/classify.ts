@@ -85,12 +85,90 @@ const PRICE_MARKERS = new Set([
   "over",
   "below",
   "above",
+  "less",
   "עד",
   "מעל",
+  "מתחת",
+  "פחות",
   "$",
   "₪",
   "€",
 ]);
+
+/**
+ * A number carrying a Hebrew prepositional prefix ("ל-900", "ב900", "מ-400"):
+ * a price or bound, never a SKU — Hebrew writes "under 900" as "מתחת ל-900",
+ * and the live run showed the attached digits misread as a model number
+ * (YOY-61 defect 1).
+ */
+const HEBREW_PREFIXED_NUMBER = /^[בלמכ]-?\p{N}+$/u;
+
+/**
+ * Common color words, EN + HE (both grammatical genders where they differ):
+ * a color next to anything else is a descriptive constraint ("blue
+ * snowboard", "סנובורד כחול"), not a keyword lookup — the live run's
+ * misrouted queries were exactly this shape (YOY-61 defect 1). Deliberately
+ * small: an unlisted color simply doesn't stop the classic fast path.
+ */
+const COLOR_WORDS = new Set([
+  "black",
+  "white",
+  "red",
+  "blue",
+  "green",
+  "yellow",
+  "pink",
+  "purple",
+  "orange",
+  "brown",
+  "grey",
+  "gray",
+  "beige",
+  "gold",
+  "silver",
+  "navy",
+  "שחור",
+  "שחורה",
+  "לבן",
+  "לבנה",
+  "אדום",
+  "אדומה",
+  "כחול",
+  "כחולה",
+  "ירוק",
+  "ירוקה",
+  "צהוב",
+  "צהובה",
+  "ורוד",
+  "ורודה",
+  "סגול",
+  "סגולה",
+  "כתום",
+  "כתומה",
+  "חום",
+  "חומה",
+  "אפור",
+  "אפורה",
+  "בז'",
+  "זהב",
+  "כסף",
+]);
+
+/**
+ * Constraint-shaped query (YOY-61 AC-1): carries a price marker, a
+ * Hebrew-prefixed number, or (alongside at least one other token) a color
+ * word. Such a query expresses natural-language intent no matter how short
+ * or digit-bearing it is, so no classic-settling heuristic may decide it —
+ * it escalates to the model.
+ */
+function isConstraintShaped(tokens: string[]): boolean {
+  return tokens.some(
+    (token) =>
+      PRICE_MARKERS.has(token) ||
+      HEBREW_PREFIXED_NUMBER.test(token) ||
+      (tokens.length >= 2 && COLOR_WORDS.has(token)),
+  );
+}
 
 /** SKU_TOKEN, except a bare number right after a price marker is a price bound, not a SKU. */
 function isSkuToken(tokens: string[], index: number): boolean {
@@ -112,6 +190,9 @@ function isSkuToken(tokens: string[], index: number): boolean {
  *
  * - empty query → classic (nothing to interpret)
  * - whole query wrapped in quotes → classic (exact-phrase intent)
+ * - constraint-shaped (price marker, Hebrew-prefixed number, or color word
+ *   with company) → undecided, so the sku/short rules below cannot misroute
+ *   "blue snowboard" or "סנובורד כחול מתחת ל-900" to classic (YOY-61 AC-1)
  * - ≤4 tokens with a SKU/model-number-looking token → classic ("nike air max 90");
  *   a bare number right after a price marker ("dress under 400") is not one
  * - ≤2 tokens → classic (too short to carry natural-language intent)
@@ -126,6 +207,9 @@ export function classifyByHeuristics(
     return { route: "classic", reason: "quoted-phrase" };
   }
   const tokens = normalized.split(" ");
+  if (isConstraintShaped(tokens)) {
+    return null;
+  }
   if (tokens.length <= 4 && tokens.some((_, index) => isSkuToken(tokens, index))) {
     return { route: "classic", reason: "sku-pattern" };
   }

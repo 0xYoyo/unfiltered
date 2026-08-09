@@ -12,6 +12,13 @@ export interface ShopifyProductNode {
   tags: string[];
   vendor: string | null;
   productType: string | null;
+  /**
+   * Shopify product status ("ACTIVE" | "ARCHIVED" | "DRAFT"). Consumed by the
+   * ingest filter (YOY-61 AC-2) before mapping; absent in older fixtures and
+   * treated as ACTIVE there. Deliberately not part of the snapshot row or the
+   * content hash — only ACTIVE products are ever mapped.
+   */
+  status?: string;
   updatedAt: string;
   priceRangeV2: {
     minVariantPrice: { amount: string; currencyCode: string };

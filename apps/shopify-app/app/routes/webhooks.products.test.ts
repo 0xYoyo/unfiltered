@@ -323,6 +323,77 @@ describe("products/update webhook", () => {
     expect(row?.featuredImageUrl).toBe("https://cdn.example.com/overshirt.jpg");
   });
 
+  it("removes the snapshot row — with its enrichment and embedding — when the product goes non-active (YOY-61 AC-2)", async () => {
+    await db.productEnrichment.deleteMany();
+    await db.$executeRawUnsafe(`DELETE FROM "ProductEmbedding"`);
+    await db.productEnrichment.create({
+      data: {
+        shopDomain: SHOP,
+        productId: PRODUCT_GID,
+        contentHash: (await snapshotRow())!.contentHash,
+        status: "enriched",
+        category: "top",
+        colors: [],
+        occasions: [],
+        fit: null,
+        styleTags: [],
+        seasons: [],
+      },
+    });
+    await db.$executeRawUnsafe(
+      `INSERT INTO "ProductEmbedding"
+         ("id", "shopDomain", "productId", "contentHash", "embedding", "updatedAt")
+       VALUES ('emb-arch', $1, $2, 'hash', $3::vector(3), CURRENT_TIMESTAMP)`,
+      SHOP,
+      PRODUCT_GID,
+      "[1,0,0]",
+    );
+
+    // Archiving fires products/update with the new status, not a delete.
+    const response = await updateAction(
+      actionArgs(
+        webhookRequest({
+          topic: "products/update",
+          shop: SHOP,
+          payload: productPayload({
+            status: "archived",
+            updated_at: "2026-08-01T11:00:00Z",
+          }),
+        }),
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await snapshotRow()).toBeNull();
+    expect(
+      await db.productEnrichment.count({
+        where: { shopDomain: SHOP, productId: PRODUCT_GID },
+      }),
+    ).toBe(0);
+    const embeddings = await db.$queryRawUnsafe<Array<{ count: number }>>(
+      `SELECT count(*)::int AS count FROM "ProductEmbedding"
+        WHERE "shopDomain" = $1 AND "productId" = $2`,
+      SHOP,
+      PRODUCT_GID,
+    );
+    expect(Number(embeddings[0]!.count)).toBe(0);
+
+    // An explicitly active status keeps flowing through the update path.
+    await updateAction(
+      actionArgs(
+        webhookRequest({
+          topic: "products/update",
+          shop: SHOP,
+          payload: productPayload({
+            status: "active",
+            updated_at: "2026-08-01T12:00:00Z",
+          }),
+        }),
+      ),
+    );
+    expect(await snapshotRow()).not.toBeNull();
+  });
+
   it("preserves the ingested currency code, which webhook payloads never carry", async () => {
     await db.catalogProduct.update({
       where: {

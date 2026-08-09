@@ -70,7 +70,13 @@ export interface SearchClientOptions {
 }
 
 const DEFAULT_BASE_PATH = "/apps/unfiltered";
-const DEFAULT_TIMEOUT_MS = 5000;
+/**
+ * Generous by design (YOY-61 AC-4): the live AI route measured 8–24s
+ * (YOY-52 AC-12), and an aborted request can never render. Config-driven via
+ * `timeoutMs` (the embed block's `searchTimeoutMs`), so the value can drop
+ * once the server-side latency work lands.
+ */
+const DEFAULT_TIMEOUT_MS = 30_000;
 
 /**
  * Serialize one search request onto the wire. Objects (previousIntent,
