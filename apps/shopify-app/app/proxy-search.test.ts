@@ -150,11 +150,14 @@ function proxyRequest({
   shop = SHOP,
   secret = process.env.SHOPIFY_API_SECRET ?? "",
   omitSignature = false,
+  prependUnsigned = [],
 }: {
   payload: unknown;
   shop?: string;
   secret?: string;
   omitSignature?: boolean;
+  /** Params placed before the signed set and left out of the signature. */
+  prependUnsigned?: [name: string, value: string][];
 }): Request {
   const params = new URLSearchParams({
     shop,
@@ -171,8 +174,17 @@ function proxyRequest({
       createHmac("sha256", secret).update(data).digest("hex"),
     );
   }
+  const query = [
+    ...prependUnsigned.map(
+      ([name, value]) =>
+        `${encodeURIComponent(name)}=${encodeURIComponent(value)}`,
+    ),
+    params.toString(),
+  ]
+    .filter((part) => part !== "")
+    .join("&");
   return new Request(
-    `https://test-app.example.com/apps/unfiltered/search?${params}`,
+    `https://test-app.example.com/apps/unfiltered/search?${query}`,
     {
       method: "POST",
       body: JSON.stringify(payload),
@@ -348,6 +360,36 @@ describe("app proxy authentication (AC-2)", () => {
     );
     expect(response.status).toBe(401);
     expect(await response.text()).toBe("");
+  });
+
+  it("adopts the signed shop, not a client duplicate smuggled before it (YOY-52 AC-10)", async () => {
+    // Shopify's edge strips client-set reserved `shop` params (probed live
+    // 2026-08-09), so in production only the signed shop arrives. This pins
+    // the defense-in-depth layer beneath that guarantee: the signature
+    // validator resolves duplicate params last-wins — a duplicate in FRONT
+    // of the signed set passes validation — so the route must read the last
+    // occurrence, the value the signature actually covered.
+    await seed([{ productId: "boot-1", title: "leather boots" }]);
+    installOrchestrator({ llm: fakeLlm({}) });
+
+    const response = await action(
+      actionArgs(
+        proxyRequest({
+          payload: { query: "leather boots", sessionId: "s1" },
+          prependUnsigned: [["shop", "attacker-probe.myshopify.com"]],
+        }),
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    // boot-1 exists only under the signed shop's catalog, so serving it
+    // proves the foreign first occurrence was never adopted.
+    expect(body.results.map((r: { productId: string }) => r.productId)).toEqual(
+      ["boot-1"],
+    );
+    const events = await db.searchEvent.findMany();
+    expect(events.map((event) => event.shopDomain)).toEqual([SHOP]);
   });
 
   it("takes the shop from the verified proxy params, ignoring any shop in the body", async () => {

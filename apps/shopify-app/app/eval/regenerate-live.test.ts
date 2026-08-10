@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 
 import type { PrismaClient } from "@prisma/client";
 import {
+  classifyByHeuristics,
   composeQueryText,
   createIntentExtractor,
   createQueryClassifier,
@@ -292,6 +293,22 @@ describe("REGEN_PACE_MS resolution", () => {
   });
 });
 
+describe("golden classification tiers (YOY-52 AC-1 amendment)", () => {
+  // Pins each golden's regeneration expectation offline, so a heuristics
+  // change that reroutes a golden fails here — in every `npm test` — instead
+  // of surfacing as a false FAIL mid-way through a paid live regeneration.
+  it("AI-tier goldens escalate past the heuristics; heuristic-settled goldens are classic controls", () => {
+    for (const golden of loadGoldens()) {
+      const heuristic = classifyByHeuristics(normalizeQuery(golden.query));
+      if ((golden.expectedRoute ?? "ai") === "ai") {
+        expect(heuristic, `${golden.id} must escalate to the model`).toBeNull();
+      } else if (heuristic !== null) {
+        expect(heuristic.route, `${golden.id} heuristic route`).toBe("classic");
+      }
+    }
+  });
+});
+
 describe.runIf(live)("eval fixture regeneration (live)", () => {
   let db: PrismaClient;
 
@@ -352,13 +369,34 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
       // so the classifier's own timeout must outlast a full retry ladder.
       timeoutMs: 600_000,
     });
+    // Per-golden expected reason (YOY-52 AC-1 amendment): heuristic-settled
+    // goldens — the SKU-shaped and short-query classic controls — never reach
+    // the model, so demanding reason "model" for every golden is wrong since
+    // the YOY-61 classifier rewrite. The heuristics are deterministic, so
+    // each golden's expectation derives from classifyByHeuristics itself.
     for (const golden of goldens) {
       const decision = await classifier.classify(golden.query);
-      expect(decision.reason, `${golden.id} must reach the model`).toBe("model");
-      expect(
-        classificationEntries[normalizeQuery(golden.query)],
-        `${golden.id} classification recorded`,
-      ).toBeDefined();
+      expect(decision.route, `${golden.id} route`).toBe(
+        golden.expectedRoute ?? "ai",
+      );
+      const heuristic = classifyByHeuristics(normalizeQuery(golden.query));
+      if (heuristic === null) {
+        expect(decision.reason, `${golden.id} must reach the model`).toBe(
+          "model",
+        );
+        expect(
+          classificationEntries[normalizeQuery(golden.query)],
+          `${golden.id} classification recorded`,
+        ).toBeDefined();
+      } else {
+        expect(decision.reason, `${golden.id} settles heuristically`).toBe(
+          heuristic.reason,
+        );
+        expect(
+          classificationEntries[normalizeQuery(golden.query)],
+          `${golden.id} must not spend a model call`,
+        ).toBeUndefined();
+      }
     }
     writeRecording(
       "classification.json",

@@ -23,6 +23,13 @@ import { authenticate } from "../shopify.server";
  * this shop actually ran, else 404 and no row — the beacon fields are
  * shopper-controlled and must not write into another shop's log.
  *
+ * Duplicate `shop` params (YOY-52 AC-10): Shopify's proxy edge strips a
+ * client-set reserved `shop` param before forwarding (probed live
+ * 2026-08-09 — see apps.unfiltered.search.tsx). Defense in depth beneath
+ * that: the signature validator resolves duplicates last-wins, so the shop
+ * read takes the LAST occurrence — the signature-verified value — never a
+ * client duplicate smuggled in front of the signed set.
+ *
  * Every response — every status — carries `Cache-Control: no-store` (YOY-52
  * AC-9): the beacon rides GET, and its responses must never be cached.
  */
@@ -41,7 +48,9 @@ async function handleClick(
   let shop: string | null;
   try {
     await authenticate.public.appProxy(request);
-    shop = new URL(request.url).searchParams.get("shop");
+    // Last occurrence: the value the signature validation verified (see the
+    // duplicate-shop note above).
+    shop = new URL(request.url).searchParams.getAll("shop").at(-1) ?? null;
   } catch {
     return emptyResponse(401);
   }
