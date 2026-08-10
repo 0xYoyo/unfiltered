@@ -80,6 +80,36 @@ export const INTENT_SCHEMA: JsonSchema = {
 };
 
 /**
+ * The model's judgment of what a follow-up query is (YOY-52 run-5
+ * directive): a refinement of the previous search, or a change of topic.
+ * The judgment stays with the model — it has been reliable across every
+ * live run — while the constraint mechanics it gates are deterministic
+ * code (carry-over and comparative enforcement below).
+ */
+export type RefinementOutcome = "refinement" | "topic_change";
+
+export const REFINEMENT_OUTCOMES: readonly RefinementOutcome[] = [
+  "refinement",
+  "topic_change",
+];
+
+/**
+ * Schema for refinement calls — extraction with a previous intent present.
+ * The answer stays a full Intent (never a patch; the delta-output redesign
+ * was explicitly rejected) plus the one extra field code cannot infer: the
+ * model's explicit refinement/topic-change judgment, which gates whether
+ * constraint carry-over applies.
+ */
+export const REFINEMENT_INTENT_SCHEMA: JsonSchema = {
+  type: "object",
+  properties: {
+    ...(INTENT_SCHEMA.properties as Record<string, unknown>),
+    outcome: { type: "string", enum: [...REFINEMENT_OUTCOMES] },
+  },
+  required: [...(INTENT_SCHEMA.required as string[]), "outcome"],
+};
+
+/**
  * The model failed to produce a schema-valid intent after the retry (AC-2).
  * Callers decide the fallback; the engine never invents an intent.
  */
@@ -206,6 +236,93 @@ export function enforceComparativeBounds(
 }
 
 /**
+ * A parsed refinement answer: the model's outcome judgment plus the full
+ * intent it returned. Produced by parseRefinementAnswer, consumed by
+ * mergeRefinementIntent — the single production merge path.
+ */
+export interface RefinementAnswer {
+  outcome: RefinementOutcome;
+  intent: Intent;
+}
+
+/**
+ * Validate a refinement-call answer: a full Intent plus the required
+ * outcome judgment. Returns null on any violation so the extractor can
+ * retry, same as parseIntent.
+ */
+export function parseRefinementAnswer(value: unknown): RefinementAnswer | null {
+  if (typeof value !== "object" || value === null) {
+    return null;
+  }
+  const outcome = (value as Record<string, unknown>).outcome;
+  if (outcome !== "refinement" && outcome !== "topic_change") {
+    return null;
+  }
+  const intent = parseIntent(value);
+  return intent === null ? null : { outcome, intent };
+}
+
+/**
+ * Deterministic constraint carry-over (YOY-52 run-5 directive): under the
+ * locked M3 design, constraint removal happens via chips (×) or New search,
+ * never via unphrased omission — a follow-up that does not name a constraint
+ * cannot legitimately clear it. Live runs showed the model nondeterministically
+ * dropping constraints it was instructed to carry (r01's occasion, r02's on
+ * another run), so any constraint field set in the previous intent that comes
+ * back null/absent in a refinement answer is restored from the previous
+ * intent. Refinement outcomes only — a topic change discards everything.
+ * availabilityRequired is untouched: false is its resting value, not an
+ * absent one, so restoring it would be a guess. softAttributes stay the
+ * model's: they are similarity hints, not constraints.
+ */
+export function carryOverRefinementConstraints(
+  previousIntent: Intent,
+  intent: Intent,
+): Intent {
+  return {
+    ...intent,
+    category: intent.category ?? previousIntent.category,
+    priceMin: intent.priceMin ?? previousIntent.priceMin,
+    priceMax: intent.priceMax ?? previousIntent.priceMax,
+    currency: intent.currency ?? previousIntent.currency,
+    occasion: intent.occasion ?? previousIntent.occasion,
+    size: intent.size ?? previousIntent.size,
+    colorsInclude:
+      intent.colorsInclude.length > 0
+        ? intent.colorsInclude
+        : previousIntent.colorsInclude,
+    colorsExclude:
+      intent.colorsExclude.length > 0
+        ? intent.colorsExclude
+        : previousIntent.colorsExclude,
+  };
+}
+
+/**
+ * THE production refinement merge (YOY-52 run-5 directive): every consumer
+ * that turns a raw refinement answer into a searchable intent — the runtime
+ * orchestrator, the offline eval rescore, the live regeneration — reaches
+ * this function through extract(), so carry-over and comparative enforcement
+ * apply identically everywhere. Enforcement runs after carry-over on
+ * purpose: a restored previous bound that a comparative follow-up should
+ * have moved is then moved by code.
+ */
+export function mergeRefinementIntent(
+  query: string,
+  previousIntent: Intent,
+  answer: RefinementAnswer,
+): Intent {
+  if (answer.outcome === "topic_change") {
+    return answer.intent;
+  }
+  return enforceComparativeBounds(
+    query,
+    previousIntent,
+    carryOverRefinementConstraints(previousIntent, answer.intent),
+  );
+}
+
+/**
  * Refinement instructions, appended only when the caller supplies a previous
  * intent. Without one the prompt stays byte-for-byte what it was before
  * YOY-42, so recordings and caches keyed on it remain valid.
@@ -230,7 +347,8 @@ function refinementSection(previousIntent: Intent): string[] {
     '     "colorsExclude": [], "occasion": "sport",',
     '     "availabilityRequired": false, "softAttributes": ["waterproof"]}',
     '  follow-up "pricier" answers:',
-    '    {"category": "boots", "priceMin": 100, "priceMax": null,',
+    '    {"outcome": "refinement",',
+    '     "category": "boots", "priceMin": 100, "priceMax": null,',
     '     "colorsInclude": ["purple"], "colorsExclude": [],',
     '     "occasion": "sport", "availabilityRequired": false,',
     '     "softAttributes": ["waterproof"]}',
@@ -240,7 +358,9 @@ function refinementSection(previousIntent: Intent): string[] {
     "  discard the previous intent entirely and extract the new query alone,",
     "  carrying nothing over.",
     "Either way, answer with a complete intent in the same JSON shape — never",
-    "a patch, never a reference to what changed.",
+    "a patch, never a reference to what changed — plus one extra field:",
+    '"outcome", set to "refinement" or "topic_change" to state which of the',
+    "two judgments you made.",
     "",
     `Previous intent: ${serializePreviousIntent(previousIntent)}`,
   ];
@@ -383,11 +503,15 @@ export function createIntentExtractor(
 ): IntentExtractor {
   async function attempt(
     query: string,
+    previousIntent: Intent | undefined,
     context?: IntentExtractionContext,
   ): Promise<Intent | null> {
     const completion = await options.llm.completeStructured({
-      prompt: buildIntentPrompt(query, context?.previousIntent),
-      schema: INTENT_SCHEMA,
+      prompt: buildIntentPrompt(query, previousIntent),
+      // A refinement call carries the outcome-judgment field; a plain
+      // extraction keeps the pre-YOY-42 schema byte for byte.
+      schema:
+        previousIntent === undefined ? INTENT_SCHEMA : REFINEMENT_INTENT_SCHEMA,
       operation: "intent",
       // Structured extraction has no use for sampling variance, and
       // run-to-run eval stability requires determinism (YOY-52) — same rule
@@ -396,21 +520,27 @@ export function createIntentExtractor(
       shopDomain: context?.shopDomain,
       searchId: context?.searchId,
     });
-    return parseIntent(completion);
+    if (previousIntent === undefined) {
+      return parseIntent(completion);
+    }
+    const answer = parseRefinementAnswer(completion);
+    return answer === null
+      ? null
+      : mergeRefinementIntent(query, previousIntent, answer);
   }
 
   return {
     async extract(query, context) {
+      const previousIntent = context?.previousIntent;
       const extracted =
-        (await attempt(query, context)) ?? (await attempt(query, context));
+        (await attempt(query, previousIntent, context)) ??
+        (await attempt(query, previousIntent, context));
       if (extracted === null) {
         throw new IntentExtractionError(
           "intent extraction produced schema-violating output twice",
         );
       }
-      return context?.previousIntent === undefined
-        ? extracted
-        : enforceComparativeBounds(query, context.previousIntent, extracted);
+      return extracted;
     },
   };
 }

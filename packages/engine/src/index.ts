@@ -31,15 +31,22 @@ export {
 } from "./classify.js";
 
 export {
+  carryOverRefinementConstraints,
   createIntentExtractor,
   enforceComparativeBounds,
   INTENT_SCHEMA,
   IntentExtractionError,
+  mergeRefinementIntent,
   parseIntent,
+  parseRefinementAnswer,
+  REFINEMENT_INTENT_SCHEMA,
+  REFINEMENT_OUTCOMES,
   type Intent,
   type IntentExtractionContext,
   type IntentExtractor,
   type IntentExtractorOptions,
+  type RefinementAnswer,
+  type RefinementOutcome,
 } from "./intent.js";
 
 export {
