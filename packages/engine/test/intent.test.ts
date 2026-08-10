@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   createIntentExtractor,
+  enforceComparativeBounds,
   INTENT_SCHEMA,
   IntentExtractionError,
   parseIntent,
@@ -291,6 +292,17 @@ describe("port call shape (AC-2, AC-4)", () => {
     expect(calls[0]!.operation).toBe("intent");
   });
 
+  it("pins extraction to temperature 0 (YOY-52)", async () => {
+    const { llm, calls } = llmStub(scenarios[0]!.recorded);
+    const extractor = createIntentExtractor({ llm });
+
+    await extractor.extract(scenarios[0]!.query);
+
+    // Structured extraction is deterministic by contract, refinement calls
+    // included — the same plumbing classification pins.
+    expect(calls[0]!.temperature).toBe(0);
+  });
+
   it("forwards shopDomain and searchId to the port for metering", async () => {
     const { llm, calls } = llmStub(scenarios[0]!.recorded);
     const extractor = createIntentExtractor({ llm });
@@ -441,6 +453,14 @@ describe("parseIntent", () => {
     expect(other?.occasion).toBeUndefined();
   });
 
+  it("canonicalizes size casing to uppercase (YOY-52)", () => {
+    const valid = scenarios[0]!.recorded;
+    expect(parseIntent({ ...valid, size: "m" })?.size).toBe("M");
+    expect(parseIntent({ ...valid, size: "M" })?.size).toBe("M");
+    expect(parseIntent({ ...valid, size: "42" })?.size).toBe("42");
+    expect(parseIntent({ ...valid, size: null })?.size).toBeUndefined();
+  });
+
   it("normalizes missing optionals like nulls", () => {
     expect(
       parseIntent({
@@ -461,5 +481,211 @@ describe("parseIntent", () => {
       availabilityRequired: false,
       softAttributes: ["linen"],
     });
+  });
+});
+
+describe("deterministic comparative enforcement (YOY-52 AC-15)", () => {
+  /** A merged intent echoing the previous bounds — the uncooperative case. */
+  function merged(overrides: Partial<Intent>): Intent {
+    return {
+      colorsInclude: [],
+      colorsExclude: [],
+      availabilityRequired: false,
+      softAttributes: [],
+      ...overrides,
+    };
+  }
+
+  describe("cheaper", () => {
+    it("overrides an unchanged EN echo to 75% of the previous priceMax", () => {
+      const previous = merged({ priceMax: 400, occasion: "wedding" });
+      const intent = enforceComparativeBounds(
+        "same but cheaper",
+        previous,
+        merged({ priceMax: 400, occasion: "wedding" }),
+      );
+      expect(intent.priceMax).toBe(300);
+      expect(intent.priceMin).toBeUndefined();
+      // Enforcement touches the price bounds only; carried constraints pass.
+      expect(intent.occasion).toBe("wedding");
+    });
+
+    it("overrides an unchanged HE echo, both word orders", () => {
+      const previous = merged({ priceMax: 900 });
+      for (const query of ["אותו דבר אבל יותר זול", "זול יותר בבקשה"]) {
+        expect(
+          enforceComparativeBounds(query, previous, merged({ priceMax: 900 }))
+            .priceMax,
+        ).toBe(675);
+      }
+    });
+
+    it("keeps a cooperative model's own strictly-lower figure", () => {
+      const previous = merged({ priceMax: 400 });
+      const intent = enforceComparativeBounds(
+        "same but cheaper",
+        previous,
+        merged({ priceMax: 250 }),
+      );
+      expect(intent.priceMax).toBe(250);
+    });
+
+    it("falls back to the previous priceMin as the bound, clearing it once contradicted", () => {
+      // Previous intent has only a floor: cheaper caps below it, and the
+      // carried floor would empty every result, so it clears.
+      const previous = merged({ priceMin: 200 });
+      const intent = enforceComparativeBounds(
+        "less expensive please",
+        previous,
+        merged({ priceMin: 200 }),
+      );
+      expect(intent.priceMax).toBe(150);
+      expect(intent.priceMin).toBeUndefined();
+    });
+
+    it("does nothing when the previous intent carries no price bound", () => {
+      const previous = merged({ occasion: "wedding" });
+      const intent = enforceComparativeBounds(
+        "same but cheaper",
+        previous,
+        merged({ occasion: "wedding" }),
+      );
+      expect(intent.priceMax).toBeUndefined();
+      expect(intent.priceMin).toBeUndefined();
+    });
+  });
+
+  describe("more expensive", () => {
+    it("overrides an unchanged EN echo to 125% of the previous priceMin", () => {
+      const previous = merged({ priceMin: 200 });
+      const intent = enforceComparativeBounds(
+        "show me more expensive ones",
+        previous,
+        merged({ priceMin: 200 }),
+      );
+      expect(intent.priceMin).toBe(250);
+      expect(intent.priceMax).toBeUndefined();
+    });
+
+    it("raises above the previous priceMax when only a cap exists, clearing the contradicted cap (HE, both word orders)", () => {
+      const previous = merged({ priceMax: 300 });
+      for (const query of ["יותר יקר", "יקר יותר"]) {
+        const intent = enforceComparativeBounds(
+          query,
+          previous,
+          merged({ priceMax: 300 }),
+        );
+        expect(intent.priceMin).toBe(375);
+        expect(intent.priceMax).toBeUndefined();
+      }
+    });
+
+    it("keeps a cooperative model's own strictly-higher floor, still clearing a contradicted cap", () => {
+      const previous = merged({ priceMin: 300, priceMax: 300 });
+      const intent = enforceComparativeBounds(
+        "pricier",
+        previous,
+        merged({ priceMin: 450, priceMax: 300 }),
+      );
+      expect(intent.priceMin).toBe(450);
+      expect(intent.priceMax).toBeUndefined();
+    });
+
+    it("does nothing when the previous intent carries no price bound", () => {
+      const previous = merged({});
+      const intent = enforceComparativeBounds(
+        "more expensive",
+        previous,
+        merged({}),
+      );
+      expect(intent.priceMin).toBeUndefined();
+    });
+  });
+
+  it("leaves non-comparative and both-directions queries to the model", () => {
+    const previous = merged({ priceMax: 400 });
+    const echo = merged({ priceMax: 400 });
+    expect(enforceComparativeBounds("in red", previous, echo)).toEqual(echo);
+    expect(
+      enforceComparativeBounds(
+        "cheaper or more expensive, anything",
+        previous,
+        echo,
+      ),
+    ).toEqual(echo);
+  });
+
+  it("runs inside extract when a previous intent is supplied", async () => {
+    const previousIntent: Intent = {
+      category: "dress",
+      priceMax: 400,
+      colorsInclude: [],
+      colorsExclude: ["black"],
+      occasion: "wedding",
+      availabilityRequired: false,
+      softAttributes: ["elegant"],
+    };
+    // The model echoes the previous cap unchanged — the live failure shape.
+    const { llm } = llmStub({
+      category: "dress",
+      priceMin: null,
+      priceMax: 400,
+      currency: null,
+      colorsInclude: [],
+      colorsExclude: ["black"],
+      occasion: "wedding",
+      size: null,
+      availabilityRequired: false,
+      softAttributes: ["elegant"],
+    });
+    const extractor = createIntentExtractor({ llm });
+
+    const intent = await extractor.extract("same but cheaper", {
+      previousIntent,
+    });
+
+    expect(intent.priceMax).toBe(300);
+    expect(intent.occasion).toBe("wedding");
+    expect(intent.colorsExclude).toEqual(["black"]);
+  });
+
+  it("does not run without a previous intent, even on comparative phrasing", async () => {
+    const { llm } = llmStub({
+      category: null,
+      priceMin: null,
+      priceMax: 400,
+      currency: null,
+      colorsInclude: [],
+      colorsExclude: [],
+      occasion: null,
+      size: null,
+      availabilityRequired: false,
+      softAttributes: ["cheaper"],
+    });
+    const extractor = createIntentExtractor({ llm });
+
+    const intent = await extractor.extract("cheaper dresses under 400");
+
+    expect(intent.priceMax).toBe(400);
+  });
+});
+
+describe("refinement worked example (YOY-52)", () => {
+  it("shows a comparative refinement preserving untouched constraints, in golden-free vocabulary", async () => {
+    const previousIntent: Intent = scenarios[0]!.expected;
+    const { llm, calls } = llmStub(scenarios[0]!.recorded);
+    const extractor = createIntentExtractor({ llm });
+
+    await extractor.extract("same but cheaper", { previousIntent });
+
+    const prompt = calls[0]!.prompt;
+    expect(prompt).toContain("Worked example");
+    expect(prompt).toContain('"occasion": "sport"');
+    expect(prompt).toContain('"category": "boots"');
+    // The example must never collide with the replay's recording key.
+    const keyLines = prompt
+      .split("\n")
+      .filter((line) => /^(?:Title|Query): /.test(line));
+    expect(keyLines).toEqual(["Query: same but cheaper"]);
   });
 });

@@ -32,6 +32,7 @@ export {
 
 export {
   createIntentExtractor,
+  enforceComparativeBounds,
   INTENT_SCHEMA,
   IntentExtractionError,
   parseIntent,
