@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  carryOverRefinementConstraints,
   createIntentExtractor,
   enforceComparativeBounds,
   INTENT_SCHEMA,
   IntentExtractionError,
+  mergeRefinementIntent,
   parseIntent,
+  parseRefinementAnswer,
+  REFINEMENT_INTENT_SCHEMA,
   type Intent,
   type LlmClient,
   type StructuredCompletionRequest,
@@ -335,7 +339,10 @@ describe("refinement context (YOY-42 AC-1, AC-4)", () => {
   });
 
   it("asks for a merged-or-fresh full intent when a previous intent is supplied", async () => {
-    const { llm, calls } = llmStub(scenarios[0]!.recorded);
+    const { llm, calls } = llmStub({
+      ...scenarios[0]!.recorded,
+      outcome: "refinement",
+    });
     const extractor = createIntentExtractor({ llm });
 
     await extractor.extract("same but cheaper", { previousIntent });
@@ -345,14 +352,17 @@ describe("refinement context (YOY-42 AC-1, AC-4)", () => {
     expect(prompt).toContain("TOPIC CHANGE");
     expect(prompt).toContain('"category": "dress"');
     expect(prompt).toContain('"colorsExclude": [');
-    // The schema and operation are unchanged: refinement is a prompt-level
-    // contract, not a new port call shape.
-    expect(calls[0]!.schema).toBe(INTENT_SCHEMA);
+    // A refinement call carries the outcome-judgment schema (YOY-52 run-5
+    // directive); the answer stays a full Intent, never a patch.
+    expect(calls[0]!.schema).toBe(REFINEMENT_INTENT_SCHEMA);
     expect(calls[0]!.operation).toBe("intent");
   });
 
   it("keeps the query line last and unambiguous for replay keying (AC-4)", async () => {
-    const { llm, calls } = llmStub(scenarios[0]!.recorded);
+    const { llm, calls } = llmStub({
+      ...scenarios[0]!.recorded,
+      outcome: "refinement",
+    });
     const extractor = createIntentExtractor({ llm });
 
     await extractor.extract("same but cheaper", { previousIntent });
@@ -368,7 +378,7 @@ describe("refinement context (YOY-42 AC-1, AC-4)", () => {
   it("carries the previous intent into the retry attempt too", async () => {
     const { llm, calls } = llmStub(
       { colorsInclude: "not-an-array" },
-      scenarios[0]!.recorded,
+      { ...scenarios[0]!.recorded, outcome: "refinement" },
     );
     const extractor = createIntentExtractor({ llm });
 
@@ -376,6 +386,22 @@ describe("refinement context (YOY-42 AC-1, AC-4)", () => {
 
     expect(calls).toHaveLength(2);
     expect(calls[1]!.prompt).toBe(calls[0]!.prompt);
+  });
+
+  it("retries an answer missing the outcome judgment, then errors out", async () => {
+    // A full Intent without the outcome field is schema-violating on a
+    // refinement call: code cannot infer the judgment, so it must retry
+    // rather than guess.
+    const { llm, calls } = llmStub(
+      scenarios[0]!.recorded,
+      scenarios[0]!.recorded,
+    );
+    const extractor = createIntentExtractor({ llm });
+
+    await expect(
+      extractor.extract("same but cheaper", { previousIntent }),
+    ).rejects.toBeInstanceOf(IntentExtractionError);
+    expect(calls).toHaveLength(2);
   });
 });
 
@@ -627,6 +653,7 @@ describe("deterministic comparative enforcement (YOY-52 AC-15)", () => {
     };
     // The model echoes the previous cap unchanged — the live failure shape.
     const { llm } = llmStub({
+      outcome: "refinement",
       category: "dress",
       priceMin: null,
       priceMax: 400,
@@ -673,7 +700,10 @@ describe("deterministic comparative enforcement (YOY-52 AC-15)", () => {
 describe("refinement worked example (YOY-52)", () => {
   it("shows a comparative refinement preserving untouched constraints, in golden-free vocabulary", async () => {
     const previousIntent: Intent = scenarios[0]!.expected;
-    const { llm, calls } = llmStub(scenarios[0]!.recorded);
+    const { llm, calls } = llmStub({
+      ...scenarios[0]!.recorded,
+      outcome: "refinement",
+    });
     const extractor = createIntentExtractor({ llm });
 
     await extractor.extract("same but cheaper", { previousIntent });
@@ -682,10 +712,157 @@ describe("refinement worked example (YOY-52)", () => {
     expect(prompt).toContain("Worked example");
     expect(prompt).toContain('"occasion": "sport"');
     expect(prompt).toContain('"category": "boots"');
+    // The example demonstrates the outcome judgment the schema requires.
+    expect(prompt).toContain('"outcome": "refinement"');
+    expect(prompt).toContain('"topic_change"');
     // The example must never collide with the replay's recording key.
     const keyLines = prompt
       .split("\n")
       .filter((line) => /^(?:Title|Query): /.test(line));
     expect(keyLines).toEqual(["Query: same but cheaper"]);
+  });
+});
+
+describe("deterministic constraint carry-over (YOY-52 run-5 directive)", () => {
+  function intent(overrides: Partial<Intent>): Intent {
+    return {
+      colorsInclude: [],
+      colorsExclude: [],
+      availabilityRequired: false,
+      softAttributes: [],
+      ...overrides,
+    };
+  }
+
+  const previous = intent({
+    category: "dress",
+    priceMax: 400,
+    colorsExclude: ["black"],
+    occasion: "wedding",
+    softAttributes: ["elegant"],
+  });
+
+  it("restores a constraint the model dropped — the roaming-drop shape", () => {
+    // r01's live failure: occasion set previously, model returns it absent
+    // on a refinement. Unphrased omission never clears a constraint.
+    const merged = carryOverRefinementConstraints(
+      previous,
+      intent({ category: "dress", priceMax: 400, colorsExclude: ["black"] }),
+    );
+    expect(merged.occasion).toBe("wedding");
+    expect(merged.colorsExclude).toEqual(["black"]);
+    expect(merged.priceMax).toBe(400);
+  });
+
+  it("keeps the model's own changed values over the previous ones", () => {
+    const merged = carryOverRefinementConstraints(
+      previous,
+      intent({
+        category: "dress",
+        priceMax: 250,
+        colorsInclude: ["red"],
+        colorsExclude: ["black"],
+        occasion: "evening",
+      }),
+    );
+    expect(merged.priceMax).toBe(250);
+    expect(merged.colorsInclude).toEqual(["red"]);
+    expect(merged.occasion).toBe("evening");
+  });
+
+  it("leaves availabilityRequired and softAttributes to the model", () => {
+    const withAvailability = intent({
+      ...previous,
+      availabilityRequired: true,
+      softAttributes: ["elegant"],
+    });
+    const merged = carryOverRefinementConstraints(
+      withAvailability,
+      intent({ category: "dress", softAttributes: ["בקיץ"] }),
+    );
+    // false is availabilityRequired's resting value, not an absent one —
+    // restoring it would be a guess; soft attributes are not constraints.
+    expect(merged.availabilityRequired).toBe(false);
+    expect(merged.softAttributes).toEqual(["בקיץ"]);
+  });
+
+  it("mergeRefinementIntent discards everything on an explicit topic change", () => {
+    const fresh = intent({ category: "sneakers", softAttributes: ["nike"] });
+    const merged = mergeRefinementIntent("nike air max 90", previous, {
+      outcome: "topic_change",
+      intent: fresh,
+    });
+    expect(merged).toEqual(fresh);
+    expect(merged.occasion).toBeUndefined();
+    expect(merged.priceMax).toBeUndefined();
+  });
+
+  it("composes with comparative enforcement: restore first, then move the bound", () => {
+    // The model both drops the previous cap AND fails to tighten: carry-over
+    // restores 400, then cheaper-enforcement moves it to 300.
+    const merged = mergeRefinementIntent("same but cheaper", previous, {
+      outcome: "refinement",
+      intent: intent({ category: "dress", colorsExclude: ["black"] }),
+    });
+    expect(merged.priceMax).toBe(300);
+    expect(merged.occasion).toBe("wedding");
+  });
+
+  it("enforcement clears a restored cap a more-expensive follow-up contradicts", () => {
+    // r09's shape: previous has only a cap; the model raises the floor but
+    // returns no cap. Carry-over restores the 300 cap; enforcement then
+    // clears it as contradicted by the new floor.
+    const skirt = intent({ category: "skirt", priceMax: 300 });
+    const merged = mergeRefinementIntent("יותר יקר", skirt, {
+      outcome: "refinement",
+      intent: intent({ category: "skirt", priceMin: 375 }),
+    });
+    expect(merged.priceMin).toBe(375);
+    expect(merged.priceMax).toBeUndefined();
+  });
+
+  describe("parseRefinementAnswer", () => {
+    const valid = { ...scenarios[0]!.recorded, outcome: "refinement" };
+
+    it("parses a full intent plus the outcome judgment", () => {
+      const answer = parseRefinementAnswer(valid);
+      expect(answer?.outcome).toBe("refinement");
+      expect(answer?.intent).toEqual(scenarios[0]!.expected);
+      expect(
+        parseRefinementAnswer({ ...valid, outcome: "topic_change" })?.outcome,
+      ).toBe("topic_change");
+    });
+
+    it("rejects a missing, unknown, or wrong-typed outcome", () => {
+      expect(parseRefinementAnswer(scenarios[0]!.recorded)).toBeNull();
+      expect(parseRefinementAnswer({ ...valid, outcome: "fresh" })).toBeNull();
+      expect(parseRefinementAnswer({ ...valid, outcome: null })).toBeNull();
+      expect(parseRefinementAnswer(null)).toBeNull();
+    });
+
+    it("rejects an intent-invalid answer even with a valid outcome", () => {
+      expect(
+        parseRefinementAnswer({ ...valid, colorsInclude: "not-an-array" }),
+      ).toBeNull();
+    });
+  });
+
+  it("REFINEMENT_INTENT_SCHEMA requires the outcome judgment", () => {
+    expect(REFINEMENT_INTENT_SCHEMA.required).toContain("outcome");
+    const outcome = (
+      REFINEMENT_INTENT_SCHEMA.properties as Record<
+        string,
+        Record<string, unknown>
+      >
+    ).outcome!;
+    expect(outcome.enum).toEqual(["refinement", "topic_change"]);
+    // Everything else is the Intent shape, unchanged.
+    for (const key of Object.keys(
+      INTENT_SCHEMA.properties as Record<string, unknown>,
+    )) {
+      expect(
+        (REFINEMENT_INTENT_SCHEMA.properties as Record<string, unknown>)[key],
+      ).toBeDefined();
+    }
   });
 });
