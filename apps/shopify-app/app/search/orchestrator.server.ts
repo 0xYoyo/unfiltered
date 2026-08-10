@@ -29,6 +29,13 @@ import {
  *   keyword engine and carry no chips. A classifier failure or timeout
  *   surfaces as reason "model-error" (the classifier never rejects) and is
  *   served as classic results with `degraded: true`.
+ * - Classic zero hits (YOY-67 AC-3): a genuine classic route (heuristic or
+ *   model-decided — not throttled, not already degraded) whose keyword
+ *   search returns nothing for a non-empty query escalates once into the
+ *   full AI path under reason "classic-zero-hit" — a cross-language query
+ *   the model routed classic must not dead-end on a Latin-indexed catalog.
+ *   The escalation runs the ladder below it unchanged; its own failure
+ *   degrades back to the empty classic response without re-escalating.
  * - Any AI-path failure — intent LLM error or timeout (the Gemini adapter's
  *   GeminiTimeoutError/GeminiApiError taxonomy propagates through the
  *   extractor port), IntentExtractionError, embedding failure, retrieval
@@ -66,13 +73,16 @@ const DEFAULT_LIMIT = 10;
 /**
  * Why the response took the route it did: the classifier's reason,
  * "resolved-intent" when the caller supplied the intent itself (chip
- * removal, YOY-46) and no classification ran, or "throttled" when the
- * caller forced the classic path (YOY-47) and no classification ran.
+ * removal, YOY-46) and no classification ran, "throttled" when the
+ * caller forced the classic path (YOY-47) and no classification ran, or
+ * "classic-zero-hit" when a genuine classic route found nothing and
+ * escalated once into the AI path (YOY-67 AC-3).
  */
 export type SearchRouteReason =
   | ClassificationReason
   | "resolved-intent"
-  | "throttled";
+  | "throttled"
+  | "classic-zero-hit";
 
 /** One orchestrated search request. */
 export interface SearchRequest {
@@ -207,8 +217,24 @@ export function createSearchOrchestrator(
         routeReason: SearchRouteReason,
         degraded: boolean,
         intent: Intent | null = null,
+        escalateOnEmpty = false,
       ): Promise<SearchResponse> => {
         const result = await classicStore.search({ shopDomain, query, limit });
+        if (
+          escalateOnEmpty &&
+          result.hits.length === 0 &&
+          query.trim() !== ""
+        ) {
+          // Classic zero hits must not be a dead end (YOY-67 AC-3): the
+          // keyword engine has nothing for this query — a cross-language
+          // query against a Latin index being the live-run shape — so the
+          // search escalates ONCE into the full AI path. Only a genuine
+          // classic route escalates: throttled responses stay classic by
+          // budget decision, degraded fallbacks already failed the AI path,
+          // and the escalation's own failure lands back here with
+          // escalateOnEmpty unset, so there is no loop.
+          return escalatedAiPath();
+        }
         return {
           searchId,
           route: "classic",
@@ -337,6 +363,27 @@ export function createSearchOrchestrator(
         };
       };
 
+      /**
+       * The one-time classic zero-hit escalation (YOY-67 AC-3): the full AI
+       * path from intent extraction down, under reason "classic-zero-hit" so
+       * the caller's budget accounting can see LLM spend happened. An
+       * extraction failure degrades back to the (still empty) classic
+       * response rather than surfacing an error.
+       */
+      const escalatedAiPath = async (): Promise<SearchResponse> => {
+        let intent: Intent;
+        try {
+          intent = await extractor.extract(query, {
+            shopDomain,
+            searchId,
+            previousIntent: request.previousIntent,
+          });
+        } catch {
+          return classicResponse("classic-zero-hit", true);
+        }
+        return aiPath(intent, "classic-zero-hit");
+      };
+
       if (request.forceClassic === true) {
         // Throttled (YOY-47): the caller has decided this session spent its
         // AI budget — classic keyword results, zero LLM calls, degraded so
@@ -360,11 +407,11 @@ export function createSearchOrchestrator(
       if (decision.route === "classic") {
         // "model-error" means the model was needed and failed — served
         // classic, but flagged degraded (AC-4). Heuristic and model-decided
-        // classic routes are the genuine article.
-        return classicResponse(
-          decision.reason,
-          decision.reason === "model-error",
-        );
+        // classic routes are the genuine article, and only those escalate
+        // when the keyword engine comes back empty (YOY-67 AC-3) — a failing
+        // model is not asked to rescue its own failure.
+        const degraded = decision.reason === "model-error";
+        return classicResponse(decision.reason, degraded, null, !degraded);
       }
 
       let intent: Intent;

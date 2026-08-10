@@ -305,10 +305,12 @@ describe("eval run (AC-2, AC-3, AC-4, AC-6)", () => {
     const classic = result.perQuery.filter(
       (score) => score.golden.expectedRoute === "classic",
     );
-    expect(classic.length).toBeGreaterThanOrEqual(8);
-    // The specified mix: exact EN, EN typo, Hebrew, and SKU-like queries.
+    // Six controls since YOY-67 AC-2: the three Hebrew short-query classic
+    // goldens re-routed to the AI path — the Option B contract settles
+    // cross-script queries at the model, never by length — leaving the
+    // exact EN, EN typo, quoted-phrase, and SKU-like shapes.
+    expect(classic.length).toBeGreaterThanOrEqual(6);
     expect(classic.some((score) => score.golden.language === "en")).toBe(true);
-    expect(classic.some((score) => score.golden.language === "he")).toBe(true);
     expect(classic.some((score) => /\d/.test(score.golden.query))).toBe(true);
     for (const score of classic) {
       expect(score.route, score.golden.id).toBe("classic");
@@ -326,6 +328,22 @@ describe("eval run (AC-2, AC-3, AC-4, AC-6)", () => {
         // calls (AC-5).
         expect(score.costUsd, score.golden.id).toBe(0);
       }
+    }
+  });
+
+  it("routes the Hebrew short-query goldens to the AI path (YOY-67 AC-2)", () => {
+    // The documented consequence of the non-Latin heuristic guard: these
+    // three settled classic by the short-query rule before; under the Option
+    // B contract the model decides them, and cross-language routes ai. Their
+    // classification recordings are synthesized until the run-8 live
+    // regeneration replaces them.
+    for (const id of ["gc05", "gc06", "gc08"]) {
+      const score = result.perQuery.find((entry) => entry.golden.id === id);
+      expect(score, `${id} did not run`).toBeDefined();
+      expect(score!.route, id).toBe("ai");
+      expect(score!.routeReason, id).toBe("model");
+      // The full AI path spends real per-search money now.
+      expect(score!.costUsd, id).toBeGreaterThan(0);
     }
   });
 

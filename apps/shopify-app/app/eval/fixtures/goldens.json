@@ -454,17 +454,16 @@
     "id": "gc05",
     "language": "he",
     "query": "שמלת ערב",
-    "expectedRoute": "classic",
     "expectedProductIds": [
       "p03"
     ],
     "hardConstraints": {
-      "category": null,
+      "category": "dress",
       "priceMin": null,
       "priceMax": null,
       "colorsInclude": [],
       "colorsExclude": [],
-      "occasion": null,
+      "occasion": "evening",
       "availabilityRequired": false
     }
   },
@@ -472,17 +471,16 @@
     "id": "gc06",
     "language": "he",
     "query": "שמלת ערבב",
-    "expectedRoute": "classic",
     "expectedProductIds": [
       "p03"
     ],
     "hardConstraints": {
-      "category": null,
+      "category": "dress",
       "priceMin": null,
       "priceMax": null,
       "colorsInclude": [],
       "colorsExclude": [],
-      "occasion": null,
+      "occasion": "evening",
       "availabilityRequired": false
     }
   },
@@ -508,12 +506,11 @@
     "id": "gc08",
     "language": "he",
     "query": "שמלת קיץ",
-    "expectedRoute": "classic",
     "expectedProductIds": [
       "p05"
     ],
     "hardConstraints": {
-      "category": null,
+      "category": "dress",
       "priceMin": null,
       "priceMax": null,
       "colorsInclude": [],

@@ -59,11 +59,11 @@ describe("heuristic fast path (AC-1, AC-5)", () => {
     ["SM-1234-XL", "sku-pattern"],
     ["SB-2024", "sku-pattern"],
     ["900", "sku-pattern"],
-    ["מכנסי ג'ינס 501", "sku-pattern"],
     ["snowboard", "short-query"],
-    ["שמלה", "short-query"],
-    ["נעלי ספורט", "short-query"],
     ["aurora dress", "short-query"],
+    // Quoted-phrase intent is script-independent (YOY-67 AC-2): the
+    // non-Latin guard exempts only the length/shape rules, not this one.
+    ['"שמלת ערב"', "quoted-phrase"],
   ];
 
   for (const [query, reason] of classicFixtures) {
@@ -104,6 +104,15 @@ describe("model escalation (AC-2, AC-5)", () => {
     // shape ("black dress") also escalates here; the MODEL routes it
     // classic per the hybrid ladder, which the eval goldens pin.
     "שמלה שחורה",
+    // Non-Latin letters disarm the short-query and sku-pattern settling
+    // rules (YOY-67 AC-2, Option B): a cross-language query is never
+    // decided by length or digit shape — the hand check's `סנובורד`
+    // dead-ended in classic exactly because the 1-token rule settled it
+    // before the model could see it.
+    "סנובורד",
+    "שמלה",
+    "נעלי ספורט",
+    "מכנסי ג'ינס 501",
   ];
 
   for (const query of aiFixtures) {
