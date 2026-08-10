@@ -1,199 +1,195 @@
 {
   "modelId": "gemini-3.6-flash",
-  "provenance": "synthesized",
+  "provenance": "live",
   "entries": {
     "same but cheaper": {
       "output": {
-        "outcome": "refinement",
-        "category": "dress",
-        "priceMin": null,
-        "priceMax": 250,
-        "currency": null,
         "colorsInclude": [],
         "colorsExclude": [
           "black"
         ],
-        "occasion": "wedding",
-        "size": null,
         "availabilityRequired": false,
         "softAttributes": [
           "elegant",
           "summer"
-        ]
+        ],
+        "outcome": "refinement",
+        "category": "dress",
+        "currency": null,
+        "occasion": "wedding",
+        "priceMax": 300,
+        "priceMin": null,
+        "size": null
       },
-      "inputTokens": 561,
-      "outputTokens": 98
+      "inputTokens": 932,
+      "outputTokens": 110
     },
     "בלי שרוולים": {
       "output": {
-        "outcome": "refinement",
-        "category": "dress",
-        "priceMin": null,
-        "priceMax": 400,
-        "currency": null,
         "colorsInclude": [],
         "colorsExclude": [
           "black"
         ],
-        "occasion": "wedding",
-        "size": null,
         "availabilityRequired": false,
         "softAttributes": [
           "אלגנטית",
           "בקיץ",
-          "ללא שרוולים"
-        ]
+          "בלי שרוולים"
+        ],
+        "outcome": "refinement",
+        "category": "dress",
+        "currency": null,
+        "occasion": "wedding",
+        "priceMax": 400,
+        "priceMin": null,
+        "size": null
       },
-      "inputTokens": 574,
-      "outputTokens": 71
+      "inputTokens": 938,
+      "outputTokens": 66
     },
     "nike air max 90": {
       "output": {
-        "outcome": "topic_change",
-        "category": "sneakers",
-        "priceMin": null,
-        "priceMax": null,
-        "currency": null,
         "colorsInclude": [],
         "colorsExclude": [],
-        "occasion": null,
-        "size": null,
         "availabilityRequired": false,
         "softAttributes": [
           "nike",
           "air max 90"
-        ]
+        ],
+        "outcome": "topic_change",
+        "category": "sneakers",
+        "currency": null,
+        "occasion": null,
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
       },
-      "inputTokens": 563,
-      "outputTokens": 52
+      "inputTokens": 935,
+      "outputTokens": 104
     },
     "בצבע אדום": {
       "output": {
-        "outcome": "refinement",
-        "category": "coat",
-        "priceMin": null,
-        "priceMax": 500,
-        "currency": null,
         "colorsInclude": [
           "red"
         ],
         "colorsExclude": [
           "black"
         ],
-        "occasion": null,
-        "size": null,
         "availabilityRequired": false,
         "softAttributes": [
           "חם",
           "לחורף"
-        ]
+        ],
+        "outcome": "refinement",
+        "category": "coat",
+        "priceMax": 500
       },
-      "inputTokens": 566,
-      "outputTokens": 64
+      "inputTokens": 929,
+      "outputTokens": 42
     },
     "מידה M in stock only": {
       "output": {
-        "outcome": "refinement",
-        "category": "dress",
-        "priceMin": null,
-        "priceMax": null,
-        "currency": null,
         "colorsInclude": [
           "black"
         ],
         "colorsExclude": [],
-        "occasion": "evening",
-        "size": "M",
         "availabilityRequired": true,
         "softAttributes": [
           "formal",
           "gala"
-        ]
-      },
-      "inputTokens": 559,
-      "outputTokens": 60
-    },
-    "אותו דבר אבל יותר זול": {
-      "output": {
+        ],
         "outcome": "refinement",
         "category": "dress",
+        "currency": null,
+        "occasion": "evening",
+        "priceMax": null,
         "priceMin": null,
-        "priceMax": 675,
-        "currency": null,
-        "colorsInclude": [
-          "blue"
-        ],
-        "colorsExclude": [],
-        "occasion": "wedding",
-        "size": null,
-        "availabilityRequired": false,
-        "softAttributes": [
-          "אלגנטית"
-        ]
+        "size": "m"
       },
-      "inputTokens": 578,
-      "outputTokens": 74
-    },
-    "show me more expensive ones": {
-      "output": {
-        "outcome": "refinement",
-        "category": "coat",
-        "priceMin": 260,
-        "priceMax": null,
-        "currency": null,
-        "colorsInclude": [],
-        "colorsExclude": [],
-        "occasion": null,
-        "size": null,
-        "availabilityRequired": false,
-        "softAttributes": [
-          "wool",
-          "winter"
-        ]
-      },
-      "inputTokens": 555,
-      "outputTokens": 62
-    },
-    "יותר יקר": {
-      "output": {
-        "outcome": "refinement",
-        "category": "skirt",
-        "priceMin": 375,
-        "priceMax": null,
-        "currency": null,
-        "colorsInclude": [],
-        "colorsExclude": [
-          "black"
-        ],
-        "occasion": null,
-        "size": null,
-        "availabilityRequired": false,
-        "softAttributes": [
-          "למסיבה"
-        ]
-      },
-      "inputTokens": 549,
-      "outputTokens": 58
+      "inputTokens": 925,
+      "outputTokens": 110
     },
     "under 500 and only what is in stock": {
       "output": {
-        "outcome": "refinement",
-        "category": "sneakers",
-        "priceMin": null,
-        "priceMax": 500,
-        "currency": null,
         "colorsInclude": [],
         "colorsExclude": [],
-        "occasion": null,
-        "size": null,
         "availabilityRequired": true,
         "softAttributes": [
           "nike",
           "air max 90"
-        ]
+        ],
+        "outcome": "refinement",
+        "category": "sneakers",
+        "currency": null,
+        "occasion": null,
+        "priceMax": 500,
+        "priceMin": null,
+        "size": null
       },
-      "inputTokens": 552,
-      "outputTokens": 55
+      "inputTokens": 918,
+      "outputTokens": 59
+    },
+    "אותו דבר אבל יותר זול": {
+      "output": {
+        "colorsInclude": [
+          "blue"
+        ],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "אלגנטית"
+        ],
+        "outcome": "refinement",
+        "category": "dress",
+        "currency": null,
+        "occasion": "wedding",
+        "priceMax": 675,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 933,
+      "outputTokens": 108
+    },
+    "show me more expensive ones": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "wool",
+          "winter"
+        ],
+        "outcome": "refinement",
+        "category": "coat",
+        "currency": null,
+        "occasion": null,
+        "priceMax": null,
+        "priceMin": 250,
+        "size": null
+      },
+      "inputTokens": 918,
+      "outputTokens": 54
+    },
+    "יותר יקר": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [
+          "black"
+        ],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "למסיבה"
+        ],
+        "outcome": "refinement",
+        "category": "skirt",
+        "currency": null,
+        "occasion": null,
+        "priceMax": null,
+        "priceMin": 375,
+        "size": null
+      },
+      "inputTokens": 923,
+      "outputTokens": 108
     }
   }
 }
