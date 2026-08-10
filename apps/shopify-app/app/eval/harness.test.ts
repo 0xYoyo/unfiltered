@@ -12,6 +12,12 @@ import {
   type EvalRunResult,
   type Golden,
 } from "./harness.server";
+import { assertEngineSourceExecution } from "./source-guard.server";
+
+// Same source-execution guard as regenerate-live.test.ts (YOY-52 run-6): an
+// offline eval scored against dist-resolved engine logic is as misleading as
+// a live one, and the check is free.
+assertEngineSourceExecution();
 
 // The sparse-catalog quality harness (YOY-27): one deterministic offline eval
 // run over recorded fixtures, asserted against the M2 pass bar. Runs inside
