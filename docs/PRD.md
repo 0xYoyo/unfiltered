@@ -110,6 +110,24 @@ Numbered capabilities, each observable behavior:
     cost is absorbed as COGS (measured ceiling: single-digit dollars per
     1,000 products).
 
+**Parity floor (added 2026-08-10).** Any capability directly comparable
+to the incumbent search experience — plain keyword lookup, typo
+handling, result relevance on simple queries, empty states,
+responsiveness feel — must be at parity or better with the storefront's
+stock search for the same query. The AI tier only ever upgrades the
+baseline; it never gates, degrades, or replaces it with something worse.
+A regression against the stock experience on a simple query is a launch
+blocker, and every milestone touching the shopper path verifies this in
+its live-run tail.
+
+**Interaction model (decided 2026-08-10, implemented in YOY-68,
+pre-M4).** While the shopper types, the bar behaves like a normal search
+bar: live, debounced, classic-only results per keystroke — free and
+instant. The full Unfiltered pipeline (classificationnderstanding,
+chips, refinement, rescue) fires only on explicit submit (Enter or the
+magnifier). Keystroke previews consume no AI budget and are not logged
+as searches.
+
 ## 4. Explicitly out of v1 (Later)
 1. Image-input search ("a shoe like this Prada" + photo). Reuses the
    vision infrastructure built in the vision milestone.
@@ -133,8 +151,19 @@ Numbered capabilities, each observable behavior:
 query: instant classic results in the store's normal results layout → NL
 query: brief loading state, then results grid with filter chips on top →
 optionally edits chips or types a refinement → clicks a product (click
-recorded) → buys or not. Mobile-first rendering; the widget inherits the
-store theme's fonts/colors where feasible.
+recorded) → buys or not. Mobile-first rendering; the widget's presence must feel
+native to the store, not like a foreign takeover. Product intent
+(sharpened 2026-08-10): Unfiltered intercepts the query and returns
+better matches — it does not replace or redesign the store's results
+experience. The rendering approach must maximize reuse of the store's
+own visual language (theme components/markup where Shopify technically
+allows, CSS inheritance where it does not), and a one-size-fits-all
+Unfiltered-branded results page is explicitly rejected, as is per-store
+manual styling as an ongoing operating model. The exact mechanism (theme
+component reuse vs. Section Rendering API vs. deep CSS inheritance, and
+what is technically reachable per the generation) is an open engineering
+question requiring a research spike, specced no later than M6; its
+conclusion may adjust this section.
 
 **Merchant flow:** finds app via App Store search → listing → install →
 OAuth + billing consent (trial) → guided onboarding: indexing progress →
