@@ -120,10 +120,19 @@ A regression against the stock experience on a simple query is a launch
 blocker, and every milestone touching the shopper path verifies this in
 its live-run tail.
 
+**Self-removal kill switch (added 2026-08-10).** Capability 6 covers
+AI-call failures; this covers genuine application bugs. If Unfiltered
+itself is broken in a way that impairs a store's ability to search at
+all, the widget must be able to fully disable itself — per store,
+remotely, and automatically on repeated hard failures — restoring the
+store's native search untouched, without a theme edit or reinstall.
+Merchants never inherit our downtime. Mechanism specced with M6's
+operational work.
+
 **Interaction model (decided 2026-08-10, implemented in YOY-68,
 pre-M4).** While the shopper types, the bar behaves like a normal search
 bar: live, debounced, classic-only results per keystroke — free and
-instant. The full Unfiltered pipeline (classificationnderstanding,
+instant. The full Unfiltered pipeline (classification, AI understanding,
 chips, refinement, rescue) fires only on explicit submit (Enter or the
 magnifier). Keystroke previews consume no AI budget and are not logged
 as searches.
@@ -161,9 +170,12 @@ allows, CSS inheritance where it does not), and a one-size-fits-all
 Unfiltered-branded results page is explicitly rejected, as is per-store
 manual styling as an ongoing operating model. The exact mechanism (theme
 component reuse vs. Section Rendering API vs. deep CSS inheritance, and
-what is technically reachable per the generation) is an open engineering
+what is technically reachable per theme generation) is an open engineering
 question requiring a research spike, specced no later than M6; its
-conclusion may adjust this section.
+conclusion may adjust this section. Hard bar (2026-08-10): the
+shopper-visible footprint may not exceed chips-level additions; the
+store's existing design is preserved at a 90–95% minimum. Harming a
+store's design is treated as a defect, not a trade-off.
 
 **Merchant flow:** finds app via App Store search → listing → install →
 OAuth + billing consent (trial) → guided onboarding: indexing progress →
