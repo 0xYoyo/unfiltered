@@ -128,6 +128,84 @@ function serializePreviousIntent(intent: Intent): string {
 }
 
 /**
+ * Comparative phrasing lexicon (YOY-52 AC-15). Deliberately small, EN + HE,
+ * matched as substrings of the raw follow-up query: an unlisted phrasing
+ * simply gets no deterministic enforcement and the model's own answer stands.
+ */
+const CHEAPER_PHRASES = ["cheaper", "less expensive", "יותר זול", "זול יותר"];
+const PRICIER_PHRASES = [
+  "more expensive",
+  "pricier",
+  "יותר יקר",
+  "יקר יותר",
+];
+
+/** Bound applied when the model names no figure of its own: 75% of the
+ * previous bound on "cheaper", 125% on "more expensive". */
+const CHEAPER_FACTOR = 0.75;
+const PRICIER_FACTOR = 1.25;
+
+function matchesAny(query: string, phrases: string[]): boolean {
+  return phrases.some((phrase) => query.includes(phrase));
+}
+
+/**
+ * Deterministic comparative enforcement (YOY-52 AC-15): after two live
+ * regeneration runs, prompt-only instruction still let comparative follow-ups
+ * echo the previous price bound unchanged, so the direction guarantee lives
+ * in code. When the follow-up query carries comparative-cheaper phrasing, the
+ * merged intent's priceMax must land strictly below the previous bound
+ * (previous priceMax, else previous priceMin); comparative-more-expensive
+ * must put priceMin strictly above the previous floor (previous priceMin,
+ * else previous priceMax). A cooperative model's own figure passes untouched;
+ * an uncooperative echo is overridden to 75% / 125% of the previous bound. A
+ * bound the enforcement contradicts (a floor at or above the new cap, a cap
+ * at or below the new floor) is cleared rather than shipped as an
+ * empty-result filter. A query matching both directions is ambiguous and left
+ * to the model.
+ */
+export function enforceComparativeBounds(
+  query: string,
+  previousIntent: Intent,
+  intent: Intent,
+): Intent {
+  const normalized = query.trim().replace(/\s+/g, " ").toLowerCase();
+  const cheaper = matchesAny(normalized, CHEAPER_PHRASES);
+  const pricier = matchesAny(normalized, PRICIER_PHRASES);
+  if (cheaper === pricier) {
+    return intent;
+  }
+  if (cheaper) {
+    const bound = previousIntent.priceMax ?? previousIntent.priceMin;
+    if (bound === undefined) {
+      return intent;
+    }
+    const priceMax =
+      intent.priceMax !== undefined && intent.priceMax < bound
+        ? intent.priceMax
+        : bound * CHEAPER_FACTOR;
+    const priceMin =
+      intent.priceMin !== undefined && intent.priceMin >= priceMax
+        ? undefined
+        : intent.priceMin;
+    return { ...intent, priceMin, priceMax };
+  }
+  const floor = previousIntent.priceMin ?? previousIntent.priceMax;
+  if (floor === undefined) {
+    return intent;
+  }
+  const priceMin =
+    intent.priceMin !== undefined && intent.priceMin > floor
+      ? intent.priceMin
+      : floor * PRICIER_FACTOR;
+  const priceMax =
+    intent.priceMax !== undefined && intent.priceMax <= priceMin
+      ? undefined
+      : intent.priceMax;
+  return { ...intent, priceMin, priceMax };
+}
+
+/**
  * Refinement instructions, appended only when the caller supplies a previous
  * intent. Without one the prompt stays byte-for-byte what it was before
  * YOY-42, so recordings and caches keyed on it remain valid.
@@ -147,6 +225,17 @@ function refinementSection(previousIntent: Intent): string[] {
     '  "more expensive" ("יותר יקר") returns a priceMin strictly above the',
     "  previous priceMin, or above the previous priceMax when only that",
     "  bound exists — clearing the now-contradicted priceMax.",
+    "  Worked example of a comparative refinement — previous intent:",
+    '    {"category": "boots", "priceMax": 80, "colorsInclude": ["purple"],',
+    '     "colorsExclude": [], "occasion": "sport",',
+    '     "availabilityRequired": false, "softAttributes": ["waterproof"]}',
+    '  follow-up "pricier" answers:',
+    '    {"category": "boots", "priceMin": 100, "priceMax": null,',
+    '     "colorsInclude": ["purple"], "colorsExclude": [],',
+    '     "occasion": "sport", "availabilityRequired": false,',
+    '     "softAttributes": ["waterproof"]}',
+    "  — the named bound moved, and every constraint the follow-up did not",
+    "  touch (occasion included) returned verbatim.",
     "- a TOPIC CHANGE (it names a different product or search altogether):",
     "  discard the previous intent entirely and extract the new query alone,",
     "  carrying nothing over.",
@@ -273,7 +362,9 @@ export function parseIntent(value: unknown): Intent | null {
     colorsInclude,
     colorsExclude,
     occasion: normalizedConstraint(occasion ?? undefined, normalizeOccasion),
-    size: size ?? undefined,
+    // Size casing is canonicalized at parse (YOY-52): the model answers "m"
+    // or "M" interchangeably, and downstream comparison must not care.
+    size: (size ?? undefined)?.toUpperCase(),
     availabilityRequired,
     softAttributes,
   };
@@ -298,6 +389,10 @@ export function createIntentExtractor(
       prompt: buildIntentPrompt(query, context?.previousIntent),
       schema: INTENT_SCHEMA,
       operation: "intent",
+      // Structured extraction has no use for sampling variance, and
+      // run-to-run eval stability requires determinism (YOY-52) — same rule
+      // as classification.
+      temperature: 0,
       shopDomain: context?.shopDomain,
       searchId: context?.searchId,
     });
@@ -306,17 +401,16 @@ export function createIntentExtractor(
 
   return {
     async extract(query, context) {
-      const first = await attempt(query, context);
-      if (first !== null) {
-        return first;
+      const extracted =
+        (await attempt(query, context)) ?? (await attempt(query, context));
+      if (extracted === null) {
+        throw new IntentExtractionError(
+          "intent extraction produced schema-violating output twice",
+        );
       }
-      const second = await attempt(query, context);
-      if (second !== null) {
-        return second;
-      }
-      throw new IntentExtractionError(
-        "intent extraction produced schema-violating output twice",
-      );
+      return context?.previousIntent === undefined
+        ? extracted
+        : enforceComparativeBounds(query, context.previousIntent, extracted);
     },
   };
 }

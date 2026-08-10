@@ -228,7 +228,13 @@ export function refinementViolations(
   compare("colorsExclude", actual.colorsExclude, expected.colorsExclude);
   compare("occasion", actual.occasion, expected.occasion);
   compare("availableOnly", actual.availableOnly, expected.availabilityRequired);
-  compare("size", intent.size, golden.expectedSize);
+  // Case-insensitive belt-and-braces (YOY-52): parseIntent already
+  // canonicalizes size casing, but the golden's own casing must not matter.
+  compare(
+    "size",
+    intent.size?.toUpperCase(),
+    golden.expectedSize?.toUpperCase(),
+  );
   return violations;
 }
 
