@@ -148,6 +148,58 @@
         ],
       };
 
+      // Color-filter fixture (YOY-67 AC-5): known-color matches first, then
+      // unknown-color products flagged by the server; the widget must render
+      // the flagged ones de-emphasized and labeled, after the known ones.
+      const AI_COLOR_RESPONSE = {
+        searchId: "harness-ai-color-1",
+        route: "ai",
+        degraded: false,
+        results: [
+          {
+            productId: "gid://shopify/Product/31",
+            title: "Blue Snowboard",
+            handle: "blue-snowboard",
+            imageUrl: PIXEL,
+            priceMin: 700,
+            priceMax: 700,
+            currencyCode: "ILS",
+            available: true,
+            colorUnknown: false,
+          },
+          {
+            productId: "gid://shopify/Product/32",
+            title: "Ocean Board",
+            handle: "ocean-board",
+            imageUrl: PIXEL,
+            priceMin: 800,
+            priceMax: 800,
+            currencyCode: "ILS",
+            available: true,
+            colorUnknown: false,
+          },
+          {
+            productId: "gid://shopify/Product/33",
+            title: "Mystery Board",
+            handle: "mystery-board",
+            imageUrl: null,
+            priceMin: 600,
+            priceMax: 600,
+            currencyCode: "ILS",
+            available: true,
+            colorUnknown: true,
+          },
+        ],
+        chips: [{ field: "colorsInclude", value: "blue" }],
+        intent: {
+          ...AI_INTENT,
+          colorsInclude: ["blue"],
+          colorsExclude: [],
+          category: null,
+          priceMax: null,
+        },
+      };
+
       const AI_ZERO_HIT_RESPONSE = {
         ...AI_RESPONSE,
         searchId: "harness-ai-zero-1",
@@ -258,6 +310,8 @@
             body = AI_RESPONSE;
           } else if (fixture === "ai-localized") {
             body = AI_LOCALIZED_RESPONSE;
+          } else if (fixture === "ai-color") {
+            body = AI_COLOR_RESPONSE;
           } else if (fixture === "ai-zero-hit") {
             body = AI_ZERO_HIT_RESPONSE;
           } else if (fixture === "degraded") {

@@ -21,6 +21,12 @@ export interface ProxyResult {
   priceMax: number;
   currencyCode: string;
   available: boolean;
+  /**
+   * The product passed a color filter without color evidence (YOY-67 AC-5):
+   * rendered de-emphasized with a label. Optional so the widget tolerates
+   * responses from a server predating the field.
+   */
+  colorUnknown?: boolean;
 }
 
 /** One applied-constraint chip as the proxy serves it. */

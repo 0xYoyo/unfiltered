@@ -37,6 +37,14 @@ export interface StoreQueryHit {
   productId: string;
   /** Cosine distance to the query vector; lower is nearer. */
   distance: number;
+  /**
+   * True when a positive color constraint was applied and this product's
+   * enrichment states no colors — it passed on the unknown-passes leniency,
+   * not on evidence (YOY-67 AC-5). Stores must rank such hits strictly
+   * below evidence-backed color matches. Absent when no positive color
+   * constraint was applied.
+   */
+  colorUnknown?: boolean;
 }
 
 /** One filtered similarity query against the consumer's store. */
@@ -77,6 +85,12 @@ export interface AppliedConstraint {
 export interface RetrievalHit {
   /** Consumer-assigned product identifier. */
   productId: string;
+  /**
+   * Passed a positive color constraint on unknown-passes leniency, not on
+   * evidence (YOY-67 AC-5); the consumer renders such hits de-emphasized.
+   * Absent when no positive color constraint was applied.
+   */
+  colorUnknown?: boolean;
   /**
    * Similarity score `1 - cosine distance`, in [-1, 1]; higher is more
    * relevant. Cosine distance spans [0, 2], so anti-correlated vectors score
@@ -266,6 +280,9 @@ export function createRetriever(options: RetrieverOptions): Retriever {
         hits: hits.map((hit) => ({
           productId: hit.productId,
           score: 1 - hit.distance,
+          ...(hit.colorUnknown !== undefined
+            ? { colorUnknown: hit.colorUnknown }
+            : {}),
         })),
         appliedConstraints: appliedConstraints(constraints),
       };

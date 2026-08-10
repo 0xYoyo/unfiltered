@@ -29,6 +29,7 @@ export const CHIP_TESTID = "unfiltered-widget-chip";
 export const ZERO_HIT_TESTID = "unfiltered-widget-zero-hit";
 export const CLOSE_MATCHES_TESTID = "unfiltered-widget-close-matches";
 export const NEW_SEARCH_TESTID = "unfiltered-widget-new-search";
+export const COLOR_NOTE_TESTID = "unfiltered-widget-color-note";
 
 /** Card and chip interactions the state machine in main.ts handles. */
 export interface ResponseHandlers {
@@ -204,6 +205,19 @@ export function createOverlay(options: OverlayOptions): Overlay {
       anchor.appendChild(soldOut);
     }
 
+    // Color truthfulness (YOY-67 AC-5): a card that passed a color filter
+    // without color evidence renders de-emphasized with an explicit label,
+    // so it can never pose as an indistinguishable first-class match under
+    // a color chip.
+    if (result.colorUnknown === true) {
+      anchor.classList.add("card-color-unknown");
+      const label = document.createElement("span");
+      label.className = "card-color-note";
+      label.setAttribute("data-testid", COLOR_NOTE_TESTID);
+      label.textContent = strings.colorNotConfirmed;
+      anchor.appendChild(label);
+    }
+
     // The beacon fires and the anchor's own navigation proceeds untouched —
     // never prevented, never awaited (AC-5).
     anchor.addEventListener("click", () => onCardClick(result, position));
@@ -252,6 +266,10 @@ export function createOverlay(options: OverlayOptions): Overlay {
       return !overlay.hidden;
     },
     showLoading() {
+      // First open happens here or in showResponse (YOY-67 AC-6): the
+      // overlay never renders before there is something — at least a
+      // loading state — to show.
+      overlay.hidden = false;
       loading.hidden = false;
       noResults.hidden = true;
       zeroHit.hidden = true;
@@ -271,6 +289,7 @@ export function createOverlay(options: OverlayOptions): Overlay {
       noResults.hidden = false;
     },
     showResponse(response, handlers) {
+      overlay.hidden = false;
       loading.hidden = true;
 
       // Chip row (AC-1): AI-resolved responses only. Degraded responses

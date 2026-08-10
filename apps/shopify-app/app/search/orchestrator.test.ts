@@ -237,6 +237,7 @@ describe("routing and the single response shape (AC-1, AC-2, AC-3)", () => {
         priceMax: 300,
         currencyCode: "ILS",
         available: true,
+        colorUnknown: false,
       },
     ]);
   });

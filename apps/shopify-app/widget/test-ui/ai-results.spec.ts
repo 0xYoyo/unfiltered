@@ -171,3 +171,66 @@ test("the AI loading indicator survives slow responses and the input stays respo
   await expect(cards(page).first()).toBeVisible();
   await expect(page.getByTestId("unfiltered-widget-loading")).toBeHidden();
 });
+
+test("unknown-color results rank after known matches and carry the label (YOY-67 AC-5)", async ({
+  page,
+}) => {
+  await page.goto("/?fixture=ai-color");
+
+  await themeInput(page).fill("blue snowboard");
+  await expect(cards(page)).toHaveCount(3);
+  await expect(chips(page)).toHaveCount(1);
+  await expect(chips(page).first()).toContainText("blue");
+
+  // Known-color matches render first; the unknown-color product is last,
+  // visually de-emphasized, and explicitly labeled.
+  await expect(cards(page).nth(0)).toContainText("Blue Snowboard");
+  await expect(cards(page).nth(1)).toContainText("Ocean Board");
+  const unknown = cards(page).nth(2);
+  await expect(unknown).toContainText("Mystery Board");
+  await expect(unknown).toHaveClass(/card-color-unknown/);
+  await expect(
+    unknown.getByTestId("unfiltered-widget-color-note"),
+  ).toHaveText("Color not confirmed");
+
+  // Known matches carry no label and no de-emphasis.
+  await expect(
+    cards(page).nth(0).getByTestId("unfiltered-widget-color-note"),
+  ).toHaveCount(0);
+  const knownOpacity = await cards(page)
+    .nth(0)
+    .evaluate((element) => getComputedStyle(element).opacity);
+  const unknownOpacity = await unknown.evaluate(
+    (element) => getComputedStyle(element).opacity,
+  );
+  expect(Number(unknownOpacity)).toBeLessThan(Number(knownOpacity));
+});
+
+test("the unknown-color label is localized in Hebrew chrome (YOY-67 AC-5)", async ({
+  page,
+}) => {
+  await page.goto("/?fixture=ai-color&locale=he");
+
+  await themeInput(page).fill("סנובורד כחול");
+  await expect(cards(page)).toHaveCount(3);
+  await expect(
+    cards(page).nth(2).getByTestId("unfiltered-widget-color-note"),
+  ).toHaveText("צבע לא מאומת");
+});
+
+test("focus renders no panel; loading opens it; results keep it open (YOY-67 AC-6)", async ({
+  page,
+}) => {
+  await page.goto("/?fixture=ai-delayed");
+
+  const overlay = page.getByTestId("unfiltered-widget-overlay");
+  await themeInput(page).focus();
+  await page.waitForTimeout(100);
+  await expect(overlay).toBeHidden();
+
+  // The first query opens the overlay at the loading state, then results.
+  await themeInput(page).fill("elegant dress");
+  await expect(page.getByTestId("unfiltered-widget-loading")).toBeVisible();
+  await expect(overlay).toBeVisible();
+  await expect(cards(page).first()).toBeVisible();
+});

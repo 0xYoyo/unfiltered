@@ -104,6 +104,13 @@ export function init(config: WidgetConfig): void {
     const debounceMs = config.debounceMs ?? DEFAULT_DEBOUNCE_MS;
 
     let inert = false;
+    // Explicit dismissal (YOY-67 AC-6): with overlay visibility deferred to
+    // the first loading state/response, `overlay.isOpen()` no longer means
+    // "the widget owns the input" — during the debounce window the overlay
+    // is legitimately closed. Enter/submit suppression keys on this flag
+    // instead: set by close/Escape (native search returns until the shopper
+    // re-engages), cleared by refocusing or typing.
+    let dismissed = false;
     let debounceTimer: number | undefined;
     let currentSearchId: string | null = null;
     let requestSequence = 0;
@@ -118,7 +125,10 @@ export function init(config: WidgetConfig): void {
     const overlay = createOverlay({
       locale: config.locale,
       shopDomain: config.shopDomain,
-      onClose: () => overlay.close(),
+      onClose: () => {
+        dismissed = true;
+        overlay.close();
+      },
       onNewSearch: () => {
         // AC-5: clear the held intent, the input, the chips, and the
         // results; the next query is sent without previousIntent.
@@ -210,7 +220,7 @@ export function init(config: WidgetConfig): void {
       if (inert) {
         return;
       }
-      overlay.open();
+      dismissed = false;
       window.clearTimeout(debounceTimer);
       const query = input.value.trim();
       if (query === "") {
@@ -240,6 +250,10 @@ export function init(config: WidgetConfig): void {
     // `focus` does not bubble but capture still descends to the target, so
     // this shields listeners attached directly to the input; the `focusin`
     // twin shields delegated ancestor listeners.
+    // No overlay.open() here (YOY-67 AC-6): focusing the input renders
+    // nothing until a first query produces a loading state or response —
+    // the shield below stays, because native predictive suppression
+    // (YOY-60 AC-3) is about the theme's listeners, not our overlay.
     document.addEventListener(
       "focus",
       (event) => {
@@ -247,7 +261,9 @@ export function init(config: WidgetConfig): void {
           return;
         }
         event.stopPropagation();
-        overlay.open();
+        // Refocusing re-engages the widget (Enter searches in-widget again)
+        // without rendering anything (YOY-67 AC-6).
+        dismissed = false;
       },
       true,
     );
@@ -303,7 +319,7 @@ export function init(config: WidgetConfig): void {
           return;
         }
         event.stopPropagation();
-        if (event.key === "Enter" && overlay.isOpen()) {
+        if (event.key === "Enter" && !dismissed) {
           event.preventDefault();
           searchNow();
         }
@@ -313,6 +329,7 @@ export function init(config: WidgetConfig): void {
           // focus: preventDefault stops the browser clearing a
           // type="search" input (AC-6).
           event.preventDefault();
+          dismissed = true;
           overlay.close();
         }
       },
@@ -329,7 +346,7 @@ export function init(config: WidgetConfig): void {
         if (inert || input.form === null || event.target !== input.form) {
           return;
         }
-        if (overlay.isOpen()) {
+        if (!dismissed) {
           event.preventDefault();
           event.stopPropagation();
           searchNow();
@@ -344,6 +361,7 @@ export function init(config: WidgetConfig): void {
         // reopening must retain the query text (AC-6), and the clear would
         // also fire an input event that reopened the overlay.
         event.preventDefault();
+        dismissed = true;
         overlay.close();
       }
     });

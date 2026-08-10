@@ -83,6 +83,16 @@ function buildClassicSearchSql(request: ClassicSearchRequest): {
     return `$${params.length}`;
   };
 
+  // Color-evidence tiering (YOY-67 AC-5), mirroring the pgvector store:
+  // under a positive color constraint, unknown-passes hits rank strictly
+  // below evidence-backed color matches and are flagged for the consumer.
+  const colorUnknownExpr =
+    constraints.colorsInclude.length > 0
+      ? `(COALESCE(cardinality(en."colors"), 0) = 0)`
+      : null;
+  const colorTierPrefix =
+    colorUnknownExpr === null ? "" : `${colorUnknownExpr} ASC, `;
+
   let select: string;
   let orderBy: string;
   if (query !== "") {
@@ -90,10 +100,13 @@ function buildClassicSearchSql(request: ClassicSearchRequest): {
     where.push(`${queryParam} <% ${SEARCH_TEXT}`);
     select = `(${TITLE_WEIGHT} * word_similarity(${queryParam}, p."title")
         + ${SECONDARY_WEIGHT} * word_similarity(${queryParam}, ${SEARCH_TEXT}))::float8 AS score`;
-    orderBy = `score DESC, p."productId" ASC`;
+    orderBy = `${colorTierPrefix}score DESC, p."productId" ASC`;
   } else {
     select = `0::float8 AS score`;
-    orderBy = `p."productId" ASC`;
+    orderBy = `${colorTierPrefix}p."productId" ASC`;
+  }
+  if (colorUnknownExpr !== null) {
+    select += `,\n        ${colorUnknownExpr} AS "colorUnknown"`;
   }
 
   if (constraints.priceMax !== undefined) {
@@ -156,16 +169,24 @@ export function createPgTrgmClassicStore(db: PrismaClient): ClassicSearchStore {
         db.$queryRawUnsafe(
           `SELECT set_config('pg_trgm.word_similarity_threshold', '${WORD_SIMILARITY_THRESHOLD}', true)`,
         ),
-        db.$queryRawUnsafe<Array<{ productId: string; score: number }>>(
-          sql,
-          ...params,
-        ),
+        db.$queryRawUnsafe<
+          Array<{ productId: string; score: number; colorUnknown?: boolean }>
+        >(sql, ...params),
       ]);
       return {
-        hits: (rows as Array<{ productId: string; score: number }>).map(
+        hits: (
+          rows as Array<{
+            productId: string;
+            score: number;
+            colorUnknown?: boolean;
+          }>
+        ).map(
           (row): ClassicSearchHit => ({
             productId: row.productId,
             score: row.score,
+            ...(row.colorUnknown !== undefined
+              ? { colorUnknown: row.colorUnknown === true }
+              : {}),
           }),
         ),
       };

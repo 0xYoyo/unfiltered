@@ -16,11 +16,15 @@ test("typing renders the widget overlay and never the native SUGGESTIONS dropdow
 }) => {
   await page.goto("/native-predictive.html");
 
+  // Focus renders nothing (YOY-67 AC-6) — and the theme's own focus
+  // listener must still be suppressed while the widget owns the input.
   await themeInput(page).focus();
-  await expect(overlay(page)).toBeVisible();
+  await page.waitForTimeout(100);
+  await expect(overlay(page)).toBeHidden();
 
   await themeInput(page).fill("nike");
   await expect(page.getByTestId("unfiltered-widget-card")).toBeVisible();
+  await expect(overlay(page)).toBeVisible();
 
   // The theme's dropdown must not have rendered at any point: suppressed
   // listeners never populate it, so it is still empty as well as hidden.
