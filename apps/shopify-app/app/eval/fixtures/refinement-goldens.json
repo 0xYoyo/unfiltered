@@ -17,12 +17,13 @@
     "expectedConstraints": {
       "category": "dress",
       "priceMin": null,
-      "priceMax": 250,
+      "priceMax": null,
       "colorsInclude": [],
       "colorsExclude": ["black"],
       "occasion": "wedding",
       "availabilityRequired": false
     },
+    "expectedPriceMaxBelow": 400,
     "expectedSoftAttributes": ["elegant", "summer"]
   },
   {
@@ -151,5 +152,84 @@
       "availabilityRequired": true
     },
     "expectedSoftAttributes": ["nike", "air max 90"]
+  },
+  {
+    "id": "r07",
+    "language": "he",
+    "note": "Hebrew comparative-cheaper follow-up strictly lowers the price cap (YOY-52 AC-15)",
+    "previousIntent": {
+      "category": "dress",
+      "priceMax": 900,
+      "colorsInclude": ["blue"],
+      "colorsExclude": [],
+      "occasion": "wedding",
+      "availabilityRequired": false,
+      "softAttributes": ["אלגנטית"]
+    },
+    "query": "אותו דבר אבל יותר זול",
+    "outcome": "refinement",
+    "expectedConstraints": {
+      "category": "dress",
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": ["blue"],
+      "colorsExclude": [],
+      "occasion": "wedding",
+      "availabilityRequired": false
+    },
+    "expectedPriceMaxBelow": 900,
+    "expectedSoftAttributes": ["אלגנטית"]
+  },
+  {
+    "id": "r08",
+    "language": "en",
+    "note": "comparative-more-expensive follow-up strictly raises the price floor (YOY-52 AC-15)",
+    "previousIntent": {
+      "category": "coat",
+      "priceMin": 200,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "availabilityRequired": false,
+      "softAttributes": ["wool", "winter"]
+    },
+    "query": "show me more expensive ones",
+    "outcome": "refinement",
+    "expectedConstraints": {
+      "category": "coat",
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    },
+    "expectedPriceMinAbove": 200,
+    "expectedSoftAttributes": ["wool", "winter"]
+  },
+  {
+    "id": "r09",
+    "language": "he",
+    "note": "Hebrew comparative-more-expensive follow-up raises the floor above the previous cap (YOY-52 AC-15)",
+    "previousIntent": {
+      "category": "skirt",
+      "priceMax": 300,
+      "colorsInclude": [],
+      "colorsExclude": ["black"],
+      "availabilityRequired": false,
+      "softAttributes": ["למסיבה"]
+    },
+    "query": "יותר יקר",
+    "outcome": "refinement",
+    "expectedConstraints": {
+      "category": "skirt",
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [],
+      "colorsExclude": ["black"],
+      "occasion": null,
+      "availabilityRequired": false
+    },
+    "expectedPriceMinAbove": 300,
+    "expectedSoftAttributes": ["למסיבה"]
   }
 ]

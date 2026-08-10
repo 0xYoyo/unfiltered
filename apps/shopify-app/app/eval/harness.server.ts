@@ -100,6 +100,16 @@ export interface RefinementGolden {
   query: string;
   outcome: "refinement" | "fresh";
   expectedConstraints: GoldenConstraints;
+  /**
+   * Comparative-tightening bounds (YOY-52 AC-15). When present, the named
+   * price field is scored as an inequality against the previous intent's
+   * bound — "cheaper" must land strictly below, "more expensive" strictly
+   * above — instead of the exact `expectedConstraints` value, because a live
+   * model's exact figure is its own choice; only the direction is the
+   * contract.
+   */
+  expectedPriceMaxBelow?: number;
+  expectedPriceMinAbove?: number;
   /** Expected size constraint, when the follow-up states or preserves one. */
   expectedSize?: string;
   /** Soft attributes the merged intent must carry, in order. */
@@ -189,9 +199,31 @@ export function refinementViolations(
       );
     }
   };
+  const bound = (
+    field: string,
+    got: number | null | undefined,
+    check: (value: number) => boolean,
+    want: string,
+  ): void => {
+    if (got === null || got === undefined || !check(got)) {
+      violations.push(
+        `${golden.id}: ${field} ${JSON.stringify(got ?? null)} ≠ expected ${want}`,
+      );
+    }
+  };
   compare("category", actual.category, expected.category);
-  compare("priceMin", actual.priceMin, expected.priceMin);
-  compare("priceMax", actual.priceMax, expected.priceMax);
+  if (golden.expectedPriceMinAbove !== undefined) {
+    const above = golden.expectedPriceMinAbove;
+    bound("priceMin", actual.priceMin, (value) => value > above, `> ${above}`);
+  } else {
+    compare("priceMin", actual.priceMin, expected.priceMin);
+  }
+  if (golden.expectedPriceMaxBelow !== undefined) {
+    const below = golden.expectedPriceMaxBelow;
+    bound("priceMax", actual.priceMax, (value) => value < below, `< ${below}`);
+  } else {
+    compare("priceMax", actual.priceMax, expected.priceMax);
+  }
   compare("colorsInclude", actual.colorsInclude, expected.colorsInclude);
   compare("colorsExclude", actual.colorsExclude, expected.colorsExclude);
   compare("occasion", actual.occasion, expected.occasion);

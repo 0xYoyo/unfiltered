@@ -23,11 +23,14 @@ function beaconRequest({
   shop = SHOP,
   secret = process.env.SHOPIFY_API_SECRET ?? "",
   omitSignature = false,
+  prependUnsigned = [],
 }: {
   payload: unknown;
   shop?: string;
   secret?: string;
   omitSignature?: boolean;
+  /** Params placed before the signed set and left out of the signature. */
+  prependUnsigned?: [name: string, value: string][];
 }): Request {
   const params = new URLSearchParams({
     shop,
@@ -44,8 +47,17 @@ function beaconRequest({
       createHmac("sha256", secret).update(data).digest("hex"),
     );
   }
+  const query = [
+    ...prependUnsigned.map(
+      ([name, value]) =>
+        `${encodeURIComponent(name)}=${encodeURIComponent(value)}`,
+    ),
+    params.toString(),
+  ]
+    .filter((part) => part !== "")
+    .join("&");
   return new Request(
-    `https://test-app.example.com/apps/unfiltered/click?${params}`,
+    `https://test-app.example.com/apps/unfiltered/click?${query}`,
     {
       method: "POST",
       body: JSON.stringify(payload),
@@ -97,6 +109,29 @@ describe("click beacon auth", () => {
     );
     expect(response.status).toBe(401);
     expect(await db.clickEvent.count()).toBe(0);
+  });
+
+  it("adopts the signed shop, not a client duplicate smuggled before it (YOY-52 AC-18)", async () => {
+    // Mirrors proxy-search.test.ts: the signature validator resolves
+    // duplicate params last-wins, so a duplicate prepended in FRONT of the
+    // signed set passes validation — the route must read the last `shop`
+    // occurrence, the value the signature actually covered. Pinned here so a
+    // regression reverting the click route alone to `.get("shop")` fails CI.
+    const response = await action(
+      actionArgs(
+        beaconRequest({
+          payload: validPayload,
+          prependUnsigned: [["shop", "attacker-probe.myshopify.com"]],
+        }),
+      ),
+    );
+
+    // SEARCH_ID exists only under the signed shop, so recording the click
+    // proves the foreign first occurrence was never adopted.
+    expect(response.status).toBe(204);
+    const rows = await db.clickEvent.findMany();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.shopDomain).toBe(SHOP);
   });
 });
 

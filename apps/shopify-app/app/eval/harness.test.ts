@@ -98,6 +98,51 @@ describe("refinement fixtures (YOY-42 AC-3)", () => {
     ).toHaveLength(1);
     expect(refinementViolations(golden, { ...merged, size: "M" })).toHaveLength(1);
   });
+
+  it("scores comparative tightening as a strict inequality (YOY-52 AC-15)", () => {
+    // r01 pins "cheaper" as expectedPriceMaxBelow: any priceMax strictly
+    // under the previous bound passes; echoing it unchanged — the live-run
+    // defect — or dropping it fails.
+    const cheaper = loadRefinementGoldens().find((entry) => entry.id === "r01")!;
+    const merged = {
+      category: "dress",
+      priceMax: 250,
+      colorsInclude: [],
+      colorsExclude: ["black"],
+      occasion: "wedding",
+      availabilityRequired: false,
+      softAttributes: ["elegant", "summer"],
+    };
+    expect(cheaper.expectedPriceMaxBelow).toBe(400);
+    expect(refinementViolations(cheaper, merged)).toEqual([]);
+    expect(refinementViolations(cheaper, { ...merged, priceMax: 399 })).toEqual([]);
+    expect(
+      refinementViolations(cheaper, { ...merged, priceMax: 400 }),
+    ).toHaveLength(1);
+    expect(
+      refinementViolations(cheaper, { ...merged, priceMax: undefined }),
+    ).toHaveLength(1);
+
+    // r09 pins "more expensive" over a cap-only previous intent: the floor
+    // must rise strictly above the previous priceMax, which is cleared.
+    const pricier = loadRefinementGoldens().find((entry) => entry.id === "r09")!;
+    const raised = {
+      category: "skirt",
+      priceMin: 375,
+      colorsInclude: [],
+      colorsExclude: ["black"],
+      availabilityRequired: false,
+      softAttributes: ["למסיבה"],
+    };
+    expect(pricier.expectedPriceMinAbove).toBe(300);
+    expect(refinementViolations(pricier, raised)).toEqual([]);
+    expect(
+      refinementViolations(pricier, { ...raised, priceMin: 300 }),
+    ).toHaveLength(1);
+    expect(
+      refinementViolations(pricier, { ...raised, priceMin: undefined }),
+    ).toHaveLength(1);
+  });
 });
 
 describe("violation scoring covers occasion (YOY-29 AC-11)", () => {

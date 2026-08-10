@@ -97,6 +97,11 @@ describe("model escalation (AC-2, AC-5)", () => {
     "blue snowboard under 900",
     "סנובורד כחול מתחת ל-900",
     "red dress",
+    // The g22 shape (YOY-52): a digit-free Hebrew attribute+noun query. The
+    // heuristics escalate it; the prompt must then steer the model to "ai" —
+    // classic keyword search cannot serve a Hebrew attribute query against
+    // the English catalog index.
+    "שמלה שחורה",
   ];
 
   for (const query of aiFixtures) {
@@ -112,6 +117,9 @@ describe("model escalation (AC-2, AC-5)", () => {
       expect(calls[0]!.operation).toBe("classification");
       expect(calls[0]!.schema).toBe(CLASSIFICATION_SCHEMA);
       expect(calls[0]!.prompt).toContain(normalizeQuery(query));
+      // The attribute-query steer (YOY-52 / YOY-61 AC-1) reaches the model:
+      // attribute+noun shapes, non-English above all, must classify "ai".
+      expect(calls[0]!.prompt).toContain("descriptive attribute");
     });
   }
 

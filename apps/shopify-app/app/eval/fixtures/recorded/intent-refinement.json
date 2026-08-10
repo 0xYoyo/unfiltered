@@ -82,6 +82,54 @@
       "inputTokens": 559,
       "outputTokens": 60
     },
+    "אותו דבר אבל יותר זול": {
+      "output": {
+        "category": "dress",
+        "priceMin": null,
+        "priceMax": 675,
+        "currency": null,
+        "colorsInclude": ["blue"],
+        "colorsExclude": [],
+        "occasion": "wedding",
+        "size": null,
+        "availabilityRequired": false,
+        "softAttributes": ["אלגנטית"]
+      },
+      "inputTokens": 578,
+      "outputTokens": 74
+    },
+    "show me more expensive ones": {
+      "output": {
+        "category": "coat",
+        "priceMin": 260,
+        "priceMax": null,
+        "currency": null,
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "occasion": null,
+        "size": null,
+        "availabilityRequired": false,
+        "softAttributes": ["wool", "winter"]
+      },
+      "inputTokens": 555,
+      "outputTokens": 62
+    },
+    "יותר יקר": {
+      "output": {
+        "category": "skirt",
+        "priceMin": 375,
+        "priceMax": null,
+        "currency": null,
+        "colorsInclude": [],
+        "colorsExclude": ["black"],
+        "occasion": null,
+        "size": null,
+        "availabilityRequired": false,
+        "softAttributes": ["למסיבה"]
+      },
+      "inputTokens": 549,
+      "outputTokens": 58
+    },
     "under 500 and only what is in stock": {
       "output": {
         "category": "sneakers",
