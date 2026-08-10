@@ -234,3 +234,25 @@ test("focus renders no panel; loading opens it; results keep it open (YOY-67 AC-
   await expect(overlay).toBeVisible();
   await expect(cards(page).first()).toBeVisible();
 });
+
+test("the unknown-color label renders under an exclusion-only color chip too (YOY-67 AC-5)", async ({
+  page,
+}) => {
+  await page.goto("/?fixture=ai-color-exclude");
+
+  await themeInput(page).fill("snowboard not black");
+  await expect(cards(page)).toHaveCount(2);
+  await expect(chips(page)).toHaveCount(1);
+  await expect(chips(page).first()).toContainText("Not black");
+
+  // The evidence-backed hit is unlabeled; the unknown-color hit is flagged
+  // exactly as under an inclusion chip.
+  await expect(
+    cards(page).nth(0).getByTestId("unfiltered-widget-color-note"),
+  ).toHaveCount(0);
+  const unknown = cards(page).nth(1);
+  await expect(unknown).toHaveClass(/card-color-unknown/);
+  await expect(
+    unknown.getByTestId("unfiltered-widget-color-note"),
+  ).toHaveText("Color not confirmed");
+});

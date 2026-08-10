@@ -42,11 +42,11 @@ export interface ClassicSearchHit {
    */
   score: number;
   /**
-   * True when a positive color constraint was applied and this product's
-   * enrichment states no colors — it passed on the unknown-passes leniency,
-   * not on evidence (YOY-67 AC-5). Implementations rank such hits strictly
-   * below evidence-backed color matches. Absent when no positive color
-   * constraint was applied.
+   * True when a color constraint (inclusion or exclusion) was applied and
+   * this product's enrichment states no colors — it passed on the
+   * unknown-passes leniency, not on evidence (YOY-67 AC-5). Implementations
+   * rank such hits strictly below evidence-backed hits. Absent when no
+   * color constraint was applied.
    */
   colorUnknown?: boolean;
 }

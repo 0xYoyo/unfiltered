@@ -84,10 +84,11 @@ function buildClassicSearchSql(request: ClassicSearchRequest): {
   };
 
   // Color-evidence tiering (YOY-67 AC-5), mirroring the pgvector store:
-  // under a positive color constraint, unknown-passes hits rank strictly
-  // below evidence-backed color matches and are flagged for the consumer.
+  // under a color constraint — inclusion or exclusion; both render a color
+  // chip — unknown-passes hits rank strictly below evidence-backed hits and
+  // are flagged for the consumer.
   const colorUnknownExpr =
-    constraints.colorsInclude.length > 0
+    constraints.colorsInclude.length > 0 || constraints.colorsExclude.length > 0
       ? `(COALESCE(cardinality(en."colors"), 0) = 0)`
       : null;
   const colorTierPrefix =

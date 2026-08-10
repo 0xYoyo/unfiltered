@@ -200,6 +200,24 @@
         },
       };
 
+      // Exclusion-only variant (YOY-67 AC-5 fix round 1): a "Not black x"
+      // chip is a color chip too — unknown-color hits must render flagged
+      // under it exactly as under an inclusion chip.
+      const AI_COLOR_EXCLUDE_RESPONSE = {
+        ...AI_COLOR_RESPONSE,
+        searchId: "harness-ai-color-exclude-1",
+        results: [
+          { ...AI_COLOR_RESPONSE.results[0], colorUnknown: false },
+          { ...AI_COLOR_RESPONSE.results[2], colorUnknown: true },
+        ],
+        chips: [{ field: "colorsExclude", value: "black" }],
+        intent: {
+          ...AI_COLOR_RESPONSE.intent,
+          colorsInclude: [],
+          colorsExclude: ["black"],
+        },
+      };
+
       const AI_ZERO_HIT_RESPONSE = {
         ...AI_RESPONSE,
         searchId: "harness-ai-zero-1",
@@ -312,6 +330,8 @@
             body = AI_LOCALIZED_RESPONSE;
           } else if (fixture === "ai-color") {
             body = AI_COLOR_RESPONSE;
+          } else if (fixture === "ai-color-exclude") {
+            body = AI_COLOR_EXCLUDE_RESPONSE;
           } else if (fixture === "ai-zero-hit") {
             body = AI_ZERO_HIT_RESPONSE;
           } else if (fixture === "degraded") {

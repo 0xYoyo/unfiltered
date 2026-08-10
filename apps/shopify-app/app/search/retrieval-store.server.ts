@@ -93,13 +93,15 @@ export function createPgVectorRetrievalStore(db: PrismaClient): RetrievalStore {
         );
       }
 
-      // Color-evidence tiering (YOY-67 AC-5): under a positive color
-      // constraint, products that passed only on the unknown-passes leniency
-      // (enrichment states no colors) rank strictly below evidence-backed
-      // color matches — inside the query, so an unknown can never displace a
-      // known match from the top N — and are flagged for the consumer to
-      // render de-emphasized.
-      const colorTiering = constraints.colorsInclude.length > 0;
+      // Color-evidence tiering (YOY-67 AC-5): under a color constraint —
+      // inclusion or exclusion; both render a color chip — products that
+      // passed only on the unknown-passes leniency (enrichment states no
+      // colors) rank strictly below evidence-backed hits — inside the
+      // query, so an unknown can never displace a known match from the top
+      // N — and are flagged for the consumer to render de-emphasized.
+      const colorTiering =
+        constraints.colorsInclude.length > 0 ||
+        constraints.colorsExclude.length > 0;
       const colorUnknownExpr = colorTiering
         ? `(COALESCE(cardinality(en."colors"), 0) = 0)`
         : null;

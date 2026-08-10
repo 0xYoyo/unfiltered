@@ -38,11 +38,11 @@ export interface StoreQueryHit {
   /** Cosine distance to the query vector; lower is nearer. */
   distance: number;
   /**
-   * True when a positive color constraint was applied and this product's
-   * enrichment states no colors — it passed on the unknown-passes leniency,
-   * not on evidence (YOY-67 AC-5). Stores must rank such hits strictly
-   * below evidence-backed color matches. Absent when no positive color
-   * constraint was applied.
+   * True when a color constraint (inclusion or exclusion) was applied and
+   * this product's enrichment states no colors — it passed on the
+   * unknown-passes leniency, not on evidence (YOY-67 AC-5). Stores must
+   * rank such hits strictly below evidence-backed hits. Absent when no
+   * color constraint was applied.
    */
   colorUnknown?: boolean;
 }
@@ -86,9 +86,9 @@ export interface RetrievalHit {
   /** Consumer-assigned product identifier. */
   productId: string;
   /**
-   * Passed a positive color constraint on unknown-passes leniency, not on
-   * evidence (YOY-67 AC-5); the consumer renders such hits de-emphasized.
-   * Absent when no positive color constraint was applied.
+   * Passed a color constraint (inclusion or exclusion) on unknown-passes
+   * leniency, not on evidence (YOY-67 AC-5); the consumer renders such hits
+   * de-emphasized. Absent when no color constraint was applied.
    */
   colorUnknown?: boolean;
   /**

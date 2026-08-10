@@ -313,6 +313,38 @@ describe("hard constraints are filters, never preferences (AC-2)", () => {
     );
   });
 
+  it("tiers and flags unknowns under an exclusion-only color constraint too (YOY-67 AC-5 fix round 1)", async () => {
+    await seed(db, [
+      // Nearest vector but no color evidence: passes the exclusion on
+      // leniency (nothing proves the excluded color), flagged and tiered
+      // below the evidence-backed hit — a "Not black ×" chip is a color
+      // chip, so unknowns must not pose as first-class hits under it.
+      {
+        productId: "excl-unknown-near",
+        vector: [1, 0, 0],
+        enrichment: { colors: [] },
+      },
+      {
+        productId: "excl-known-red",
+        vector: [0.6, 0.8, 0],
+        enrichment: { colors: ["red"] },
+      },
+    ]);
+
+    const hits = await createPgVectorRetrievalStore(db).query({
+      shopDomain: SHOP,
+      constraints: { ...noConstraints(), colorsExclude: ["black"] },
+      vector: [1, 0, 0],
+      limit: 10,
+    });
+
+    expect(hits.map((hit) => hit.productId)).toEqual([
+      "excl-known-red",
+      "excl-unknown-near",
+    ]);
+    expect(hits.map((hit) => hit.colorUnknown)).toEqual([false, true]);
+  });
+
   it("expands a parent category constraint through the taxonomy groups; child constraints stay exact (YOY-35 AC-5)", async () => {
     await seed(db, [
       {
