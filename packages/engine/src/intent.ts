@@ -315,11 +315,32 @@ export function mergeRefinementIntent(
   if (answer.outcome === "topic_change") {
     return answer.intent;
   }
-  return enforceComparativeBounds(
-    query,
-    previousIntent,
-    carryOverRefinementConstraints(previousIntent, answer.intent),
-  );
+  let merged = carryOverRefinementConstraints(previousIntent, answer.intent);
+  // A restored bound must never contradict the model's own answer (YOY-52
+  // AC-19): "over 500" after a priceMax=400 search phrases an explicit new
+  // floor in non-comparative wording, and unconditionally restoring the old
+  // cap would ship priceMin=500 ∧ priceMax=400 — zero hits by construction,
+  // and enforceComparativeBounds only clears contradictions for
+  // comparative-lexicon queries. An explicitly model-set bound always beats
+  // a restored one, so when the merged bounds contradict and exactly one of
+  // the two was restored, the restored one drops. Both-restored cannot
+  // contradict (they coexisted in the previous intent); both-model-set is
+  // the model's answer and stands, as today.
+  const priceMinRestored =
+    answer.intent.priceMin === undefined && merged.priceMin !== undefined;
+  const priceMaxRestored =
+    answer.intent.priceMax === undefined && merged.priceMax !== undefined;
+  if (
+    merged.priceMin !== undefined &&
+    merged.priceMax !== undefined &&
+    merged.priceMin > merged.priceMax &&
+    priceMinRestored !== priceMaxRestored
+  ) {
+    merged = priceMinRestored
+      ? { ...merged, priceMin: undefined }
+      : { ...merged, priceMax: undefined };
+  }
+  return enforceComparativeBounds(query, previousIntent, merged);
 }
 
 /**

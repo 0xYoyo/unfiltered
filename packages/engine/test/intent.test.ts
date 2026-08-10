@@ -808,6 +808,60 @@ describe("deterministic constraint carry-over (YOY-52 run-5 directive)", () => {
     expect(merged.occasion).toBe("wedding");
   });
 
+  it("drops a restored cap the model's explicit non-comparative floor contradicts (AC-19)", () => {
+    // "over 500" after a priceMax=400 search: the model sets a new floor and
+    // returns no cap; restoring the old cap would ship priceMin=500 ∧
+    // priceMax=400 — zero hits — and the query has no comparative lexicon
+    // for enforcement to clear it. The model-set bound wins.
+    const merged = mergeRefinementIntent("over 500", previous, {
+      outcome: "refinement",
+      intent: intent({ category: "dress", priceMin: 500 }),
+    });
+    expect(merged.priceMin).toBe(500);
+    expect(merged.priceMax).toBeUndefined();
+    // Untouched constraints still carry over.
+    expect(merged.occasion).toBe("wedding");
+  });
+
+  it("drops a restored floor the model's explicit non-comparative cap contradicts (AC-19)", () => {
+    const pricey = intent({ category: "coat", priceMin: 600 });
+    const merged = mergeRefinementIntent("under 300", pricey, {
+      outcome: "refinement",
+      intent: intent({ category: "coat", priceMax: 300 }),
+    });
+    expect(merged.priceMax).toBe(300);
+    expect(merged.priceMin).toBeUndefined();
+  });
+
+  it("keeps both bounds when the model set both — its answer stands (AC-19)", () => {
+    const merged = mergeRefinementIntent("between prices", previous, {
+      outcome: "refinement",
+      intent: intent({ category: "dress", priceMin: 500, priceMax: 450 }),
+    });
+    // Neither bound was restored, so the contradiction is the model's own
+    // answer and passes through unchanged, as before AC-19.
+    expect(merged.priceMin).toBe(500);
+    expect(merged.priceMax).toBe(450);
+  });
+
+  it("leaves a same-direction explicit bound and compatible restores untouched (AC-19)", () => {
+    // New cap after old cap: nothing restored on the price axis, no
+    // contradiction, no clearing.
+    const merged = mergeRefinementIntent("under 250", previous, {
+      outcome: "refinement",
+      intent: intent({ category: "dress", priceMax: 250 }),
+    });
+    expect(merged.priceMax).toBe(250);
+    expect(merged.priceMin).toBeUndefined();
+    // Compatible floor + restored cap both survive.
+    const compatible = mergeRefinementIntent("over 100", previous, {
+      outcome: "refinement",
+      intent: intent({ category: "dress", priceMin: 100 }),
+    });
+    expect(compatible.priceMin).toBe(100);
+    expect(compatible.priceMax).toBe(400);
+  });
+
   it("enforcement clears a restored cap a more-expensive follow-up contradicts", () => {
     // r09's shape: previous has only a cap; the model raises the floor but
     // returns no cap. Carry-over restores the 300 cap; enforcement then
