@@ -1,6 +1,6 @@
 {
   "modelId": "gemini-3.6-flash",
-  "provenance": "synthesized",
+  "provenance": "live",
   "entries": {
     "elegant summer wedding dress, not black, under 400": {
       "output": {
@@ -35,7 +35,7 @@
           "בקיץ"
         ],
         "category": "dress",
-        "currency": "ILS",
+        "currency": null,
         "occasion": "wedding",
         "priceMax": 400,
         "priceMin": null,
@@ -52,8 +52,7 @@
         "colorsExclude": [],
         "availabilityRequired": false,
         "softAttributes": [
-          "formal",
-          "gala"
+          "formal gala"
         ],
         "category": "dress",
         "currency": null,
@@ -63,7 +62,7 @@
         "size": null
       },
       "inputTokens": 392,
-      "outputTokens": 49
+      "outputTokens": 48
     },
     "שמלת ערב שחורה עד 400": {
       "output": {
@@ -74,7 +73,7 @@
         "availabilityRequired": false,
         "softAttributes": [],
         "category": "dress",
-        "currency": null,
+        "currency": "ILS",
         "occasion": "evening",
         "priceMax": 400,
         "priceMin": null,
@@ -102,7 +101,7 @@
         "size": null
       },
       "inputTokens": 396,
-      "outputTokens": 50
+      "outputTokens": 100
     },
     "מעיל חם לחורף לא שחור עד 500": {
       "output": {
@@ -113,17 +112,17 @@
         "availabilityRequired": false,
         "softAttributes": [
           "חם",
-          "לחורף"
+          "חורף"
         ],
         "category": "coat",
-        "currency": null,
+        "currency": "ILS",
         "occasion": null,
         "priceMax": 500,
         "priceMin": null,
         "size": null
       },
       "inputTokens": 401,
-      "outputTokens": 103
+      "outputTokens": 53
     },
     "white sneakers for everyday wear": {
       "output": {
@@ -132,12 +131,18 @@
         ],
         "colorsExclude": [],
         "availabilityRequired": false,
-        "softAttributes": [],
+        "softAttributes": [
+          "everyday wear"
+        ],
         "category": "sneakers",
-        "occasion": "casual"
+        "currency": null,
+        "occasion": "casual",
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
       },
       "inputTokens": 390,
-      "outputTokens": 28
+      "outputTokens": 49
     },
     "נעלי עקב elegant לערב": {
       "output": {
@@ -145,7 +150,7 @@
         "colorsExclude": [],
         "availabilityRequired": false,
         "softAttributes": [
-          "נעלי עקב",
+          "עקב",
           "elegant"
         ],
         "category": "shoes",
@@ -156,7 +161,7 @@
         "size": null
       },
       "inputTokens": 393,
-      "outputTokens": 50
+      "outputTokens": 48
     },
     "gold strappy sandals for a summer wedding under 250": {
       "output": {
@@ -206,7 +211,7 @@
         "availabilityRequired": false,
         "softAttributes": [
           "חם",
-          "חורף"
+          "לחורף"
         ],
         "category": "top",
         "currency": null,
@@ -293,7 +298,7 @@
         "size": null
       },
       "inputTokens": 394,
-      "outputTokens": 99
+      "outputTokens": 50
     },
     "beige office skirt under 200": {
       "output": {
@@ -331,7 +336,7 @@
         "size": null
       },
       "inputTokens": 396,
-      "outputTokens": 48
+      "outputTokens": 94
     },
     "white linen summer pants for the beach under 200": {
       "output": {
@@ -352,7 +357,7 @@
         "size": null
       },
       "inputTokens": 397,
-      "outputTokens": 87
+      "outputTokens": 50
     },
     "תיק ערב מנצנץ עד 250": {
       "output": {
@@ -392,6 +397,146 @@
       "inputTokens": 395,
       "outputTokens": 48
     },
+    "air zoom 90": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "air zoom 90"
+        ],
+        "category": "sneakers",
+        "currency": null,
+        "occasion": null,
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 390,
+      "outputTokens": 50
+    },
+    "air zom 90": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "air zom 90"
+        ],
+        "category": "sneakers",
+        "currency": null,
+        "occasion": null,
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 390,
+      "outputTokens": 50
+    },
+    "aurora dress": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "aurora"
+        ],
+        "category": "dress",
+        "currency": null,
+        "occasion": null,
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 387,
+      "outputTokens": 46
+    },
+    "auroa dress": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "auroa"
+        ],
+        "category": "dress",
+        "currency": null,
+        "occasion": null,
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 389,
+      "outputTokens": 85
+    },
+    "שמלת ערב": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [],
+        "category": "dress",
+        "currency": null,
+        "occasion": "evening",
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 389,
+      "outputTokens": 44
+    },
+    "שמלת ערבב": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [],
+        "category": "dress",
+        "currency": null,
+        "occasion": "evening",
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 390,
+      "outputTokens": 44
+    },
+    "\"linen beach dress\"": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "linen"
+        ],
+        "category": "dress",
+        "currency": null,
+        "occasion": "beach",
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 390,
+      "outputTokens": 85
+    },
+    "שמלת קיץ": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "קיץ"
+        ],
+        "category": "dress",
+        "currency": null,
+        "occasion": null,
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 389,
+      "outputTokens": 46
+    },
     "שמלה שחורה": {
       "output": {
         "colorsInclude": [
@@ -408,7 +553,7 @@
         "size": null
       },
       "inputTokens": 390,
-      "outputTokens": 60
+      "outputTokens": 45
     },
     "black dress": {
       "output": {
@@ -425,8 +570,8 @@
         "priceMin": null,
         "size": null
       },
-      "inputTokens": 390,
-      "outputTokens": 60
+      "inputTokens": 387,
+      "outputTokens": 45
     },
     "שמלה שחורה מתחת ל-400": {
       "output": {
@@ -443,8 +588,8 @@
         "priceMin": null,
         "size": null
       },
-      "inputTokens": 390,
-      "outputTokens": 60
+      "inputTokens": 397,
+      "outputTokens": 81
     }
   }
 }

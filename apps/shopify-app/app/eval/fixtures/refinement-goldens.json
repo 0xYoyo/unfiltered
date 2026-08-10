@@ -50,7 +50,7 @@
       "occasion": "wedding",
       "availabilityRequired": false
     },
-    "expectedSoftAttributes": ["אלגנטית", "בקיץ", "ללא שרוולים"]
+    "expectedSoftAttributes": ["אלגנטית", "בקיץ", "בלי שרוולים"]
   },
   {
     "id": "r03",

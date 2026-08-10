@@ -1,166 +1,166 @@
 {
   "modelId": "gemini-3.5-flash-lite",
-  "provenance": "synthesized",
+  "provenance": "live",
   "entries": {
     "elegant summer wedding dress, not black, under 400": {
       "output": {
         "route": "ai"
       },
-      "inputTokens": 100,
+      "inputTokens": 186,
       "outputTokens": 11
     },
     "שמלה אלגנטית לחתונה בקיץ לא שחור עד 400": {
       "output": {
         "route": "ai"
       },
-      "inputTokens": 108,
+      "inputTokens": 194,
       "outputTokens": 11
     },
     "black evening gown for a formal gala": {
       "output": {
         "route": "ai"
       },
-      "inputTokens": 94,
+      "inputTokens": 180,
       "outputTokens": 11
     },
     "שמלת ערב שחורה עד 400": {
       "output": {
         "route": "ai"
       },
-      "inputTokens": 99,
+      "inputTokens": 185,
       "outputTokens": 11
     },
     "warm winter coat under 500, not black": {
       "output": {
         "route": "ai"
       },
-      "inputTokens": 98,
+      "inputTokens": 184,
       "outputTokens": 11
     },
     "מעיל חם לחורף לא שחור עד 500": {
       "output": {
         "route": "ai"
       },
-      "inputTokens": 103,
+      "inputTokens": 189,
       "outputTokens": 11
     },
     "white sneakers for everyday wear": {
       "output": {
         "route": "ai"
       },
-      "inputTokens": 92,
+      "inputTokens": 178,
       "outputTokens": 11
     },
     "נעלי עקב elegant לערב": {
       "output": {
         "route": "ai"
       },
-      "inputTokens": 95,
+      "inputTokens": 181,
       "outputTokens": 11
     },
     "gold strappy sandals for a summer wedding under 250": {
       "output": {
         "route": "ai"
       },
-      "inputTokens": 100,
+      "inputTokens": 186,
       "outputTokens": 11
     },
     "cozy cashmere sweater for cold winter evenings": {
       "output": {
         "route": "ai"
       },
-      "inputTokens": 94,
+      "inputTokens": 180,
       "outputTokens": 11
     },
     "סוודר חם לחורף": {
       "output": {
         "route": "ai"
       },
-      "inputTokens": 96,
+      "inputTokens": 182,
       "outputTokens": 11
     },
     "leather jacket for a night out, in stock": {
       "output": {
         "route": "ai"
       },
-      "inputTokens": 96,
+      "inputTokens": 182,
       "outputTokens": 11
     },
     "party dress in stock under 400": {
       "output": {
         "route": "ai"
       },
-      "inputTokens": 96,
+      "inputTokens": 182,
       "outputTokens": 11
     },
     "שמלת מקסי לבנה לחתונה": {
       "output": {
         "route": "ai"
       },
-      "inputTokens": 96,
+      "inputTokens": 182,
       "outputTokens": 11
     },
     "מעיל winter אלגנטי בצבע camel": {
       "output": {
         "route": "ai"
       },
-      "inputTokens": 96,
+      "inputTokens": 182,
       "outputTokens": 11
     },
     "beige office skirt under 200": {
       "output": {
         "route": "ai"
       },
-      "inputTokens": 95,
+      "inputTokens": 181,
       "outputTokens": 11
     },
     "חצאית מיני שחורה למסיבה": {
       "output": {
         "route": "ai"
       },
-      "inputTokens": 98,
+      "inputTokens": 184,
       "outputTokens": 6
     },
     "white linen summer pants for the beach under 200": {
       "output": {
         "route": "ai"
       },
-      "inputTokens": 99,
+      "inputTokens": 185,
       "outputTokens": 11
     },
     "תיק ערב מנצנץ עד 250": {
       "output": {
         "route": "ai"
       },
-      "inputTokens": 101,
+      "inputTokens": 187,
       "outputTokens": 11
     },
     "accessory אלגנטי לחתונה בצבע white": {
       "output": {
         "route": "ai"
       },
-      "inputTokens": 97,
-      "outputTokens": 11
+      "inputTokens": 183,
+      "outputTokens": 6
     },
     "שמלה שחורה": {
       "output": {
         "route": "ai"
       },
-      "inputTokens": 100,
+      "inputTokens": 178,
       "outputTokens": 11
     },
     "black dress": {
       "output": {
         "route": "classic"
       },
-      "inputTokens": 100,
+      "inputTokens": 175,
       "outputTokens": 11
     },
     "שמלה שחורה מתחת ל-400": {
       "output": {
         "route": "ai"
       },
-      "inputTokens": 100,
+      "inputTokens": 185,
       "outputTokens": 11
     }
   }
