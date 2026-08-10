@@ -32,6 +32,16 @@ import { authenticate } from "../shopify.server";
  * never from the request body or client-set params, which a shopper
  * controls.
  *
+ * Duplicate `shop` params (YOY-52 AC-10): Shopify's proxy edge strips a
+ * client-set reserved `shop` param before forwarding — probed live on
+ * 2026-08-09 with `shop=attacker-probe.myshopify.com` appended to a proxy
+ * GET; the route received only the signed shop and every SearchEvent
+ * recorded the real shop domain. Defense in depth beneath that guarantee:
+ * the signature validator resolves duplicate params last-wins, so the shop
+ * read below takes the LAST occurrence — the value the signature was
+ * actually verified against — never a client duplicate smuggled in front
+ * of the signed set.
+ *
  * Every response — every status — carries `Cache-Control: no-store` (YOY-52
  * AC-9): the widget transport is GET, and per-shopper search responses must
  * never land in a shared or browser cache.
@@ -53,7 +63,9 @@ async function handleSearch(
     // Validates the signature over the proxy query params; throws a
     // Response for missing/invalid signatures.
     await authenticate.public.appProxy(request);
-    shop = new URL(request.url).searchParams.get("shop");
+    // Last occurrence: the value the signature validation verified (see the
+    // duplicate-shop note above).
+    shop = new URL(request.url).searchParams.getAll("shop").at(-1) ?? null;
   } catch {
     return emptyResponse(401);
   }
