@@ -20,7 +20,9 @@ vi.mock("./db.server", async () => {
 
 // Replace only the production orchestrator factory (which needs
 // GEMINI_API_KEY and the network); each test installs its own build over
-// fake AI clients. Parsing and serialization stay the real implementations.
+// fake AI clients, threaded through the REAL getProxySearchOrchestrator so
+// the module-singleton memoization (YOY-67 AC-7) is what these tests
+// exercise. Parsing and serialization stay the real implementations.
 const orchestratorSeam = vi.hoisted(() => ({
   build: undefined as ((db: PrismaClient) => unknown) | undefined,
 }));
@@ -29,12 +31,15 @@ vi.mock("./search/proxy.server", async (importOriginal) => {
     await importOriginal<typeof import("./search/proxy.server")>();
   return {
     ...original,
-    createProxySearchOrchestrator: (db: PrismaClient) => {
-      if (orchestratorSeam.build === undefined) {
-        throw new Error("test installed no orchestrator");
-      }
-      return orchestratorSeam.build(db);
-    },
+    getProxySearchOrchestrator: (db: PrismaClient) =>
+      original.getProxySearchOrchestrator(db, (factoryDb) => {
+        if (orchestratorSeam.build === undefined) {
+          throw new Error("test installed no orchestrator");
+        }
+        return orchestratorSeam.build(
+          factoryDb,
+        ) as import("./search/orchestrator.server").SearchOrchestrator;
+      }),
   };
 });
 
@@ -88,6 +93,7 @@ import { createPrismaCostRecorder } from "./ai/cost-recorder.server";
 import { action } from "./routes/apps.unfiltered.search";
 import { createPgTrgmClassicStore } from "./search/classic-store.server";
 import { createSearchOrchestrator } from "./search/orchestrator.server";
+import { resetProxySearchOrchestrator } from "./search/proxy.server";
 import { createPgVectorRetrievalStore } from "./search/retrieval-store.server";
 import { createSessionThrottle } from "./search/throttle.server";
 
@@ -307,11 +313,14 @@ function fakeEmbeddings(options?: { costRecorder?: CostRecorder }): EmbeddingCli
   };
 }
 
-/** Install a real orchestrator over the given fakes as the route's seam. */
+/** Install a real orchestrator over the given fakes as the route's seam.
+ * Installing drops the module singleton (YOY-67 AC-7), so each install gets
+ * a fresh build on the next request and memoizes from there. */
 function installOrchestrator(options: {
   llm: LlmClient;
   embeddings?: EmbeddingClient;
 }): void {
+  resetProxySearchOrchestrator();
   orchestratorSeam.build = (routeDb) =>
     createSearchOrchestrator({
       db: routeDb as PrismaClient,
@@ -326,6 +335,7 @@ function installOrchestrator(options: {
 }
 
 beforeEach(async () => {
+  resetProxySearchOrchestrator();
   orchestratorSeam.build = () => {
     throw new Error("search ran before authentication");
   };
@@ -957,6 +967,42 @@ describe("per-session AI throttle (YOY-47 AC-4, AC-5)", () => {
     expect((await ai.json()).route).toBe("ai");
   });
 
+  it("counts a classic zero-hit escalation toward the budget (YOY-67 AC-3)", async () => {
+    await aiSeed();
+    throttleSeam.instance = createSessionThrottle({ limit: 1, now: () => 0 });
+    installOrchestrator({
+      llm: fakeLlm({
+        // The model routes the cross-language query classic; the keyword
+        // engine finds nothing, so the search escalates into the AI path.
+        classification: () => ({ route: "classic" }),
+        intent: () => DRESS_INTENT,
+      }),
+    });
+
+    const escalated = await action(
+      actionArgs(
+        proxyRequest({ payload: { query: "שמלה לחתונה", sessionId: "t6" } }),
+      ),
+    );
+    const escalatedBody = await escalated.json();
+    expect(escalatedBody.route).toBe("ai");
+    expect(escalatedBody.degraded).toBe(false);
+    expect(
+      escalatedBody.results.map((r: { productId: string }) => r.productId),
+    ).toEqual(["silk-gown"]);
+
+    // The escalation spent intent + embedding calls: the budget of 1 is gone.
+    const counting = countingAiLlm();
+    installOrchestrator({ llm: counting.llm });
+    const throttled = await action(
+      actionArgs(proxyRequest({ payload: { query: AI_QUERY, sessionId: "t6" } })),
+    );
+    const throttledBody = await throttled.json();
+    expect(throttledBody.route).toBe("classic");
+    expect(throttledBody.degraded).toBe(true);
+    expect(counting.invocations()).toBe(0);
+  });
+
   it("chip-removal requests are neither counted nor throttled", async () => {
     await aiSeed();
     throttleSeam.instance = createSessionThrottle({ limit: 1, now: () => 0 });
@@ -991,5 +1037,51 @@ describe("per-session AI throttle (YOY-47 AC-4, AC-5)", () => {
     expect(removalBody.route).toBe("ai");
     expect(removalBody.degraded).toBe(false);
     expect(counting.invocations()).toBe(callsBefore);
+  });
+});
+
+describe("orchestrator module singleton (YOY-67 AC-7)", () => {
+  it("serves repeat requests from one orchestrator: one classification call, identical route", async () => {
+    await seed([
+      {
+        productId: "silk-gown",
+        title: "silk gown",
+        vector: [0.9, 0.1, 0],
+        category: "dress",
+        occasions: ["wedding"],
+      },
+    ]);
+    let classificationCalls = 0;
+    installOrchestrator({
+      llm: fakeLlm({
+        classification: () => {
+          classificationCalls += 1;
+          return { route: "ai" };
+        },
+        intent: () => DRESS_INTENT,
+      }),
+    });
+
+    // Two requests with the same normalized query (spelled differently so
+    // normalization, not string identity, is what dedupes them). Before the
+    // singleton, each request built a fresh classifier with an empty
+    // decision cache — the live run recorded the same query taking opposite
+    // routes 1.6s apart despite temperature 0.
+    const first = await action(
+      actionArgs(proxyRequest({ payload: { query: AI_QUERY, sessionId: "c1" } })),
+    );
+    const second = await action(
+      actionArgs(
+        proxyRequest({
+          payload: { query: `  ${AI_QUERY.toUpperCase()}  `, sessionId: "c2" } ,
+        }),
+      ),
+    );
+
+    const firstBody = await first.json();
+    const secondBody = await second.json();
+    expect(firstBody.route).toBe("ai");
+    expect(secondBody.route).toBe("ai");
+    expect(classificationCalls).toBe(1);
   });
 });

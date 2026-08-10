@@ -396,3 +396,29 @@ export function createProxySearchOrchestrator(
     classicStore: createPgTrgmClassicStore(db),
   });
 }
+
+let orchestratorSingleton: SearchOrchestrator | undefined;
+
+/**
+ * The production orchestrator as a module singleton (YOY-67 AC-7): the
+ * classifier's decision cache and the retriever's query-embedding cache are
+ * per-instance, so per-request construction threw them away on every search
+ * — observed live as the same normalized query taking opposite routes 1.6s
+ * apart despite temperature 0. Memoizing the first successful construction
+ * makes the caches the cross-request determinism layer they were designed to
+ * be. A construction failure caches nothing, so a missing GEMINI_API_KEY
+ * stays a per-request 500 rather than a poisoned process. The `factory`
+ * parameter exists for tests, which memoize their fake builds through the
+ * same code path production takes.
+ */
+export function getProxySearchOrchestrator(
+  db: PrismaClient,
+  factory: (db: PrismaClient) => SearchOrchestrator = createProxySearchOrchestrator,
+): SearchOrchestrator {
+  return (orchestratorSingleton ??= factory(db));
+}
+
+/** Drop the memoized orchestrator so tests can install a fresh build. */
+export function resetProxySearchOrchestrator(): void {
+  orchestratorSingleton = undefined;
+}

@@ -3,7 +3,7 @@ import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import db from "../db.server";
 import { writeSearchEvent } from "../search/events.server";
 import {
-  createProxySearchOrchestrator,
+  getProxySearchOrchestrator,
   parseProxySearchBody,
   parseProxySearchParams,
   removeChipFromIntent,
@@ -101,7 +101,11 @@ async function handleSearch(
   // fallback ladder — construction included — must never surface framework
   // error details to a shopper. Same empty-body style as the 401/400 above.
   try {
-    const orchestrator = createProxySearchOrchestrator(db);
+    // Module singleton (YOY-67 AC-7): per-request construction emptied the
+    // classifier's decision cache on every search, so identical queries
+    // could take opposite routes across requests. Construction failures are
+    // not memoized, so this stays inside the containment try.
+    const orchestrator = getProxySearchOrchestrator(db);
     const startedAt = Date.now();
     const response = await orchestrator.runSearch(
       throttled
@@ -121,13 +125,18 @@ async function handleSearch(
     // Budget is consumed whenever the classifier decided the AI route (YOY-52
     // AC-5) — an AI-classified search that degraded to classic after intent
     // extraction or retrieval failed (route "classic", degraded, routeReason
-    // "model") spent real LLM calls and counts. Heuristic and model-decided
+    // "model") spent real LLM calls and counts, and so does a classic
+    // zero-hit escalation that degraded after its intent call (YOY-67 AC-3
+    // — reason "classic-zero-hit"; the successful escalation lands route
+    // "ai" and counts through the first arm). Heuristic and model-decided
     // classic searches ("short-query", "sku-pattern", non-degraded "model",
     // "model-error") consume nothing; chip removal and throttled responses
     // stay exempt (YOY-47 AC-4).
     const aiDecided =
       response.route === "ai" ||
-      (response.degraded && response.routeReason === "model");
+      (response.degraded &&
+        (response.routeReason === "model" ||
+          response.routeReason === "classic-zero-hit"));
     if (resolvedIntent === undefined && !throttled && aiDecided) {
       throttle.recordAiSearch(body.sessionId);
     }

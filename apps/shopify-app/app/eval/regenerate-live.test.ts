@@ -466,6 +466,22 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
       models.classificationModel,
       classificationEntries,
     );
+    // The synthesized stopgap classifications (YOY-67 AC-2) are superseded by
+    // the live answers just recorded; leaving them in place would collide
+    // with classification.json at replay time, so the regeneration empties
+    // the file rather than leaving that cleanup to hand-editing.
+    writeFileSync(
+      join(recordedDir, "classification-synthesized.json"),
+      `${JSON.stringify(
+        {
+          modelId: models.classificationModel,
+          provenance: "synthesized",
+          entries: {},
+        },
+        null,
+        2,
+      )}\n`,
+    );
 
     // Intent: the accuracy-tier model per golden query.
     const intentEntries: Record<string, RecordedEntry> = {};

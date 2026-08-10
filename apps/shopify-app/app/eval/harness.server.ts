@@ -147,8 +147,8 @@ export interface EvalRunResult {
   perRefinement: RefinementScore[];
   /** Constraint-outcome misses across every refinement golden. */
   refinementViolationCount: number;
-  /** True when any replayed intent recording is hand-written, not live. */
-  synthesizedIntentRecordings: boolean;
+  /** True when any replayed LLM recording is hand-written, not live. */
+  synthesizedRecordings: boolean;
   /** Fraction of goldens with an expected product in the top 10. */
   hitRate: number;
   /** Total constraint violations across every query's top 10. */
@@ -331,9 +331,37 @@ export async function runEval(db: PrismaClient): Promise<EvalRunResult> {
       `eval: refinement recordings collide with base intent recordings on ${collisions.join(", ")}`,
     );
   }
+  // Synthesized classification completions (YOY-67 AC-2): the non-Latin
+  // heuristic guard re-routed the Hebrew short-query goldens to the model,
+  // which had never been asked about them, so no live recording exists until
+  // the run-8 regeneration. Same separate-file pattern as the refinement
+  // intents: own provenance, collision is an error, and the regenerate flow
+  // empties this file once the live answers land in classification.json.
+  const classificationRecording = readJson<LlmRecording>(
+    "recorded",
+    "classification.json",
+  );
+  const classificationSynthesized = readJson<LlmRecording>(
+    "recorded",
+    "classification-synthesized.json",
+  );
+  const classificationCollisions = Object.keys(
+    classificationSynthesized.entries,
+  ).filter((key) => key in classificationRecording.entries);
+  if (classificationCollisions.length > 0) {
+    throw new Error(
+      `eval: synthesized classification recordings collide with live ones on ${classificationCollisions.join(", ")} — empty classification-synthesized.json after regenerating`,
+    );
+  }
   const recordings: Record<string, LlmRecording> = {
     enrichment: readJson<LlmRecording>("recorded", "enrichment.json"),
-    classification: readJson<LlmRecording>("recorded", "classification.json"),
+    classification: {
+      modelId: classificationRecording.modelId,
+      entries: {
+        ...classificationRecording.entries,
+        ...classificationSynthesized.entries,
+      },
+    },
     intent: {
       modelId: intentRecording.modelId,
       entries: { ...intentRecording.entries, ...refinementRecording.entries },
@@ -500,9 +528,10 @@ export async function runEval(db: PrismaClient): Promise<EvalRunResult> {
       (sum, score) => sum + score.violations.length,
       0,
     ),
-    synthesizedIntentRecordings:
+    synthesizedRecordings:
       intentRecording.provenance === "synthesized" ||
-      refinementRecording.provenance === "synthesized",
+      refinementRecording.provenance === "synthesized" ||
+      Object.keys(classificationSynthesized.entries).length > 0,
     hitRate: hitCount / goldens.length,
     violationCount: perQuery.reduce((sum, score) => sum + score.violations.length, 0),
     oneTimeCostUsd,
@@ -562,10 +591,10 @@ function printScorecard(result: EvalRunResult): void {
       lines.push(`  VIOLATION: ${violation}`);
     }
   }
-  if (result.synthesizedIntentRecordings) {
+  if (result.synthesizedRecordings) {
     lines.push(
       "",
-      "NOTE: some replayed intent recordings are synthesized, not live model",
+      "NOTE: some replayed LLM recordings are synthesized, not live model",
       "output — regenerate them (LIVE_LLM_TESTS=1) before trusting these rows",
       "as evidence of model behavior.",
     );

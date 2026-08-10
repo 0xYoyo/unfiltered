@@ -170,6 +170,18 @@ function isConstraintShaped(tokens: string[]): boolean {
   );
 }
 
+/**
+ * A letter outside the Latin script (Hebrew, Arabic, Cyrillic, …). The Option
+ * B routing contract (YOY-67 AC-2) makes cross-language routing the model's
+ * call, never a heuristic's: a query carrying any non-Latin letter must not
+ * be settled classic by the length- and shape-based rules below — keyword
+ * search cannot serve it against a Latin-indexed catalog, and the live run
+ * showed `סנובורד` dead-ending exactly that way. The empty-query and
+ * quoted-phrase rules stay universal: emptiness and exact-phrase intent are
+ * script-independent.
+ */
+const NON_LATIN_LETTER = /(?=\p{L})\P{Script=Latin}/u;
+
 /** SKU_TOKEN, except a bare number right after a price marker is a price bound, not a SKU. */
 function isSkuToken(tokens: string[], index: number): boolean {
   const token = tokens[index]!;
@@ -193,6 +205,9 @@ function isSkuToken(tokens: string[], index: number): boolean {
  * - constraint-shaped (price marker, Hebrew-prefixed number, or color word
  *   with company) → undecided, so the sku/short rules below cannot misroute
  *   "blue snowboard" or "סנובורד כחול מתחת ל-900" to classic (YOY-61 AC-1)
+ * - any non-Latin letter → undecided (YOY-67 AC-2): cross-language routing
+ *   is the model's call, so "סנובורד" escalates instead of dead-ending in
+ *   the keyword engine
  * - ≤4 tokens with a SKU/model-number-looking token → classic ("nike air max 90");
  *   a bare number right after a price marker ("dress under 400") is not one
  * - ≤2 tokens → classic (too short to carry natural-language intent)
@@ -207,7 +222,7 @@ export function classifyByHeuristics(
     return { route: "classic", reason: "quoted-phrase" };
   }
   const tokens = normalized.split(" ");
-  if (isConstraintShaped(tokens)) {
+  if (isConstraintShaped(tokens) || NON_LATIN_LETTER.test(normalized)) {
     return null;
   }
   if (tokens.length <= 4 && tokens.some((_, index) => isSkuToken(tokens, index))) {

@@ -612,6 +612,166 @@ describe("zero-hit close matches fall back to relaxed vector retrieval (YOY-52 A
   });
 });
 
+describe("classic zero hits escalate once into the AI path (YOY-67 AC-3)", () => {
+  /** The live-run row f9b8d67c shape: the MODEL routes a Hebrew query
+   * classic; trigram has nothing on an EN-only catalog. */
+  const HEBREW_QUERY = "סנובורד כחול";
+  const BLUE_DRESS_INTENT = {
+    ...DRESS_INTENT,
+    occasion: null,
+    colorsInclude: ["blue"],
+    softAttributes: [],
+  };
+
+  const seedBlueDress = (db: PrismaClient) =>
+    seed(db, [
+      {
+        productId: "blue-dress",
+        title: "The Blue Dress",
+        vector: [0.9, 0.1, 0],
+        enrichment: { category: "dress", colors: ["blue"] },
+      },
+    ]);
+
+  it("model-decided classic with zero keyword hits serves AI hits under reason classic-zero-hit", async () => {
+    const db = await createTestDb();
+    await seedBlueDress(db);
+    const orchestrator = buildOrchestrator(db, {
+      llm: fakeLlm({
+        classification: () => ({ route: "classic" }),
+        intent: () => BLUE_DRESS_INTENT,
+      }),
+    });
+
+    const response = await orchestrator.runSearch({
+      query: HEBREW_QUERY,
+      shopDomain: SHOP,
+    });
+
+    expect(response.route).toBe("ai");
+    expect(response.routeReason).toBe("classic-zero-hit");
+    expect(response.degraded).toBe(false);
+    expect(response.hits.map((hit) => hit.productId)).toEqual(["blue-dress"]);
+    expect(response.chips).toEqual([
+      { field: "category", value: "dress" },
+      { field: "colorsInclude", value: "blue" },
+    ]);
+  });
+
+  it("heuristic classic with zero keyword hits escalates the same way", async () => {
+    const db = await createTestDb();
+    await seedBlueDress(db);
+    const orchestrator = buildOrchestrator(db, {
+      llm: fakeLlm({
+        // Heuristics settle "vintage board" (short-query): no classification
+        // call happens, so only the escalation's intent handler is needed.
+        intent: () => BLUE_DRESS_INTENT,
+      }),
+    });
+
+    const response = await orchestrator.runSearch({
+      query: "vintage board",
+      shopDomain: SHOP,
+    });
+
+    expect(response.route).toBe("ai");
+    expect(response.routeReason).toBe("classic-zero-hit");
+    expect(response.hits.map((hit) => hit.productId)).toEqual(["blue-dress"]);
+  });
+
+  it("does not escalate when classic finds hits", async () => {
+    const db = await createTestDb();
+    await seed(db, [{ productId: "sneaker-90", title: "nike 90" }]);
+    const orchestrator = buildOrchestrator(db, {
+      llm: fakeLlm({}), // any LLM call would throw
+    });
+
+    const response = await orchestrator.runSearch({
+      query: "nike 90",
+      shopDomain: SHOP,
+    });
+
+    expect(response.route).toBe("classic");
+    expect(response.routeReason).toBe("sku-pattern");
+    expect(response.hits).toHaveLength(1);
+  });
+
+  it("does not escalate a throttled response: forced classic stays LLM-free", async () => {
+    const db = await createTestDb();
+    // Empty catalog: zero classic hits, yet no escalation may happen — the
+    // fake would throw on any LLM call.
+    const orchestrator = buildOrchestrator(db, { llm: fakeLlm({}) });
+
+    const response = await orchestrator.runSearch({
+      query: HEBREW_QUERY,
+      shopDomain: SHOP,
+      forceClassic: true,
+    });
+
+    expect(response.route).toBe("classic");
+    expect(response.routeReason).toBe("throttled");
+    expect(response.degraded).toBe(true);
+    expect(response.hits).toEqual([]);
+  });
+
+  it("degrades back to the empty classic response when the escalation's intent call fails", async () => {
+    const db = await createTestDb();
+    const orchestrator = buildOrchestrator(db, {
+      llm: fakeLlm({
+        classification: () => ({ route: "classic" }),
+        intent: () => {
+          throw new Error("extractor down");
+        },
+      }),
+    });
+
+    const response = await orchestrator.runSearch({
+      query: HEBREW_QUERY,
+      shopDomain: SHOP,
+    });
+
+    expect(response.route).toBe("classic");
+    expect(response.routeReason).toBe("classic-zero-hit");
+    expect(response.degraded).toBe(true);
+    expect(response.hits).toEqual([]);
+    expect(response.chips).toEqual([]);
+  });
+
+  it("an escalation landing on AI zero hits keeps chips and close matches without re-escalating", async () => {
+    const db = await createTestDb();
+    await seed(db, [
+      // Vector-near but fails the blue constraint: primary hits stay empty,
+      // and the relaxed ladder rescues it as a close match.
+      {
+        productId: "red-dress",
+        title: "The Red Dress",
+        vector: [0.8, 0.2, 0],
+        enrichment: { category: "dress", colors: ["red"] },
+      },
+    ]);
+    const orchestrator = buildOrchestrator(db, {
+      llm: fakeLlm({
+        classification: () => ({ route: "classic" }),
+        intent: () => BLUE_DRESS_INTENT,
+      }),
+    });
+
+    const response = await orchestrator.runSearch({
+      query: HEBREW_QUERY,
+      shopDomain: SHOP,
+    });
+
+    expect(response.route).toBe("ai");
+    expect(response.routeReason).toBe("classic-zero-hit");
+    expect(response.degraded).toBe(false);
+    expect(response.hits).toEqual([]);
+    expect(response.chips.length).toBeGreaterThan(0);
+    expect(response.closeMatches.map((hit) => hit.productId)).toEqual([
+      "red-dress",
+    ]);
+  });
+});
+
 describe("searchId threading (AC-7)", () => {
   it("threads one generated searchId through every AiCall row of an AI search", async () => {
     const db = await createTestDb();
