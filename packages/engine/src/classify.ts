@@ -226,7 +226,12 @@ function buildClassificationPrompt(normalized: string): string {
     'code lookup that classic keyword search handles well. Answer "ai" when',
     "the query expresses natural-language intent: descriptive attributes,",
     "occasions, comparisons, negations, price constraints, or full sentences.",
-    "The query may be in any language. Answer as JSON.",
+    "A query pairing a descriptive attribute — a color, material, fit, or",
+    'style — with a product noun ("black dress", "שמלה שחורה") is a',
+    'descriptive query, not a keyword lookup: answer "ai". This holds',
+    "especially for queries not in English — the catalog's keyword index is",
+    "English, so classic search cannot serve attribute queries written in",
+    "another language. The query may be in any language. Answer as JSON.",
     "",
     `Query: ${normalized}`,
   ].join("\n");
