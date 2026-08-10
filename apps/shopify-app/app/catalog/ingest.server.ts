@@ -44,6 +44,7 @@ export const PRODUCTS_QUERY = `#graphql
         vendor
         productType
         status
+        publishedAt
         updatedAt
         priceRangeV2 {
           minVariantPrice { amount currencyCode }
@@ -105,11 +106,14 @@ async function fetchAllProducts(graphql: AdminGraphql): Promise<ShopifyProductNo
  * Snapshot one shop's full catalog into CatalogProduct rows. Idempotent by
  * content hash: unchanged products are untouched, changed ones updated,
  * products gone from Shopify are deleted from the snapshot. Only ACTIVE
- * products are indexed (YOY-61 AC-2): archived and draft products are
- * excluded from the snapshot, so any previously ingested non-active rows
- * fall into the stale set below and are deleted — a shopper must never see
- * a product whose storefront page is a 404. All writes are scoped to
- * `shopDomain`; other shops' rows are never read or modified.
+ * products are indexed (YOY-61 AC-2), and only products published to the
+ * Online Store sales channel (YOY-67 AC-4 — status and publication are
+ * independent axes; an ACTIVE product with `publishedAt: null` 404s on
+ * click): anything else is excluded from the snapshot, so previously
+ * ingested rows that no longer qualify fall into the stale set below and
+ * are deleted — a shopper must never see a product whose storefront page is
+ * a 404. All writes are scoped to `shopDomain`; other shops' rows are never
+ * read or modified.
  */
 export async function ingestCatalog({
   db,
@@ -121,7 +125,14 @@ export async function ingestCatalog({
   graphql: AdminGraphql;
 }): Promise<IngestResult> {
   const snapshot = (await fetchAllProducts(graphql))
-    .filter((node) => node.status === undefined || node.status === "ACTIVE")
+    .filter(
+      (node) =>
+        (node.status === undefined || node.status === "ACTIVE") &&
+        // Never published to the Online Store (YOY-67 AC-4): the storefront
+        // page does not exist, however ACTIVE the product is. Absent means
+        // a legacy fixture, treated as published.
+        node.publishedAt !== null,
+    )
     .map(mapProductNode);
 
   const existing = await db.catalogProduct.findMany({
@@ -131,6 +142,7 @@ export async function ingestCatalog({
       contentHash: true,
       handle: true,
       featuredImageUrl: true,
+      publishedAt: true,
     },
   });
   const existingRows = new Map(existing.map((row) => [row.productId, row]));
@@ -152,13 +164,17 @@ export async function ingestCatalog({
       result.updated += 1;
     } else {
       // Searchable content unchanged. The display-only fields (handle,
-      // featuredImageUrl) sit outside contentHash (YOY-44 AC-4), so refresh
-      // them here when they drifted — this is also how a repeat full ingest
-      // backfills rows created before the fields existed (AC-5) — without
+      // featuredImageUrl) and the publication timestamp (YOY-67 AC-4) sit
+      // outside contentHash, so refresh them here when they drifted — this
+      // is also how a repeat full ingest backfills rows created before the
+      // fields existed (YOY-44 AC-5), and how the migration's
+      // assumed-published backfill is replaced with the real value — without
       // dirtying the hash or triggering re-enrichment.
       if (
         known.handle !== product.handle ||
-        known.featuredImageUrl !== product.featuredImageUrl
+        known.featuredImageUrl !== product.featuredImageUrl ||
+        (known.publishedAt?.getTime() ?? null) !==
+          (product.publishedAt?.getTime() ?? null)
       ) {
         await db.catalogProduct.update({
           where: {
@@ -167,6 +183,7 @@ export async function ingestCatalog({
           data: {
             handle: product.handle,
             featuredImageUrl: product.featuredImageUrl,
+            publishedAt: product.publishedAt,
           },
         });
       }

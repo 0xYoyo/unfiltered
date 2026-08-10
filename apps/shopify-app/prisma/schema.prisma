@@ -51,6 +51,15 @@ model CatalogProduct {
   // search stores still filter on it as defense in depth — a non-active row
   // that reaches the table by any other path must never be served.
   status          String   @default("ACTIVE")
+  // When the product was published to the Online Store sales channel, as of
+  // the last sync (YOY-67 AC-4). Status and channel publication are
+  // independent axes: ACTIVE but never published still 404s on the
+  // storefront. Ingestion and webhook sync drop unpublished products, so
+  // this is non-null in practice; both search stores filter on it as defense
+  // in depth. Nullable with a now() default so pre-migration rows and test
+  // seeds that predate the column stay served; sync paths always write the
+  // real value.
+  publishedAt     DateTime? @default(now())
   imageAltTexts   String[]
   // Display-only snapshot fields (YOY-44): storefront handle and featured
   // image for result cards. Deliberately OUTSIDE contentHash — a change here

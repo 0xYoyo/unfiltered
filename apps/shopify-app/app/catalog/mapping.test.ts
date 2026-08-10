@@ -93,6 +93,24 @@ describe("Shopify→snapshot mapping", () => {
     expect(snapshot.imageAltTexts).toEqual(["Front view"]);
   });
 
+  it("maps Online Store publication: timestamp, explicit null, and legacy-absent (YOY-67 AC-4)", () => {
+    const published = mapProductNode(
+      productNode({ id: "p", publishedAt: "2026-07-01T08:00:00Z" }),
+    );
+    const unpublished = mapProductNode(productNode({ id: "p", publishedAt: null }));
+    // Absent means a legacy fixture: treated as published as of updatedAt,
+    // the same compatibility rule `status` follows.
+    const legacy = mapProductNode(productNode({ id: "p" }));
+
+    expect(published.publishedAt).toEqual(new Date("2026-07-01T08:00:00Z"));
+    expect(unpublished.publishedAt).toBeNull();
+    expect(legacy.publishedAt).toEqual(new Date("2026-08-01T10:00:00Z"));
+    // Publication sits outside the searchable content: re-publishing or
+    // unpublishing must not dirty the hash or trigger re-enrichment.
+    expect(published.contentHash).toBe(unpublished.contentHash);
+    expect(published.contentHash).toBe(legacy.contentHash);
+  });
+
   it("keeps the content hash stable across tag order and timestamp churn", () => {
     const a = mapProductNode(
       productNode({ id: "p", tags: ["a", "b"], updatedAt: "2026-08-01T10:00:00Z" }),

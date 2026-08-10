@@ -344,6 +344,87 @@ describe("catalog ingestion", () => {
     expect(Number(embeddings[0]!.count)).toBe(0);
   });
 
+  it("indexes only Online-Store-published products and purges unpublished rows on repeat ingest (YOY-67 AC-4)", async () => {
+    await db.productEnrichment.deleteMany();
+    await db.$executeRawUnsafe(`DELETE FROM "ProductEmbedding"`);
+    // First sync: product 3 is still published, indexed, enriched, embedded.
+    await ingestCatalog({
+      db,
+      shopDomain: SHOP,
+      graphql: graphqlStub(fixtureCatalog()).graphql,
+    });
+    await db.productEnrichment.create({
+      data: {
+        shopDomain: SHOP,
+        productId: "gid://shopify/Product/3",
+        contentHash: "hash",
+        status: "enriched",
+        category: "top",
+        colors: [],
+        occasions: [],
+        fit: null,
+        styleTags: [],
+        seasons: [],
+      },
+    });
+    await db.$executeRawUnsafe(
+      `INSERT INTO "ProductEmbedding"
+         ("id", "shopDomain", "productId", "contentHash", "embedding", "updatedAt")
+       VALUES ('emb-pub-3', $1, 'gid://shopify/Product/3', 'hash', $2::vector(3), CURRENT_TIMESTAMP)`,
+      SHOP,
+      "[1,0,0]",
+    );
+
+    // Mixed publication: product 3 unpublished from the Online Store (still
+    // ACTIVE — status and publication are independent axes), a new
+    // never-published product appears. Both must be absent afterwards.
+    const mixed = [
+      productNode({
+        id: "gid://shopify/Product/1",
+        publishedAt: "2026-07-01T08:00:00Z",
+      }),
+      fixtureCatalog()[1]!,
+      productNode({
+        id: "gid://shopify/Product/3",
+        status: "ACTIVE",
+        publishedAt: null,
+      }),
+      productNode({ id: "gid://shopify/Product/5", publishedAt: null }),
+    ];
+    const result = await ingestCatalog({
+      db,
+      shopDomain: SHOP,
+      graphql: graphqlStub(mixed).graphql,
+    });
+
+    // The unpublished product is reported deleted; the new one never lands.
+    expect(result.deleted).toBe(1);
+    expect(result.created).toBe(0);
+    const rows = await db.catalogProduct.findMany({
+      where: { shopDomain: SHOP },
+      orderBy: { productId: "asc" },
+    });
+    expect(rows.map((row) => row.productId)).toEqual([
+      "gid://shopify/Product/1",
+      "gid://shopify/Product/2",
+    ]);
+    // The real publication timestamp is persisted (YOY-67 AC-4), replacing
+    // the assumed-published default older rows carry.
+    expect(rows[0]?.publishedAt).toEqual(new Date("2026-07-01T08:00:00Z"));
+    // Enrichment AND embedding rows go with the unpublished product.
+    expect(
+      await db.productEnrichment.count({
+        where: { shopDomain: SHOP, productId: "gid://shopify/Product/3" },
+      }),
+    ).toBe(0);
+    const embeddings = await db.$queryRawUnsafe<Array<{ count: bigint }>>(
+      `SELECT count(*)::int8 AS count FROM "ProductEmbedding"
+        WHERE "shopDomain" = $1 AND "productId" = 'gid://shopify/Product/3'`,
+      SHOP,
+    );
+    expect(Number(embeddings[0]!.count)).toBe(0);
+  });
+
   it("isolates shops: two ingested catalogs never cross-contaminate", async () => {
     await ingestCatalog({
       db,
