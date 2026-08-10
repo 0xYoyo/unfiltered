@@ -19,6 +19,14 @@ export interface ShopifyProductNode {
    * content hash — only ACTIVE products are ever mapped.
    */
   status?: string;
+  /**
+   * When the product was published to the Online Store sales channel; null
+   * means never published (YOY-67 AC-4) — its storefront page 404s even
+   * while ACTIVE, so the ingest filter drops it before mapping. Absent in
+   * older fixtures and treated as published as of `updatedAt` there, the
+   * same compatibility rule `status` follows.
+   */
+  publishedAt?: string | null;
   updatedAt: string;
   priceRangeV2: {
     minVariantPrice: { amount: string; currencyCode: string };
@@ -46,6 +54,13 @@ export interface SnapshotProduct {
   handle: string;
   /** Featured-image URL for result cards (display-only, YOY-44). */
   featuredImageUrl: string | null;
+  /**
+   * Online Store publication timestamp (YOY-67 AC-4); null means never
+   * published. Outside contentHash like the display fields: a re-publish
+   * must not dirty the searchable content, and unpublishing removes the row
+   * entirely rather than updating it.
+   */
+  publishedAt: Date | null;
   sourceUpdatedAt: Date;
   contentHash: string;
 }
@@ -62,7 +77,11 @@ export interface SnapshotProduct {
 export function computeContentHash(
   product: Omit<
     SnapshotProduct,
-    "contentHash" | "sourceUpdatedAt" | "handle" | "featuredImageUrl"
+    | "contentHash"
+    | "sourceUpdatedAt"
+    | "handle"
+    | "featuredImageUrl"
+    | "publishedAt"
   >,
 ): string {
   return createHash("sha256")
@@ -108,6 +127,16 @@ export function mapProductNode(node: ShopifyProductNode): SnapshotProduct {
     ...withoutHash,
     handle: node.handle,
     featuredImageUrl: node.featuredImage?.url ?? null,
+    // Absent (legacy fixture) means published, as of the node's own
+    // timestamp; explicit null means never published (YOY-67 AC-4) — the
+    // ingest and webhook paths drop those before mapping, so a null here is
+    // belt-and-braces for any other caller.
+    publishedAt:
+      node.publishedAt === undefined
+        ? new Date(node.updatedAt)
+        : node.publishedAt === null
+          ? null
+          : new Date(node.publishedAt),
     sourceUpdatedAt: new Date(node.updatedAt),
     contentHash: computeContentHash(withoutHash),
   };

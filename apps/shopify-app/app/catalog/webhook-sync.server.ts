@@ -25,6 +25,14 @@ export interface ProductWebhookPayload {
    * `products/delete`. Absent in older payloads and treated as active.
    */
   status?: string;
+  /**
+   * When the product was published to the Online Store sales channel; null
+   * means not published (YOY-67 AC-4) — the storefront page 404s even while
+   * ACTIVE, so a null removes the product from the snapshot the same way a
+   * non-active status does (unpublishing fires `products/update`, not
+   * `products/delete`). Absent in older payloads and treated as published.
+   */
+  published_at?: string | null;
   updated_at: string;
   variants: Array<{
     price: string;
@@ -231,6 +239,7 @@ export function mapWebhookProduct(
       .filter((tag) => tag !== ""),
     vendor: payload.vendor,
     productType: payload.product_type,
+    publishedAt: payload.published_at,
     updatedAt: payload.updated_at,
     priceRangeV2: {
       minVariantPrice: { amount: String(min), currencyCode },
@@ -269,11 +278,16 @@ export async function syncProductFromWebhook({
 }): Promise<WebhookSyncOutcome> {
   const productId = productGid(payload);
 
-  // Non-active products leave the snapshot (YOY-61 AC-2): archiving or
-  // drafting fires `products/update` with the new status, and serving the
-  // product afterwards means 404s on click. Same deletion set as
-  // `products/delete` — enrichment and embedding rows go with the product.
-  if (payload.status !== undefined && payload.status !== "active") {
+  // Non-active products leave the snapshot (YOY-61 AC-2), and so do
+  // products unpublished from the Online Store (YOY-67 AC-4 — status and
+  // channel publication are independent axes): archiving, drafting, or
+  // unpublishing fires `products/update`, and serving the product afterwards
+  // means 404s on click. Same deletion set as `products/delete` —
+  // enrichment and embedding rows go with the product.
+  if (
+    (payload.status !== undefined && payload.status !== "active") ||
+    payload.published_at === null
+  ) {
     const [, , { count }] = await db.$transaction([
       db.productEnrichment.deleteMany({ where: { shopDomain, productId } }),
       db.productEmbedding.deleteMany({ where: { shopDomain, productId } }),
@@ -291,6 +305,7 @@ export async function syncProductFromWebhook({
         sourceUpdatedAt: true,
         handle: true,
         featuredImageUrl: true,
+        publishedAt: true,
       },
     });
 
@@ -326,17 +341,21 @@ export async function syncProductFromWebhook({
   }
   if (product.contentHash === existing.contentHash) {
     // Searchable content unchanged — but the display-only fields (handle,
-    // featuredImageUrl) sit outside contentHash (YOY-44 AC-4), so an update
-    // that changed only them must still land on the row (AC-3).
+    // featuredImageUrl) and the publication timestamp (YOY-67 AC-4) sit
+    // outside contentHash, so an update that changed only them must still
+    // land on the row (YOY-44 AC-3).
     if (
       product.handle !== existing.handle ||
-      product.featuredImageUrl !== existing.featuredImageUrl
+      product.featuredImageUrl !== existing.featuredImageUrl ||
+      (product.publishedAt?.getTime() ?? null) !==
+        (existing.publishedAt?.getTime() ?? null)
     ) {
       await db.catalogProduct.update({
         where: { shopDomain_productId: { shopDomain, productId } },
         data: {
           handle: product.handle,
           featuredImageUrl: product.featuredImageUrl,
+          publishedAt: product.publishedAt,
           sourceUpdatedAt: product.sourceUpdatedAt,
         },
       });

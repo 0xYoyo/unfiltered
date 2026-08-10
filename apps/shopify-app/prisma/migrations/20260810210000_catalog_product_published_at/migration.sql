@@ -1,0 +1,11 @@
+-- Online Store publication on the catalog snapshot (YOY-67 AC-4). Product
+-- status and channel publication are independent axes: an ACTIVE product
+-- never published to the Online Store 404s on click while passing the
+-- YOY-61 status filter. Ingestion and webhook sync drop unpublished
+-- products, so the column is non-null in practice, and both search stores
+-- filter on it as defense in depth. The CURRENT_TIMESTAMP default backfills
+-- pre-migration rows as assumed-published -- the next full ingest replaces
+-- the assumption with the real per-product value and purges rows that turn
+-- out unpublished.
+-- No semicolon anywhere but the statement end, for the PGlite test-DB loader.
+ALTER TABLE "CatalogProduct" ADD COLUMN "publishedAt" TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP

@@ -394,6 +394,87 @@ describe("products/update webhook", () => {
     expect(await snapshotRow()).not.toBeNull();
   });
 
+  it("removes the snapshot row when the product is unpublished from the Online Store (YOY-67 AC-4)", async () => {
+    await db.productEnrichment.deleteMany();
+    await db.$executeRawUnsafe(`DELETE FROM "ProductEmbedding"`);
+    await db.productEnrichment.create({
+      data: {
+        shopDomain: SHOP,
+        productId: PRODUCT_GID,
+        contentHash: (await snapshotRow())!.contentHash,
+        status: "enriched",
+        category: "top",
+        colors: [],
+        occasions: [],
+        fit: null,
+        styleTags: [],
+        seasons: [],
+      },
+    });
+    await db.$executeRawUnsafe(
+      `INSERT INTO "ProductEmbedding"
+         ("id", "shopDomain", "productId", "contentHash", "embedding", "updatedAt")
+       VALUES ('emb-unpub', $1, $2, 'hash', $3::vector(3), CURRENT_TIMESTAMP)`,
+      SHOP,
+      PRODUCT_GID,
+      "[1,0,0]",
+    );
+
+    // Unpublishing fires products/update with published_at null while the
+    // product stays ACTIVE — status and channel publication are independent
+    // axes, and the storefront page is a 404 either way.
+    const response = await updateAction(
+      actionArgs(
+        webhookRequest({
+          topic: "products/update",
+          shop: SHOP,
+          payload: productPayload({
+            status: "active",
+            published_at: null,
+            updated_at: "2026-08-01T11:00:00Z",
+          }),
+        }),
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await snapshotRow()).toBeNull();
+    expect(
+      await db.productEnrichment.count({
+        where: { shopDomain: SHOP, productId: PRODUCT_GID },
+      }),
+    ).toBe(0);
+    const embeddings = await db.$queryRawUnsafe<Array<{ count: number }>>(
+      `SELECT count(*)::int AS count FROM "ProductEmbedding"
+        WHERE "shopDomain" = $1 AND "productId" = $2`,
+      SHOP,
+      PRODUCT_GID,
+    );
+    expect(Number(embeddings[0]!.count)).toBe(0);
+  });
+
+  it("stores the publication timestamp and refreshes it without dirtying the hash (YOY-67 AC-4)", async () => {
+    const before = await snapshotRow();
+
+    // Re-publish with an explicit timestamp; searchable content unchanged.
+    await updateAction(
+      actionArgs(
+        webhookRequest({
+          topic: "products/update",
+          shop: SHOP,
+          payload: productPayload({
+            published_at: "2026-07-15T09:30:00Z",
+            updated_at: "2026-08-01T11:00:00Z",
+          }),
+        }),
+      ),
+    );
+
+    const after = await snapshotRow();
+    expect(after?.publishedAt).toEqual(new Date("2026-07-15T09:30:00Z"));
+    expect(after?.contentHash).toBe(before?.contentHash);
+  });
+
   it("preserves the ingested currency code, which webhook payloads never carry", async () => {
     await db.catalogProduct.update({
       where: {
