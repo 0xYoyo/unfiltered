@@ -40,6 +40,17 @@ import {
   runEval,
 } from "./harness.server";
 import { recordingKeyFromPrompt } from "./replay.server";
+import {
+  assertEngineSourceExecution,
+  engineSourceResolutionFailure,
+} from "./source-guard.server";
+
+// Source-execution guard (YOY-52 run-6): at module load — before any paid
+// LLM/embedding call — fail loudly unless @unfiltered/engine is executing
+// from packages/engine/src via the root vitest.config.ts alias. A vitest run
+// started inside apps/shopify-app picks up the app's alias-less
+// vite.config.ts and would silently score stale compiled dist/ output.
+assertEngineSourceExecution();
 
 // Fixture regeneration (AC-5 of YOY-27): re-records every eval fixture output
 // — enrichments, classifications, intents, embeddings — against the live
@@ -290,6 +301,39 @@ describe("REGEN_PACE_MS resolution", () => {
     } finally {
       warn.mockRestore();
     }
+  });
+});
+
+describe("source-execution guard (YOY-52 run-6)", () => {
+  // Pins the guard both ways so a refactor can't quietly disarm it: source
+  // resolution passes, dist resolution — current or so stale the sentinel
+  // export is missing entirely — trips with a message naming the fix.
+  it("passes on a source-resolved engine module", () => {
+    expect(
+      engineSourceResolutionFailure(
+        "file:///repo/packages/engine/src/index.ts",
+      ),
+    ).toBeNull();
+  });
+
+  it("trips on a dist-resolved engine module and names the fix", () => {
+    const failure = engineSourceResolutionFailure(
+      "file:///repo/packages/engine/dist/index.js",
+    );
+    expect(failure).toMatch(/did not resolve to packages\/engine\/src/);
+    expect(failure).toMatch(/repository root/);
+    expect(failure).toMatch(/vitest\.config\.ts/);
+    expect(failure).toMatch(/regen:live/);
+  });
+
+  it("trips on a dist build so stale it predates the sentinel export", () => {
+    expect(engineSourceResolutionFailure(undefined)).toMatch(
+      /predates the ENGINE_SOURCE_URL sentinel/,
+    );
+  });
+
+  it("this run itself is executing the engine from source", () => {
+    expect(() => assertEngineSourceExecution()).not.toThrow();
   });
 });
 

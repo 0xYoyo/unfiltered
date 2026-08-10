@@ -10,6 +10,15 @@
 /** Semantic version of the engine's public API contract. */
 export const version = "0.4.0";
 
+/**
+ * The URL this module was actually loaded from. Test runs alias
+ * @unfiltered/engine to this TypeScript source (root vitest.config.ts); a
+ * URL under compiled dist/ output means the alias was bypassed and the run
+ * is scoring whatever was last built, not the current source. Generic by
+ * construction: any dist skew — missing symbol or not — moves this URL.
+ */
+export const ENGINE_SOURCE_URL = import.meta.url;
+
 export {
   type ClassicSearchHit,
   type ClassicSearchRequest,

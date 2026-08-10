@@ -8,6 +8,7 @@
   ],
   "scripts": {
     "test": "vitest run",
+    "regen:live": "vitest run --config vitest.config.ts apps/shopify-app/app/eval/regenerate-live.test.ts",
     "lint": "npm run lint --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "build": "npm run build --workspaces --if-present",

@@ -56,7 +56,14 @@ Gemini APIs and rewrites `fixtures/recorded/*.json` in place. It runs only
 under `LIVE_LLM_TESTS=1` with a local `GEMINI_API_KEY` — never by default and
 never in CI, which holds no key (NG-2):
 
-    LIVE_LLM_TESTS=1 GEMINI_API_KEY=... npx vitest run apps/shopify-app/app/eval/regenerate-live.test.ts
+    LIVE_LLM_TESTS=1 GEMINI_API_KEY=... npm run regen:live
+
+The root `regen:live` script pins the run to the root `vitest.config.ts`,
+whose alias resolves `@unfiltered/*` to the TypeScript source. Invoking
+vitest directly with a working directory inside `apps/shopify-app` picks up
+the app's alias-less `vite.config.ts` instead and would score the stale
+compiled `dist/` output (YOY-52 run 6); a source-execution guard in the test
+now fails loudly before the first paid call if that happens.
 
 Afterwards, re-run `npm test` to prove the harness still clears the bar on
 the fresh recordings, then commit the changed JSONs.
