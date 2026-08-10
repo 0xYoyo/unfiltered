@@ -153,6 +153,24 @@ describe("structured completion", () => {
     });
   });
 
+  it("forwards a request temperature into generationConfig, omitting it otherwise (YOY-52)", async () => {
+    const { recorder } = recorderSpy();
+    const { captured, impl } = fetchStub(200, completionFixture);
+    const client = llmClient(impl, recorder);
+
+    await client.completeStructured({
+      prompt: "Route this query",
+      schema: SCHEMA,
+      operation: "classification",
+      temperature: 0,
+    });
+
+    expect(
+      (captured[0]!.body.generationConfig as { temperature?: number })
+        .temperature,
+    ).toBe(0);
+  });
+
   it("translates nullable type arrays to Gemini's nullable form in responseSchema (YOY-28)", async () => {
     const { recorder } = recorderSpy();
     const { captured, impl } = fetchStub(200, completionFixture);

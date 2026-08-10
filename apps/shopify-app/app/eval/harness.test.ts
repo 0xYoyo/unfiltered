@@ -310,8 +310,16 @@ describe("eval run (AC-2, AC-3, AC-4, AC-6)", () => {
       // The expected product must appear in the top 5 classic results.
       expect(score.firstExpectedRank, score.golden.id).not.toBeNull();
       expect(score.firstExpectedRank!, score.golden.id).toBeLessThanOrEqual(5);
-      // A classic search issues zero LLM/embedding calls (AC-5).
-      expect(score.costUsd, score.golden.id).toBe(0);
+      if (score.routeReason === "model") {
+        // A model-decided classic golden (the hybrid ladder's same-language
+        // attribute+noun shape, YOY-52) spends exactly its one
+        // classification call — never intent or embedding spend.
+        expect(score.costUsd, score.golden.id).toBeGreaterThan(0);
+      } else {
+        // A heuristic-settled classic search issues zero LLM/embedding
+        // calls (AC-5).
+        expect(score.costUsd, score.golden.id).toBe(0);
+      }
     }
   });
 

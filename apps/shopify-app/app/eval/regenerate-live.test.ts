@@ -326,6 +326,19 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
     const goldens = loadGoldens();
     const usage = captureUsage(createPrismaCostRecorder(db));
 
+    // Failure collection (YOY-52 directive): a live run costs ~9 paid
+    // minutes, so a single bad assertion must not hide every finding behind
+    // it. Each section collects its failures and keeps going; the run fails
+    // once, at the end, with the complete picture. Recording files are still
+    // written per section, so a failing run leaves a full fixture set to
+    // inspect rather than a half-rewritten tree.
+    const failures: string[] = [];
+    const check = (condition: boolean, message: string): void => {
+      if (!condition) {
+        failures.push(message);
+      }
+    };
+
     // Enrichment: the classification-tier model over every sparse product.
     const enrichmentEntries: Record<string, RecordedEntry> = {};
     const enrichmentLlm = captureCompletions(
@@ -348,7 +361,10 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
         operation: "enrichment",
       });
       const attributes = parseEnrichment(completion);
-      expect(attributes, `enrichment for ${product.productId}`).not.toBeNull();
+      check(
+        attributes !== null,
+        `enrichment: ${product.productId} answered outside the schema`,
+      );
       attributesByProduct.set(product.productId, attributes);
     }
     writeRecording("enrichment.json", models.classificationModel, enrichmentEntries);
@@ -376,26 +392,29 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
     // each golden's expectation derives from classifyByHeuristics itself.
     for (const golden of goldens) {
       const decision = await classifier.classify(golden.query);
-      expect(decision.route, `${golden.id} route`).toBe(
-        golden.expectedRoute ?? "ai",
+      check(
+        decision.route === (golden.expectedRoute ?? "ai"),
+        `classification: ${golden.id} routed ${decision.route}, expected ${golden.expectedRoute ?? "ai"}`,
       );
       const heuristic = classifyByHeuristics(normalizeQuery(golden.query));
       if (heuristic === null) {
-        expect(decision.reason, `${golden.id} must reach the model`).toBe(
-          "model",
+        check(
+          decision.reason === "model",
+          `classification: ${golden.id} must reach the model, got reason ${decision.reason}`,
         );
-        expect(
-          classificationEntries[normalizeQuery(golden.query)],
-          `${golden.id} classification recorded`,
-        ).toBeDefined();
+        check(
+          classificationEntries[normalizeQuery(golden.query)] !== undefined,
+          `classification: ${golden.id} recorded no completion`,
+        );
       } else {
-        expect(decision.reason, `${golden.id} settles heuristically`).toBe(
-          heuristic.reason,
+        check(
+          decision.reason === heuristic.reason,
+          `classification: ${golden.id} should settle heuristically (${heuristic.reason}), got ${decision.reason}`,
         );
-        expect(
-          classificationEntries[normalizeQuery(golden.query)],
-          `${golden.id} must not spend a model call`,
-        ).toBeUndefined();
+        check(
+          classificationEntries[normalizeQuery(golden.query)] === undefined,
+          `classification: ${golden.id} spent a model call despite settling heuristically`,
+        );
       }
     }
     writeRecording(
@@ -418,8 +437,16 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
     });
     const intents = new Map<string, NonNullable<ReturnType<typeof parseIntent>>>();
     for (const golden of goldens) {
-      intents.set(golden.id, await extractor.extract(golden.query));
-      expect(intentEntries[golden.query], `${golden.id} intent recorded`).toBeDefined();
+      try {
+        intents.set(golden.id, await extractor.extract(golden.query));
+      } catch (error) {
+        check(false, `intent: ${golden.id} extraction failed: ${String(error)}`);
+        continue;
+      }
+      check(
+        intentEntries[golden.query] !== undefined,
+        `intent: ${golden.id} recorded no completion`,
+      );
     }
     writeRecording("intent.json", models.intentModel, intentEntries);
 
@@ -439,13 +466,21 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
       ),
     });
     for (const golden of loadRefinementGoldens()) {
-      await refinementExtractor.extract(golden.query, {
-        previousIntent: golden.previousIntent,
-      });
-      expect(
-        refinementEntries[golden.query],
-        `${golden.id} refinement intent recorded`,
-      ).toBeDefined();
+      try {
+        await refinementExtractor.extract(golden.query, {
+          previousIntent: golden.previousIntent,
+        });
+      } catch (error) {
+        check(
+          false,
+          `refinement: ${golden.id} extraction failed: ${String(error)}`,
+        );
+        continue;
+      }
+      check(
+        refinementEntries[golden.query] !== undefined,
+        `refinement: ${golden.id} recorded no completion`,
+      );
     }
     writeRecording(
       "intent-refinement.json",
@@ -467,7 +502,9 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
           attributesByProduct.get(product.productId) ?? null,
         ),
       ),
-      ...goldens.map((golden) => composeQueryText(intents.get(golden.id)!)),
+      ...goldens
+        .filter((golden) => intents.has(golden.id))
+        .map((golden) => composeQueryText(intents.get(golden.id)!)),
     ];
     const unique = [...new Set(texts)];
     const vectors: Record<string, number[]> = {};
@@ -492,9 +529,18 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
       )}\n`,
     );
 
-    expect(Object.keys(enrichmentEntries)).toHaveLength(catalog.length);
-    expect(Object.keys(intentEntries)).toHaveLength(goldens.length);
-    expect(Object.keys(vectors)).toHaveLength(unique.length);
+    check(
+      Object.keys(enrichmentEntries).length === catalog.length,
+      `coverage: ${Object.keys(enrichmentEntries).length}/${catalog.length} enrichments recorded`,
+    );
+    check(
+      Object.keys(intentEntries).length === goldens.length,
+      `coverage: ${Object.keys(intentEntries).length}/${goldens.length} intents recorded`,
+    );
+    check(
+      Object.keys(vectors).length === unique.length,
+      `coverage: ${Object.keys(vectors).length}/${unique.length} embeddings recorded`,
+    );
 
     // In-process re-score against the freshly written recordings (YOY-31
     // AC-6). Vitest gives the offline harness suite no ordering guarantee
@@ -509,19 +555,32 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
       const misses = rescored.perQuery
         .filter((score) => score.firstExpectedRank === null)
         .map((score) => score.golden.id);
-      expect(
-        rescored.hitRate,
-        `fresh recordings miss the bar; misses: ${misses.join(", ")}`,
-      ).toBeGreaterThanOrEqual(0.8);
-      expect(
-        rescored.perQuery.flatMap((score) => score.violations),
-      ).toEqual([]);
-      expect(
-        rescored.perRefinement.flatMap((score) => score.violations),
-      ).toEqual([]);
-      expect(rescored.perSearchCostPer1000Usd).toBeLessThanOrEqual(2.0);
+      check(
+        rescored.hitRate >= 0.8,
+        `rescore: hit rate ${rescored.hitRate.toFixed(2)} misses the 0.8 bar; misses: ${misses.join(", ")}`,
+      );
+      for (const violation of rescored.perQuery.flatMap(
+        (score) => score.violations,
+      )) {
+        check(false, `rescore: ${violation}`);
+      }
+      for (const violation of rescored.perRefinement.flatMap(
+        (score) => score.violations,
+      )) {
+        check(false, `rescore: ${violation}`);
+      }
+      check(
+        rescored.perSearchCostPer1000Usd <= 2.0,
+        `rescore: blended cost $${rescored.perSearchCostPer1000Usd.toFixed(4)}/1k exceeds the $2.00 bar`,
+      );
+    } catch (error) {
+      check(false, `rescore: eval run failed: ${String(error)}`);
     } finally {
       await evalDb.$disconnect();
     }
+
+    // The single verdict: every collected failure from every section, at
+    // once. An empty list is the green run that ends the regeneration loop.
+    expect(failures, `\n${failures.join("\n")}`).toEqual([]);
   }, 2_700_000);
 });

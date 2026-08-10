@@ -151,7 +151,7 @@
     },
     "black dress": {
       "output": {
-        "route": "ai"
+        "route": "classic"
       },
       "inputTokens": 100,
       "outputTokens": 11

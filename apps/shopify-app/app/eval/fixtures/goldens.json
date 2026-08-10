@@ -546,17 +546,21 @@
     "id": "g22",
     "language": "en",
     "query": "black dress",
+    "expectedRoute": "classic",
     "expectedProductIds": [
-      "p02",
-      "p03"
+      "p01",
+      "p04",
+      "p06",
+      "p07",
+      "p09",
+      "p10",
+      "p11"
     ],
     "hardConstraints": {
-      "category": "dress",
+      "category": null,
       "priceMin": null,
       "priceMax": null,
-      "colorsInclude": [
-        "black"
-      ],
+      "colorsInclude": [],
       "colorsExclude": [],
       "occasion": null,
       "availabilityRequired": false

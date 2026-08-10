@@ -115,6 +115,12 @@ export interface StructuredCompletionRequest {
   schema: JsonSchema;
   /** Cost-ledger operation label, e.g. "classification", "intent", "enrichment". */
   operation: string;
+  /**
+   * Sampling temperature, when the call needs a specific one — routing
+   * decisions pass 0 for determinism (YOY-52). Absent means the provider's
+   * default.
+   */
+  temperature?: number;
   /** Shop the call is made on behalf of, for metering, when known. */
   shopDomain?: string;
   /** Correlation ID tying together every call serving one search. */

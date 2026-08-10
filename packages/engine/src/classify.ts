@@ -221,17 +221,18 @@ export function classifyByHeuristics(
 
 function buildClassificationPrompt(normalized: string): string {
   return [
-    "Route this e-commerce product search query.",
-    'Answer "classic" when the query is a plain keyword, brand, or product-',
-    'code lookup that classic keyword search handles well. Answer "ai" when',
-    "the query expresses natural-language intent: descriptive attributes,",
-    "occasions, comparisons, negations, price constraints, or full sentences.",
-    "A query pairing a descriptive attribute — a color, material, fit, or",
-    'style — with a product noun ("black dress", "שמלה שחורה") is a',
-    'descriptive query, not a keyword lookup: answer "ai". This holds',
-    "especially for queries not in English — the catalog's keyword index is",
-    "English, so classic search cannot serve attribute queries written in",
-    "another language. The query may be in any language. Answer as JSON.",
+    "Route this e-commerce product search query. The catalog is indexed in",
+    "English; AI routing is reserved for what keyword search cannot serve.",
+    'Answer "ai" when any of these holds:',
+    "- the query is in a language other than English (keyword search cannot",
+    '  match a cross-language query: "שמלה שחורה" routes ai),',
+    "- it carries a price bound or other constraint phrasing,",
+    '- it negates or excludes something ("not black"),',
+    "- it names an occasion, makes a comparison, or reads as a sentence.",
+    'Otherwise answer "classic": an English query whose shape keyword search',
+    "serves well — a brand, SKU, or model-code lookup, an exact product",
+    'title, or a plain attribute-plus-noun lookup like "black dress".',
+    "Answer as JSON.",
     "",
     `Query: ${normalized}`,
   ].join("\n");
@@ -272,6 +273,9 @@ export function createQueryClassifier(
           prompt: buildClassificationPrompt(normalized),
           schema: CLASSIFICATION_SCHEMA,
           operation: "classification",
+          // Routing must be deterministic: the same query always takes the
+          // same route (YOY-52 — the g21/g22 flip-flop across live runs).
+          temperature: 0,
           shopDomain: context?.shopDomain,
           searchId: context?.searchId,
         }),

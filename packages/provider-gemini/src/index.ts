@@ -257,6 +257,9 @@ export function createGeminiLlmClient(options: GeminiClientOptions): LlmClient {
           generationConfig: {
             responseMimeType: "application/json",
             responseSchema: toGeminiResponseSchema(request.schema),
+            ...(request.temperature !== undefined
+              ? { temperature: request.temperature }
+              : {}),
           },
         },
       )) as GenerateContentResponse;
