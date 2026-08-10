@@ -126,6 +126,12 @@ export interface ProductCard {
   priceMax: number;
   currencyCode: string;
   available: boolean;
+  /**
+   * Passed a positive color constraint on unknown-passes leniency, not on
+   * evidence (YOY-67 AC-5): the widget renders such cards de-emphasized and
+   * labeled. False whenever no positive color constraint was applied.
+   */
+  colorUnknown: boolean;
 }
 
 /** The single response shape every orchestrated search resolves to. */
@@ -175,7 +181,7 @@ export function createSearchOrchestrator(
    * rather than served as half-empty cards. */
   async function hydrateCards(
     shopDomain: string,
-    hits: ReadonlyArray<{ productId: string }>,
+    hits: ReadonlyArray<{ productId: string; colorUnknown?: boolean }>,
   ): Promise<ProductCard[]> {
     if (hits.length === 0) {
       return [];
@@ -202,6 +208,7 @@ export function createSearchOrchestrator(
           priceMax: row.priceMax,
           currencyCode: row.currencyCode,
           available: row.available,
+          colorUnknown: hit.colorUnknown === true,
         },
       ];
     });
@@ -293,7 +300,7 @@ export function createSearchOrchestrator(
         intent: Intent,
         routeReason: SearchRouteReason,
       ): Promise<SearchResponse> => {
-        let hits: Array<{ productId: string }>;
+        let hits: Array<{ productId: string; colorUnknown?: boolean }>;
         let chips: AppliedConstraint[];
         try {
           const retrieval = await retriever.retrieve({
@@ -335,7 +342,7 @@ export function createSearchOrchestrator(
           // when the keyword engine finds nothing either, relax the vector
           // search instead (YOY-52 AC-16).
           const close = await classicStore.search({ shopDomain, query, limit });
-          const closeHits: Array<{ productId: string }> =
+          const closeHits: Array<{ productId: string; colorUnknown?: boolean }> =
             close.hits.length > 0
               ? close.hits
               : await relaxedCloseMatches(intent, limit);

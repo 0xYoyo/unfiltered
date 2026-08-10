@@ -269,6 +269,12 @@ export interface ProxyResult {
   priceMax: number;
   currencyCode: string;
   available: boolean;
+  /**
+   * Passed a positive color constraint on unknown-passes leniency, not on
+   * evidence (YOY-67 AC-5): the widget de-emphasizes and labels such cards.
+   * False whenever no positive color constraint was applied.
+   */
+  colorUnknown: boolean;
 }
 
 /** The intent on the wire: every field present, absent optionals as null. */
@@ -307,6 +313,7 @@ function serializeCard(card: {
   priceMax: number;
   currencyCode: string;
   available: boolean;
+  colorUnknown: boolean;
 }): ProxyResult {
   return {
     productId: card.productId,
@@ -317,6 +324,7 @@ function serializeCard(card: {
     priceMax: card.priceMax,
     currencyCode: card.currencyCode,
     available: card.available,
+    colorUnknown: card.colorUnknown,
   };
 }
 

@@ -137,6 +137,7 @@ const CONTRACT_KEYS_WITH_CLOSE_MATCHES = [...CONTRACT_KEYS, "closeMatches"]
 /** The exact keys of one result card on the wire. */
 const RESULT_KEYS = [
   "available",
+  "colorUnknown",
   "currencyCode",
   "handle",
   "imageUrl",
@@ -489,6 +490,7 @@ describe("the response contract (AC-3, AC-5)", () => {
         priceMax: 100,
         currencyCode: "ILS",
         available: true,
+        colorUnknown: false,
       },
     ]);
     expect(Object.keys(body.results[0]).sort()).toEqual(RESULT_KEYS);

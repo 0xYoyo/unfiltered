@@ -41,6 +41,14 @@ export interface ClassicSearchHit {
    * only searches carry no text signal to rank by and score every hit 0.
    */
   score: number;
+  /**
+   * True when a color constraint (inclusion or exclusion) was applied and
+   * this product's enrichment states no colors — it passed on the
+   * unknown-passes leniency, not on evidence (YOY-67 AC-5). Implementations
+   * rank such hits strictly below evidence-backed hits. Absent when no
+   * color constraint was applied.
+   */
+  colorUnknown?: boolean;
 }
 
 /** The outcome of one classic search. */

@@ -282,7 +282,83 @@ describe("hard constraints are filters, never preferences (AC-2)", () => {
       colorsInclude: ["red"],
       occasion: "wedding",
     });
-    expect(ids).toEqual(["sparse-dress", "unenriched", "red-wedding-dress"]);
+    // Unknowns still pass the filter (YOY-35 AC-1), but under a positive
+    // color constraint the evidence-backed match ranks strictly above them
+    // regardless of similarity (YOY-67 AC-5); unknowns keep their own
+    // similarity order after it.
+    expect(ids).toEqual(["red-wedding-dress", "sparse-dress", "unenriched"]);
+  });
+
+  it("tiers unknown-color hits below every known match and flags them (YOY-67 AC-5)", async () => {
+    await seed(db, [
+      // Nearest vector but no color evidence: passes on leniency, flagged,
+      // and ranked below every evidence-backed match.
+      {
+        productId: "unknown-near",
+        vector: [1, 0, 0],
+        enrichment: { colors: [] },
+      },
+      { productId: "known-far", vector: [0, 1, 0], enrichment: { colors: ["blue"] } },
+      { productId: "known-near", vector: [0.9, 0.1, 0], enrichment: { colors: ["blue"] } },
+    ]);
+
+    const hits = await createPgVectorRetrievalStore(db).query({
+      shopDomain: SHOP,
+      constraints: { ...noConstraints(), colorsInclude: ["blue"] },
+      vector: [1, 0, 0],
+      limit: 10,
+    });
+
+    expect(hits.map((hit) => hit.productId)).toEqual([
+      "known-near",
+      "known-far",
+      "unknown-near",
+    ]);
+    expect(hits.map((hit) => hit.colorUnknown)).toEqual([false, false, true]);
+
+    // Without a positive color constraint, no flag and pure similarity order.
+    const unconstrained = await createPgVectorRetrievalStore(db).query({
+      shopDomain: SHOP,
+      constraints: noConstraints(),
+      vector: [1, 0, 0],
+      limit: 10,
+    });
+    expect(unconstrained[0]!.productId).toBe("unknown-near");
+    expect(unconstrained.every((hit) => hit.colorUnknown === undefined)).toBe(
+      true,
+    );
+  });
+
+  it("tiers and flags unknowns under an exclusion-only color constraint too (YOY-67 AC-5 fix round 1)", async () => {
+    await seed(db, [
+      // Nearest vector but no color evidence: passes the exclusion on
+      // leniency (nothing proves the excluded color), flagged and tiered
+      // below the evidence-backed hit — a "Not black ×" chip is a color
+      // chip, so unknowns must not pose as first-class hits under it.
+      {
+        productId: "excl-unknown-near",
+        vector: [1, 0, 0],
+        enrichment: { colors: [] },
+      },
+      {
+        productId: "excl-known-red",
+        vector: [0.6, 0.8, 0],
+        enrichment: { colors: ["red"] },
+      },
+    ]);
+
+    const hits = await createPgVectorRetrievalStore(db).query({
+      shopDomain: SHOP,
+      constraints: { ...noConstraints(), colorsExclude: ["black"] },
+      vector: [1, 0, 0],
+      limit: 10,
+    });
+
+    expect(hits.map((hit) => hit.productId)).toEqual([
+      "excl-known-red",
+      "excl-unknown-near",
+    ]);
+    expect(hits.map((hit) => hit.colorUnknown)).toEqual([false, true]);
   });
 
   it("expands a parent category constraint through the taxonomy groups; child constraints stay exact (YOY-35 AC-5)", async () => {

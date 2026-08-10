@@ -319,6 +319,87 @@ describe("constraint-only mode mirrors pgvector predicate semantics (AC-4)", () 
     expect(ids).toContain("unenriched");
   });
 
+  it("tiers unknown-color hits below known matches and flags them (YOY-67 AC-5)", async () => {
+    await seed(db, [
+      {
+        productId: "cs-known-blue",
+        title: "Constraint Fixture Known",
+        enrichment: { colors: ["blue"] },
+      },
+      {
+        productId: "cs-unknown-a",
+        title: "Constraint Fixture Unknown A",
+        enrichment: { colors: [] },
+      },
+    ]);
+
+    const result = await createPgTrgmClassicStore(db).search({
+      shopDomain: SHOP,
+      constraints: {
+        category: undefined,
+        priceMin: undefined,
+        priceMax: undefined,
+        colorsInclude: ["blue"],
+        colorsExclude: [],
+        occasion: undefined,
+        availableOnly: false,
+      },
+      limit: 50,
+    });
+
+    const ids = result.hits.map((hit) => hit.productId);
+    // productId order alone would put cs-known-blue after unenriched seeds
+    // from other tests; the color tier overrides it: every known match
+    // before every unknown-passes hit, each tier ordered by productId.
+    const knownIndex = ids.indexOf("cs-known-blue");
+    const unknownIndex = ids.indexOf("cs-unknown-a");
+    expect(knownIndex).toBeGreaterThanOrEqual(0);
+    expect(unknownIndex).toBeGreaterThanOrEqual(0);
+    expect(knownIndex).toBeLessThan(unknownIndex);
+    const byId = new Map(result.hits.map((hit) => [hit.productId, hit]));
+    expect(byId.get("cs-known-blue")!.colorUnknown).toBe(false);
+    expect(byId.get("cs-unknown-a")!.colorUnknown).toBe(true);
+  });
+
+  it("tiers and flags unknowns under an exclusion-only color constraint too (YOY-67 AC-5 fix round 1)", async () => {
+    await seed(db, [
+      {
+        productId: "cs-excl-known-red",
+        title: "Exclusion Fixture Known",
+        enrichment: { colors: ["red"] },
+      },
+      {
+        productId: "cs-excl-unknown",
+        title: "Exclusion Fixture Unknown",
+        enrichment: { colors: [] },
+      },
+    ]);
+
+    const result = await createPgTrgmClassicStore(db).search({
+      shopDomain: SHOP,
+      constraints: {
+        category: undefined,
+        priceMin: undefined,
+        priceMax: undefined,
+        colorsInclude: [],
+        colorsExclude: ["black"],
+        occasion: undefined,
+        availableOnly: false,
+      },
+      limit: 50,
+    });
+
+    const ids = result.hits.map((hit) => hit.productId);
+    const knownIndex = ids.indexOf("cs-excl-known-red");
+    const unknownIndex = ids.indexOf("cs-excl-unknown");
+    expect(knownIndex).toBeGreaterThanOrEqual(0);
+    expect(unknownIndex).toBeGreaterThanOrEqual(0);
+    expect(knownIndex).toBeLessThan(unknownIndex);
+    const byId = new Map(result.hits.map((hit) => [hit.productId, hit]));
+    expect(byId.get("cs-excl-known-red")!.colorUnknown).toBe(false);
+    expect(byId.get("cs-excl-unknown")!.colorUnknown).toBe(true);
+  });
+
   it("scores every constraint-only hit 0, ordered deterministically", async () => {
     const result = await createPgTrgmClassicStore(db).search({
       shopDomain: SHOP,

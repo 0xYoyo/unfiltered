@@ -31,6 +31,9 @@ export interface WidgetStrings {
   /** aria template for chip remove buttons; {label} is the chip's text. */
   removeFilter: string;
   soldOut: string;
+  /** Label on results that passed a color filter without color evidence
+   * (YOY-67 AC-5). */
+  colorNotConfirmed: string;
 }
 
 export const STRING_CATALOG: Record<WidgetLocale, WidgetStrings> = {
@@ -46,6 +49,7 @@ export const STRING_CATALOG: Record<WidgetLocale, WidgetStrings> = {
     appliedFilters: "Applied filters",
     removeFilter: "Remove filter: {label}",
     soldOut: "Sold out",
+    colorNotConfirmed: "Color not confirmed",
   },
   he: {
     inputPlaceholder: "חיפוש",
@@ -59,6 +63,7 @@ export const STRING_CATALOG: Record<WidgetLocale, WidgetStrings> = {
     appliedFilters: "סינונים פעילים",
     removeFilter: "הסרת סינון: {label}",
     soldOut: "אזל מהמלאי",
+    colorNotConfirmed: "צבע לא מאומת",
   },
 };
 

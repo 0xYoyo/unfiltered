@@ -24,16 +24,20 @@ async function runFailingSearch(page: Page, query: string): Promise<void> {
   await expect(noResults(page)).toBeVisible({ timeout: 5000 });
 }
 
-test("focusing or typing opens the overlay and suppresses native search while open (AC-1)", async ({
+test("focus alone renders nothing; the first response opens the overlay and native search stays suppressed (AC-1, YOY-67 AC-6)", async ({
   page,
 }) => {
   await page.goto("/");
 
+  // Focusing the input renders no panel (YOY-67 AC-6): before any query
+  // there is nothing to show, so the overlay stays hidden.
   await themeInput(page).focus();
-  await expect(overlay(page)).toBeVisible();
+  await page.waitForTimeout(100);
+  await expect(overlay(page)).toBeHidden();
 
   await themeInput(page).fill("nike");
   await expect(cards(page).first()).toBeVisible();
+  await expect(overlay(page)).toBeVisible();
 
   // Enter must NOT navigate to the theme's /search while the overlay is open.
   await themeInput(page).press("Enter");
@@ -115,9 +119,10 @@ test("the magnifier fires an immediate search, skipping the debounce, without na
   // before it can only have come from the immediate path.
   await page.goto("/?debounce=30000");
 
-  await themeInput(page).focus();
-  await expect(overlay(page)).toBeVisible();
+  // The overlay has nothing to show yet (YOY-67 AC-6) — the magnifier must
+  // still fire the widget search, not the theme's navigation.
   await themeInput(page).fill("nike");
+  await expect(overlay(page)).toBeHidden();
   await page.locator('form[role="search"] button[type="submit"]').click();
 
   await expect(cards(page).first()).toBeVisible({ timeout: 5000 });
@@ -254,15 +259,21 @@ test("close control and Escape both dismiss; reopening retains the query (AC-6)"
   await page.getByTestId("unfiltered-widget-close").click();
   await expect(overlay(page)).toBeHidden();
 
-  // Refocus reopens with the query text still in the input.
+  // Refocus alone no longer reopens (superseded by YOY-67 AC-6: nothing
+  // renders until a query produces a response); the query text is retained
+  // and continuing to type reopens from the new search's response.
   await themeInput(page).focus();
-  await expect(overlay(page)).toBeVisible();
+  await page.waitForTimeout(100);
+  await expect(overlay(page)).toBeHidden();
   await expect(themeInput(page)).toHaveValue("nike");
+  await themeInput(page).press("s");
+  await expect(overlay(page)).toBeVisible();
+  await expect(themeInput(page)).toHaveValue("nikes");
   await expect(cards(page).first()).toBeVisible();
 
   await page.keyboard.press("Escape");
   await expect(overlay(page)).toBeHidden();
-  await expect(themeInput(page)).toHaveValue("nike");
+  await expect(themeInput(page)).toHaveValue("nikes");
 });
 
 test("hostile host CSS cannot break the overlay, and widget CSS does not leak out (AC-7)", async ({
