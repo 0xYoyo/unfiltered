@@ -199,6 +199,12 @@ export function createSearchOrchestrator(
       where: {
         shopDomain,
         productId: { in: hits.map((hit) => hit.productId) },
+        // Status guard (YOY-61 AC-3) and publication guard (YOY-67 AC-4),
+        // matching both search stores' predicates: hits only ever come from
+        // those guarded stores, so this is defense in depth — a non-active
+        // or unpublished row must never be served, whatever handed us its id.
+        status: "ACTIVE",
+        publishedAt: { not: null },
       },
     });
     const byId = new Map(rows.map((row) => [row.productId, row]));

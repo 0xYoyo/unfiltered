@@ -334,9 +334,9 @@ describe("eval run (AC-2, AC-3, AC-4, AC-6)", () => {
   it("routes the Hebrew short-query goldens to the AI path (YOY-67 AC-2)", () => {
     // The documented consequence of the non-Latin heuristic guard: these
     // three settled classic by the short-query rule before; under the Option
-    // B contract the model decides them, and cross-language routes ai. Their
-    // classification recordings are synthesized until the run-8 live
-    // regeneration replaces them.
+    // B contract the model decides them, and cross-language routes ai. The
+    // goldens carry expectedRoute "ai" as the contract; this pins the route
+    // reason and per-search spend on top.
     for (const id of ["gc05", "gc06", "gc08"]) {
       const score = result.perQuery.find((entry) => entry.golden.id === id);
       expect(score, `${id} did not run`).toBeDefined();
