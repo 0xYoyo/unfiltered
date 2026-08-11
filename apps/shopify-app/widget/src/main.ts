@@ -114,6 +114,12 @@ export function init(config: WidgetConfig): void {
     let debounceTimer: number | undefined;
     let currentSearchId: string | null = null;
     let requestSequence = 0;
+    // Dismissal-race bookkeeping (YOY-69 AC-2): a search is "active" while a
+    // debounced preview is pending or a request is in flight — exactly the
+    // window in which closing the overlay must cancel work, or a late
+    // response would reopen the overlay the shopper just closed.
+    let debouncePending = false;
+    let settledSequence = 0;
     let consecutiveFailures = 0;
     // Refinement memory (YOY-49 AC-4): the latest response's echoed intent,
     // held in memory only — it lives exactly as long as this page view and
@@ -126,8 +132,7 @@ export function init(config: WidgetConfig): void {
       locale: config.locale,
       shopDomain: config.shopDomain,
       onClose: () => {
-        dismissed = true;
-        overlay.close();
+        dismiss();
       },
       onNewSearch: () => {
         // AC-5: clear the held intent, the input, the chips, and the
@@ -139,6 +144,28 @@ export function init(config: WidgetConfig): void {
         input.focus();
       },
     });
+
+    /** A debounced preview is pending or a request is in flight (YOY-69
+     * AC-2): the window in which dismissal must cancel, not just hide. */
+    const searchActive = (): boolean =>
+      debouncePending || settledSequence !== requestSequence;
+
+    /**
+     * Explicit dismissal (YOY-69 AC-2): close the overlay AND cancel every
+     * pending search — clear the debounce timer and invalidate in-flight
+     * requests by bumping the sequence, so a late response hits the
+     * stale-sequence guard and renders nothing. Without the cancellation,
+     * showLoading/showPreview/showResponse would reopen the overlay the
+     * shopper just closed.
+     */
+    const dismiss = (): void => {
+      dismissed = true;
+      debouncePending = false;
+      window.clearTimeout(debounceTimer);
+      requestSequence += 1;
+      settledSequence = requestSequence;
+      overlay.close();
+    };
 
     /** AC-2: leave the page exactly as without the app, permanently. */
     const goInert = (): void => {
@@ -180,8 +207,9 @@ export function init(config: WidgetConfig): void {
       try {
         const response = await client.search(query, getSessionId(), context);
         if (inert || sequence !== requestSequence) {
-          return; // A newer keystroke superseded this request.
+          return; // A newer keystroke (or a dismissal) superseded this.
         }
+        settledSequence = sequence;
         consecutiveFailures = 0;
         if (preview) {
           // Previews are not attributable searches (YOY-68 AC-3): no
@@ -201,8 +229,9 @@ export function init(config: WidgetConfig): void {
         overlay.showResponse(response, { onCardClick, onChipRemove });
       } catch {
         if (inert || sequence !== requestSequence) {
-          return; // A newer keystroke superseded this request.
+          return; // A newer keystroke (or a dismissal) superseded this.
         }
+        settledSequence = sequence;
         // Failure containment (YOY-61 AC-4): one slow or failed search
         // resolves to a quiet no-results state and the widget stays alive
         // for the next query. Self-removal is reserved for structural
@@ -226,6 +255,7 @@ export function init(config: WidgetConfig): void {
       if (inert || heldIntent === null) {
         return;
       }
+      debouncePending = false;
       window.clearTimeout(debounceTimer);
       void runSearch(lastQuery, {
         previousIntent: heldIntent,
@@ -238,13 +268,16 @@ export function init(config: WidgetConfig): void {
         return;
       }
       dismissed = false;
+      debouncePending = false;
       window.clearTimeout(debounceTimer);
       const query = input.value.trim();
       if (query === "") {
         overlay.showIdle();
         return;
       }
+      debouncePending = true;
       debounceTimer = window.setTimeout(() => {
+        debouncePending = false;
         // Typing is preview-only (YOY-68 AC-1): a live, classic-only fetch
         // with no refinement context — the full pipeline (and the held
         // intent riding along, AC-4) waits for the explicit submit.
@@ -312,6 +345,7 @@ export function init(config: WidgetConfig): void {
      * the callers.
      */
     const searchNow = (): void => {
+      debouncePending = false;
       window.clearTimeout(debounceTimer);
       const query = input.value.trim();
       if (query === "") {
@@ -338,14 +372,16 @@ export function init(config: WidgetConfig): void {
           event.preventDefault();
           searchNow();
         }
-        if (event.key === "Escape" && overlay.isOpen()) {
+        if (event.key === "Escape" && (overlay.isOpen() || searchActive())) {
           // Mirrors the document-level Escape handler below, which this
           // stopPropagation would otherwise starve while the input has
           // focus: preventDefault stops the browser clearing a
-          // type="search" input (AC-6).
+          // type="search" input (AC-6). Escape also cancels a pending or
+          // in-flight search before the overlay ever opened (YOY-69 AC-2)
+          // — otherwise the debounce firing would open the overlay the
+          // shopper just declined.
           event.preventDefault();
-          dismissed = true;
-          overlay.close();
+          dismiss();
         }
       },
       true,
@@ -371,13 +407,17 @@ export function init(config: WidgetConfig): void {
     );
 
     document.addEventListener("keydown", (event) => {
-      if (event.key === "Escape" && !inert && overlay.isOpen()) {
+      if (
+        event.key === "Escape" &&
+        !inert &&
+        (overlay.isOpen() || searchActive())
+      ) {
         // preventDefault stops the browser clearing a type="search" input —
         // reopening must retain the query text (AC-6), and the clear would
-        // also fire an input event that reopened the overlay.
+        // also fire an input event that reopened the overlay. Dismissal
+        // cancels pending and in-flight searches too (YOY-69 AC-2).
         event.preventDefault();
-        dismissed = true;
-        overlay.close();
+        dismiss();
       }
     });
 

@@ -281,6 +281,61 @@ test("close control and Escape both dismiss; reopening retains the query (AC-6)"
   await expect(themeInput(page)).toHaveValue("nikes");
 });
 
+test("Escape before the debounce fires cancels the pending preview: no request, overlay stays hidden (YOY-69 AC-2)", async ({
+  page,
+}) => {
+  // A debounce long enough to press Escape inside it, short enough that the
+  // test can wait it out and prove the timer was cancelled, not just slow.
+  await page.goto("/?fixture=delayed&debounce=500");
+
+  await themeInput(page).fill("nike");
+  await themeInput(page).press("Escape");
+
+  // Past the debounce interval AND the fixture's response delay: had the
+  // timer survived, a request would have fired and the overlay opened.
+  await page.waitForTimeout(1200);
+  await expect(overlay(page)).toBeHidden();
+  const requests = await page.evaluate(
+    () =>
+      (window as unknown as { __searchRequests: unknown[] }).__searchRequests,
+  );
+  expect(requests).toHaveLength(0);
+});
+
+test("Escape while a request is in flight closes for good: the late response renders nothing (YOY-69 AC-2)", async ({
+  page,
+}) => {
+  await page.goto("/?fixture=delayed");
+
+  // The loading state proves the request is in flight and the overlay open.
+  await themeInput(page).fill("nike");
+  await expect(page.getByTestId("unfiltered-widget-loading")).toBeVisible();
+
+  await themeInput(page).press("Escape");
+  await expect(overlay(page)).toBeHidden();
+
+  // The delayed response lands after ~500ms — it must not reopen anything.
+  await page.waitForTimeout(900);
+  await expect(overlay(page)).toBeHidden();
+  await expect(cards(page)).toHaveCount(0);
+});
+
+test("the close control mid-flight cancels the same way (YOY-69 AC-2)", async ({
+  page,
+}) => {
+  await page.goto("/?fixture=delayed");
+
+  await themeInput(page).fill("nike");
+  await expect(page.getByTestId("unfiltered-widget-loading")).toBeVisible();
+
+  await page.getByTestId("unfiltered-widget-close").click();
+  await expect(overlay(page)).toBeHidden();
+
+  await page.waitForTimeout(900);
+  await expect(overlay(page)).toBeHidden();
+  await expect(cards(page)).toHaveCount(0);
+});
+
 test("hostile host CSS cannot break the overlay, and widget CSS does not leak out (AC-7)", async ({
   page,
 }) => {

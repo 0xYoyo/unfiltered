@@ -111,49 +111,21 @@ Conventions used below:
 
 The pipeline functions (`ingestCatalog`, `enrichCatalog`, `embedCatalog`) are
 committed app modules with no admin-UI trigger yet (a merchant-facing
-indexing surface is a later milestone). For this run, execute them directly
-with a throwaway script — the offline access token persisted in the `Session`
-table authenticates the Admin API calls.
+indexing surface is a later milestone). Execute them with the committed
+entrypoint `apps/shopify-app/scripts/ingest.mts` (YOY-69) — the offline
+access token persisted in the `Session` table authenticates the Admin API
+calls, so no tunnel is needed.
 
-5. Create the script at `apps/shopify-app/m3-index.mts` (paste as-is):
+5. (Superseded by YOY-69: the script is committed; nothing to create.)
 
-   ```bash
-   cat > apps/shopify-app/m3-index.mts <<'EOF'
-   import { PrismaClient } from "@prisma/client";
-   import { ingestCatalog } from "./app/catalog/ingest.server";
-   import { enrichCatalog, createEnrichmentLlmClient } from "./app/catalog/enrich.server";
-   import { embedCatalog, createCatalogEmbeddingClient } from "./app/catalog/embed.server";
-
-   const SHOP = "unfiltered-dev.myshopify.com";
-   const db = new PrismaClient();
-
-   const session = await db.session.findFirstOrThrow({
-     where: { shop: SHOP, isOnline: false },
-   });
-   const graphql = (query: string, options?: { variables?: Record<string, unknown> }) =>
-     fetch(`https://${SHOP}/admin/api/2025-10/graphql.json`, {
-       method: "POST",
-       headers: {
-         "Content-Type": "application/json",
-         "X-Shopify-Access-Token": session.accessToken,
-       },
-       body: JSON.stringify({ query, variables: options?.variables }),
-     });
-
-   console.log("ingest:", await ingestCatalog({ db, shopDomain: SHOP, graphql }));
-   console.log("enrich:", await enrichCatalog({ db, shopDomain: SHOP, llm: createEnrichmentLlmClient(db) }));
-   console.log("embed:", await embedCatalog({ db, shopDomain: SHOP, embeddings: createCatalogEmbeddingClient(db) }));
-
-   await db.$disconnect();
-   EOF
-   ```
-
-6. Run it with the app's `.env` loaded (second terminal; the dev server keeps
-   running):
+6. Run the ingest entrypoint with the app's `.env` loaded (second terminal;
+   the dev server keeps running):
 
    ```bash
-   cd apps/shopify-app && set -a && source .env && set +a && npx tsx m3-index.mts
+   cd apps/shopify-app && set -a && source .env && set +a && npm run ingest
    ```
+
+   (Pass another shop with `npm run ingest -- SHOP.myshopify.com`.)
 
    **Expected outcome:** three result lines, e.g.
    `ingest: { created: N, updated: 0, unchanged: 0, deleted: 0 }`,
@@ -178,11 +150,8 @@ table authenticates the Admin API calls.
    (M2 reference for 60 products: ~$0.013 one-time). Without the exact
    token the page is a 404.
 
-8. Delete the script — the repo must stay unchanged (`git status` clean):
-
-   ```bash
-   rm apps/shopify-app/m3-index.mts
-   ```
+8. (Superseded by YOY-69: the script is a committed repo file — nothing to
+   delete; `git status` stays clean by construction.)
 
 ## Part 3 — Storefront verification pass
 
