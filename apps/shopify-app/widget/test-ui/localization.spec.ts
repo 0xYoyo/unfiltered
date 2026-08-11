@@ -55,7 +55,7 @@ test("every canonical category and occasion has a Hebrew display entry (YOY-52 A
 test("Hebrew locale renders Hebrew chrome and dir=rtl; query text passes through untouched (AC-2, AC-3)", async ({
   page,
 }) => {
-  await page.goto("/?fixture=ai&locale=he");
+  await page.goto("/?fixture=ai&locale=he&debounce=30000");
 
   await expect(root(page)).toHaveAttribute("dir", "rtl");
   await expect(themeInput(page)).toHaveAttribute(
@@ -66,6 +66,7 @@ test("Hebrew locale renders Hebrew chrome and dir=rtl; query text passes through
   // Chrome language never touches query language: an English query in
   // Hebrew chrome reaches the endpoint verbatim.
   await themeInput(page).fill("elegant dress");
+  await themeInput(page).press("Enter");
   await expect(cards(page)).toHaveCount(2);
   const requests = await page.evaluate(
     () =>
@@ -86,7 +87,7 @@ test("Hebrew locale renders Hebrew chrome and dir=rtl; query text passes through
 test("any non-Hebrew locale falls back to English chrome and dir=ltr (AC-2)", async ({
   page,
 }) => {
-  await page.goto("/?fixture=ai&locale=fr");
+  await page.goto("/?fixture=ai&locale=fr&debounce=30000");
 
   await expect(root(page)).toHaveAttribute("dir", "ltr");
   await expect(themeInput(page)).toHaveAttribute(
@@ -95,6 +96,7 @@ test("any non-Hebrew locale falls back to English chrome and dir=ltr (AC-2)", as
   );
 
   await themeInput(page).fill("elegant dress");
+  await themeInput(page).press("Enter");
   await expect(cards(page)).toHaveCount(2);
   await expect(
     page.getByTestId("unfiltered-widget-new-search"),
@@ -104,9 +106,10 @@ test("any non-Hebrew locale falls back to English chrome and dir=ltr (AC-2)", as
 test("Hebrew chrome mirrors the layout and isolates Latin card text (AC-3)", async ({
   page,
 }) => {
-  await page.goto("/?fixture=ai&locale=he");
+  await page.goto("/?fixture=ai&locale=he&debounce=30000");
 
   await themeInput(page).fill("elegant dress");
+  await themeInput(page).press("Enter");
   await expect(cards(page)).toHaveCount(2);
 
   // dir on the root flips the resolved direction of everything inside the
@@ -133,9 +136,10 @@ test("Hebrew chrome mirrors the layout and isolates Latin card text (AC-3)", asy
 test("Hebrew chrome localizes chip values; unknown values render as extracted (AC-4)", async ({
   page,
 }) => {
-  await page.goto("/?fixture=ai-localized&locale=he");
+  await page.goto("/?fixture=ai-localized&locale=he&debounce=30000");
 
   await themeInput(page).fill("elegant dress");
+  await themeInput(page).press("Enter");
   await expect(chips(page)).toHaveCount(6);
 
   // Canonical values display in Hebrew; the price chip carries the intent's
@@ -155,9 +159,10 @@ test("Hebrew chrome localizes chip values; unknown values render as extracted (A
 test("English chrome keeps the YOY-49 chip labels on the same fixture (AC-4)", async ({
   page,
 }) => {
-  await page.goto("/?fixture=ai-localized&locale=en");
+  await page.goto("/?fixture=ai-localized&locale=en&debounce=30000");
 
   await themeInput(page).fill("elegant dress");
+  await themeInput(page).press("Enter");
   await expect(chips(page)).toHaveCount(6);
 
   await expect(chips(page).nth(0)).toContainText("dress");
@@ -174,9 +179,10 @@ for (const locale of ["en", "he"] as WidgetLocale[]) {
   test(`results grid with chips matches the ${locale} baseline (AC-5)`, async ({
     page,
   }) => {
-    await page.goto(`/?fixture=ai&locale=${locale}`);
+    await page.goto(`/?fixture=ai&locale=${locale}&debounce=30000`);
 
     await themeInput(page).fill("elegant dress");
+  await themeInput(page).press("Enter");
     await expect(cards(page)).toHaveCount(2);
     await expect(chips(page)).toHaveCount(3);
 
@@ -186,9 +192,10 @@ for (const locale of ["en", "he"] as WidgetLocale[]) {
   test(`zero-hit state matches the ${locale} baseline (AC-5)`, async ({
     page,
   }) => {
-    await page.goto(`/?fixture=ai-zero-hit&locale=${locale}`);
+    await page.goto(`/?fixture=ai-zero-hit&locale=${locale}&debounce=30000`);
 
     await themeInput(page).fill("elegant dress under 400");
+  await themeInput(page).press("Enter");
     await expect(page.getByTestId("unfiltered-widget-zero-hit")).toBeVisible();
     await expect(
       page.getByTestId("unfiltered-widget-close-matches"),

@@ -66,6 +66,12 @@ export interface SearchRequestContext {
   previousIntent?: ProxyIntent;
   /** Chip the shopper dismissed; requires `previousIntent`. */
   removeChip?: ProxyChip;
+  /**
+   * Keystroke preview (YOY-68): the request rides `mode=preview` and the
+   * server serves classic-only results with no logging and no AI spend.
+   * Mutually exclusive with `previousIntent`/`removeChip` by contract.
+   */
+  preview?: boolean;
 }
 
 export interface SearchClientOptions {
@@ -103,6 +109,11 @@ export function buildSearchParams(
   }
   if (context?.removeChip !== undefined) {
     params.set("removeChip", JSON.stringify(context.removeChip));
+  }
+  // `mode` is OMITTED on submitted searches — its absence is what makes the
+  // full pipeline run (YOY-68 AC-2).
+  if (context?.preview === true) {
+    params.set("mode", "preview");
   }
   return params;
 }

@@ -47,6 +47,13 @@ export interface ProxySearchBody {
   previousIntent?: Intent;
   /** Chip the shopper dismissed; requires `previousIntent` to adjust. */
   removeChip?: ProxyChip;
+  /**
+   * "preview" marks a keystroke preview (YOY-68): classic-only results,
+   * zero LLM calls, no throttle budget, no SearchEvent. Absent on submitted
+   * searches, which run the full pipeline. A preview is a bare classic
+   * fetch, so it combines with neither `previousIntent` nor `removeChip`.
+   */
+  mode?: "preview";
 }
 
 const CHIP_FIELDS: ReadonlySet<string> = new Set([
@@ -79,6 +86,19 @@ export function parseProxySearchBody(value: unknown): ProxySearchBody | null {
   }
 
   const body: ProxySearchBody = { query, sessionId };
+
+  if (record.mode !== undefined && record.mode !== null) {
+    if (record.mode !== "preview") {
+      return null;
+    }
+    // A preview is a bare classic fetch (YOY-68 AC-1): refinement context
+    // belongs to the submitted pipeline, so combining them is a contract
+    // violation, not a request to guess about.
+    if (record.previousIntent != null || record.removeChip != null) {
+      return null;
+    }
+    body.mode = "preview";
+  }
 
   if (record.previousIntent !== undefined && record.previousIntent !== null) {
     const intent = parseIntent(record.previousIntent);
@@ -131,6 +151,10 @@ export function parseProxySearchParams(
     return null;
   }
   const record: Record<string, unknown> = { query, sessionId };
+  const mode = params.get("mode");
+  if (mode !== null) {
+    record.mode = mode;
+  }
   const previousIntent = params.get("previousIntent");
   if (previousIntent !== null) {
     try {

@@ -118,6 +118,12 @@
   display: none;
 }
 
+/* Preview zero hits (YOY-68 AC-4): quieter than the submitted panel. */
+.status-quiet {
+  opacity: 0.6;
+  font-size: 0.9em;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));

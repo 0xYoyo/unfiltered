@@ -773,6 +773,50 @@ describe("classic zero hits escalate once into the AI path (YOY-67 AC-3)", () =>
   });
 });
 
+describe("keystroke preview (YOY-68 AC-1)", () => {
+  it("serves classic-only results with zero LLM calls and nothing degraded", async () => {
+    const db = await createTestDb();
+    await seed(db, [
+      { productId: "gown-1", title: "elegant summer wedding gown" },
+    ]);
+    // An AI-shaped query (long natural language, no SKU): without preview
+    // the classifier would be asked — and this fake throws on any LLM call,
+    // so passing proves none happened.
+    const orchestrator = buildOrchestrator(db, { llm: fakeLlm({}) });
+
+    const response = await orchestrator.runSearch({
+      query: "elegant summer wedding gown",
+      shopDomain: SHOP,
+      preview: true,
+    });
+
+    expect(response.route).toBe("classic");
+    expect(response.routeReason).toBe("preview");
+    expect(response.degraded).toBe(false);
+    expect(response.chips).toEqual([]);
+    expect(response.closeMatches).toEqual([]);
+    expect(response.hits.map((hit) => hit.productId)).toEqual(["gown-1"]);
+  });
+
+  it("does not escalate a preview on zero classic hits: mid-keystroke emptiness stays LLM-free", async () => {
+    const db = await createTestDb();
+    // Empty catalog: zero classic hits, yet no zero-hit escalation may fire
+    // — the fake would throw on any LLM call.
+    const orchestrator = buildOrchestrator(db, { llm: fakeLlm({}) });
+
+    const response = await orchestrator.runSearch({
+      query: "סנובורד כחול",
+      shopDomain: SHOP,
+      preview: true,
+    });
+
+    expect(response.route).toBe("classic");
+    expect(response.routeReason).toBe("preview");
+    expect(response.degraded).toBe(false);
+    expect(response.hits).toEqual([]);
+  });
+});
+
 describe("searchId threading (AC-7)", () => {
   it("threads one generated searchId through every AiCall row of an AI search", async () => {
     const db = await createTestDb();
