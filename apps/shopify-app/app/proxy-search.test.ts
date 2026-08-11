@@ -1029,6 +1029,44 @@ describe("per-session AI throttle (YOY-47 AC-4, AC-5)", () => {
     expect(counting.invocations()).toBe(0);
   });
 
+  it("counts a FAILED classic zero-hit escalation toward the budget (degraded classic-zero-hit)", async () => {
+    await aiSeed();
+    throttleSeam.instance = createSessionThrottle({ limit: 1, now: () => 0 });
+    installOrchestrator({
+      llm: fakeLlm({
+        // The model routes the cross-language query classic; the keyword
+        // engine finds nothing, the escalation fires — and its intent call
+        // fails. Real LLM spend happened, so the budget is still consumed.
+        classification: () => ({ route: "classic" }),
+        intent: () => {
+          throw new Error("extractor down");
+        },
+      }),
+    });
+
+    const failed = await action(
+      actionArgs(
+        proxyRequest({ payload: { query: "שמלה לחתונה", sessionId: "t6f" } }),
+      ),
+    );
+    const failedBody = await failed.json();
+    expect(failedBody.route).toBe("classic");
+    expect(failedBody.degraded).toBe(true);
+    expect(failedBody.results).toEqual([]);
+
+    // The next AI-shaped query from that session is throttled: forced
+    // classic with zero LLM calls.
+    const counting = countingAiLlm();
+    installOrchestrator({ llm: counting.llm });
+    const throttled = await action(
+      actionArgs(proxyRequest({ payload: { query: AI_QUERY, sessionId: "t6f" } })),
+    );
+    const throttledBody = await throttled.json();
+    expect(throttledBody.route).toBe("classic");
+    expect(throttledBody.degraded).toBe(true);
+    expect(counting.invocations()).toBe(0);
+  });
+
   it("chip-removal requests are neither counted nor throttled", async () => {
     await aiSeed();
     throttleSeam.instance = createSessionThrottle({ limit: 1, now: () => 0 });

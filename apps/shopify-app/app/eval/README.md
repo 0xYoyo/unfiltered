@@ -72,11 +72,8 @@ Provenance of what is committed today:
 
 - `enrichment.json`, `classification.json`, `intent.json`, `embeddings.json` —
   live Gemini output, recorded by the regenerate flow (YOY-28).
-- `intent-refinement.json` — **synthesized** (`"provenance": "synthesized"`):
-  hand-written in the vocabulary the refinement prompt requests, because the
-  regenerate flow needs a live API key that CI and the build loop do not hold.
-  It proves the refinement plumbing and scoring end to end, not the model's
-  own refinement quality. The eval scorecard prints a NOTE whenever any
-  replayed intent recording is synthesized. Regenerating (above) re-records
-  these six follow-ups against the live model and flips the file's provenance
-  to `live`; that run is what turns the refinement rows into real evidence.
+- `intent-refinement.json` — live Gemini output (`"provenance": "live"`)
+  since the run-8 regeneration (YOY-67): the refinement rows are real model
+  evidence, not hand-written plumbing checks. The eval scorecard still prints
+  a NOTE whenever any replayed intent recording is synthesized, so a future
+  hand-written stopgap cannot pass silently as live evidence.

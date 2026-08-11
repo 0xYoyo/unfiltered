@@ -454,6 +454,7 @@
     "id": "gc05",
     "language": "he",
     "query": "שמלת ערב",
+    "expectedRoute": "ai",
     "expectedProductIds": [
       "p03"
     ],
@@ -471,6 +472,7 @@
     "id": "gc06",
     "language": "he",
     "query": "שמלת ערבב",
+    "expectedRoute": "ai",
     "expectedProductIds": [
       "p03"
     ],
@@ -506,6 +508,7 @@
     "id": "gc08",
     "language": "he",
     "query": "שמלת קיץ",
+    "expectedRoute": "ai",
     "expectedProductIds": [
       "p05"
     ],

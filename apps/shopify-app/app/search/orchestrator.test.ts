@@ -715,6 +715,36 @@ describe("classic zero hits escalate once into the AI path (YOY-67 AC-3)", () =>
     expect(response.hits).toEqual([]);
   });
 
+  it("does not escalate a degraded classic response: a failing model is not asked to rescue its own zero hits", async () => {
+    const db = await createTestDb();
+    // Empty catalog: zero classic hits. The classifier failed (model-error),
+    // so the response is already degraded — and a degraded classic must
+    // never escalate, even though the intent handler stands ready to answer.
+    let intentCalls = 0;
+    const orchestrator = buildOrchestrator(db, {
+      llm: fakeLlm({
+        classification: () => {
+          throw new Error("classifier down");
+        },
+        intent: () => {
+          intentCalls += 1;
+          return DRESS_INTENT;
+        },
+      }),
+    });
+
+    const response = await orchestrator.runSearch({
+      query: HEBREW_QUERY,
+      shopDomain: SHOP,
+    });
+
+    expect(response.route).toBe("classic");
+    expect(response.routeReason).toBe("model-error");
+    expect(response.degraded).toBe(true);
+    expect(response.hits).toEqual([]);
+    expect(intentCalls).toBe(0);
+  });
+
   it("degrades back to the empty classic response when the escalation's intent call fails", async () => {
     const db = await createTestDb();
     const orchestrator = buildOrchestrator(db, {
@@ -769,6 +799,54 @@ describe("classic zero hits escalate once into the AI path (YOY-67 AC-3)", () =>
     expect(response.chips.length).toBeGreaterThan(0);
     expect(response.closeMatches.map((hit) => hit.productId)).toEqual([
       "red-dress",
+    ]);
+  });
+});
+
+describe("card hydration publication guard (YOY-72 AC-4)", () => {
+  it("excludes non-active and unpublished rows even when a store hands their ids back", async () => {
+    const db = await createTestDb();
+    await seed(db, [
+      { productId: "published-dress", title: "published dress" },
+      { productId: "unpublished-dress", title: "unpublished dress" },
+      { productId: "draft-dress", title: "draft dress" },
+    ]);
+    // Inject the guarded states directly: production stores never return
+    // these rows, so the injection stands in for any future unguarded
+    // consumer handing hydration a bad id.
+    await db.catalogProduct.updateMany({
+      where: { shopDomain: SHOP, productId: "unpublished-dress" },
+      data: { publishedAt: null },
+    });
+    await db.catalogProduct.updateMany({
+      where: { shopDomain: SHOP, productId: "draft-dress" },
+      data: { status: "DRAFT" },
+    });
+
+    const orchestrator = buildOrchestrator(db, {
+      llm: fakeLlm({
+        classification: () => ({ route: "ai" }),
+        intent: () => DRESS_INTENT,
+      }),
+      retrievalStore: {
+        async query() {
+          return [
+            { productId: "unpublished-dress", distance: 0.1 },
+            { productId: "draft-dress", distance: 0.2 },
+            { productId: "published-dress", distance: 0.3 },
+          ];
+        },
+      },
+    });
+
+    const response = await orchestrator.runSearch({
+      query: AI_QUERY,
+      shopDomain: SHOP,
+    });
+
+    expect(response.route).toBe("ai");
+    expect(response.hits.map((hit) => hit.productId)).toEqual([
+      "published-dress",
     ]);
   });
 });
