@@ -1,11 +1,14 @@
-import { statSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-// Prisma client drift guard (YOY-71): after pulling a migration, the generated
-// client in node_modules is stale and every DB-touching test fails with dozens
-// of confusing "Unknown argument" validation errors. Fail once, loudly, with
-// the fix — same loud-guard pattern as the source-execution guard (PR #54).
-// Cost when fresh: two statSync calls per test file, well under a millisecond.
+// Prisma client drift guard (YOY-71, YOY-78): after pulling a migration, the
+// generated client in node_modules is stale and every DB-touching test fails
+// with dozens of confusing "Unknown argument" validation errors. Fail once,
+// loudly, with the fix — same loud-guard pattern as the source-execution guard
+// (PR #54). The generated client keeps a copy of the schema it was built from;
+// equal contents mean fresh, whatever the mtimes — so branch switches that
+// merely bump the schema's mtime no longer trip a false "stale" (YOY-78).
+// Cost when fresh: two small file reads per test file, well under a millisecond.
 {
   const schemaPath = fileURLToPath(
     new URL("./apps/shopify-app/prisma/schema.prisma", import.meta.url),
@@ -14,16 +17,26 @@ import { fileURLToPath } from "node:url";
     new URL("./node_modules/.prisma/client/schema.prisma", import.meta.url),
   );
   const fixCommand = "npm exec --workspace=app -- prisma generate";
-  let generatedMtime: number | null = null;
+  // prisma generate re-prints the schema copy it embeds (its own field
+  // alignment), so raw bytes differ from the source even when freshly
+  // generated; normalize whitespace before comparing.
+  const normalize = (schema: string) =>
+    schema
+      .replace(/\r\n/g, "\n")
+      .split("\n")
+      .map((line) => line.trim().replace(/\s+/g, " "))
+      .join("\n")
+      .trim();
+  let generatedSchema: string | null = null;
   try {
-    generatedMtime = statSync(generatedSchemaPath).mtimeMs;
+    generatedSchema = readFileSync(generatedSchemaPath, "utf8");
   } catch {
     throw new Error(
       `Prisma client has not been generated (${generatedSchemaPath} is missing). ` +
         `Run: ${fixCommand}`,
     );
   }
-  if (statSync(schemaPath).mtimeMs > generatedMtime) {
+  if (normalize(readFileSync(schemaPath, "utf8")) !== normalize(generatedSchema)) {
     throw new Error(
       "Stale Prisma client: apps/shopify-app/prisma/schema.prisma is newer than " +
         "the generated client in node_modules/.prisma/client. Tests would fail " +
