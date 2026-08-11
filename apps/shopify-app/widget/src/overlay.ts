@@ -30,6 +30,7 @@ export const ZERO_HIT_TESTID = "unfiltered-widget-zero-hit";
 export const CLOSE_MATCHES_TESTID = "unfiltered-widget-close-matches";
 export const NEW_SEARCH_TESTID = "unfiltered-widget-new-search";
 export const COLOR_NOTE_TESTID = "unfiltered-widget-color-note";
+export const PREVIEW_EMPTY_TESTID = "unfiltered-widget-preview-empty";
 
 /** Card and chip interactions the state machine in main.ts handles. */
 export interface ResponseHandlers {
@@ -53,6 +54,12 @@ export interface Overlay {
   showFailure(): void;
   /** Render one search response: cards, chips, and empty states. */
   showResponse(response: ProxySearchResponse, handlers: ResponseHandlers): void;
+  /**
+   * Render a keystroke preview (YOY-68 AC-4): a plain results grid only —
+   * no chips, no zero-hit rescue, no close matches. Preview zero hits show
+   * a minimal quiet empty state, never the flat "No results" panel.
+   */
+  showPreview(response: ProxySearchResponse, handlers: ResponseHandlers): void;
   /** Remove the widget from the page entirely (inert degradation). */
   destroy(): void;
 }
@@ -136,6 +143,14 @@ export function createOverlay(options: OverlayOptions): Overlay {
   zeroHit.textContent = strings.zeroHit;
   zeroHit.hidden = true;
 
+  // Preview zero hits (YOY-68 AC-4): a quiet nudge, visually softer than
+  // the submitted no-results panel — the shopper is mid-keystroke.
+  const previewEmpty = document.createElement("div");
+  previewEmpty.className = "status status-quiet";
+  previewEmpty.setAttribute("data-testid", PREVIEW_EMPTY_TESTID);
+  previewEmpty.textContent = strings.previewEmpty;
+  previewEmpty.hidden = true;
+
   const grid = document.createElement("div");
   grid.className = "grid";
   grid.setAttribute("data-testid", RESULTS_TESTID);
@@ -151,7 +166,16 @@ export function createOverlay(options: OverlayOptions): Overlay {
   closeMatchesGrid.className = "grid";
   closeMatches.append(closeMatchesHeading, closeMatchesGrid);
 
-  overlay.append(bar, chipsRow, loading, noResults, zeroHit, grid, closeMatches);
+  overlay.append(
+    bar,
+    chipsRow,
+    loading,
+    noResults,
+    zeroHit,
+    previewEmpty,
+    grid,
+    closeMatches,
+  );
   shadow.appendChild(overlay);
 
   function card(
@@ -273,11 +297,13 @@ export function createOverlay(options: OverlayOptions): Overlay {
       loading.hidden = false;
       noResults.hidden = true;
       zeroHit.hidden = true;
+      previewEmpty.hidden = true;
     },
     showIdle() {
       loading.hidden = true;
       noResults.hidden = true;
       zeroHit.hidden = true;
+      previewEmpty.hidden = true;
       chipsRow.hidden = true;
       chipsRow.replaceChildren();
       grid.replaceChildren();
@@ -291,6 +317,7 @@ export function createOverlay(options: OverlayOptions): Overlay {
     showResponse(response, handlers) {
       overlay.hidden = false;
       loading.hidden = true;
+      previewEmpty.hidden = true;
 
       // Chip row (AC-1): AI-resolved responses only. Degraded responses
       // carry no chips by the endpoint contract (AC-6), so this hides the
@@ -332,6 +359,27 @@ export function createOverlay(options: OverlayOptions): Overlay {
         ),
       );
       closeMatches.hidden = matches.length === 0;
+    },
+    showPreview(response, handlers) {
+      // A preview is the plain-grid subset of showResponse (YOY-68 AC-4):
+      // every full-response surface — chips, zero-hit rescue, close matches,
+      // the flat no-results panel — stays hidden, so the preview→submitted
+      // transition swaps grids without ever stacking panels (AC-5).
+      overlay.hidden = false;
+      loading.hidden = true;
+      noResults.hidden = true;
+      zeroHit.hidden = true;
+      chipsRow.hidden = true;
+      chipsRow.replaceChildren();
+      closeMatches.hidden = true;
+      closeMatchesGrid.replaceChildren();
+
+      grid.replaceChildren(
+        ...response.results.map((result, index) =>
+          card(result, index, handlers.onCardClick),
+        ),
+      );
+      previewEmpty.hidden = response.results.length !== 0;
     },
     destroy() {
       host.remove();

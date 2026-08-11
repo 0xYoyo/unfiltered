@@ -297,6 +297,9 @@
           if (params.has("removeChip")) {
             request.removeChip = JSON.parse(params.get("removeChip"));
           }
+          if (params.has("mode")) {
+            request.mode = params.get("mode");
+          }
           window.__searchRequests.push(request);
           searchCount += 1;
           if (fixture === "error") {
@@ -322,7 +325,15 @@
             });
           }
           let body;
-          if (request.removeChip !== undefined) {
+          if (request.mode === "preview") {
+            // Keystroke previews are classic-only server-side (YOY-68 AC-1),
+            // whatever fixture the SUBMIT would hit: `empty` previews stay
+            // empty; every other fixture previews the plain classic set.
+            body =
+              fixture === "empty"
+                ? { ...RESULTS_RESPONSE, results: [] }
+                : RESULTS_RESPONSE;
+          } else if (request.removeChip !== undefined) {
             body = chipRemovalResponse(request);
           } else if (fixture === "ai" || fixture === "ai-delayed") {
             body = AI_RESPONSE;

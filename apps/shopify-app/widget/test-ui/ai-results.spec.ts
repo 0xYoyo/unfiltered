@@ -1,11 +1,19 @@
 import { expect, test, type Page } from "@playwright/test";
 
 // AI results with chips, zero-hit state, and the refinement flow (YOY-49),
-// driven against the harness AI fixtures.
+// driven against the harness AI fixtures. The full pipeline is submit-gated
+// (YOY-68 AC-2), so these tests stretch the preview debounce beyond the test
+// timeout and submit with Enter — every request below is a submitted search.
 
 // The widget owns the input's placeholder while active (YOY-50 AC-1), so
 // tests locate the theme input structurally rather than by placeholder.
 const themeInput = (page: Page) => page.locator('input[type="search"]');
+
+/** Submit a query through the full pipeline: fill, then explicit Enter. */
+async function submitQuery(page: Page, query: string): Promise<void> {
+  await themeInput(page).fill(query);
+  await themeInput(page).press("Enter");
+}
 const chips = (page: Page) => page.getByTestId("unfiltered-widget-chip");
 const cards = (page: Page) => page.getByTestId("unfiltered-widget-card");
 
@@ -33,9 +41,9 @@ const AI_INTENT = {
 test("AI responses render a chip row with remove controls and accessible labels (AC-1)", async ({
   page,
 }) => {
-  await page.goto("/?fixture=ai");
+  await page.goto("/?fixture=ai&debounce=30000");
 
-  await themeInput(page).fill("elegant dress");
+  await submitQuery(page, "elegant dress");
   await expect(cards(page)).toHaveCount(2);
 
   await expect(page.getByTestId("unfiltered-widget-chips")).toBeVisible();
@@ -52,9 +60,9 @@ test("AI responses render a chip row with remove controls and accessible labels 
 test("removing a chip sends the echoed intent + removed chip and re-renders (AC-2)", async ({
   page,
 }) => {
-  await page.goto("/?fixture=ai");
+  await page.goto("/?fixture=ai&debounce=30000");
 
-  await themeInput(page).fill("elegant dress");
+  await submitQuery(page, "elegant dress");
   await expect(chips(page)).toHaveCount(3);
 
   await chips(page).filter({ hasText: "Under 400" }).click();
@@ -77,9 +85,9 @@ test("removing a chip sends the echoed intent + removed chip and re-renders (AC-
 test("AI zero-hits render the message, removable chips, and close matches (AC-3)", async ({
   page,
 }) => {
-  await page.goto("/?fixture=ai-zero-hit");
+  await page.goto("/?fixture=ai-zero-hit&debounce=30000");
 
-  await themeInput(page).fill("elegant dress under 400");
+  await submitQuery(page, "elegant dress under 400");
 
   await expect(page.getByTestId("unfiltered-widget-zero-hit")).toBeVisible();
   await expect(page.getByTestId("unfiltered-widget-zero-hit")).toContainText(
@@ -105,12 +113,12 @@ test("AI zero-hits render the message, removable chips, and close matches (AC-3)
 test("a follow-up query carries the held intent; the response's echo replaces it (AC-4)", async ({
   page,
 }) => {
-  await page.goto("/?fixture=ai");
+  await page.goto("/?fixture=ai&debounce=30000");
 
-  await themeInput(page).fill("elegant dress");
+  await submitQuery(page, "elegant dress");
   await expect(cards(page)).toHaveCount(2);
 
-  await themeInput(page).fill("same but cheaper");
+  await submitQuery(page, "same but cheaper");
   await expect.poll(async () => (await searchRequests(page)).length).toBe(2);
 
   const requests = await searchRequests(page);
@@ -121,9 +129,9 @@ test("a follow-up query carries the held intent; the response's echo replaces it
 test("new search clears intent, input, chips, and results; next query has no previousIntent (AC-5)", async ({
   page,
 }) => {
-  await page.goto("/?fixture=ai");
+  await page.goto("/?fixture=ai&debounce=30000");
 
-  await themeInput(page).fill("elegant dress");
+  await submitQuery(page, "elegant dress");
   await expect(chips(page)).toHaveCount(3);
 
   await page.getByTestId("unfiltered-widget-new-search").click();
@@ -131,7 +139,7 @@ test("new search clears intent, input, chips, and results; next query has no pre
   await expect(chips(page)).toHaveCount(0);
   await expect(cards(page)).toHaveCount(0);
 
-  await themeInput(page).fill("fresh query");
+  await submitQuery(page, "fresh query");
   await expect.poll(async () => (await searchRequests(page)).length).toBe(2);
   const requests = await searchRequests(page);
   expect(requests[1]!.query).toBe("fresh query");
@@ -141,9 +149,9 @@ test("new search clears intent, input, chips, and results; next query has no pre
 test("degraded responses render plain classic cards: no chips, no error text (AC-6)", async ({
   page,
 }) => {
-  await page.goto("/?fixture=degraded");
+  await page.goto("/?fixture=degraded&debounce=30000");
 
-  await themeInput(page).fill("elegant dress");
+  await submitQuery(page, "elegant dress");
   await expect(cards(page)).toHaveCount(1);
 
   await expect(chips(page)).toHaveCount(0);
@@ -158,9 +166,9 @@ test("degraded responses render plain classic cards: no chips, no error text (AC
 test("the AI loading indicator survives slow responses and the input stays responsive (AC-7)", async ({
   page,
 }) => {
-  await page.goto("/?fixture=ai-delayed");
+  await page.goto("/?fixture=ai-delayed&debounce=30000");
 
-  await themeInput(page).fill("elegant dress");
+  await submitQuery(page, "elegant dress");
   await expect(page.getByTestId("unfiltered-widget-loading")).toBeVisible();
 
   // The input stays responsive mid-flight.
@@ -175,9 +183,9 @@ test("the AI loading indicator survives slow responses and the input stays respo
 test("unknown-color results rank after known matches and carry the label (YOY-67 AC-5)", async ({
   page,
 }) => {
-  await page.goto("/?fixture=ai-color");
+  await page.goto("/?fixture=ai-color&debounce=30000");
 
-  await themeInput(page).fill("blue snowboard");
+  await submitQuery(page, "blue snowboard");
   await expect(cards(page)).toHaveCount(3);
   await expect(chips(page)).toHaveCount(1);
   await expect(chips(page).first()).toContainText("blue");
@@ -209,9 +217,9 @@ test("unknown-color results rank after known matches and carry the label (YOY-67
 test("the unknown-color label is localized in Hebrew chrome (YOY-67 AC-5)", async ({
   page,
 }) => {
-  await page.goto("/?fixture=ai-color&locale=he");
+  await page.goto("/?fixture=ai-color&locale=he&debounce=30000");
 
-  await themeInput(page).fill("סנובורד כחול");
+  await submitQuery(page, "סנובורד כחול");
   await expect(cards(page)).toHaveCount(3);
   await expect(
     cards(page).nth(2).getByTestId("unfiltered-widget-color-note"),
@@ -238,9 +246,9 @@ test("focus renders no panel; loading opens it; results keep it open (YOY-67 AC-
 test("the unknown-color label renders under an exclusion-only color chip too (YOY-67 AC-5)", async ({
   page,
 }) => {
-  await page.goto("/?fixture=ai-color-exclude");
+  await page.goto("/?fixture=ai-color-exclude&debounce=30000");
 
-  await themeInput(page).fill("snowboard not black");
+  await submitQuery(page, "snowboard not black");
   await expect(cards(page)).toHaveCount(2);
   await expect(chips(page)).toHaveCount(1);
   await expect(chips(page).first()).toContainText("Not black");

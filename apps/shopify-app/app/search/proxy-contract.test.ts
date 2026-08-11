@@ -129,6 +129,33 @@ describe("search request: widget serialization → route parsing", () => {
     expect(parsed).toEqual({ query: "snowboard", sessionId: "session-2" });
   });
 
+  it("round-trips a keystroke preview and omits mode on submitted searches (YOY-68)", async () => {
+    const captured: CapturedRequest[] = [];
+    captureFetch(captured);
+
+    const client = createSearchClient();
+    await client.search("snowb", "session-5", { preview: true });
+    await client.search("snowboard", "session-5");
+
+    const previewUrl = new URL(captured[0]!.url, "https://shop.example");
+    expect(previewUrl.searchParams.get("mode")).toBe("preview");
+    const preview = parseProxySearchParams(previewUrl.searchParams);
+    expect(preview).toEqual({
+      query: "snowb",
+      sessionId: "session-5",
+      mode: "preview",
+    });
+
+    // The submitted search carries NO mode parameter — its absence is what
+    // runs the full pipeline.
+    const submitUrl = new URL(captured[1]!.url, "https://shop.example");
+    expect(submitUrl.searchParams.has("mode")).toBe(false);
+    expect(parseProxySearchParams(submitUrl.searchParams)).toEqual({
+      query: "snowboard",
+      sessionId: "session-5",
+    });
+  });
+
   it("round-trips a Hebrew query and coexists with Shopify's signed proxy params", async () => {
     const captured: CapturedRequest[] = [];
     captureFetch(captured);

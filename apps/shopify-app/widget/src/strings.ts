@@ -34,6 +34,9 @@ export interface WidgetStrings {
   /** Label on results that passed a color filter without color evidence
    * (YOY-67 AC-5). */
   colorNotConfirmed: string;
+  /** Quiet empty state while a keystroke preview has no matches (YOY-68
+   * AC-4) — deliberately softer than the submitted `noResults` panel. */
+  previewEmpty: string;
 }
 
 export const STRING_CATALOG: Record<WidgetLocale, WidgetStrings> = {
@@ -50,6 +53,7 @@ export const STRING_CATALOG: Record<WidgetLocale, WidgetStrings> = {
     removeFilter: "Remove filter: {label}",
     soldOut: "Sold out",
     colorNotConfirmed: "Color not confirmed",
+    previewEmpty: "Keep typing…",
   },
   he: {
     inputPlaceholder: "חיפוש",
@@ -64,6 +68,7 @@ export const STRING_CATALOG: Record<WidgetLocale, WidgetStrings> = {
     removeFilter: "הסרת סינון: {label}",
     soldOut: "אזל מהמלאי",
     colorNotConfirmed: "צבע לא מאומת",
+    previewEmpty: "המשיכו להקליד…",
   },
 };
 

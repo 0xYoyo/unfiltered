@@ -461,6 +461,30 @@ describe("request validation", () => {
     );
     expect(response.status).toBe(400);
   });
+
+  it("rejects an unknown mode and any preview carrying refinement context (YOY-68)", async () => {
+    installOrchestrator({ llm: fakeLlm({}) });
+    for (const payload of [
+      { query: "shoes", sessionId: "s1", mode: "instant" },
+      {
+        query: "shoes",
+        sessionId: "s1",
+        mode: "preview",
+        previousIntent: DRESS_INTENT,
+      },
+      {
+        query: "shoes",
+        sessionId: "s1",
+        mode: "preview",
+        previousIntent: DRESS_INTENT,
+        removeChip: { field: "occasion", value: "wedding" },
+      },
+    ]) {
+      const response = await action(actionArgs(proxyRequest({ payload })));
+      expect(response.status).toBe(400);
+      expect(await response.text()).toBe("");
+    }
+  });
 });
 
 describe("the response contract (AC-3, AC-5)", () => {
@@ -1039,6 +1063,118 @@ describe("per-session AI throttle (YOY-47 AC-4, AC-5)", () => {
     expect(removalBody.route).toBe("ai");
     expect(removalBody.degraded).toBe(false);
     expect(counting.invocations()).toBe(callsBefore);
+  });
+});
+
+describe("keystroke preview mode (YOY-68 AC-1/AC-3)", () => {
+  /** Fake LLM that counts invocations, answering the AI route + intent. */
+  function countingAiLlm() {
+    let calls = 0;
+    return {
+      llm: fakeLlm({
+        classification: () => {
+          calls += 1;
+          return { route: "ai" };
+        },
+        intent: () => {
+          calls += 1;
+          return DRESS_INTENT;
+        },
+      }),
+      invocations: () => calls,
+    };
+  }
+
+  it("serves classic-only results on contract with zero LLM calls, no SearchEvent, and no budget spent", async () => {
+    await seed([
+      { productId: "sneaker-90", title: "nike 90" },
+      {
+        productId: "silk-gown",
+        title: "silk gown",
+        vector: [0.9, 0.1, 0],
+        category: "dress",
+        occasions: ["wedding"],
+      },
+    ]);
+    throttleSeam.instance = createSessionThrottle({ limit: 1, now: () => 0 });
+    const counting = countingAiLlm();
+    installOrchestrator({ llm: counting.llm });
+
+    // An AI-shaped query as a preview: classic results, zero LLM calls.
+    const preview = await action(
+      actionArgs(
+        proxyRequest({
+          payload: { query: "nike 90", sessionId: "p1", mode: "preview" },
+        }),
+      ),
+    );
+    expect(preview.status).toBe(200);
+    const previewBody = await preview.json();
+    expect(Object.keys(previewBody).sort()).toEqual(CONTRACT_KEYS);
+    expect(previewBody.route).toBe("classic");
+    expect(previewBody.degraded).toBe(false);
+    expect(previewBody.chips).toEqual([]);
+    expect(
+      previewBody.results.map((r: { productId: string }) => r.productId),
+    ).toEqual(["sneaker-90"]);
+    expect(counting.invocations()).toBe(0);
+
+    // No SearchEvent row exists for the preview (AC-3).
+    expect(await db.searchEvent.count({ where: { sessionId: "p1" } })).toBe(0);
+
+    // The preview consumed no AI budget: the full budget of 1 still serves
+    // a genuine submitted AI search afterwards.
+    const submitted = await action(
+      actionArgs(proxyRequest({ payload: { query: AI_QUERY, sessionId: "p1" } })),
+    );
+    expect((await submitted.json()).route).toBe("ai");
+    expect(await db.searchEvent.count({ where: { sessionId: "p1" } })).toBe(1);
+  });
+
+  it("previews keep working for a throttled session, still LLM-free and unlogged", async () => {
+    await seed([{ productId: "sneaker-90", title: "nike 90" }]);
+    // A session with its budget fully spent: shouldThrottle would say yes,
+    // but previews never consult it.
+    throttleSeam.instance = createSessionThrottle({ limit: 0, now: () => 0 });
+    const counting = countingAiLlm();
+    installOrchestrator({ llm: counting.llm });
+
+    const preview = await action(
+      actionArgs(
+        proxyRequest({
+          payload: { query: "nike 90", sessionId: "p2", mode: "preview" },
+        }),
+      ),
+    );
+    expect(preview.status).toBe(200);
+    const previewBody = await preview.json();
+    expect(previewBody.route).toBe("classic");
+    // Not the throttled degradation (YOY-47) — a preview is the intended
+    // shape, so it is not flagged degraded.
+    expect(previewBody.degraded).toBe(false);
+    expect(counting.invocations()).toBe(0);
+    expect(await db.searchEvent.count({ where: { sessionId: "p2" } })).toBe(0);
+  });
+
+  it("a preview with zero classic hits does not run the zero-hit escalation", async () => {
+    // Empty catalog: a submitted classic search would escalate (YOY-67
+    // AC-3); a preview must not spend the intent call.
+    const counting = countingAiLlm();
+    installOrchestrator({ llm: counting.llm });
+
+    const preview = await action(
+      actionArgs(
+        proxyRequest({
+          payload: { query: "סנובורד כחול", sessionId: "p3", mode: "preview" },
+        }),
+      ),
+    );
+    expect(preview.status).toBe(200);
+    const previewBody = await preview.json();
+    expect(previewBody.route).toBe("classic");
+    expect(previewBody.results).toEqual([]);
+    expect(previewBody.degraded).toBe(false);
+    expect(counting.invocations()).toBe(0);
   });
 });
 

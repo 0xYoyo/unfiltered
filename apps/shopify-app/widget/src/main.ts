@@ -168,14 +168,31 @@ export function init(config: WidgetConfig): void {
       query: string,
       context?: SearchRequestContext,
     ): Promise<void> => {
+      const preview = context?.preview === true;
       const sequence = ++requestSequence;
-      overlay.showLoading();
+      // A preview over an already-open overlay keeps the current results in
+      // place until the new ones land — live-search feel, no loading flicker
+      // per keystroke. The first render still opens via the loading state
+      // (YOY-67 AC-6: nothing shows before there is something to show).
+      if (!preview || !overlay.isOpen()) {
+        overlay.showLoading();
+      }
       try {
         const response = await client.search(query, getSessionId(), context);
         if (inert || sequence !== requestSequence) {
           return; // A newer keystroke superseded this request.
         }
         consecutiveFailures = 0;
+        if (preview) {
+          // Previews are not attributable searches (YOY-68 AC-3): no
+          // SearchEvent row exists server-side, so the click beacon must
+          // not fire against this searchId — and the refinement memory
+          // (heldIntent/lastQuery) stays whatever the last SUBMITTED
+          // search established, so submit-gated refinement still works.
+          currentSearchId = null;
+          overlay.showPreview(response, { onCardClick, onChipRemove });
+          return;
+        }
         currentSearchId = response.searchId;
         lastQuery = query;
         // The response's echoed intent replaces the held one (AC-4) — also
@@ -228,13 +245,10 @@ export function init(config: WidgetConfig): void {
         return;
       }
       debounceTimer = window.setTimeout(() => {
-        // A follow-up refines: the held intent rides along (AC-4). After
-        // "new search" (or before any response) nothing is held and the
-        // request carries no previousIntent field (AC-5).
-        void runSearch(
-          query,
-          heldIntent !== null ? { previousIntent: heldIntent } : undefined,
-        );
+        // Typing is preview-only (YOY-68 AC-1): a live, classic-only fetch
+        // with no refinement context — the full pipeline (and the held
+        // intent riding along, AC-4) waits for the explicit submit.
+        void runSearch(query, { preview: true });
       }, debounceMs);
     };
 
@@ -291,10 +305,11 @@ export function init(config: WidgetConfig): void {
     );
 
     /**
-     * Explicit search request (YOY-52 AC-14): Enter or the theme's submit
-     * button while the widget owns the input runs the current query NOW,
-     * skipping the pending debounce — the live run showed the magnifier as
-     * a dead control. Navigation stays suppressed by the callers.
+     * Explicit submit (YOY-52 AC-14, now the YOY-68 AC-2 submit action):
+     * Enter or the theme's submit button runs the current query through the
+     * FULL pipeline now — classification, AI route, chips, refinement —
+     * skipping any pending preview debounce. Navigation stays suppressed by
+     * the callers.
      */
     const searchNow = (): void => {
       window.clearTimeout(debounceTimer);

@@ -217,9 +217,13 @@ test("instant classic responses replace the indicator with cards (AC-4)", async 
 test("clicking a card fires the beacon and navigates to the product (AC-5)", async ({
   page,
 }) => {
-  await page.goto("/");
+  // Attribution belongs to submitted searches (YOY-68 AC-3): the beacon
+  // test submits explicitly; the preview-click case is pinned in
+  // preview-submit.spec.ts.
+  await page.goto("/?debounce=30000");
 
   await themeInput(page).fill("nike");
+  await themeInput(page).press("Enter");
   await cards(page).first().click();
 
   await page.waitForURL(/\/products\/nike-air-90/);
@@ -240,9 +244,10 @@ test("clicking a card fires the beacon and navigates to the product (AC-5)", asy
 test("navigation proceeds even when the beacon endpoint is absent (AC-5)", async ({
   page,
 }) => {
-  await page.goto("/?fixture=beacon-missing");
+  await page.goto("/?fixture=beacon-missing&debounce=30000");
 
   await themeInput(page).fill("nike");
+  await themeInput(page).press("Enter");
   await cards(page).first().click();
 
   await page.waitForURL(/\/products\/nike-air-90/);
@@ -303,12 +308,16 @@ test("hostile host CSS cannot break the overlay, and widget CSS does not leak ou
   expect(hostCardBorder).toBe("0px");
 });
 
-test("an empty classic result set renders a no-results message (AC-8)", async ({
+test("an empty classic result set renders a no-results message on submit (AC-8)", async ({
   page,
 }) => {
-  await page.goto("/?fixture=empty");
+  // The flat no-results panel belongs to SUBMITTED searches (YOY-68 AC-4);
+  // typing previews show the quiet empty state, pinned in
+  // preview-submit.spec.ts.
+  await page.goto("/?fixture=empty&debounce=30000");
 
   await themeInput(page).fill("nothing matches this");
+  await themeInput(page).press("Enter");
   await expect(page.getByTestId("unfiltered-widget-no-results")).toBeVisible();
   await expect(page.getByTestId("unfiltered-widget-no-results")).toContainText(
     "No results",

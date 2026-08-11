@@ -90,12 +90,20 @@ async function handleSearch(
       ? removeChipFromIntent(body.previousIntent, body.removeChip)
       : undefined;
 
+  // Keystroke preview (YOY-68): classic-only, zero LLM calls, outside the
+  // throttle and outside the SearchEvent log — the submitted search is the
+  // shopper's actual query; previews are typing noise.
+  const preview = body.mode === "preview";
+
   // Per-session AI throttle (YOY-47): a session past its sliding-window
   // budget is forced onto the classic path with zero LLM calls. Chip
-  // removal is exempt — it makes no classification or intent call anyway.
+  // removal is exempt — it makes no classification or intent call anyway —
+  // and previews never reach the AI path, so the throttle ignores them too.
   const throttle = getSessionThrottle();
   const throttled =
-    resolvedIntent === undefined && throttle.shouldThrottle(body.sessionId);
+    !preview &&
+    resolvedIntent === undefined &&
+    throttle.shouldThrottle(body.sessionId);
 
   // Containment (YOY-52 AC-4): a failure below the orchestrator's own
   // fallback ladder — construction included — must never surface framework
@@ -108,7 +116,9 @@ async function handleSearch(
     const orchestrator = getProxySearchOrchestrator(db);
     const startedAt = Date.now();
     const response = await orchestrator.runSearch(
-      throttled
+      preview
+        ? { query: body.query, shopDomain: shop, preview: true }
+        : throttled
         ? { query: body.query, shopDomain: shop, forceClassic: true }
         : resolvedIntent !== undefined
           ? { query: body.query, shopDomain: shop, resolvedIntent }
@@ -137,22 +147,27 @@ async function handleSearch(
       (response.degraded &&
         (response.routeReason === "model" ||
           response.routeReason === "classic-zero-hit"));
-    if (resolvedIntent === undefined && !throttled && aiDecided) {
+    if (!preview && resolvedIntent === undefined && !throttled && aiDecided) {
       throttle.recordAiSearch(body.sessionId);
     }
 
-    // Exactly one SearchEvent per search — degraded, zero-hit, and throttled
-    // included; a write failure never fails the response (YOY-47 AC-2/AC-5).
-    await writeSearchEvent(db, {
-      searchId: response.searchId,
-      shopDomain: shop,
-      sessionId: body.sessionId,
-      query: body.query,
-      route: response.route,
-      degraded: response.degraded,
-      latencyMs,
-      resultCount: response.hits.length,
-    });
+    // Exactly one SearchEvent per SUBMITTED search — degraded, zero-hit, and
+    // throttled included; a write failure never fails the response (YOY-47
+    // AC-2/AC-5). Keystroke previews are never logged (YOY-68 AC-3): they
+    // would flood analytics with per-keystroke noise, and the click beacon
+    // has nothing to attribute to a search the shopper never submitted.
+    if (!preview) {
+      await writeSearchEvent(db, {
+        searchId: response.searchId,
+        shopDomain: shop,
+        sessionId: body.sessionId,
+        query: body.query,
+        route: response.route,
+        degraded: response.degraded,
+        latencyMs,
+        resultCount: response.hits.length,
+      });
+    }
 
     return Response.json(serializeProxySearchResponse(response), {
       headers: PROXY_RESPONSE_HEADERS,
