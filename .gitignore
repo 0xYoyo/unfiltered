@@ -4,5 +4,8 @@ test-results/
 playwright-report/
 .env
 .env.*
+# Real env-file location, declared explicitly so docs/REPO-MAP.md's key
+# locations name the path (the generator lists env paths from this file).
+apps/shopify-app/.env
 !.env.example
 .DS_Store
