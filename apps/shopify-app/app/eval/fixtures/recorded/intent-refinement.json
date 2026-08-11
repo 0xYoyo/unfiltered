@@ -22,7 +22,7 @@
         "size": null
       },
       "inputTokens": 932,
-      "outputTokens": 110
+      "outputTokens": 55
     },
     "בלי שרוולים": {
       "output": {
@@ -82,10 +82,14 @@
         ],
         "outcome": "refinement",
         "category": "coat",
-        "priceMax": 500
+        "currency": null,
+        "occasion": null,
+        "priceMax": 500,
+        "priceMin": null,
+        "size": null
       },
       "inputTokens": 929,
-      "outputTokens": 42
+      "outputTokens": 120
     },
     "מידה M in stock only": {
       "output": {
@@ -107,7 +111,7 @@
         "size": "m"
       },
       "inputTokens": 925,
-      "outputTokens": 110
+      "outputTokens": 54
     },
     "under 500 and only what is in stock": {
       "output": {
@@ -148,7 +152,7 @@
         "size": null
       },
       "inputTokens": 933,
-      "outputTokens": 108
+      "outputTokens": 56
     },
     "show me more expensive ones": {
       "output": {
@@ -163,12 +167,11 @@
         "category": "coat",
         "currency": null,
         "occasion": null,
-        "priceMax": null,
         "priceMin": 250,
         "size": null
       },
       "inputTokens": 918,
-      "outputTokens": 54
+      "outputTokens": 93
     },
     "יותר יקר": {
       "output": {
@@ -184,12 +187,11 @@
         "category": "skirt",
         "currency": null,
         "occasion": null,
-        "priceMax": null,
         "priceMin": 375,
         "size": null
       },
       "inputTokens": 923,
-      "outputTokens": 108
+      "outputTokens": 100
     }
   }
 }
