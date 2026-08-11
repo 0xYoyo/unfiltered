@@ -10,6 +10,7 @@ does not match a fresh generation. -->
 .claude/
   settings.json
   yoyo.md
+.env.example
 .github/
   workflows/
     ci.yml
@@ -21,6 +22,7 @@ apps/
       mcp.json
     .dockerignore
     .editorconfig
+    .env.example
     .eslintignore
     .eslintrc.cjs
     .gemini/
@@ -259,7 +261,7 @@ vitest.setup.ts
 ## Key locations
 
 - **Config files**: .claude/yoyo.md, .github/workflows/ci.yml, apps/shopify-app/package.json, apps/shopify-app/tsconfig.json, apps/shopify-app/vite.config.ts, apps/shopify-app/widget/vite.config.ts, package.json, packages/engine/package.json, packages/engine/tsconfig.json, packages/provider-gemini/package.json, packages/provider-gemini/tsconfig.json, playwright.config.ts, vitest.config.ts
-- **Env files (paths only — contents never read)**: .env (declared in .gitignore), .env.* (declared in .gitignore), apps/shopify-app/.env (declared in .gitignore)
+- **Env files (paths only — contents never read)**: .env (declared in .gitignore), .env.* (declared in .gitignore), .env.example, apps/shopify-app/.env (declared in .gitignore), apps/shopify-app/.env.example
 - **Entrypoints**: apps/shopify-app/app/routes/app.tsx, apps/shopify-app/widget/src/main.ts, packages/engine/src/index.ts, packages/provider-gemini/src/index.ts
 - **Scripts**: scripts/repo-map.mjs
 - **Fixtures**: apps/shopify-app/app/eval/fixtures/catalog.json, apps/shopify-app/app/eval/fixtures/goldens.json, apps/shopify-app/app/eval/fixtures/recorded/classification-synthesized.json, apps/shopify-app/app/eval/fixtures/recorded/classification.json, apps/shopify-app/app/eval/fixtures/recorded/embeddings.json, apps/shopify-app/app/eval/fixtures/recorded/enrichment.json, apps/shopify-app/app/eval/fixtures/recorded/intent-refinement.json, apps/shopify-app/app/eval/fixtures/recorded/intent.json, apps/shopify-app/app/eval/fixtures/refinement-goldens.json
@@ -326,14 +328,14 @@ vitest.setup.ts
 - apps/shopify-app/widget/src/main.ts → apps/shopify-app/widget/src/overlay.ts, apps/shopify-app/widget/src/search-client.ts, apps/shopify-app/widget/src/session.ts, apps/shopify-app/widget/src/strings.ts
 - apps/shopify-app/widget/src/overlay.ts → apps/shopify-app/widget/src/format.ts, apps/shopify-app/widget/src/search-client.ts, apps/shopify-app/widget/src/strings.ts, apps/shopify-app/widget/src/widget.css?inline (unresolved)
 - apps/shopify-app/widget/test-ui/localization.spec.ts → apps/shopify-app/widget/src/strings.ts
-- packages/engine/src/classic.ts → packages/engine/src/retrieve.js (unresolved)
-- packages/engine/src/classify.ts → packages/engine/src/index.js (unresolved)
-- packages/engine/src/intent.ts → packages/engine/src/index.js (unresolved), packages/engine/src/taxonomy.js (unresolved)
-- packages/engine/src/retrieve.ts → packages/engine/src/index.js (unresolved), packages/engine/src/intent.js (unresolved)
-- packages/engine/test/classic.test.ts → packages/engine/src/index.js (unresolved)
-- packages/engine/test/classify.test.ts → packages/engine/src/index.js (unresolved)
-- packages/engine/test/index.test.ts → packages/engine/src/index.js (unresolved)
-- packages/engine/test/intent.test.ts → packages/engine/src/index.js (unresolved)
-- packages/engine/test/retrieve.test.ts → packages/engine/src/index.js (unresolved)
-- packages/engine/test/taxonomy.test.ts → packages/engine/src/index.js (unresolved)
-- packages/provider-gemini/test/gemini.test.ts → packages/provider-gemini/src/index.js (unresolved)
+- packages/engine/src/classic.ts → packages/engine/src/retrieve.ts
+- packages/engine/src/classify.ts → packages/engine/src/index.ts
+- packages/engine/src/intent.ts → packages/engine/src/index.ts, packages/engine/src/taxonomy.ts
+- packages/engine/src/retrieve.ts → packages/engine/src/index.ts, packages/engine/src/intent.ts
+- packages/engine/test/classic.test.ts → packages/engine/src/index.ts
+- packages/engine/test/classify.test.ts → packages/engine/src/index.ts
+- packages/engine/test/index.test.ts → packages/engine/src/index.ts
+- packages/engine/test/intent.test.ts → packages/engine/src/index.ts
+- packages/engine/test/retrieve.test.ts → packages/engine/src/index.ts
+- packages/engine/test/taxonomy.test.ts → packages/engine/src/index.ts
+- packages/provider-gemini/test/gemini.test.ts → packages/provider-gemini/src/index.ts

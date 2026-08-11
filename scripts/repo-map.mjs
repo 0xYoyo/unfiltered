@@ -25,6 +25,11 @@ const MAP_PATH = "docs/REPO-MAP.md";
 const FIX_COMMAND = "node scripts/repo-map.mjs";
 
 const ENV_FILE = /(^|\/)\.env(\.[^/]*)?$/;
+// Example/sample/template-named env files are tracked documentation of key
+// names, not secrets — the same exception the factory guard makes (YOY-76).
+// They stay in the listing (YOY-77); real env files stay excluded, and
+// readText() still refuses ALL env-like paths, examples included.
+const ENV_EXAMPLE = /(^|\/)\.env\.[^/]*(example|sample|template)[^/]*$/i;
 const LOCKFILES = new Set([
   "package-lock.json", "yarn.lock", "pnpm-lock.yaml", "bun.lockb", "bun.lock",
   "Cargo.lock", "poetry.lock", "uv.lock", "Gemfile.lock", "composer.lock",
@@ -60,7 +65,7 @@ function listFiles() {
   try {
     const output = execFileSync("git", ["ls-files"], { encoding: "utf8" });
     const files = output.split("\n").filter(Boolean).map((f) => posix.normalize(f));
-    return { files: files.filter((f) => !isExcluded(f) && !ENV_FILE.test(f)), mode: "git" };
+    return { files: files.filter((f) => !isExcluded(f) && (!ENV_FILE.test(f) || ENV_EXAMPLE.test(f))), mode: "git" };
   } catch {
     const files = [];
     const walk = (dir) => {
@@ -74,7 +79,7 @@ function listFiles() {
       }
     };
     walk(".");
-    return { files: files.filter((f) => !ENV_FILE.test(f)), mode: "walk" };
+    return { files: files.filter((f) => !ENV_FILE.test(f) || ENV_EXAMPLE.test(f)), mode: "walk" };
   }
 }
 
@@ -84,7 +89,7 @@ function listFiles() {
 function envPaths(files, mode) {
   const paths = new Set();
   for (const file of files) {
-    if (/(^|\/)\.env\.[^/]*(example|sample|template)[^/]*$/i.test(file)) paths.add(file);
+    if (ENV_EXAMPLE.test(file)) paths.add(file);
   }
   if (existsSync(".gitignore")) {
     for (const line of readText(".gitignore").split("\n")) {
@@ -158,7 +163,15 @@ function importGraph(files) {
   const resolve = (fromFile, specifier) => {
     if (!specifier.startsWith(".")) return null; // external package — out of scope
     const base = posix.normalize(posix.join(posix.dirname(fromFile), specifier));
-    const candidates = [base, ...["js", "mjs", "cjs", "ts", "tsx", "jsx"].map((ext) => `${base}.${ext}`),
+    // TS-ESM: a .js-suffixed relative specifier may name a .ts/.tsx source
+    // (./index.js → index.ts). Without this mapping those edges render as
+    // (unresolved) even though the source module is right there.
+    const tsMapped = [];
+    if (base.endsWith(".js")) tsMapped.push(`${base.slice(0, -3)}.ts`, `${base.slice(0, -3)}.tsx`);
+    else if (base.endsWith(".mjs")) tsMapped.push(`${base.slice(0, -4)}.mts`);
+    else if (base.endsWith(".cjs")) tsMapped.push(`${base.slice(0, -4)}.cts`);
+    const candidates = [base, ...tsMapped,
+      ...["js", "mjs", "cjs", "ts", "tsx", "jsx"].map((ext) => `${base}.${ext}`),
       ...["js", "mjs", "cjs", "ts", "tsx", "jsx"].map((ext) => `${base}/index.${ext}`)];
     return candidates.find((candidate) => moduleSet.has(candidate)) ?? `${base} (unresolved)`;
   };
