@@ -1,27 +1,5 @@
 {
   "modelId": "gemini-3.5-flash-lite",
   "provenance": "synthesized",
-  "entries": {
-    "שמלת ערב": {
-      "output": {
-        "route": "ai"
-      },
-      "inputTokens": 182,
-      "outputTokens": 11
-    },
-    "שמלת ערבב": {
-      "output": {
-        "route": "ai"
-      },
-      "inputTokens": 182,
-      "outputTokens": 11
-    },
-    "שמלת קיץ": {
-      "output": {
-        "route": "ai"
-      },
-      "inputTokens": 182,
-      "outputTokens": 11
-    }
-  }
+  "entries": {}
 }
