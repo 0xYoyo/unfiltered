@@ -12,6 +12,9 @@ jobs:
         with:
           node-version: 22
       - run: npm ci
+      # Repo-map drift guard (YOY-75 AC-2): docs/REPO-MAP.md is generated;
+      # fails on a stale map, naming the fix command.
+      - run: node scripts/repo-map.mjs --check
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
