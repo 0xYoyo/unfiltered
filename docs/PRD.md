@@ -137,6 +137,13 @@ chips, refinement, rescue) fires only on explicit submit (Enter or the
 magnifier). Keystroke previews consume no AI budget and are not logged
 as searches.
 
+**Portability constraint (binding, 2026-08-13):** v1 is built
+Shopify-first, but every shopper-facing mechanism must state its
+generic-store (Door 2) analog at design time. Shopify-specific code is an
+adapter around a generic mechanism, never the mechanism itself. A design
+whose generic analog cannot be stated is rejected at spec time. The
+pre-Door-2 adapter-boundary audit is tracked as YOY-81.
+
 ## 4. Explicitly out of v1 (Later)
 1. Image-input search ("a shoe like this Prada" + photo). Reuses the
    vision infrastructure built in the vision milestone.
