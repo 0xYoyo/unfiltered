@@ -222,6 +222,7 @@ docs/
   DEV-STORE.md
   M2-LIVE-RUN.md
   M3-LIVE-RUN.md
+  PORTABILITY.md
   PRD.md
 package.json
 packages/
