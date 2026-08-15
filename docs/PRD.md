@@ -29,6 +29,8 @@ store owner/manager. End user: their shoppers. Why now: small-model LLM
 pricing (~$0.10–0.40 per 1M tokens and falling ~80%/year) makes per-search
 AI economically viable at SMB price points for the first time.
 
+> **Positioning note (2026-08-15, binding):** The moat is measured superiority of the core search loop for both shopper and merchant — accuracy, speed, seamlessness, attributed revenue, honest pricing, painless integration. Features (chips, playground, attribution-first onboarding) are proof surfaces that make that superiority visible, not the moat itself; they are prioritized by visibility speed. Hebrew support is a local-sales convenience, never a headline. Pricing posture: sensible-best, not cheapest. See docs/COMPETITORS.md.
+
 ## 3. v1 scope
 Numbered capabilities, each observable behavior:
 
@@ -153,9 +155,7 @@ pre-Door-2 adapter-boundary audit is tracked as YOY-81.
 4. Rigorous attribution: A/B testing vs. native search, multi-touch models.
 5. Languages beyond EN+HE (architecture is language-agnostic; adding
    Spanish/French/Arabic/Chinese is config-and-QA later).
-6. Door 2: generic feed+snippet integration sold directly to non-Shopify
-   retailers (TerminalX-tier). Architecture keeps the engine
-   catalog-agnostic, but no Door 2 build, sales motion, or admin in v1.
+6. Door 2 self-serve product: no self-serve generic-store admin, billing portal, or marketing site in v1. REVISED 2026-08-15: a Door 2 MVP (generic feed adapter + embeddable snippet + manual design-partner onboarding) is scheduled as milestone 8, run during the App Store review-wait window — architecture portability is already binding (see PRD portability constraint and docs/PORTABILITY.md); the playground's store-preload mode (capability 10) must ingest arbitrary public catalogs, not only Shopify stores, making it the first generic-ingestion consumer.
 7. Personalization from shopper history.
 8. Voice input.
 9. Permanent free tier.
@@ -393,6 +393,4 @@ external analytics platform required.
    onboarding flow, first-session best-model behavior, Built-for-Shopify
    compliance pass, listing assets, GDPR webhooks, submission. (~8–12
    issues)
-8. **Outreach tooling** (post-submission, parallel with review) — fashion-
-   store identification + per-store playground link generation. (~4–6
-   issues)
+8. **Outreach tooling + Door 2 MVP** (post-submission, parallel with App Store review wait) — fashion-store identification + per-store playground link generation for BOTH Shopify and non-Shopify stores; generic feed adapter + embeddable snippet + manual onboarding path for first non-Shopify design partners (Israeli fashion brands as warm leads). (~6–10 issues)

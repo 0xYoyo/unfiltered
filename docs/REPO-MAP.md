@@ -217,6 +217,7 @@ config/
 docs/
   ARCHITECTURE.md
   COMPARISON.md
+  COMPETITORS.md
   DEPENDENCIES.md
   DESIGN.md
   DEV-STORE.md
