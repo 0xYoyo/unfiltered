@@ -39,7 +39,7 @@ describe.runIf(live)("live query classification (ledger-backed)", () => {
 
     const decision = await classifier.classify(
       "שמלה אלגנטית לחתונה בקיץ לא שחור",
-      { shopDomain },
+      { storeId: shopDomain },
     );
     expect(decision).toEqual({ route: "ai", reason: "model" });
 

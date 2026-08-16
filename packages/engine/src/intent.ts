@@ -117,7 +117,7 @@ export class IntentExtractionError extends Error {}
 
 /** Per-call context forwarded to the LLM port for metering. */
 export interface IntentExtractionContext {
-  shopDomain?: string;
+  storeId?: string;
   searchId?: string;
   /**
    * Intent extracted from the shopper's previous query in the same search
@@ -538,7 +538,7 @@ export function createIntentExtractor(
       // run-to-run eval stability requires determinism (YOY-52) — same rule
       // as classification.
       temperature: 0,
-      shopDomain: context?.shopDomain,
+      storeId: context?.storeId,
       searchId: context?.searchId,
     });
     if (previousIntent === undefined) {

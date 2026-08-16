@@ -44,7 +44,7 @@ describe.runIf(live)("live intent extraction (ledger-backed)", () => {
     });
 
     for (const query of queries) {
-      const intent = await extractor.extract(query, { shopDomain });
+      const intent = await extractor.extract(query, { storeId: shopDomain });
       // extract() already validated; re-parsing proves the round-tripped
       // object satisfies the schema contract on its own.
       expect(parseIntent(intent), query).not.toBeNull();

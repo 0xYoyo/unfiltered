@@ -50,7 +50,7 @@ export interface StoreQueryHit {
 /** One filtered similarity query against the consumer's store. */
 export interface StoreQueryRequest {
   /** Store the query runs against; results must come from it alone. */
-  shopDomain: string;
+  storeId: string;
   /** Hard filters; every returned product must satisfy all of them. */
   constraints: RetrievalConstraints;
   /** Query embedding to rank the filtered set by cosine distance. */
@@ -121,7 +121,7 @@ export interface RetrievalResult {
 export interface RetrievalRequest {
   intent: Intent;
   /** Store context: which consumer store to search. */
-  shopDomain: string;
+  storeId: string;
   /** Maximum hits to return; defaults to 10. */
   limit?: number;
   /** Correlation ID tying together every call serving one search. */
@@ -231,7 +231,7 @@ export function createRetriever(options: RetrieverOptions): Retriever {
 
   async function embedQuery(
     text: string,
-    shopDomain: string,
+    storeId: string,
     searchId?: string,
   ): Promise<number[]> {
     const cached = cache.get(text);
@@ -241,7 +241,7 @@ export function createRetriever(options: RetrieverOptions): Retriever {
     const vectors = await options.embeddings.embed({
       texts: [text],
       operation: "embedding",
-      shopDomain,
+      storeId,
       searchId,
     });
     const vector = vectors[0];
@@ -267,11 +267,11 @@ export function createRetriever(options: RetrieverOptions): Retriever {
       }
       const vector = await embedQuery(
         queryText,
-        request.shopDomain,
+        request.storeId,
         request.searchId,
       );
       const hits = await options.store.query({
-        shopDomain: request.shopDomain,
+        storeId: request.storeId,
         constraints,
         vector,
         limit: request.limit ?? DEFAULT_LIMIT,

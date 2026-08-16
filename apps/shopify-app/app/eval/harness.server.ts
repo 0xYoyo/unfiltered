@@ -467,7 +467,7 @@ export async function runEval(db: PrismaClient): Promise<EvalRunResult> {
   const perRefinement: RefinementScore[] = [];
   for (const golden of refinementGoldens) {
     const intent = await extractor.extract(golden.query, {
-      shopDomain,
+      storeId: shopDomain,
       searchId: golden.id,
       previousIntent: golden.previousIntent,
     });

@@ -100,7 +100,7 @@ async function searchIds(
   },
 ): Promise<string[]> {
   const result = await createPgTrgmClassicStore(db).search({
-    shopDomain: request.shopDomain ?? SHOP,
+    storeId: request.shopDomain ?? SHOP,
     query: request.query,
     constraints: request.constraints,
     limit: request.limit ?? 10,
@@ -216,7 +216,7 @@ describe("typo-tolerant keyword search (AC-2, AC-3)", () => {
 
   it("scores hits in (0, 1], most relevant first", async () => {
     const result = await createPgTrgmClassicStore(db).search({
-      shopDomain: SHOP,
+      storeId: SHOP,
       query: "aurora maxi dress",
     });
     expect(result.hits[0]!.productId).toBe("aurora");
@@ -334,7 +334,7 @@ describe("constraint-only mode mirrors pgvector predicate semantics (AC-4)", () 
     ]);
 
     const result = await createPgTrgmClassicStore(db).search({
-      shopDomain: SHOP,
+      storeId: SHOP,
       constraints: {
         category: undefined,
         priceMin: undefined,
@@ -376,7 +376,7 @@ describe("constraint-only mode mirrors pgvector predicate semantics (AC-4)", () 
     ]);
 
     const result = await createPgTrgmClassicStore(db).search({
-      shopDomain: SHOP,
+      storeId: SHOP,
       constraints: {
         category: undefined,
         priceMin: undefined,
@@ -402,7 +402,7 @@ describe("constraint-only mode mirrors pgvector predicate semantics (AC-4)", () 
 
   it("scores every constraint-only hit 0, ordered deterministically", async () => {
     const result = await createPgTrgmClassicStore(db).search({
-      shopDomain: SHOP,
+      storeId: SHOP,
       constraints: noConstraints(),
     });
     expect(result.hits.length).toBeGreaterThan(0);

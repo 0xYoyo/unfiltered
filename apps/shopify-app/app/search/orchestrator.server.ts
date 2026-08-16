@@ -246,7 +246,11 @@ export function createSearchOrchestrator(
         intent: Intent | null = null,
         escalateOnEmpty = false,
       ): Promise<SearchResponse> => {
-        const result = await classicStore.search({ shopDomain, query, limit });
+        const result = await classicStore.search({
+          storeId: shopDomain,
+          query,
+          limit,
+        });
         if (
           escalateOnEmpty &&
           result.hits.length === 0 &&
@@ -299,7 +303,7 @@ export function createSearchOrchestrator(
           try {
             const relaxed = await retriever.retrieve({
               intent,
-              shopDomain,
+              storeId: shopDomain,
               limit,
               searchId,
               constraintsOverride,
@@ -325,7 +329,7 @@ export function createSearchOrchestrator(
         try {
           const retrieval = await retriever.retrieve({
             intent,
-            shopDomain,
+            storeId: shopDomain,
             limit,
             searchId,
           });
@@ -338,7 +342,7 @@ export function createSearchOrchestrator(
             // every constraint the shopper stated.
             const constraints = constraintsFromIntent(intent);
             const result = await classicStore.search({
-              shopDomain,
+              storeId: shopDomain,
               constraints,
               limit,
             });
@@ -361,7 +365,11 @@ export function createSearchOrchestrator(
           // the chips and offer classic keyword matches as close matches;
           // when the keyword engine finds nothing either, relax the vector
           // search instead (YOY-52 AC-16).
-          const close = await classicStore.search({ shopDomain, query, limit });
+          const close = await classicStore.search({
+            storeId: shopDomain,
+            query,
+            limit,
+          });
           const closeHits: Array<{ productId: string; colorUnknown?: boolean }> =
             close.hits.length > 0
               ? close.hits
@@ -401,7 +409,7 @@ export function createSearchOrchestrator(
         let intent: Intent;
         try {
           intent = await extractor.extract(query, {
-            shopDomain,
+            storeId: shopDomain,
             searchId,
             previousIntent: request.previousIntent,
           });
@@ -435,7 +443,7 @@ export function createSearchOrchestrator(
       // The classifier never rejects by contract: failures and timeouts come
       // back as { route: "classic", reason: "model-error" }.
       const decision = await classifier.classify(query, {
-        shopDomain,
+        storeId: shopDomain,
         searchId,
       });
 
@@ -452,7 +460,7 @@ export function createSearchOrchestrator(
       let intent: Intent;
       try {
         intent = await extractor.extract(query, {
-          shopDomain,
+          storeId: shopDomain,
           searchId,
           previousIntent: request.previousIntent,
         });

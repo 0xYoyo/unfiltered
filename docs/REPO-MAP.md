@@ -56,6 +56,8 @@ apps/
         ingest.server.ts
         mapping.server.ts
         mapping.test.ts
+        offline-token.server.ts
+        offline-token.test.ts
         webhook-sync.server.ts
         webhook-sync.test.ts
       classification-live.test.ts
@@ -267,6 +269,17 @@ docs/
       5-empty-desktop.png
       6-error-desktop.png
       7-native-A-url-addressed-cards-desktop.png
+    YOY-99/
+      1-modal-open-desktop.png
+      1-modal-open-mobile.png
+      2-modal-submit-results-desktop.png
+      2-modal-submit-results-mobile.png
+      3-inpage-submit-results-desktop.png
+      3-inpage-submit-results-mobile.png
+      4-modal-submit-results-he-rtl-desktop.png
+      5-loading-desktop.png
+      6-empty-desktop.png
+      7-error-desktop.png
 package.json
 packages/
   engine/
@@ -325,6 +338,7 @@ vitest.setup.ts
 - apps/shopify-app/app/catalog/enrich.server.ts → apps/shopify-app/app/ai/cost-recorder.server.ts
 - apps/shopify-app/app/catalog/ingest.server.ts → apps/shopify-app/app/catalog/mapping.server.ts
 - apps/shopify-app/app/catalog/mapping.test.ts → apps/shopify-app/app/catalog/mapping.server.ts
+- apps/shopify-app/app/catalog/offline-token.test.ts → apps/shopify-app/app/catalog/offline-token.server.ts, apps/shopify-app/app/testing/helpers.server.ts
 - apps/shopify-app/app/catalog/webhook-sync.server.ts → apps/shopify-app/app/catalog/mapping.server.ts
 - apps/shopify-app/app/catalog/webhook-sync.test.ts → apps/shopify-app/app/catalog/mapping.server.ts, apps/shopify-app/app/catalog/webhook-sync.server.ts
 - apps/shopify-app/app/classification-live.test.ts → apps/shopify-app/app/ai/cost-recorder.server.ts, apps/shopify-app/app/testing/helpers.server.ts
@@ -368,7 +382,7 @@ vitest.setup.ts
 - apps/shopify-app/app/search/throttle.test.ts → apps/shopify-app/app/search/throttle.server.ts
 - apps/shopify-app/app/session-storage.test.ts → apps/shopify-app/app/testing/helpers.server.ts
 - apps/shopify-app/app/shopify.server.ts → apps/shopify-app/app/db.server.ts
-- apps/shopify-app/scripts/ingest.mts → apps/shopify-app/app/catalog/embed.server.ts, apps/shopify-app/app/catalog/enrich.server.ts, apps/shopify-app/app/catalog/ingest.server.ts
+- apps/shopify-app/scripts/ingest.mts → apps/shopify-app/app/catalog/embed.server.ts, apps/shopify-app/app/catalog/enrich.server.ts, apps/shopify-app/app/catalog/ingest.server.ts, apps/shopify-app/app/catalog/offline-token.server.ts
 - apps/shopify-app/scripts/native-render-template.mts → apps/shopify-app/widget/src/native-render.config.ts
 - apps/shopify-app/widget/src/format.ts → apps/shopify-app/widget/src/strings.ts
 - apps/shopify-app/widget/src/main.ts → apps/shopify-app/widget/src/native-render.config.ts, apps/shopify-app/widget/src/native-render.ts, apps/shopify-app/widget/src/overlay.ts, apps/shopify-app/widget/src/search-client.ts, apps/shopify-app/widget/src/session.ts, apps/shopify-app/widget/src/strings.ts

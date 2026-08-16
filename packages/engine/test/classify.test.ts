@@ -146,16 +146,16 @@ describe("model escalation (AC-2, AC-5)", () => {
     ).toEqual({ route: "classic", reason: "model" });
   });
 
-  it("forwards shopDomain and searchId to the port for metering (AC-4)", async () => {
+  it("forwards storeId and searchId to the port for metering (AC-4)", async () => {
     const { llm, calls } = llmStub("ai");
     const classifier = createQueryClassifier({ llm });
 
     await classifier.classify("linen dress for a beach wedding in october", {
-      shopDomain: "test-shop.myshopify.com",
+      storeId: "test-shop.myshopify.com",
       searchId: "search-1",
     });
 
-    expect(calls[0]!.shopDomain).toBe("test-shop.myshopify.com");
+    expect(calls[0]!.storeId).toBe("test-shop.myshopify.com");
     expect(calls[0]!.searchId).toBe("search-1");
   });
 });

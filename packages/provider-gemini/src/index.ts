@@ -278,7 +278,7 @@ export function createGeminiLlmClient(options: GeminiClientOptions): LlmClient {
         operation: request.operation,
         inputTokens: usage.promptTokenCount,
         outputTokens: usage.candidatesTokenCount ?? 0,
-        shopDomain: request.shopDomain,
+        storeId: request.storeId,
         searchId: request.searchId,
       });
 
@@ -360,7 +360,7 @@ export function createGeminiEmbeddingClient(
         operation: request.operation ?? "embedding",
         inputTokens: estimateTokens(request.texts),
         outputTokens: 0,
-        shopDomain: request.shopDomain,
+        storeId: request.storeId,
         searchId: request.searchId,
       });
 

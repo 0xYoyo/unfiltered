@@ -29,7 +29,7 @@ export function createPrismaCostRecorder(db: PrismaClient): CostRecorder {
           inputTokens: usage.inputTokens,
           outputTokens: usage.outputTokens,
           costUsd,
-          shopDomain: usage.shopDomain ?? null,
+          shopDomain: usage.storeId ?? null,
           searchId: usage.searchId ?? null,
         },
       });
