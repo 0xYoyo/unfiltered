@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import type { ShopifyProductNode } from "./mapping.server";
-import { computeContentHash, mapProductNode } from "./mapping.server";
+import {
+  computeContentHash,
+  mapProductNode,
+  resolveProductUrl,
+} from "./mapping.server";
 
 export function productNode(
   overrides: Partial<ShopifyProductNode> & { id: string },
@@ -125,6 +129,58 @@ describe("Shopify→snapshot mapping", () => {
     const base = mapProductNode(productNode({ id: "p" }));
     const retitled = mapProductNode(productNode({ id: "p", title: "New title" }));
     expect(base.contentHash).not.toBe(retitled.contentHash);
+  });
+
+  describe("server-resolved product url (YOY-87 AC-1/AC-2)", () => {
+    it("takes onlineStoreUrl verbatim when the node carries one", () => {
+      const snapshot = mapProductNode(
+        productNode({
+          id: "p",
+          onlineStoreUrl: "https://shop.example/products/linen-summer-dress",
+        }),
+        { shopDomain: "test-shop.myshopify.com" },
+      );
+      expect(snapshot.url).toBe(
+        "https://shop.example/products/linen-summer-dress",
+      );
+    });
+
+    it("composes the storefront form from the shop domain and handle when onlineStoreUrl is absent (legacy fixture)", () => {
+      const snapshot = mapProductNode(productNode({ id: "p" }), {
+        shopDomain: "test-shop.myshopify.com",
+      });
+      expect(snapshot.url).toBe(
+        "https://test-shop.myshopify.com/products/linen-summer-dress",
+      );
+    });
+
+    it("composes the storefront form when onlineStoreUrl is null", () => {
+      expect(
+        resolveProductUrl(
+          { handle: "linen-summer-dress", onlineStoreUrl: null },
+          "test-shop.myshopify.com",
+        ),
+      ).toBe("https://test-shop.myshopify.com/products/linen-summer-dress");
+    });
+
+    it("resolves null when neither an online store url nor a composable form exists", () => {
+      expect(mapProductNode(productNode({ id: "p" })).url).toBeNull();
+      expect(
+        resolveProductUrl({ handle: "", onlineStoreUrl: null }, "shop.example"),
+      ).toBeNull();
+    });
+
+    it("keeps url outside the content hash: a url-only change leaves the hash intact", () => {
+      const base = mapProductNode(productNode({ id: "p" }), {
+        shopDomain: "test-shop.myshopify.com",
+      });
+      const moved = mapProductNode(
+        productNode({ id: "p", onlineStoreUrl: "https://shop.example/x" }),
+        { shopDomain: "test-shop.myshopify.com" },
+      );
+      expect(moved.url).not.toBe(base.url);
+      expect(moved.contentHash).toBe(base.contentHash);
+    });
   });
 
   it("exposes computeContentHash as a pure function of the searchable fields", () => {

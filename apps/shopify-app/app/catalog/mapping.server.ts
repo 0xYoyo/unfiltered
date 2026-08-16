@@ -35,6 +35,13 @@ export interface ShopifyProductNode {
   variants: { nodes: Array<{ availableForSale: boolean }> };
   images: { nodes: Array<{ altText: string | null }> };
   featuredImage: { url: string } | null;
+  /**
+   * The product's Online Store URL as the Admin API resolves it (YOY-87);
+   * null when the product has no storefront page. Absent in older fixtures
+   * and in webhook-derived nodes, where the storefront form is composed
+   * from the shop domain and handle instead.
+   */
+  onlineStoreUrl?: string | null;
 }
 
 /** One snapshot row, before persistence (no DB identity, no shop). */
@@ -55,6 +62,14 @@ export interface SnapshotProduct {
   /** Featured-image URL for result cards (display-only, YOY-44). */
   featuredImageUrl: string | null;
   /**
+   * Server-resolved product link for result cards (YOY-87, LEAK-2):
+   * `onlineStoreUrl` when the source carries one, else the storefront form
+   * `https://<shopDomain>/products/<handle>` when a shop domain is known,
+   * else null. Display-only, outside contentHash like the fields above; a
+   * renderer never composes a URL from it.
+   */
+  url: string | null;
+  /**
    * Online Store publication timestamp (YOY-67 AC-4); null means never
    * published. Outside contentHash like the display fields: a re-publish
    * must not dirty the searchable content, and unpublishing removes the row
@@ -70,9 +85,9 @@ export interface SnapshotProduct {
  * unchanged product maps to an unchanged hash regardless of field ordering
  * in the API response. sourceUpdatedAt is deliberately excluded: a touched
  * timestamp with identical content must not dirty the row. The display-only
- * fields (handle, featuredImageUrl) are excluded too (YOY-44 AC-4): a
- * display change alone must not dirty the searchable content and must not
- * trigger re-enrichment or re-embedding.
+ * fields (handle, featuredImageUrl, url) are excluded too (YOY-44 AC-4,
+ * YOY-87 AC-1): a display change alone must not dirty the searchable content
+ * and must not trigger re-enrichment or re-embedding.
  */
 export function computeContentHash(
   product: Omit<
@@ -81,6 +96,7 @@ export function computeContentHash(
     | "sourceUpdatedAt"
     | "handle"
     | "featuredImageUrl"
+    | "url"
     | "publishedAt"
   >,
 ): string {
@@ -104,10 +120,35 @@ export function computeContentHash(
 }
 
 /**
- * Pure Shopify→snapshot mapping for one product node. Empty/missing text
- * fields normalize to "" so the hash and the row are deterministic.
+ * Storefront product URL for a Shopify product (YOY-87 AC-2): the Admin
+ * API's `onlineStoreUrl` when present, else the composed
+ * `https://<shopDomain>/products/<handle>` form when both parts are known,
+ * else null. This is the ONLY place a Shopify product URL is composed — the
+ * adapter resolves it once, and every renderer downstream uses it verbatim.
  */
-export function mapProductNode(node: ShopifyProductNode): SnapshotProduct {
+export function resolveProductUrl(
+  node: Pick<ShopifyProductNode, "handle" | "onlineStoreUrl">,
+  shopDomain: string | undefined,
+): string | null {
+  if (typeof node.onlineStoreUrl === "string" && node.onlineStoreUrl !== "") {
+    return node.onlineStoreUrl;
+  }
+  if (shopDomain !== undefined && shopDomain !== "" && node.handle !== "") {
+    return `https://${shopDomain}/products/${node.handle}`;
+  }
+  return null;
+}
+
+/**
+ * Pure Shopify→snapshot mapping for one product node. Empty/missing text
+ * fields normalize to "" so the hash and the row are deterministic. The
+ * optional `shopDomain` lets the mapping compose the storefront `url` when
+ * the node carries no `onlineStoreUrl` (YOY-87 AC-2).
+ */
+export function mapProductNode(
+  node: ShopifyProductNode,
+  options: { shopDomain?: string } = {},
+): SnapshotProduct {
   const withoutHash = {
     productId: node.id,
     title: node.title,
@@ -127,6 +168,7 @@ export function mapProductNode(node: ShopifyProductNode): SnapshotProduct {
     ...withoutHash,
     handle: node.handle,
     featuredImageUrl: node.featuredImage?.url ?? null,
+    url: resolveProductUrl(node, options.shopDomain),
     // Absent (legacy fixture) means published, as of the node's own
     // timestamp; explicit null means never published (YOY-67 AC-4) — the
     // ingest and webhook paths drop those before mapping, so a null here is

@@ -182,12 +182,20 @@ export function createOverlay(options: OverlayOptions): Overlay {
     result: ProxyResult,
     position: number,
     onCardClick: ResponseHandlers["onCardClick"],
-  ): HTMLAnchorElement {
-    const anchor = document.createElement("a");
+  ): HTMLElement {
+    // The link target is the server-resolved `url`, verbatim (YOY-87 AC-4):
+    // the widget composes no URL. Without one the card is a plain block —
+    // same image/title/price/availability, no anchor, no click beacon.
+    const anchor =
+      result.url === null
+        ? document.createElement("div")
+        : document.createElement("a");
     anchor.className = "card";
     anchor.setAttribute("data-testid", CARD_TESTID);
     anchor.setAttribute("data-product-id", result.productId);
-    anchor.href = `/products/${result.handle}`;
+    if (anchor instanceof HTMLAnchorElement && result.url !== null) {
+      anchor.href = result.url;
+    }
 
     if (result.imageUrl === null) {
       const placeholder = document.createElement("div");
@@ -243,8 +251,11 @@ export function createOverlay(options: OverlayOptions): Overlay {
     }
 
     // The beacon fires and the anchor's own navigation proceeds untouched —
-    // never prevented, never awaited (AC-5).
-    anchor.addEventListener("click", () => onCardClick(result, position));
+    // never prevented, never awaited (AC-5). A linkless card (null url) is
+    // not a click target: no navigation, no beacon (YOY-87 AC-4).
+    if (anchor instanceof HTMLAnchorElement) {
+      anchor.addEventListener("click", () => onCardClick(result, position));
+    }
     return anchor;
   }
 

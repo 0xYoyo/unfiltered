@@ -27,13 +27,13 @@ cannot be stated is rejected at spec time.
 | `app/search/orchestrator.server.ts` (hybrid ladder: routing → intent → retrieval → fallbacks → hydration) | Engine (engine-adjacent backend, portable) | Fully platform-free. Its Prisma dependency is our own infrastructure, which Door 2 reuses as-is (feed + snippet + our backend); Postgres is not a Shopify assumption. |
 | `app/search/events.server.ts`, throttle interface, `SearchEvent` / `ClickEvent` / `AiCall` schema | Engine | Generic multi-tenant attribution (searchId validated against the tenant's own searches). Portable. |
 | `CatalogProduct` schema shape | Engine | title/description/tags/price/availability/images is a generic catalog row. Shopify appears only in comments and the tenant key name. |
-| Proxy wire contract (`proxy.server.ts`) | Engine | Explicit re-mapping, platform-free fields — except `handle` → LEAK-2. |
+| Proxy wire contract (`proxy.server.ts`) | Engine | Explicit re-mapping, platform-free fields (`handle` → LEAK-2, resolved by YOY-87: the wire carries `url`). |
 | App-proxy auth in `routes/apps.unfiltered.search.tsx` / `.click.tsx` | Adapter | Signature verification + signed shop identity, all above the platform-free call into the orchestrator. Clean boundary. |
 | GET-only transport | Adapter (not a leak) | The rationale is Shopify's (its proxy edge rejects browser POSTs); the mechanism (GET + query params) is universally portable. |
 | Catalog ingestion / webhook sync / `mapping.server.ts` | Adapter | Shopify Admin payloads → generic rows. This IS the adapter, exactly where it belongs. |
 | Theme app embed (extension/liquid), OAuth `Session` model | Adapter | Adapter by definition. |
 | `shopDomain` as the tenant key in engine port types, `WidgetConfig`, and every DB table | LEAK-1 (naming) | Value is opaque, so nothing breaks — but the "catalog-agnostic by contract" surface speaks Shopify. |
-| `/products/${handle}` hardcoded in `widget/src/overlay.ts` (`card()`); `handle` as the card-contract field | LEAK-2 (structural) | Shopify's storefront URL scheme inside otherwise platform-free rendering code. |
+| `/products/${handle}` hardcoded in `widget/src/overlay.ts` (`card()`); `handle` as the card-contract field | LEAK-2 (structural) — **resolved (YOY-87)** | Was Shopify's storefront URL scheme inside otherwise platform-free rendering code; now the adapter resolves a per-card `url` and no renderer composes one. |
 | Host-discovery heuristics in `widget/src/main.ts` (`findThemeSearchInput()`, Enter/submit suppression) | LEAK-3 (soft, config-level) | Assumes `input[type=search]` / `form[action*="/search"]` + `input[name=q]` and `/search` navigation. Degrades safely (no match → no mount). |
 
 ## Leaks: generic-store analogs and routing
@@ -69,6 +69,14 @@ cannot be stated is rejected at spec time.
 - **Routing:** **folded into the M4 spec** (contract change: `url` field in
   `ProxyResult` + hydration + widget; `handle` may remain
   Shopify-adapter-internal).
+- **Resolved (YOY-87):** `CatalogProduct.url` is resolved once by the Shopify
+  ingestion adapter (Admin API `onlineStoreUrl`, else the composed storefront
+  form; webhook sync composes) and carried as `ProductCard.url` →
+  `ProxyResult.url`; `handle` stays a DB column. The widget renders `url`
+  verbatim (linkless card when null) — including the theme-native path,
+  whose alternate-template fetch addresses the product's own `url` with
+  `?view=` and whose harvest fill writes `url` into the theme's anchors.
+  `grep -rn "/products/" apps/shopify-app/widget/src` returns nothing.
 
 ### LEAK-3 — host-discovery heuristics in the widget core
 

@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+
 import type { PrismaClient } from "@prisma/client";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
@@ -122,6 +124,143 @@ describe("catalog ingestion", () => {
     );
     // A product with no featured image stores null, not "".
     expect(rows[1]?.featuredImageUrl).toBeNull();
+  });
+
+  it("stores the server-resolved url: onlineStoreUrl when present, else the storefront form (YOY-87 AC-2)", async () => {
+    await ingestCatalog({
+      db,
+      shopDomain: SHOP,
+      graphql: graphqlStub([
+        productNode({
+          id: "gid://shopify/Product/1",
+          onlineStoreUrl: "https://shop.example/products/linen-summer-dress",
+        }),
+        // Legacy fixture: no onlineStoreUrl field at all.
+        productNode({ id: "gid://shopify/Product/2", handle: "second" }),
+        // Explicit null (no storefront page): the composed form still applies.
+        productNode({
+          id: "gid://shopify/Product/3",
+          handle: "third",
+          onlineStoreUrl: null,
+        }),
+      ]).graphql,
+    });
+
+    const rows = await db.catalogProduct.findMany({ orderBy: { productId: "asc" } });
+    expect(rows.map((row) => row.url)).toEqual([
+      "https://shop.example/products/linen-summer-dress",
+      `https://${SHOP}/products/second`,
+      `https://${SHOP}/products/third`,
+    ]);
+  });
+
+  it("refreshes a drifted url on repeat ingest without dirtying the hash or touching enrichment/embedding (YOY-87 AC-1)", async () => {
+    await db.productEnrichment.deleteMany();
+    await db.productEmbedding.deleteMany();
+    await ingestCatalog({
+      db,
+      shopDomain: SHOP,
+      graphql: graphqlStub([productNode({ id: "gid://shopify/Product/1" })]).graphql,
+    });
+    const before = (await db.catalogProduct.findMany())[0]!;
+    expect(before.url).toBe(`https://${SHOP}/products/linen-summer-dress`);
+    await db.productEnrichment.create({
+      data: {
+        shopDomain: SHOP,
+        productId: "gid://shopify/Product/1",
+        contentHash: before.contentHash,
+        status: "enriched",
+        category: "dress",
+        colors: [],
+        occasions: [],
+        fit: null,
+        styleTags: [],
+        seasons: [],
+      },
+    });
+    const enrichmentBefore = await db.productEnrichment.findMany();
+
+    // Only the url changes (the Admin API now resolves an onlineStoreUrl).
+    const rerun = await ingestCatalog({
+      db,
+      shopDomain: SHOP,
+      graphql: graphqlStub([
+        productNode({
+          id: "gid://shopify/Product/1",
+          onlineStoreUrl: "https://shop.example/products/linen-summer-dress",
+        }),
+      ]).graphql,
+    });
+
+    expect(rerun).toEqual({ created: 0, updated: 0, unchanged: 1, deleted: 0 });
+    const after = (await db.catalogProduct.findMany())[0]!;
+    expect(after.id).toBe(before.id);
+    expect(after.url).toBe("https://shop.example/products/linen-summer-dress");
+    expect(after.contentHash).toBe(before.contentHash);
+    expect(await db.productEnrichment.findMany()).toEqual(enrichmentBefore);
+    expect(await db.productEmbedding.findMany()).toEqual([]);
+    await db.productEnrichment.deleteMany();
+  });
+
+  it("migration backfills url for pre-existing rows with a handle (YOY-87 AC-1)", async () => {
+    // Insert as a pre-migration row would have existed — with a handle and no
+    // url — then replay the backfill statement the migration ships.
+    await db.catalogProduct.create({
+      data: {
+        shopDomain: SHOP,
+        productId: "gid://shopify/Product/legacy",
+        title: "Legacy",
+        description: "",
+        tags: [],
+        vendor: "",
+        productType: "",
+        priceMin: 1,
+        priceMax: 1,
+        currencyCode: "ILS",
+        available: true,
+        imageAltTexts: [],
+        handle: "legacy-handle",
+        sourceUpdatedAt: new Date("2026-01-01T00:00:00Z"),
+        contentHash: "legacy-hash",
+      },
+    });
+    await db.catalogProduct.create({
+      data: {
+        shopDomain: SHOP,
+        productId: "gid://shopify/Product/no-handle",
+        title: "No handle",
+        description: "",
+        tags: [],
+        vendor: "",
+        productType: "",
+        priceMin: 1,
+        priceMax: 1,
+        currencyCode: "ILS",
+        available: true,
+        imageAltTexts: [],
+        sourceUpdatedAt: new Date("2026-01-01T00:00:00Z"),
+        contentHash: "no-handle-hash",
+      },
+    });
+    const migration = await readFile(
+      new URL(
+        "../prisma/migrations/20260816200000_catalog_product_url/migration.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+    const backfill = migration
+      .split(";")
+      .map((statement) => statement.trim())
+      .find((statement) => statement.startsWith("UPDATE"));
+    expect(backfill).toBeDefined();
+    await db.$executeRawUnsafe(backfill!);
+
+    const rows = await db.catalogProduct.findMany({ orderBy: { productId: "asc" } });
+    expect(rows.map((row) => [row.productId, row.url])).toEqual([
+      ["gid://shopify/Product/legacy", `https://${SHOP}/products/legacy-handle`],
+      ["gid://shopify/Product/no-handle", null],
+    ]);
   });
 
   it("backfills display fields on repeat ingest without re-enriching (YOY-44 AC-4/AC-5)", async () => {

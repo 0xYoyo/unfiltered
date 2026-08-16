@@ -20,7 +20,8 @@ import { getStrings, resolveLocale } from "./strings";
  * Two mechanisms, selected by config/flag:
  *
  * - Variant A — alternate-template fetch: each result's card is fetched
- *   from `/products/<handle>?view=<view>`, an alternate product template
+ *   from the product's own server-resolved `url` with `?view=<view>` — an
+ *   alternate product template
  *   that renders only the theme's card snippet (installed by
  *   scripts/native-render-template.mts). Shopify renders the real card with
  *   the theme's real settings; the widget injects the markup and hoists its
@@ -111,7 +112,7 @@ export interface NativeRenderTiming {
   native: number;
   /** Results that fell back to the plain card. */
   fallback: number;
-  /** Variant A: cards served from the per-handle cache. */
+  /** Variant A: cards served from the per-URL cache. */
   cached: number;
   /** Individual network fetch durations this render performed. */
   fetchMs: number[];
@@ -164,9 +165,14 @@ function parseHtml(html: string): Document {
 }
 
 /**
- * Variant A producer: fetch the alternate template per handle with a small
- * concurrency window; cache the parsed card per handle for the page view so
- * refinement re-renders reuse it (AC-4c: first-fetch caching).
+ * Variant A producer: fetch the alternate template per product with a small
+ * concurrency window; cache the parsed card per product URL for the page
+ * view so refinement re-renders reuse it (AC-4c: first-fetch caching). The
+ * template address is the product's server-resolved `url` (YOY-87 AC-4)
+ * with the `view` parameter added, fetched by same-origin path so a
+ * primary-domain URL still resolves on the domain the shopper is browsing;
+ * the widget composes no product path itself. A card without a URL has no
+ * template to fetch and falls back.
  */
 function createAlternateTemplateProducer(
   config: NativeRenderConfig,
@@ -192,14 +198,15 @@ function createAlternateTemplateProducer(
     waiters.shift()?.();
   };
 
-  const load = async (handle: string): Promise<HTMLElement | null> => {
+  const load = async (productUrl: string): Promise<HTMLElement | null> => {
     await acquire();
     const started = performance.now();
     try {
-      const url = `/products/${encodeURIComponent(handle)}?view=${encodeURIComponent(
-        config.template.view,
-      )}`;
-      const response = await fetch(url, { credentials: "same-origin" });
+      const url = new URL(productUrl, window.location.href);
+      url.searchParams.set("view", config.template.view);
+      const response = await fetch(url.pathname + url.search, {
+        credentials: "same-origin",
+      });
       if (!response.ok) {
         return null;
       }
@@ -222,13 +229,16 @@ function createAlternateTemplateProducer(
   };
 
   return async (result) => {
-    const cached = cache.has(result.handle);
-    if (!cached) {
-      cache.set(result.handle, load(result.handle));
+    if (result.url === null) {
+      return null;
     }
-    const template = await cache.get(result.handle)!;
+    const cached = cache.has(result.url);
+    if (!cached) {
+      cache.set(result.url, load(result.url));
+    }
+    const template = await cache.get(result.url)!;
     if (template === null) {
-      cache.delete(result.handle); // Let a later render retry.
+      cache.delete(result.url); // Let a later render retry.
       return null;
     }
     return { element: template.cloneNode(true) as HTMLElement, cached };
@@ -305,10 +315,17 @@ function createHarvestCloneProducer(
       });
     }
     const { fill: selectors } = config.harvest;
-    const href = `/products/${encodeURIComponent(result.handle)}`;
+    // The link is the server-resolved `url`, verbatim (YOY-87 AC-4); a card
+    // without one keeps the theme's anchors but strips their targets.
     card
       .querySelectorAll<HTMLAnchorElement>(selectors.link)
-      .forEach((anchor) => anchor.setAttribute("href", href));
+      .forEach((anchor) => {
+        if (result.url === null) {
+          anchor.removeAttribute("href");
+        } else {
+          anchor.setAttribute("href", result.url);
+        }
+      });
     card.querySelectorAll(selectors.title).forEach((element) => {
       element.textContent = result.title;
     });
@@ -476,9 +493,15 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
   }
 
   function fallbackCard(result: ProxyResult): HTMLElement {
-    const anchor = document.createElement("a");
+    // Server-resolved `url` verbatim, or a linkless block (YOY-87 AC-4).
+    const anchor =
+      result.url === null
+        ? document.createElement("div")
+        : document.createElement("a");
     anchor.className = "unfiltered-native__fallback";
-    anchor.href = `/products/${encodeURIComponent(result.handle)}`;
+    if (anchor instanceof HTMLAnchorElement && result.url !== null) {
+      anchor.href = result.url;
+    }
     if (result.imageUrl !== null) {
       const image = document.createElement("img");
       image.className = "unfiltered-native__fallback-image";

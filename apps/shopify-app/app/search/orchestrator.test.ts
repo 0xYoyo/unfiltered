@@ -48,6 +48,7 @@ interface SeedProduct {
   productId: string;
   title: string;
   handle?: string;
+  url?: string | null;
   featuredImageUrl?: string | null;
   vector?: number[];
   priceMin?: number;
@@ -77,6 +78,10 @@ async function seed(db: PrismaClient, products: SeedProduct[]): Promise<void> {
         available: product.available ?? true,
         imageAltTexts: [],
         handle: product.handle ?? `${product.productId}-handle`,
+        url:
+          product.url === undefined
+            ? `https://${SHOP}/products/${product.handle ?? `${product.productId}-handle`}`
+            : product.url,
         featuredImageUrl:
           product.featuredImageUrl === undefined
             ? `https://cdn.example.com/${product.productId}.jpg`
@@ -231,7 +236,7 @@ describe("routing and the single response shape (AC-1, AC-2, AC-3)", () => {
       {
         productId: "sneaker-90",
         title: "nike 90",
-        handle: "nike-90",
+        url: `https://${SHOP}/products/nike-90`,
         imageUrl: "https://cdn.example.com/nike-90.jpg",
         priceMin: 250,
         priceMax: 300,

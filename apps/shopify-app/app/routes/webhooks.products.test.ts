@@ -282,6 +282,28 @@ describe("products/update webhook", () => {
     expect(after?.sourceUpdatedAt).toEqual(new Date("2026-08-01T11:00:00Z"));
   });
 
+  it("stores the composed storefront url and refreshes it with the handle, hash unchanged (YOY-87 AC-2)", async () => {
+    const before = await snapshotRow();
+    expect(before?.url).toBe(`https://${SHOP}/products/linen-overshirt`);
+
+    await updateAction(
+      actionArgs(
+        webhookRequest({
+          topic: "products/update",
+          shop: SHOP,
+          payload: productPayload({
+            handle: "linen-overshirt-natural",
+            updated_at: "2026-08-01T11:00:00Z",
+          }),
+        }),
+      ),
+    );
+
+    const after = await snapshotRow();
+    expect(after?.url).toBe(`https://${SHOP}/products/linen-overshirt-natural`);
+    expect(after?.contentHash).toBe(before?.contentHash);
+  });
+
   it("updates the row when only the handle changes, with unchanged contentHash (YOY-44 AC-3/AC-4)", async () => {
     const before = await snapshotRow();
 

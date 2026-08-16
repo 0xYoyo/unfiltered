@@ -15,7 +15,12 @@
 export interface ProxyResult {
   productId: string;
   title: string;
-  handle: string;
+  /**
+   * Server-resolved product link (YOY-87, LEAK-2), rendered verbatim as the
+   * card's href; null means the card renders without a link. The widget
+   * never composes a product URL itself.
+   */
+  url: string | null;
   imageUrl: string | null;
   priceMin: number;
   priceMax: number;

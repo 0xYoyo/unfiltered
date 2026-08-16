@@ -87,7 +87,9 @@ per verified click beacon, both indexed on `(shopDomain, createdAt)`;
 nothing reads them yet except the beacon's searchId validation), and the
 `CatalogProduct` per-shop catalog snapshot (unique per `shopDomain` + `productId`, content-hashed for
 idempotent re-ingestion via `app/catalog/ingest.server.ts`; also carries the
-display-only fields `handle` and `featuredImageUrl` (YOY-44) for result
+display-only fields `handle`, `featuredImageUrl` (YOY-44) and the
+server-resolved product link `url` (YOY-87: Admin API `onlineStoreUrl`, else
+`https://<shop>/products/<handle>`; null when unresolvable) for result
 cards — deliberately outside `contentHash`, so ingestion and webhook sync
 refresh them even when searchable content is unchanged, and a display-only
 change never triggers re-enrichment or re-embedding); the baseline migration runs
@@ -217,8 +219,9 @@ resolvedIntent?, forceClassic?, searchId?, limit? })` always resolves to one
 response shape:
 `{ searchId, route, routeReason, intent, hits, chips, degraded,
 closeMatches }`, where `hits` and `closeMatches` are display-ready product
-cards (`productId`, `title`, `handle`, `imageUrl`, `priceMin`/`priceMax`,
-`currencyCode`, `available`) hydrated from the `CatalogProduct` snapshot in
+cards (`productId`, `title`, `url`, `imageUrl`, `priceMin`/`priceMax`,
+`currencyCode`, `available`; `handle` never leaves the adapter — YOY-87)
+hydrated from the `CatalogProduct` snapshot in
 hit order, and `chips` echoes the retrieval's applied constraints. One
 `searchId` is generated per search (unless the caller threads its own) and
 forwarded to every AI port call, so all `AiCall` rows serving one search
@@ -314,7 +317,7 @@ no Shopify tokens or internal error details ever do:
     {
       "productId": "gid://shopify/Product/1",
       "title": "…",
-      "handle": "…",
+      "url": "… | null",
       "imageUrl": "… | null",
       "priceMin": 100,
       "priceMax": 150,
@@ -434,8 +437,9 @@ priceMin ≠ priceMax), and a sold-out marker. While the overlay is open the
 theme's native search submission is suppressed; a close control and Escape
 both dismiss it, retaining the query text. Clicking a card fires a
 fire-and-forget keepalive beacon to `POST /apps/unfiltered/click`
-(searchId, productId, position) and navigates to `/products/{handle}`
-regardless of the beacon's outcome. Degradation is total silence: no
+(searchId, productId, position) and navigates to the card's server-resolved
+`url` verbatim regardless of the beacon's outcome; a card whose `url` is null
+renders linkless — no navigation, no beacon (YOY-87). Degradation is total silence: no
 recognizable search input means nothing mounts, and a failed or timed-out
 search request removes the widget so the theme's native search behaves
 exactly as without the app — no error UI ever. `init` is idempotent and

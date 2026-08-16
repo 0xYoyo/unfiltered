@@ -42,7 +42,7 @@ const ORCHESTRATOR_RESPONSE = {
     {
       productId: "gid://shopify/Product/1",
       title: "Silk Gown",
-      handle: "silk-gown",
+      url: "https://shop.example/products/silk-gown",
       imageUrl: null,
       priceMin: 350,
       priceMax: 350,

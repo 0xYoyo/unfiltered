@@ -379,3 +379,68 @@ test("an empty classic result set renders a no-results message on submit (AC-8)"
   );
   await expect(cards(page)).toHaveCount(0);
 });
+
+// Server-resolved product links (YOY-87 AC-4): the card's href is the
+// response's `url` verbatim; a null `url` renders a linkless card that
+// neither navigates nor beacons on click.
+test.describe("card links come from the server (YOY-87)", () => {
+  test("the card's href is the response url, verbatim (AC-4)", async ({
+    page,
+  }) => {
+    await page.goto("/?debounce=30000");
+    await themeInput(page).fill("nike");
+    await themeInput(page).press("Enter");
+    await expect(cards(page)).toHaveCount(3);
+    await expect(cards(page).first()).toHaveAttribute(
+      "href",
+      "/products/nike-air-90",
+    );
+    // Every card is an anchor whose href is exactly the fixture's url.
+    const hrefs = await cards(page).evaluateAll((elements) =>
+      elements.map((element) => [
+        element.tagName,
+        element.getAttribute("href"),
+      ]),
+    );
+    expect(hrefs).toEqual([
+      ["A", "/products/nike-air-90"],
+      ["A", "/products/runner-range"],
+      ["A", "/products/sold-out-boot"],
+    ]);
+  });
+
+  test("a null url renders a linkless card: no anchor, no navigation, no beacon (AC-4)", async ({
+    page,
+  }) => {
+    await page.goto("/?fixture=null-url&debounce=30000");
+    await themeInput(page).fill("nike");
+    await themeInput(page).press("Enter");
+    await expect(cards(page)).toHaveCount(3);
+
+    // Still a full card — image/title/price/sold-out — but not an anchor,
+    // and containing no anchor.
+    const shape = await cards(page).evaluateAll((elements) =>
+      elements.map((element) => ({
+        tag: element.tagName,
+        anchors: element.querySelectorAll("a").length,
+        href: element.getAttribute("href"),
+      })),
+    );
+    expect(shape).toEqual([
+      { tag: "DIV", anchors: 0, href: null },
+      { tag: "DIV", anchors: 0, href: null },
+      { tag: "DIV", anchors: 0, href: null },
+    ]);
+    await expect(cards(page).first()).toContainText("Nike Air 90");
+    await expect(cards(page).first()).toContainText("100 ILS");
+    await expect(cards(page).nth(2)).toContainText("Sold out");
+
+    await cards(page).first().click();
+    await page.waitForTimeout(300);
+    expect(new URL(page.url()).pathname).toBe("/");
+    const beacons = await page.evaluate(() =>
+      JSON.parse(sessionStorage.getItem("harness:clickBeacons") ?? "[]"),
+    );
+    expect(beacons).toEqual([]);
+  });
+});
