@@ -66,6 +66,11 @@ model CatalogProduct {
   // must not dirty the searchable content or trigger re-enrichment.
   handle          String   @default("")
   featuredImageUrl String?
+  // Server-resolved product link for result cards (YOY-87, LEAK-2): the
+  // ingestion adapter that knows the storefront resolves it once; no
+  // renderer composes a URL. Display-only, outside contentHash like the
+  // fields above; null when no adapter could resolve one.
+  url             String?
   sourceUpdatedAt DateTime
   // SHA-256 over the searchable fields; unchanged hash means the row is
   // untouched on re-ingestion.

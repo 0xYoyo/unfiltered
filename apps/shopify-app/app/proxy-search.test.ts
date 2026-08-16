@@ -134,17 +134,21 @@ const CONTRACT_KEYS_WITH_CLOSE_MATCHES = [...CONTRACT_KEYS, "closeMatches"]
   .slice()
   .sort();
 
-/** The exact keys of one result card on the wire. */
+/**
+ * The exact keys of one result card on the wire. `url` is the
+ * server-resolved product link (YOY-87 AC-3); the storefront `handle` is a
+ * DB column and never on the wire.
+ */
 const RESULT_KEYS = [
   "available",
   "colorUnknown",
   "currencyCode",
-  "handle",
   "imageUrl",
   "priceMax",
   "priceMin",
   "productId",
   "title",
+  "url",
 ];
 
 /**
@@ -229,6 +233,7 @@ async function seed(products: SeedProduct[]): Promise<void> {
         imageAltTexts: [],
         handle: `${product.productId}-handle`,
         featuredImageUrl: `https://cdn.example.com/${product.productId}.jpg`,
+        url: `https://${SHOP}/products/${product.productId}-handle`,
         sourceUpdatedAt: new Date("2026-01-01T00:00:00Z"),
         contentHash: `hash-${product.productId}`,
       },
@@ -508,7 +513,7 @@ describe("the response contract (AC-3, AC-5)", () => {
       {
         productId: "sneaker-90",
         title: "nike 90",
-        handle: "sneaker-90-handle",
+        url: `https://${SHOP}/products/sneaker-90-handle`,
         imageUrl: "https://cdn.example.com/sneaker-90.jpg",
         priceMin: 100,
         priceMax: 100,
@@ -518,6 +523,7 @@ describe("the response contract (AC-3, AC-5)", () => {
       },
     ]);
     expect(Object.keys(body.results[0]).sort()).toEqual(RESULT_KEYS);
+    expect(body.results[0]).not.toHaveProperty("handle");
   });
 
   it("serves an AI query with chips and the resolved intent for the client to echo", async () => {
@@ -558,7 +564,9 @@ describe("the response contract (AC-3, AC-5)", () => {
   });
 
   it("keeps the degraded path on the exact contract shape with no internal error details", async () => {
-    await seed([{ productId: "silk-gown", title: "silk gown elegant" }]);
+    // Title chosen so the classic fallback finds it by keyword: the degraded
+    // path then serves at least one card to shape-check (YOY-87 AC-3).
+    await seed([{ productId: "silk-gown", title: "elegant summer wedding dress" }]);
     installOrchestrator({
       llm: fakeLlm({
         classification: () => ({ route: "ai" }),
@@ -579,6 +587,13 @@ describe("the response contract (AC-3, AC-5)", () => {
     expect(body.degraded).toBe(true);
     expect(body.chips).toEqual([]);
     expect(JSON.stringify(body)).not.toContain("secret-internal-failure");
+    // The degraded path serves the same card shape (YOY-87 AC-3): `url`
+    // present, `handle` absent.
+    expect(body.results.length).toBeGreaterThan(0);
+    for (const result of body.results) {
+      expect(Object.keys(result).sort()).toEqual(RESULT_KEYS);
+      expect(result.url).toBe(`https://${SHOP}/products/silk-gown-handle`);
+    }
   });
 
   it("carries closeMatches on AI zero-hit responses, still within the contract", async () => {
@@ -609,6 +624,10 @@ describe("the response contract (AC-3, AC-5)", () => {
       body.closeMatches.map((r: { productId: string }) => r.productId),
     ).toEqual(["linen-shirt"]);
     expect(Object.keys(body.closeMatches[0]).sort()).toEqual(RESULT_KEYS);
+    expect(body.closeMatches[0]).not.toHaveProperty("handle");
+    expect(body.closeMatches[0].url).toBe(
+      `https://${SHOP}/products/linen-shirt-handle`,
+    );
   });
 });
 

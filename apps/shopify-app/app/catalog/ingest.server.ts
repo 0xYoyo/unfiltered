@@ -57,6 +57,7 @@ export const PRODUCTS_QUERY = `#graphql
           nodes { altText }
         }
         featuredImage { url }
+        onlineStoreUrl
       }
     }
   }
@@ -133,7 +134,7 @@ export async function ingestCatalog({
         // a legacy fixture, treated as published.
         node.publishedAt !== null,
     )
-    .map(mapProductNode);
+    .map((node) => mapProductNode(node, { shopDomain }));
 
   const existing = await db.catalogProduct.findMany({
     where: { shopDomain },
@@ -142,6 +143,7 @@ export async function ingestCatalog({
       contentHash: true,
       handle: true,
       featuredImageUrl: true,
+      url: true,
       publishedAt: true,
     },
   });
@@ -164,7 +166,7 @@ export async function ingestCatalog({
       result.updated += 1;
     } else {
       // Searchable content unchanged. The display-only fields (handle,
-      // featuredImageUrl) and the publication timestamp (YOY-67 AC-4) sit
+      // featuredImageUrl, url — YOY-87 AC-1) and the publication timestamp (YOY-67 AC-4) sit
       // outside contentHash, so refresh them here when they drifted — this
       // is also how a repeat full ingest backfills rows created before the
       // fields existed (YOY-44 AC-5), and how the migration's
@@ -173,6 +175,7 @@ export async function ingestCatalog({
       if (
         known.handle !== product.handle ||
         known.featuredImageUrl !== product.featuredImageUrl ||
+        known.url !== product.url ||
         (known.publishedAt?.getTime() ?? null) !==
           (product.publishedAt?.getTime() ?? null)
       ) {
@@ -183,6 +186,7 @@ export async function ingestCatalog({
           data: {
             handle: product.handle,
             featuredImageUrl: product.featuredImageUrl,
+            url: product.url,
             publishedAt: product.publishedAt,
           },
         });

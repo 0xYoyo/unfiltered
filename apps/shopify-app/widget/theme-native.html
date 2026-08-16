@@ -11,8 +11,8 @@
          grid and card markup (the selectors the native-render config
          targets), a standard search form, and stubs for the app proxy AND
          for Shopify's alternate-template URL
-         `/products/<handle>?view=unfiltered-card`, which answers with the
-         same Dawn-shaped card for the requested handle. Variant B harvests
+         `<product url>?view=unfiltered-card`, which answers with the
+         same Dawn-shaped card for the requested product. Variant B harvests
          THIS page (its first card is the clone template); Variant A fetches
          the stubbed alternate template per result. No Shopify, no network. -->
     <!-- Multi-input storefront (YOY-99): `?multi=1` adds a Dawn-shaped
@@ -236,7 +236,7 @@
         {
           productId: "gid://shopify/Product/1",
           title: "Nike Air 90",
-          handle: "nike-air-90",
+          url: "/products/nike-air-90",
           imageUrl: svg("9fb8a8"),
           priceMin: 100,
           priceMax: 100,
@@ -246,7 +246,7 @@
         {
           productId: "gid://shopify/Product/2",
           title: "Runner Range",
-          handle: "runner-range",
+          url: "/products/runner-range",
           imageUrl: null,
           priceMin: 100,
           priceMax: 150,
@@ -256,7 +256,7 @@
         {
           productId: "gid://shopify/Product/3",
           title: "Sold Out Boot",
-          handle: "sold-out-boot",
+          url: "/products/sold-out-boot",
           imageUrl: svg("c9a8b8"),
           priceMin: 200,
           priceMax: 200,
@@ -327,7 +327,7 @@
           {
             productId: "gid://shopify/Product/4",
             title: "Unfiltered By Removal",
-            handle: "unfiltered-by-removal",
+            url: "/products/unfiltered-by-removal",
             imageUrl: svg("a8c9c9"),
             priceMin: 500,
             priceMax: 500,
@@ -341,6 +341,14 @@
       // `templates/product.unfiltered-card.liquid` — the theme's card
       // snippet for that product, preceded by the card's stylesheet link
       // (Dawn's snippet emits component-rating.css the same way).
+      // Fixture results carry the server-resolved `url` (YOY-87) — the
+      // storefront handle is harness-internal, derived from it here only to
+      // key the stubbed alternate template.
+      const handleOf = (product) =>
+        new URL(product.url, window.location.origin).pathname.slice(
+          "/products/".length,
+        );
+
       const altTemplateHtml = (product) => `
 <link href="/harness/theme-card.css" rel="stylesheet" type="text/css" media="all" />
 <div class="card-wrapper product-card-wrapper underline-links-hover" data-alt-template="true">
@@ -354,8 +362,8 @@
     </div>
     <div class="card__content">
       <div class="card__information">
-        <h3 class="card__heading h5" id="title--${product.handle}">
-          <a href="/products/${product.handle}" id="CardLink--${product.handle}" class="full-unstyled-link">${product.title}</a>
+        <h3 class="card__heading h5" id="title--${handleOf(product)}">
+          <a href="${product.url}" id="CardLink--${handleOf(product)}" class="full-unstyled-link">${product.title}</a>
         </h3>
         <div class="card-information">
           <div class="price">
@@ -380,7 +388,7 @@
 
       const PRODUCTS = new Map(
         [...RESULTS, ...chipRemovalResponse({ removeChip: {}, previousIntent: {} }).results].map(
-          (product) => [product.handle, product],
+          (product) => [handleOf(product), product],
         ),
       );
 

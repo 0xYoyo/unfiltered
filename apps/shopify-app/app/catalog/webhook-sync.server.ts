@@ -219,10 +219,14 @@ function variantAvailable(variant: ProductWebhookPayload["variants"][number]): b
  * therefore the same content hash). Webhook payloads carry no currency, so
  * `currencyCode` must be supplied — pass the existing row's value to keep the
  * hash stable for unchanged products, or "" for products not yet ingested.
+ * Webhook payloads carry no Online Store URL either, so `url` is the
+ * composed storefront form when `shopDomain` is given (YOY-87 AC-2), else
+ * null.
  */
 export function mapWebhookProduct(
   payload: ProductWebhookPayload,
   currencyCode: string,
+  shopDomain?: string,
 ): SnapshotProduct {
   const prices = payload.variants.map((variant) => Number(variant.price));
   const min = prices.length > 0 ? Math.min(...prices) : 0;
@@ -256,7 +260,7 @@ export function mapWebhookProduct(
         ? { url: payload.image.src }
         : null,
   };
-  return mapProductNode(node);
+  return mapProductNode(node, { shopDomain });
 }
 
 /**
@@ -305,6 +309,7 @@ export async function syncProductFromWebhook({
         sourceUpdatedAt: true,
         handle: true,
         featuredImageUrl: true,
+        url: true,
         publishedAt: true,
       },
     });
@@ -314,7 +319,7 @@ export async function syncProductFromWebhook({
   if (existing === null) {
     try {
       await db.catalogProduct.create({
-        data: { shopDomain, ...mapWebhookProduct(payload, "") },
+        data: { shopDomain, ...mapWebhookProduct(payload, "", shopDomain) },
       });
       return "created";
     } catch (error) {
@@ -334,19 +339,24 @@ export async function syncProductFromWebhook({
     }
   }
 
-  const product = mapWebhookProduct(payload, existing.currencyCode);
+  const product = mapWebhookProduct(
+    payload,
+    existing.currencyCode,
+    shopDomain,
+  );
 
   if (product.sourceUpdatedAt < existing.sourceUpdatedAt) {
     return "skipped_stale";
   }
   if (product.contentHash === existing.contentHash) {
     // Searchable content unchanged — but the display-only fields (handle,
-    // featuredImageUrl) and the publication timestamp (YOY-67 AC-4) sit
+    // featuredImageUrl, url — YOY-87) and the publication timestamp (YOY-67 AC-4) sit
     // outside contentHash, so an update that changed only them must still
     // land on the row (YOY-44 AC-3).
     if (
       product.handle !== existing.handle ||
       product.featuredImageUrl !== existing.featuredImageUrl ||
+      product.url !== existing.url ||
       (product.publishedAt?.getTime() ?? null) !==
         (existing.publishedAt?.getTime() ?? null)
     ) {
@@ -355,6 +365,7 @@ export async function syncProductFromWebhook({
         data: {
           handle: product.handle,
           featuredImageUrl: product.featuredImageUrl,
+          url: product.url,
           publishedAt: product.publishedAt,
           sourceUpdatedAt: product.sourceUpdatedAt,
         },

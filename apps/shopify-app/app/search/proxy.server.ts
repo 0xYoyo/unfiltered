@@ -287,7 +287,8 @@ export function removeChipFromIntent(intent: Intent, chip: ProxyChip): Intent {
 export interface ProxyResult {
   productId: string;
   title: string;
-  handle: string;
+  /** Server-resolved product link, or null (YOY-87); rendered verbatim. */
+  url: string | null;
   imageUrl: string | null;
   priceMin: number;
   priceMax: number;
@@ -331,7 +332,7 @@ export interface ProxySearchResponse {
 function serializeCard(card: {
   productId: string;
   title: string;
-  handle: string;
+  url: string | null;
   imageUrl: string | null;
   priceMin: number;
   priceMax: number;
@@ -342,7 +343,7 @@ function serializeCard(card: {
   return {
     productId: card.productId,
     title: card.title,
-    handle: card.handle,
+    url: card.url,
     imageUrl: card.imageUrl,
     priceMin: card.priceMin,
     priceMax: card.priceMax,

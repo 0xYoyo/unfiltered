@@ -128,7 +128,12 @@ export interface SearchRequest {
 export interface ProductCard {
   productId: string;
   title: string;
-  handle: string;
+  /**
+   * Server-resolved product link (YOY-87, LEAK-2), rendered verbatim by the
+   * widget; null when the ingestion adapter could not resolve one. The
+   * storefront handle stays a DB column — adapter-internal, never on a card.
+   */
+  url: string | null;
   /** Featured image URL, when the product has one. */
   imageUrl: string | null;
   priceMin: number;
@@ -217,7 +222,7 @@ export function createSearchOrchestrator(
         {
           productId: row.productId,
           title: row.title,
-          handle: row.handle,
+          url: row.url,
           imageUrl: row.featuredImageUrl,
           priceMin: row.priceMin,
           priceMax: row.priceMax,

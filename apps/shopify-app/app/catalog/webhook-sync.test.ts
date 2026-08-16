@@ -55,6 +55,30 @@ function webhookPayload(
   };
 }
 
+describe("webhook→snapshot url resolution (YOY-87 AC-2)", () => {
+  it("composes the storefront url from the shop domain and handle — payloads carry no onlineStoreUrl", () => {
+    const snapshot = mapWebhookProduct(
+      webhookPayload(),
+      "ILS",
+      "test-shop.myshopify.com",
+    );
+    expect(snapshot.url).toBe(
+      "https://test-shop.myshopify.com/products/linen-summer-dress",
+    );
+  });
+
+  it("resolves null without a shop domain, and url never enters the hash", () => {
+    const withoutShop = mapWebhookProduct(webhookPayload(), "ILS");
+    const withShop = mapWebhookProduct(
+      webhookPayload(),
+      "ILS",
+      "test-shop.myshopify.com",
+    );
+    expect(withoutShop.url).toBeNull();
+    expect(withShop.contentHash).toBe(withoutShop.contentHash);
+  });
+});
+
 describe("webhook→snapshot mapping convergence with ingestion", () => {
   it("hashes a plain body_html identically to the ingested description", () => {
     const viaWebhook = mapWebhookProduct(webhookPayload(), "ILS");
