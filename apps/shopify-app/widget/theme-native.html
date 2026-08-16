@@ -15,10 +15,58 @@
          same Dawn-shaped card for the requested handle. Variant B harvests
          THIS page (its first card is the clone template); Variant A fetches
          the stubbed alternate template per result. No Shopify, no network. -->
+    <!-- Multi-input storefront (YOY-99): `?multi=1` adds a Dawn-shaped
+         header search modal — `<details-modal><details>` with a page-dim
+         overlay and a body scroll lock while open — beside the in-page
+         search form below, and `?lazyInput=1` mounts a third search input
+         after the widget has initialised (a lazily rendered header). All
+         of them must be taken over identically; a takeover submit must
+         leave the modal closed and the dim gone. -->
+    <template id="header-search-modal">
+      <style>
+        .header__search details[open] .modal-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.5);
+        }
+        .header__search details[open] .search-modal__content {
+          position: relative;
+          padding: 16px;
+          background: #fff;
+        }
+        .header__search details:not([open]) .search-modal {
+          display: none;
+        }
+        body.overflow-hidden-header {
+          overflow: hidden;
+        }
+      </style>
+      <details-modal class="header__search">
+        <details data-section="header">
+          <summary aria-label="Search" data-testid="header-search-summary">
+            Search
+          </summary>
+          <div class="search-modal modal__content" role="dialog" aria-modal="true">
+            <div class="modal-overlay" data-testid="header-search-overlay"></div>
+            <div class="search-modal__content">
+              <form action="/search" method="get" role="search">
+                <input
+                  type="search"
+                  name="q"
+                  id="Search-In-Modal"
+                  placeholder="Theme search"
+                />
+                <button type="submit">Search</button>
+              </form>
+            </div>
+          </div>
+        </details>
+      </details-modal>
+    </template>
     <header class="header">
       <a href="/theme-native.html">Harness store</a>
       <form action="/search" method="get" role="search">
-        <input type="search" name="q" placeholder="Theme search" />
+        <input type="search" name="q" id="Search-In-Page" placeholder="Theme search" />
         <button type="submit">Search</button>
       </form>
     </header>
@@ -118,6 +166,62 @@
 
       const params = new URLSearchParams(window.location.search);
       const fixture = params.get("fixture") ?? "results";
+
+      // Dawn's details-modal, reduced to what the takeover touches: open
+      // sets `open` on the <details> and locks body scroll with a
+      // section-suffixed class; close() reverses both. Closing on outside
+      // click / Escape is what a shopper's "stray click" would do — the
+      // widget must not need it (YOY-99 AC-2).
+      if (params.get("multi") === "1") {
+        class DetailsModal extends HTMLElement {
+          connectedCallback() {
+            this.detailsContainer = this.querySelector("details");
+            this.summaryToggle = this.querySelector("summary");
+            this.detailsContainer.addEventListener("keyup", (event) => {
+              if (event.code?.toUpperCase() === "ESCAPE") this.close();
+            });
+            this.summaryToggle.addEventListener("click", (event) => {
+              event.preventDefault();
+              this.isOpen() ? this.close() : this.open();
+            });
+          }
+          isOpen() {
+            return this.detailsContainer.hasAttribute("open");
+          }
+          open() {
+            this.detailsContainer.setAttribute("open", true);
+            document.body.classList.add(
+              `overflow-hidden-${this.detailsContainer.dataset.section}`,
+            );
+            this.detailsContainer.querySelector("input").focus();
+          }
+          close() {
+            this.detailsContainer.removeAttribute("open");
+            document.body.classList.remove(
+              `overflow-hidden-${this.detailsContainer.dataset.section}`,
+            );
+          }
+        }
+        customElements.define("details-modal", DetailsModal);
+        const fragment = document
+          .getElementById("header-search-modal")
+          .content.cloneNode(true);
+        document.querySelector("header.header").prepend(fragment);
+      }
+      if (params.get("lazyInput") === "1") {
+        // Mounted AFTER init below has run (macrotask), like a header that
+        // renders its search input lazily.
+        setTimeout(() => {
+          const form = document.createElement("form");
+          form.action = "/search";
+          form.method = "get";
+          form.setAttribute("role", "search");
+          form.setAttribute("data-testid", "lazy-search-form");
+          form.innerHTML =
+            '<input type="search" name="q" id="Search-Lazy" placeholder="Theme search" /><button type="submit">Search</button>';
+          document.getElementById("MainContent").prepend(form);
+        }, 300);
+      }
       // `template=missing`: the alternate template is not installed on the
       // theme (every ?view= fetch 404s) — the functional-always fallback.
       const templateMissing = params.get("template") === "missing";

@@ -66,26 +66,99 @@ const DEFAULT_DEBOUNCE_MS = 200;
 export const MAX_CONSECUTIVE_FAILURES = 3;
 
 /**
- * The theme's search input, by the common storefront patterns: a dedicated
- * search input, or a form posting to /search with a `q` input. The widget's
- * own overlay never carries an input, so a mounted widget can't match.
+ * EVERY theme search input on the page (YOY-99 AC-1), by the common
+ * storefront patterns: dedicated search inputs, and `q` inputs of forms
+ * posting to /search — a header modal input and an in-page search bar are
+ * both taken over. Document order, deduplicated. The widget's own overlay
+ * never carries an input, so a mounted widget can't match.
  */
-export function findThemeSearchInput(): HTMLInputElement | null {
-  const direct = document.querySelector<HTMLInputElement>(
+export function findThemeSearchInputs(): HTMLInputElement[] {
+  const found = new Set<HTMLInputElement>();
+  for (const direct of document.querySelectorAll<HTMLInputElement>(
     'input[type="search"]',
-  );
-  if (direct !== null) {
-    return direct;
+  )) {
+    found.add(direct);
   }
   for (const form of document.querySelectorAll<HTMLFormElement>(
     'form[action*="/search"]',
   )) {
-    const q = form.querySelector<HTMLInputElement>('input[name="q"]');
-    if (q !== null) {
-      return q;
+    for (const q of form.querySelectorAll<HTMLInputElement>(
+      'input[name="q"]',
+    )) {
+      found.add(q);
     }
   }
-  return null;
+  return [...found];
+}
+
+/** The first theme search input, in document order; kept for callers of
+ * the pre-YOY-99 single-input contract. */
+export function findThemeSearchInput(): HTMLInputElement | null {
+  return findThemeSearchInputs()[0] ?? null;
+}
+
+/**
+ * Reset the theme's own search UI around a taken-over input after a submit
+ * (YOY-99 AC-2): a native submit would have navigated away, closing any
+ * search modal/drawer and its page dim with the page; a takeover submit
+ * stays on the page, so the widget must close it explicitly. Generic by
+ * ancestor structure — an open `<details>` (Dawn's `details-modal` header
+ * search, closed through the custom element's own `close()` when it has
+ * one, so focus traps and body classes unwind the theme's way), an open
+ * `<dialog>`, or a `role="dialog"`/`aria-modal` container owned by a custom
+ * element with `close()`. Then the body-scroll lock convention
+ * (`overflow-hidden*` classes on body/html) is cleared as a fallback.
+ * Never throws: a theme whose modal refuses to close leaves the page as a
+ * native submit would have left it — that is the theme's own behavior.
+ */
+export function resetThemeSearchUi(input: HTMLInputElement): void {
+  const closeVia = (element: Element | null): boolean => {
+    const closer = element as (Element & { close?: unknown }) | null;
+    if (closer !== null && typeof closer.close === "function") {
+      try {
+        (closer.close as () => void).call(closer);
+        return true;
+      } catch {
+        return false;
+      }
+    }
+    return false;
+  };
+  const customHost = (element: Element): Element | null => {
+    let node: Element | null = element;
+    while (node !== null && node !== document.body) {
+      if (node.tagName.includes("-")) {
+        return node;
+      }
+      node = node.parentElement;
+    }
+    return null;
+  };
+  let node: Element | null = input.parentElement;
+  while (node !== null && node !== document.body) {
+    if (node instanceof HTMLDetailsElement && node.open) {
+      // Prefer the theme's own close routine on the wrapping custom
+      // element (Dawn: `<details-modal>` around the `<details>`).
+      if (!closeVia(customHost(node.parentElement ?? node))) {
+        node.open = false;
+      }
+    } else if (node instanceof HTMLDialogElement && node.open) {
+      node.close();
+    } else if (
+      node.getAttribute("role") === "dialog" ||
+      node.getAttribute("aria-modal") === "true"
+    ) {
+      closeVia(customHost(node));
+    }
+    node = node.parentElement;
+  }
+  for (const root of [document.body, document.documentElement]) {
+    for (const className of [...root.classList]) {
+      if (className.startsWith("overflow-hidden")) {
+        root.classList.remove(className);
+      }
+    }
+  }
 }
 
 /**
@@ -99,19 +172,51 @@ export function init(config: WidgetConfig): void {
       return;
     }
 
-    const foundInput = findThemeSearchInput();
-    if (foundInput === null) {
+    const initialInputs = findThemeSearchInputs();
+    if (initialInputs.length === 0) {
       return;
     }
-    const input: HTMLInputElement = foundInput;
 
+    // Global takeover (YOY-99 AC-1): every theme search input is bound, and
+    // inputs mounted after init (a lazily rendered header modal) join as
+    // they appear. Handlers key on membership, not identity, so typing and
+    // Enter/submit behave identically from any of them (AC-3). `input` is
+    // the one the shopper engaged last — the one whose value a search
+    // reads and a "new search" clears — never a fixed first-match.
     // The input placeholder is widget chrome (YOY-50 AC-1/AC-2): the
     // catalog owns it in both locales while the widget is active. Going
-    // inert restores the theme's own placeholder — the page must end
-    // exactly as without the app (YOY-48 AC-2).
+    // inert restores each theme placeholder — the page must end exactly as
+    // without the app (YOY-48 AC-2).
     const strings = getStrings(config.locale);
-    const themePlaceholder = input.placeholder;
-    input.placeholder = strings.inputPlaceholder;
+    const themePlaceholders = new Map<HTMLInputElement, string>();
+    const bindInput = (candidate: HTMLInputElement): void => {
+      if (themePlaceholders.has(candidate)) {
+        return;
+      }
+      themePlaceholders.set(candidate, candidate.placeholder);
+      candidate.placeholder = strings.inputPlaceholder;
+    };
+    const isBound = (target: EventTarget | null): target is HTMLInputElement =>
+      target instanceof HTMLInputElement && themePlaceholders.has(target);
+    for (const candidate of initialInputs) {
+      bindInput(candidate);
+    }
+    let input: HTMLInputElement = initialInputs[0];
+    const engage = (target: HTMLInputElement): void => {
+      input = target;
+    };
+    const inputObserver = new MutationObserver(() => {
+      if (inert) {
+        return;
+      }
+      for (const candidate of findThemeSearchInputs()) {
+        bindInput(candidate);
+      }
+    });
+    inputObserver.observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+    });
 
     const client = createSearchClient({
       basePath: config.proxyBasePath,
@@ -205,7 +310,10 @@ export function init(config: WidgetConfig): void {
     const goInert = (): void => {
       inert = true;
       window.clearTimeout(debounceTimer);
-      input.placeholder = themePlaceholder;
+      inputObserver.disconnect();
+      for (const [bound, themePlaceholder] of themePlaceholders) {
+        bound.placeholder = themePlaceholder;
+      }
       overlay.destroy();
     };
 
@@ -338,10 +446,11 @@ export function init(config: WidgetConfig): void {
     document.addEventListener(
       "focus",
       (event) => {
-        if (inert || event.target !== input) {
+        if (inert || !isBound(event.target)) {
           return;
         }
         event.stopPropagation();
+        engage(event.target);
         // Refocusing re-engages the widget (Enter searches in-widget again)
         // without rendering anything (YOY-67 AC-6).
         dismissed = false;
@@ -351,10 +460,11 @@ export function init(config: WidgetConfig): void {
     document.addEventListener(
       "focusin",
       (event) => {
-        if (inert || event.target !== input) {
+        if (inert || !isBound(event.target)) {
           return;
         }
         event.stopPropagation();
+        engage(event.target);
       },
       true,
     );
@@ -362,10 +472,11 @@ export function init(config: WidgetConfig): void {
     document.addEventListener(
       "input",
       (event) => {
-        if (inert || event.target !== input) {
+        if (inert || !isBound(event.target)) {
           return;
         }
         event.stopPropagation();
+        engage(event.target);
         onType();
       },
       true,
@@ -390,6 +501,15 @@ export function init(config: WidgetConfig): void {
         query,
         heldIntent !== null ? { previousIntent: heldIntent } : undefined,
       );
+      // Theme search-UI reset (YOY-99 AC-2): on the native view the results
+      // render in the page itself, so the theme's search modal/drawer and
+      // page dim — which a native submit's navigation would have discarded
+      // — must close now, not on a stray click. The overlay path keeps the
+      // theme UI as it was: its floating panel sits above the theme's
+      // modal, and the input the shopper is typing in lives inside it.
+      if (nativeConfig !== null) {
+        resetThemeSearchUi(input);
+      }
     };
 
     // Enter must neither submit the theme's form nor feed a theme keydown
@@ -398,10 +518,11 @@ export function init(config: WidgetConfig): void {
     document.addEventListener(
       "keydown",
       (event) => {
-        if (inert || event.target !== input) {
+        if (inert || !isBound(event.target)) {
           return;
         }
         event.stopPropagation();
+        engage(event.target);
         if (event.key === "Enter" && !dismissed) {
           event.preventDefault();
           searchNow();
@@ -428,9 +549,17 @@ export function init(config: WidgetConfig): void {
     document.addEventListener(
       "submit",
       (event) => {
-        if (inert || input.form === null || event.target !== input.form) {
+        if (inert || !(event.target instanceof HTMLFormElement)) {
           return;
         }
+        const form = event.target;
+        const submitted = [...themePlaceholders.keys()].find(
+          (bound) => bound.form === form,
+        );
+        if (submitted === undefined) {
+          return;
+        }
+        engage(submitted);
         if (!dismissed) {
           event.preventDefault();
           event.stopPropagation();
