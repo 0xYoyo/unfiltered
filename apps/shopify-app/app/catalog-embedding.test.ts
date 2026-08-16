@@ -67,7 +67,7 @@ function embeddingStub({
           request.texts.reduce((sum, text) => sum + text.length, 0) / 4,
         ),
         outputTokens: 0,
-        shopDomain: request.shopDomain,
+        storeId: request.storeId,
       });
       return request.texts.map(
         (text, index) => respond?.(text, index) ?? fixtureVector(text, dimension),
@@ -191,7 +191,7 @@ describe("catalog embedding", () => {
     expect(result).toEqual({ embedded: 3, cached: 0, deleted: 0 });
     expect(calls).toHaveLength(1);
     expect(calls[0]!.texts).toHaveLength(3);
-    expect(calls[0]!.shopDomain).toBe(SHOP);
+    expect(calls[0]!.storeId).toBe(SHOP);
     // The composed text reaches the port — Hebrew products included.
     expect(calls[0]!.texts[1]).toContain("שמלת ערב שחורה");
 

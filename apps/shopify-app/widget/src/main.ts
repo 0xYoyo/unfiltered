@@ -36,8 +36,12 @@ export { ROOT_TESTID };
 export interface WidgetConfig {
   /** Storefront locale ISO code, e.g. "en" or "he". */
   locale: string;
-  /** The shop's permanent .myshopify.com domain. */
-  shopDomain: string;
+  /**
+   * Neutral tenant identifier (YOY-84): the widget core speaks no commerce
+   * platform; the Shopify theme-embed adapter passes the shop's permanent
+   * .myshopify.com domain as its value.
+   */
+  storeId: string;
   /** Proxy subpath prefix; the app proxy's default when absent. */
   proxyBasePath?: string;
   /** Abort an unanswered search after this long (harness shortens it). */
@@ -156,7 +160,7 @@ export function init(config: WidgetConfig): void {
     };
     const shadowOverlay = createOverlay({
       locale: config.locale,
-      shopDomain: config.shopDomain,
+      storeId: config.storeId,
       ...surfaceOptions,
     });
     // Theme-native rendering (YOY-70): off unless configured or dev-flagged,

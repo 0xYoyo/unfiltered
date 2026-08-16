@@ -52,7 +52,9 @@ cannot be stated is rejected at spec time.
 - **Cost:** mechanical rename (engine + provider-gemini + app call sites; DB
   column renames optional/deferred — the port name is the leak, the column is
   internal).
-- **Routing:** stable code → **filed as YOY-84**.
+- **Routing:** stable code → **filed as YOY-84** — resolved: engine and
+  widget ports now name the tenant key `storeId`; DB columns keep
+  `shopDomain` per YOY-84 NG-1.
 
 ### LEAK-2 — `/products/${handle}` hardcoded in the widget core
 

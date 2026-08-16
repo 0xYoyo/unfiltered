@@ -47,7 +47,7 @@ describe.runIf(live)("live catalog embedding (ledger-backed)", () => {
 
     const [queryVector] = await embeddings.embed({
       texts: ["elegant black evening dress"],
-      shopDomain,
+      storeId: shopDomain,
     });
     const hits = await similarProducts({
       db,

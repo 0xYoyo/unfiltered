@@ -3,7 +3,7 @@
  * RetrievalStore pattern — the engine owns the contract (request/response
  * types and semantics), the consumer implements it over its own database
  * (the app: Postgres/pg_trgm trigram search). Given a text query and a
- * shopDomain it returns ranked product hits; given constraints and no query
+ * storeId it returns ranked product hits; given constraints and no query
  * text it filters without ranking by similarity. A classic search must never
  * issue an LLM or embedding call.
  */
@@ -13,7 +13,7 @@ import type { RetrievalConstraints } from "./retrieve.js";
 /** One classic search against the consumer's store. */
 export interface ClassicSearchRequest {
   /** Store the search runs against; results must come from it alone. */
-  shopDomain: string;
+  storeId: string;
   /**
    * Raw query text. Implementations normalize it themselves (the engine's
    * `normalizeQuery` is the shared normalizer). Absent or effectively empty

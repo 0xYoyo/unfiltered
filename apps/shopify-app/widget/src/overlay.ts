@@ -66,7 +66,7 @@ export interface Overlay {
 
 export interface OverlayOptions {
   locale: string;
-  shopDomain: string;
+  storeId: string;
   onClose: () => void;
   /** The "new search" control (YOY-49 AC-5). */
   onNewSearch: () => void;
@@ -79,7 +79,7 @@ export function createOverlay(options: OverlayOptions): Overlay {
   const host = document.createElement("div");
   host.setAttribute("data-testid", ROOT_TESTID);
   host.setAttribute("data-locale", options.locale);
-  host.setAttribute("data-shop-domain", options.shopDomain);
+  host.setAttribute("data-store-id", options.storeId);
   // Hebrew chrome mirrors the whole overlay (YOY-50 AC-3): dir on the root
   // flips every logical property in widget.css, so the chip row, grid,
   // controls, and text alignment flow right-to-left with no RTL stylesheet.

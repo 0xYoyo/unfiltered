@@ -194,7 +194,7 @@ export async function enrichCatalog({
             prompt: buildEnrichmentPrompt(product),
             schema: ENRICHMENT_SCHEMA,
             operation: "enrichment",
-            shopDomain,
+            storeId: shopDomain,
           }),
         );
       } catch {

@@ -293,7 +293,7 @@ describe("structured completion", () => {
       prompt: "p",
       schema: SCHEMA,
       operation: "intent",
-      shopDomain: "test-shop.myshopify.com",
+      storeId: "test-shop.myshopify.com",
       searchId: "search-1",
     });
 
@@ -304,7 +304,7 @@ describe("structured completion", () => {
         operation: "intent",
         inputTokens: 120,
         outputTokens: 8,
-        shopDomain: "test-shop.myshopify.com",
+        storeId: "test-shop.myshopify.com",
         searchId: "search-1",
       },
     ]);
@@ -533,7 +533,7 @@ describe("embeddings", () => {
         operation: "embedding",
         inputTokens: 4,
         outputTokens: 0,
-        shopDomain: undefined,
+        storeId: undefined,
         searchId: "s-1",
       },
     ]);

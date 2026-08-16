@@ -21,7 +21,7 @@ test("init receives the storefront locale and shop domain", async ({
   const root = page.getByTestId("unfiltered-widget-root");
   await expect(root).toHaveAttribute("data-locale", "he");
   await expect(root).toHaveAttribute(
-    "data-shop-domain",
+    "data-store-id",
     "harness.myshopify.com",
   );
 });
@@ -48,7 +48,7 @@ test("a second init call does not mount a second root", async ({ page }) => {
   await page.evaluate(() => {
     window.UnfilteredWidget?.init({
       locale: "en",
-      shopDomain: "harness.myshopify.com",
+      storeId: "harness.myshopify.com",
     });
   });
 

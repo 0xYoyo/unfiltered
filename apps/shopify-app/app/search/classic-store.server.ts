@@ -74,7 +74,7 @@ function buildClassicSearchSql(request: ClassicSearchRequest): {
     throw new RangeError(`limit must be a positive integer, got ${limit}`);
   }
 
-  const params: unknown[] = [request.shopDomain];
+  const params: unknown[] = [request.storeId];
   // status guard (YOY-61 AC-3) and publication guard (YOY-67 AC-4): defense
   // in depth — ingestion should never store a non-active or unpublished
   // product, but one that exists anyway must not serve.

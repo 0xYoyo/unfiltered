@@ -11,13 +11,13 @@ import type {
 // engine gaining any runtime dependency.
 
 function createInMemoryStore(
-  rows: Array<{ shopDomain: string; productId: string; text: string }>,
+  rows: Array<{ storeId: string; productId: string; text: string }>,
 ): ClassicSearchStore {
   return {
     async search(request: ClassicSearchRequest) {
       const query = (request.query ?? "").trim().toLowerCase();
       const hits = rows
-        .filter((row) => row.shopDomain === request.shopDomain)
+        .filter((row) => row.storeId === request.storeId)
         .map((row) => ({
           productId: row.productId,
           score: query === "" ? 0 : row.text.toLowerCase().includes(query) ? 1 : 0,
@@ -31,16 +31,16 @@ function createInMemoryStore(
 }
 
 const rows = [
-  { shopDomain: "a.example.com", productId: "p1", text: "Nike Air Max 90" },
-  { shopDomain: "a.example.com", productId: "p2", text: "Linen Beach Dress" },
-  { shopDomain: "b.example.com", productId: "p3", text: "Nike Air Max 90" },
+  { storeId: "a.example.com", productId: "p1", text: "Nike Air Max 90" },
+  { storeId: "a.example.com", productId: "p2", text: "Linen Beach Dress" },
+  { storeId: "b.example.com", productId: "p3", text: "Nike Air Max 90" },
 ];
 
 describe("ClassicSearchStore port contract", () => {
-  it("returns ranked hits for a text query, scoped to the shopDomain", async () => {
+  it("returns ranked hits for a text query, scoped to the storeId", async () => {
     const store = createInMemoryStore(rows);
     const result = await store.search({
-      shopDomain: "a.example.com",
+      storeId: "a.example.com",
       query: "nike air max 90",
     });
     expect(result.hits).toEqual([{ productId: "p1", score: 1 }]);
@@ -49,7 +49,7 @@ describe("ClassicSearchStore port contract", () => {
   it("accepts constraint-only requests: no query text, zero scores", async () => {
     const store = createInMemoryStore(rows);
     const result = await store.search({
-      shopDomain: "a.example.com",
+      storeId: "a.example.com",
       constraints: {
         colorsInclude: [],
         colorsExclude: [],
@@ -62,7 +62,7 @@ describe("ClassicSearchStore port contract", () => {
   it("honors the limit", async () => {
     const store = createInMemoryStore(rows);
     const result = await store.search({
-      shopDomain: "a.example.com",
+      storeId: "a.example.com",
       limit: 1,
     });
     expect(result.hits).toHaveLength(1);

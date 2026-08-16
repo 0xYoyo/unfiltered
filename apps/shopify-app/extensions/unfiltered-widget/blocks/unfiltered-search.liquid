@@ -12,7 +12,7 @@
     if (window.UnfilteredWidget) {
       window.UnfilteredWidget.init({
         locale: {{ request.locale.iso_code | json }},
-        shopDomain: {{ shop.permanent_domain | json }}
+        storeId: {{ shop.permanent_domain | json }}
       });
     }
   });

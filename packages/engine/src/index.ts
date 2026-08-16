@@ -138,8 +138,8 @@ export interface StructuredCompletionRequest {
    * default.
    */
   temperature?: number;
-  /** Shop the call is made on behalf of, for metering, when known. */
-  shopDomain?: string;
+  /** Store (tenant) the call is made on behalf of, for metering, when known — an opaque identifier; the Shopify adapter passes the myshopify domain. */
+  storeId?: string;
   /** Correlation ID tying together every call serving one search. */
   searchId?: string;
 }
@@ -160,8 +160,8 @@ export interface EmbeddingRequest {
   texts: string[];
   /** Cost-ledger operation label; implementations default to "embedding". */
   operation?: string;
-  /** Shop the call is made on behalf of, for metering, when known. */
-  shopDomain?: string;
+  /** Store (tenant) the call is made on behalf of, for metering, when known — an opaque identifier; the Shopify adapter passes the myshopify domain. */
+  storeId?: string;
   /** Correlation ID tying together every call serving one search. */
   searchId?: string;
 }
@@ -190,8 +190,8 @@ export interface AiCallUsage {
   operation: string;
   inputTokens: number;
   outputTokens: number;
-  /** Shop the call was made on behalf of, when known. */
-  shopDomain?: string;
+  /** Store (tenant) the call was made on behalf of, when known. */
+  storeId?: string;
   /** Correlation ID tying together every call serving one search. */
   searchId?: string;
 }
