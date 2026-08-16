@@ -199,6 +199,10 @@ page; App Store listing.
 including proper RTL layout, specced from day one. Merchant dashboard and
 onboarding: English only in v1. Playground supports both query languages.
 
+### Amendment (2026-08-16) — The Mirror Bar (binding, platform-agnostic)
+
+The shopper-facing search experience is a complete mirror of the host store's own design — layout, grid, card markup, sizing, spacing, colors, typography, price formatting, page structure and copy furniture (e.g. the results-count heading) — indistinguishable from the store's native results page, on every platform: Shopify (Door 1) and the generic engine (Door 2) alike. The only permitted owned elements are the filter chips and their immediate controls, inherit-first per docs/DESIGN.md. Any mechanism that cannot meet the bar is a fallback, never the shipped default.
+
 ## 6. Data & accounts
 Stored per store: Shopify OAuth tokens; catalog snapshot + embeddings;
 query log (query text, classification, latency, cost, results shown,
