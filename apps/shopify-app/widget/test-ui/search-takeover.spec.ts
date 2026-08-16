@@ -379,3 +379,191 @@ test("an empty classic result set renders a no-results message on submit (AC-8)"
   );
   await expect(cards(page)).toHaveCount(0);
 });
+
+// Global takeover (YOY-99): every theme search input on the page is taken
+// over — a Dawn-shaped header search modal, the in-page search form, and an
+// input mounted after init — and a takeover submit on the native view
+// leaves the theme's own search UI (modal, page dim, scroll lock) reset.
+test.describe("global takeover of every search input (YOY-99)", () => {
+  const MULTI = "/theme-native.html?native=A&multi=1&debounce=30000";
+  const modalInput = (page: Page) => page.locator("#Search-In-Modal");
+  const pageInput = (page: Page) => page.locator("#Search-In-Page");
+  const lazyInput = (page: Page) => page.locator("#Search-Lazy");
+  const headerDetails = (page: Page) =>
+    page.locator("details-modal.header__search details");
+  const dim = (page: Page) => page.getByTestId("header-search-overlay");
+  const nativeItems = (page: Page) =>
+    page.getByTestId("unfiltered-native-item");
+  const bodyScrollLocked = (page: Page) =>
+    page.evaluate(() =>
+      [...document.body.classList].some((name) =>
+        name.startsWith("overflow-hidden"),
+      ),
+    );
+
+  test("the header modal input AND the in-page input are both taken over; a modal submit resets the modal, dim, and scroll lock (AC-1, AC-2)", async ({
+    page,
+  }) => {
+    await page.goto(MULTI);
+
+    // Both inputs carry the widget's placeholder: both are bound.
+    await expect(modalInput(page)).toHaveAttribute("placeholder", "Search");
+    await expect(pageInput(page)).toHaveAttribute("placeholder", "Search");
+
+    // Open the header search modal the theme's way: details open, page
+    // dimmed, body scroll locked.
+    await page.getByTestId("header-search-summary").click();
+    await expect(headerDetails(page)).toHaveAttribute("open");
+    await expect(dim(page)).toBeVisible();
+    expect(await bodyScrollLocked(page)).toBe(true);
+
+    // A takeover submit from the modal input: native results render in the
+    // page, no navigation to /search — and the theme's modal state is gone
+    // without any further click.
+    await modalInput(page).fill("runner");
+    await modalInput(page).press("Enter");
+    await expect(nativeItems(page)).toHaveCount(3);
+    expect(new URL(page.url()).pathname).toBe("/theme-native.html");
+    await expect(headerDetails(page)).not.toHaveAttribute("open");
+    await expect(dim(page)).toBeHidden();
+    expect(await bodyScrollLocked(page)).toBe(false);
+
+    // The in-page input submits through the same takeover: same request
+    // shape, same native rendering, still no navigation.
+    await pageInput(page).fill("nike");
+    await pageInput(page).press("Enter");
+    await expect
+      .poll(async () =>
+        page.evaluate(
+          () =>
+            (window as unknown as { __searchRequests: { query: string }[] })
+              .__searchRequests.map((request) => request.query),
+        ),
+      )
+      .toEqual(["runner", "nike"]);
+    await expect(nativeItems(page)).toHaveCount(3);
+    expect(new URL(page.url()).pathname).toBe("/theme-native.html");
+  });
+
+  test("the magnifier of either form submits through the takeover (AC-1)", async ({
+    page,
+  }) => {
+    await page.goto(MULTI);
+
+    await page.getByTestId("header-search-summary").click();
+    await modalInput(page).fill("runner");
+    await page
+      .locator("details-modal.header__search button[type='submit']")
+      .click();
+    await expect(nativeItems(page)).toHaveCount(3);
+    expect(new URL(page.url()).pathname).toBe("/theme-native.html");
+    await expect(headerDetails(page)).not.toHaveAttribute("open");
+
+    await pageInput(page).fill("nike");
+    await page.locator("header.header > form button[type='submit']").click();
+    await expect
+      .poll(async () =>
+        page.evaluate(
+          () =>
+            (window as unknown as { __searchRequests: unknown[] })
+              .__searchRequests.length,
+        ),
+      )
+      .toBe(2);
+    expect(new URL(page.url()).pathname).toBe("/theme-native.html");
+  });
+
+  test("an input mounted after init is bound and taken over (AC-1)", async ({
+    page,
+  }) => {
+    await page.goto(`${MULTI}&lazyInput=1`);
+
+    // The lazy form mounts ~300ms after init; binding follows via the
+    // DOM observer — proven by the widget's placeholder landing on it.
+    await expect(lazyInput(page)).toHaveAttribute("placeholder", "Search", {
+      timeout: 5000,
+    });
+    await lazyInput(page).fill("runner");
+    await lazyInput(page).press("Enter");
+    await expect(nativeItems(page)).toHaveCount(3);
+    expect(new URL(page.url()).pathname).toBe("/theme-native.html");
+  });
+
+  test("Escape dismisses identically from every bound input, and typing previews from each (AC-3)", async ({
+    page,
+  }) => {
+    await page.goto("/theme-native.html?native=A&multi=1");
+
+    // Preview from the modal input opens the overlay; Escape closes it and
+    // retains the query.
+    await page.getByTestId("header-search-summary").click();
+    await modalInput(page).fill("runner");
+    await expect(overlay(page)).toBeVisible();
+    await modalInput(page).press("Escape");
+    await expect(overlay(page)).toBeHidden();
+    await expect(modalInput(page)).toHaveValue("runner");
+
+    // The same from the in-page input.
+    await pageInput(page).fill("nike");
+    await expect(overlay(page)).toBeVisible();
+    await pageInput(page).press("Escape");
+    await expect(overlay(page)).toBeHidden();
+    await expect(pageInput(page)).toHaveValue("nike");
+
+    // After a dismissal, Enter on the still-focused input submits natively
+    // (the pre-existing single-input semantics, now per input): the
+    // theme's own navigation to /search proceeds.
+    await pageInput(page).press("Enter");
+    await page.waitForURL(/\/search\?/);
+    expect(new URL(page.url()).searchParams.get("q")).toBe("nike");
+  });
+
+  test("going inert restores every bound input's theme placeholder (YOY-48 AC-2 across inputs)", async ({
+    page,
+  }) => {
+    await page.goto("/theme-native.html?multi=1&fixture=error");
+
+    // Three consecutive hard failures are structural (YOY-61 AC-4): the
+    // widget removes itself and hands EVERY bound input its own placeholder
+    // back — the modal input included, though it never ran a search.
+    for (const query of ["nike", "nike two"]) {
+      await pageInput(page).fill("");
+      await expect(noResults(page)).toBeHidden();
+      await pageInput(page).fill(query);
+      await expect(noResults(page)).toBeVisible({ timeout: 5000 });
+    }
+    await pageInput(page).fill("");
+    await pageInput(page).fill("nike three");
+    await expect(page.getByTestId("unfiltered-widget-root")).toHaveCount(0);
+    await expect(pageInput(page)).toHaveAttribute(
+      "placeholder",
+      "Theme search",
+    );
+    await expect(modalInput(page)).toHaveAttribute(
+      "placeholder",
+      "Theme search",
+    );
+  });
+
+  test("overlay path: both inputs are taken over and the theme's modal is left as it was (flag off)", async ({
+    page,
+  }) => {
+    await page.goto("/theme-native.html?multi=1&debounce=30000");
+
+    await page.getByTestId("header-search-summary").click();
+    await modalInput(page).fill("runner");
+    await modalInput(page).press("Enter");
+    await expect(cards(page)).toHaveCount(3);
+    expect(new URL(page.url()).pathname).toBe("/theme-native.html");
+    // The floating overlay sits above the theme's modal; the modal — which
+    // holds the input the shopper is typing in — stays open on this path.
+    await expect(headerDetails(page)).toHaveAttribute("open");
+
+    await page.keyboard.press("Escape");
+    await expect(overlay(page)).toBeHidden();
+    await pageInput(page).fill("nike");
+    await pageInput(page).press("Enter");
+    await expect(cards(page)).toHaveCount(3);
+    expect(new URL(page.url()).pathname).toBe("/theme-native.html");
+  });
+});
