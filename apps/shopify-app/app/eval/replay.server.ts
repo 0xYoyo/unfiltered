@@ -87,7 +87,7 @@ export function createReplayLlmClient({
         operation: request.operation,
         inputTokens: entry.inputTokens,
         outputTokens: entry.outputTokens,
-        shopDomain: request.shopDomain,
+        storeId: request.storeId,
         searchId: request.searchId,
       });
       return structuredClone(entry.output);
@@ -123,7 +123,7 @@ export function createReplayEmbeddingClient({
         operation: request.operation ?? "embedding",
         inputTokens: Math.ceil(chars / 4),
         outputTokens: 0,
-        shopDomain: request.shopDomain,
+        storeId: request.storeId,
         searchId: request.searchId,
       });
       return vectors;

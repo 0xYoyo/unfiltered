@@ -34,7 +34,7 @@ import { expandCategoryConstraint } from "@unfiltered/engine";
 export function createPgVectorRetrievalStore(db: PrismaClient): RetrievalStore {
   return {
     async query(request: StoreQueryRequest): Promise<StoreQueryHit[]> {
-      const { shopDomain, constraints, vector, limit } = request;
+      const { storeId: shopDomain, constraints, vector, limit } = request;
       const dimension = vector.length;
       if (!Number.isInteger(dimension) || dimension <= 0) {
         throw new RangeError(

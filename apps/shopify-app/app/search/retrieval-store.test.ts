@@ -109,7 +109,7 @@ async function queryIds(
   shopDomain = SHOP,
 ): Promise<string[]> {
   const hits = await createPgVectorRetrievalStore(db).query({
-    shopDomain,
+    storeId: shopDomain,
     constraints,
     vector,
     limit: 10,
@@ -303,7 +303,7 @@ describe("hard constraints are filters, never preferences (AC-2)", () => {
     ]);
 
     const hits = await createPgVectorRetrievalStore(db).query({
-      shopDomain: SHOP,
+      storeId: SHOP,
       constraints: { ...noConstraints(), colorsInclude: ["blue"] },
       vector: [1, 0, 0],
       limit: 10,
@@ -318,7 +318,7 @@ describe("hard constraints are filters, never preferences (AC-2)", () => {
 
     // Without a positive color constraint, no flag and pure similarity order.
     const unconstrained = await createPgVectorRetrievalStore(db).query({
-      shopDomain: SHOP,
+      storeId: SHOP,
       constraints: noConstraints(),
       vector: [1, 0, 0],
       limit: 10,
@@ -348,7 +348,7 @@ describe("hard constraints are filters, never preferences (AC-2)", () => {
     ]);
 
     const hits = await createPgVectorRetrievalStore(db).query({
-      shopDomain: SHOP,
+      storeId: SHOP,
       constraints: { ...noConstraints(), colorsExclude: ["black"] },
       vector: [1, 0, 0],
       limit: 10,
@@ -420,7 +420,7 @@ describe("similarity ranking (AC-3)", () => {
     ]);
 
     const hits = await createPgVectorRetrievalStore(db).query({
-      shopDomain: SHOP,
+      storeId: SHOP,
       constraints: noConstraints(),
       vector: [1, 0, 0],
       limit: 10,
@@ -475,7 +475,7 @@ describe("latency (AC-5)", () => {
     const store = createPgVectorRetrievalStore(db);
     const started = performance.now();
     const hits = await store.query({
-      shopDomain: SHOP,
+      storeId: SHOP,
       constraints: {
         ...noConstraints(),
         priceMax: 500,
@@ -535,7 +535,7 @@ describe("end to end through the engine API (AC-1)", () => {
     });
     const result = await retriever.retrieve({
       intent,
-      shopDomain: SHOP,
+      storeId: SHOP,
       searchId: "search-1",
     });
 

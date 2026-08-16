@@ -60,7 +60,7 @@ function llmStub(
         operation: request.operation,
         inputTokens: 100,
         outputTokens: 50,
-        shopDomain: request.shopDomain,
+        storeId: request.storeId,
       });
       const response = respond(request, calls.length);
       if (response instanceof Error) {
@@ -226,7 +226,7 @@ describe("catalog enrichment", () => {
     for (const call of calls) {
       expect(call.schema).toBe(ENRICHMENT_SCHEMA);
       expect(call.operation).toBe("enrichment");
-      expect(call.shopDomain).toBe(SHOP);
+      expect(call.storeId).toBe(SHOP);
     }
     // Prompts carry the issue-specified source fields, in whatever language.
     expect(calls[1]?.prompt).toContain("שמלת ערב שחורה");

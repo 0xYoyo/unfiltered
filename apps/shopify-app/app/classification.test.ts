@@ -25,7 +25,7 @@ function meteredLlmStub(costRecorder: CostRecorder): LlmClient {
         operation: request.operation,
         inputTokens: 100,
         outputTokens: 10,
-        shopDomain: request.shopDomain,
+        storeId: request.storeId,
       });
       return { route: "ai" };
     },
@@ -50,13 +50,13 @@ describe("classification cost ledger", () => {
 
     // Escalated query: one metered call. Cached repeat: no new row.
     await classifier.classify("שמלה אלגנטית לחתונה בקיץ לא שחור", {
-      shopDomain: SHOP,
+      storeId: SHOP,
     });
     await classifier.classify("שמלה אלגנטית לחתונה בקיץ לא שחור", {
-      shopDomain: SHOP,
+      storeId: SHOP,
     });
     // Heuristic fast path: no LLM call, no row.
-    await classifier.classify("nike air max 90", { shopDomain: SHOP });
+    await classifier.classify("nike air max 90", { storeId: SHOP });
 
     const rows = await db.aiCall.findMany({
       where: { operation: "classification" },

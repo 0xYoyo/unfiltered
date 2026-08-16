@@ -37,7 +37,7 @@ export const CLASSIFICATION_SCHEMA: JsonSchema = {
 
 /** Per-call context forwarded to the LLM port for metering. */
 export interface ClassificationContext {
-  shopDomain?: string;
+  storeId?: string;
   searchId?: string;
 }
 
@@ -291,7 +291,7 @@ export function createQueryClassifier(
           // Routing must be deterministic: the same query always takes the
           // same route (YOY-52 — the g21/g22 flip-flop across live runs).
           temperature: 0,
-          shopDomain: context?.shopDomain,
+          storeId: context?.storeId,
           searchId: context?.searchId,
         }),
         new Promise<never>((_resolve, reject) => {

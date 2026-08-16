@@ -200,7 +200,7 @@ export async function embedCatalog({
     const batch = toEmbed.slice(start, start + EMBED_BATCH_SIZE);
     const vectors = await embeddings.embed({
       texts: batch.map((entry) => entry.text),
-      shopDomain,
+      storeId: shopDomain,
     });
     if (vectors.length !== batch.length) {
       throw new EmbeddingDimensionError(

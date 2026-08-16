@@ -106,12 +106,12 @@ describe("retrieve (AC-1, AC-3)", () => {
 
     const result = await retriever.retrieve({
       intent,
-      shopDomain: "shop-a.myshopify.com",
+      storeId: "shop-a.myshopify.com",
       limit: 5,
     });
 
     expect(queries).toHaveLength(1);
-    expect(queries[0]!.shopDomain).toBe("shop-a.myshopify.com");
+    expect(queries[0]!.storeId).toBe("shop-a.myshopify.com");
     expect(queries[0]!.constraints).toEqual(constraintsFromIntent(intent));
     expect(queries[0]!.vector).toEqual([0.5, 0.5, 0]);
     expect(queries[0]!.limit).toBe(5);
@@ -128,7 +128,7 @@ describe("retrieve (AC-1, AC-3)", () => {
 
     const result = await retriever.retrieve({
       intent,
-      shopDomain: "shop-a.myshopify.com",
+      storeId: "shop-a.myshopify.com",
     });
 
     expect(result.appliedConstraints).toEqual([
@@ -145,7 +145,7 @@ describe("retrieve (AC-1, AC-3)", () => {
     const { store, queries } = storeStub();
     await createRetriever({ embeddings, store }).retrieve({
       intent,
-      shopDomain: "shop-a.myshopify.com",
+      storeId: "shop-a.myshopify.com",
     });
     expect(queries[0]!.limit).toBe(10);
   });
@@ -157,13 +157,13 @@ describe("retrieve (AC-1, AC-3)", () => {
 
     await retriever.retrieve({
       intent,
-      shopDomain: "shop-a.myshopify.com",
+      storeId: "shop-a.myshopify.com",
       searchId: "search-1",
     });
 
     expect(calls).toHaveLength(1);
     expect(calls[0]!.operation).toBe("embedding");
-    expect(calls[0]!.shopDomain).toBe("shop-a.myshopify.com");
+    expect(calls[0]!.storeId).toBe("shop-a.myshopify.com");
     expect(calls[0]!.searchId).toBe("search-1");
     expect(calls[0]!.texts).toEqual([composeQueryText(intent)]);
   });
@@ -173,8 +173,8 @@ describe("retrieve (AC-1, AC-3)", () => {
     const { store } = storeStub();
     const retriever = createRetriever({ embeddings, store });
 
-    await retriever.retrieve({ intent, shopDomain: "shop-a.myshopify.com" });
-    await retriever.retrieve({ intent, shopDomain: "shop-a.myshopify.com" });
+    await retriever.retrieve({ intent, storeId: "shop-a.myshopify.com" });
+    await retriever.retrieve({ intent, storeId: "shop-a.myshopify.com" });
 
     expect(calls).toHaveLength(1);
   });
@@ -184,10 +184,10 @@ describe("retrieve (AC-1, AC-3)", () => {
     const { store } = storeStub();
     const retriever = createRetriever({ embeddings, store });
 
-    await retriever.retrieve({ intent, shopDomain: "shop-a.myshopify.com" });
+    await retriever.retrieve({ intent, storeId: "shop-a.myshopify.com" });
     await retriever.retrieve({
       intent: { ...intent, softAttributes: ["boho"] },
-      shopDomain: "shop-a.myshopify.com",
+      storeId: "shop-a.myshopify.com",
     });
 
     expect(calls).toHaveLength(2);
@@ -199,9 +199,9 @@ describe("retrieve (AC-1, AC-3)", () => {
     const retriever = createRetriever({ embeddings, store, cacheSize: 1 });
     const other: Intent = { ...intent, softAttributes: ["boho"] };
 
-    await retriever.retrieve({ intent, shopDomain: "shop-a.myshopify.com" });
-    await retriever.retrieve({ intent: other, shopDomain: "shop-a.myshopify.com" });
-    await retriever.retrieve({ intent, shopDomain: "shop-a.myshopify.com" });
+    await retriever.retrieve({ intent, storeId: "shop-a.myshopify.com" });
+    await retriever.retrieve({ intent: other, storeId: "shop-a.myshopify.com" });
+    await retriever.retrieve({ intent, storeId: "shop-a.myshopify.com" });
 
     expect(calls).toHaveLength(3);
   });
@@ -228,7 +228,7 @@ describe("empty query text (YOY-29 AC-9)", () => {
     await expect(
       retriever.retrieve({
         intent: constraintsOnly,
-        shopDomain: "shop-a.myshopify.com",
+        storeId: "shop-a.myshopify.com",
       }),
     ).rejects.toBeInstanceOf(EmptyQueryTextError);
     expect(calls).toHaveLength(0);
@@ -244,7 +244,7 @@ describe("score range (YOY-29 AC-10)", () => {
 
     const result = await retriever.retrieve({
       intent,
-      shopDomain: "shop-a.myshopify.com",
+      storeId: "shop-a.myshopify.com",
     });
 
     expect(result.hits).toEqual([

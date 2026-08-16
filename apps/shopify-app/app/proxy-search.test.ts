@@ -281,7 +281,7 @@ function fakeLlm(handlers: {
         operation: request.operation,
         inputTokens: 10,
         outputTokens: 5,
-        shopDomain: request.shopDomain,
+        storeId: request.storeId,
         searchId: request.searchId,
       });
       const handler =
@@ -306,7 +306,7 @@ function fakeEmbeddings(options?: { costRecorder?: CostRecorder }): EmbeddingCli
         operation: "embedding",
         inputTokens: 5,
         outputTokens: 0,
-        shopDomain: request.shopDomain,
+        storeId: request.storeId,
         searchId: request.searchId,
       });
       return request.texts.map(() => [1, 0, 0]);

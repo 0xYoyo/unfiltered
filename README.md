@@ -92,7 +92,7 @@ The storefront search widget lives in `apps/shopify-app/widget/`
 (TypeScript + CSS, bundled by Vite) and ships to themes through the theme
 app extension in `apps/shopify-app/extensions/unfiltered-widget/`: an app
 embed block loads the built assets and calls
-`window.UnfilteredWidget.init({ locale, shopDomain })` with the storefront
+`window.UnfilteredWidget.init({ locale, storeId })` with the storefront
 locale and shop domain. Build the self-contained bundle into the extension's
 `assets/` (the output is committed):
 

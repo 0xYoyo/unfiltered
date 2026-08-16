@@ -147,11 +147,11 @@ Retrieval (the AI result path; data reached only through injected ports):
 - `interface RetrievalStore` — the store port the consumer implements over
   its own database (the app: Postgres/pgvector in
   `apps/shopify-app/app/search/retrieval-store.server.ts`). One
-  `query({ shopDomain, constraints, vector, limit })` call returns products
+  `query({ storeId, constraints, vector, limit })` call returns products
   matching every hard constraint, ranked by cosine distance; constraints are
   WHERE filters inside the store, never post-ranking.
 - `createRetriever({ embeddings, store, cacheSize? }): Retriever` —
-  `retrieve({ intent, shopDomain, limit?, searchId? })` maps the Intent's
+  `retrieve({ intent, storeId, limit?, searchId? })` maps the Intent's
   hard constraints to store filters (`constraintsFromIntent`; size is
   deliberately unmapped — no per-size inventory exists to filter on), embeds
   the intent's descriptive signal (`composeQueryText`, metered as operation
@@ -168,7 +168,7 @@ Classic keyword search (the zero-LLM result path; YOY-41):
 
 - `interface ClassicSearchStore` — the keyword-search port the consumer
   implements over its own database. One
-  `search({ shopDomain, query?, constraints?, limit? })` call returns
+  `search({ storeId, query?, constraints?, limit? })` call returns
   `{ hits: [{ productId, score }] }` — ranked keyword hits, score in [0, 1],
   higher is better. A request with constraints and no query text is
   constraint-only mode: results are filtered without text ranking and every
@@ -196,9 +196,9 @@ Classic keyword search (the zero-LLM result path; YOY-41):
 AI ports (vendor-free; implemented by provider adapter packages):
 
 - `type JsonSchema` — `Record<string, unknown>` JSON Schema document.
-- `interface StructuredCompletionRequest` — `{ prompt; schema; operation; shopDomain?; searchId? }`.
+- `interface StructuredCompletionRequest` — `{ prompt; schema; operation; storeId?; searchId? }`.
 - `interface LlmClient` — `{ completeStructured(request): Promise<unknown> }`.
-- `interface EmbeddingRequest` — `{ texts: string[]; operation?; shopDomain?; searchId? }`.
+- `interface EmbeddingRequest` — `{ texts: string[]; operation?; storeId?; searchId? }`.
 - `interface EmbeddingClient` — `{ readonly dimension: number; embed(request): Promise<number[][]> }`.
 - `interface AiCallUsage` / `interface CostRecorder` — the metering port every
   adapter records through.
@@ -422,7 +422,7 @@ there as a `<style>` element, so theme CSS cannot break the overlay layout
 and widget CSS cannot leak onto host elements, while inheritable typography
 (font-family, color) still flows in from the host page. The extension's app
 embed block (`blocks/unfiltered-search.liquid`, `target: body`) loads the
-bundle and calls `window.UnfilteredWidget.init({ locale, shopDomain })`.
+bundle and calls `window.UnfilteredWidget.init({ locale, storeId })`.
 
 Widget behavior (YOY-48): `init` locates the theme's own search input
 (`input[type="search"]`, or a `/search`-action form's `q` input) and takes

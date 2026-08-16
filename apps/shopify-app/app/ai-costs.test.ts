@@ -35,7 +35,7 @@ async function seedFixtureLedger(client: PrismaClient) {
     operation: "classification",
     inputTokens: 1000,
     outputTokens: 500,
-    shopDomain: "test-shop.myshopify.com",
+    storeId: "test-shop.myshopify.com",
     searchId: "search-1",
   });
   await recorder.record({
@@ -86,7 +86,7 @@ describe("Prisma cost recorder", () => {
       operation: "classification",
       inputTokens: 1000,
       outputTokens: 500,
-      shopDomain: "test-shop.myshopify.com",
+      storeId: "test-shop.myshopify.com",
       searchId: "search-1",
     });
 

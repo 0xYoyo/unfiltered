@@ -307,16 +307,16 @@ describe("port call shape (AC-2, AC-4)", () => {
     expect(calls[0]!.temperature).toBe(0);
   });
 
-  it("forwards shopDomain and searchId to the port for metering", async () => {
+  it("forwards storeId and searchId to the port for metering", async () => {
     const { llm, calls } = llmStub(scenarios[0]!.recorded);
     const extractor = createIntentExtractor({ llm });
 
     await extractor.extract(scenarios[0]!.query, {
-      shopDomain: "test-shop.myshopify.com",
+      storeId: "test-shop.myshopify.com",
       searchId: "search-1",
     });
 
-    expect(calls[0]!.shopDomain).toBe("test-shop.myshopify.com");
+    expect(calls[0]!.storeId).toBe("test-shop.myshopify.com");
     expect(calls[0]!.searchId).toBe("search-1");
   });
 });
@@ -329,7 +329,7 @@ describe("refinement context (YOY-42 AC-1, AC-4)", () => {
     const extractor = createIntentExtractor({ llm });
 
     await extractor.extract(scenarios[0]!.query);
-    await extractor.extract(scenarios[0]!.query, { shopDomain: "s.example" });
+    await extractor.extract(scenarios[0]!.query, { storeId: "s.example" });
 
     // A context without previousIntent is the pre-YOY-42 prompt, byte for
     // byte — recordings and caches keyed on it stay valid.
