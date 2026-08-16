@@ -328,7 +328,7 @@ vitest.setup.ts
 - apps/shopify-app/app/shopify.server.ts → apps/shopify-app/app/db.server.ts
 - apps/shopify-app/scripts/ingest.mts → apps/shopify-app/app/catalog/embed.server.ts, apps/shopify-app/app/catalog/enrich.server.ts, apps/shopify-app/app/catalog/ingest.server.ts
 - apps/shopify-app/widget/src/format.ts → apps/shopify-app/widget/src/strings.ts
-- apps/shopify-app/widget/src/main.ts → apps/shopify-app/widget/src/overlay.ts, apps/shopify-app/widget/src/search-client.ts, apps/shopify-app/widget/src/session.ts, apps/shopify-app/widget/src/strings.ts
+- apps/shopify-app/widget/src/main.ts → apps/shopify-app/widget/src/native-render (unresolved), apps/shopify-app/widget/src/native-render.config (unresolved), apps/shopify-app/widget/src/overlay.ts, apps/shopify-app/widget/src/search-client.ts, apps/shopify-app/widget/src/session.ts, apps/shopify-app/widget/src/strings.ts
 - apps/shopify-app/widget/src/overlay.ts → apps/shopify-app/widget/src/format.ts, apps/shopify-app/widget/src/search-client.ts, apps/shopify-app/widget/src/strings.ts, apps/shopify-app/widget/src/widget.css?inline (unresolved)
 - apps/shopify-app/widget/test-ui/localization.spec.ts → apps/shopify-app/widget/src/strings.ts
 - packages/engine/src/classic.ts → packages/engine/src/retrieve.ts
