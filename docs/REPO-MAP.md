@@ -255,6 +255,17 @@ docs/
       live-B-desktop-titles-prices.jpg
       live-flag-off-overlay.jpg
       live-theme-native-results-same-page.jpg
+    YOY-99/
+      1-modal-open-desktop.png
+      1-modal-open-mobile.png
+      2-modal-submit-results-desktop.png
+      2-modal-submit-results-mobile.png
+      3-inpage-submit-results-desktop.png
+      3-inpage-submit-results-mobile.png
+      4-modal-submit-results-he-rtl-desktop.png
+      5-loading-desktop.png
+      6-empty-desktop.png
+      7-error-desktop.png
 package.json
 packages/
   engine/
