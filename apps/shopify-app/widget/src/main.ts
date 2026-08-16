@@ -1,3 +1,9 @@
+import {
+  createNativeComposite,
+  createNativeSurface,
+  resolveNativeRender,
+} from "./native-render";
+import type { NativeRenderOverrides } from "./native-render.config";
 import { createOverlay, ROOT_TESTID } from "./overlay";
 import {
   createSearchClient,
@@ -38,6 +44,12 @@ export interface WidgetConfig {
   searchTimeoutMs?: number;
   /** Debounce for typing → search (harness shortens it). */
   debounceMs?: number;
+  /**
+   * Theme-native rendering of the submit tier (YOY-70 spike): opt-in only —
+   * absent means the existing overlay path, exactly as before. The dev flag
+   * `?unfiltered_native=A|B` overrides for the browser session.
+   */
+  nativeRender?: NativeRenderOverrides;
 }
 
 const DEFAULT_DEBOUNCE_MS = 200;
@@ -128,9 +140,7 @@ export function init(config: WidgetConfig): void {
     let heldIntent: ProxyIntent | null = null;
     let lastQuery = "";
 
-    const overlay = createOverlay({
-      locale: config.locale,
-      shopDomain: config.shopDomain,
+    const surfaceOptions = {
       onClose: () => {
         dismiss();
       },
@@ -143,7 +153,27 @@ export function init(config: WidgetConfig): void {
         overlay.showIdle();
         input.focus();
       },
+    };
+    const shadowOverlay = createOverlay({
+      locale: config.locale,
+      shopDomain: config.shopDomain,
+      ...surfaceOptions,
     });
+    // Theme-native rendering (YOY-70): off unless configured or dev-flagged,
+    // in which case submitted responses render as the theme's own cards in
+    // the host document while previews keep the shadow overlay (NG-3).
+    const nativeConfig = resolveNativeRender(config.nativeRender);
+    const overlay =
+      nativeConfig === null
+        ? shadowOverlay
+        : createNativeComposite(
+            shadowOverlay,
+            createNativeSurface({
+              locale: config.locale,
+              config: nativeConfig,
+              ...surfaceOptions,
+            }),
+          );
 
     /** A debounced preview is pending or a request is in flight (YOY-69
      * AC-2): the window in which dismissal must cancel, not just hide. */

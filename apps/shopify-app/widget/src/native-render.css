@@ -1,0 +1,119 @@
+/* Theme-native results panel chrome (YOY-70 spike). These rules live in the
+   HOST document (light DOM) — the whole point of the panel is that the
+   theme's own CSS reaches the injected cards — so every selector is
+   prefixed and only the widget's residual chrome (bar, chips, status) is
+   styled here; the cards and the grid are the theme's. Chrome stays
+   inherit-first and achromatic (DESIGN.md W-3/W-4): no font, no color, no
+   brand hue of our own. */
+
+.unfiltered-native {
+  display: block;
+  box-sizing: border-box;
+  margin-block: 16px;
+}
+
+.unfiltered-native[hidden] {
+  display: none;
+}
+
+.unfiltered-native__bar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-block-end: 8px;
+}
+
+.unfiltered-native__new-search,
+.unfiltered-native__close {
+  box-sizing: border-box;
+  padding: 4px 12px;
+  font: inherit;
+  font-size: 0.9em;
+  line-height: 1.4;
+  color: inherit;
+  background: transparent;
+  border: 1px solid currentColor;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.unfiltered-native__new-search {
+  margin-inline-end: auto;
+}
+
+.unfiltered-native__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-block-end: 12px;
+}
+
+.unfiltered-native__chips[hidden] {
+  display: none;
+}
+
+.unfiltered-native__chip {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  font: inherit;
+  font-size: 0.9em;
+  color: inherit;
+  background: transparent;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.unfiltered-native__status {
+  padding: 12px 0;
+  opacity: 0.8;
+}
+
+.unfiltered-native__status[hidden] {
+  display: none;
+}
+
+.unfiltered-native__close-matches[hidden] {
+  display: none;
+}
+
+.unfiltered-native__close-matches-heading {
+  font-size: 1.1em;
+  margin-block: 16px 8px;
+}
+
+/* Color truthfulness (YOY-67 AC-5) carried onto native cards: the item is
+   dimmed and labeled, so a color-unknown hit never poses as a confirmed
+   match under a color chip. */
+.unfiltered-native__item--color-unknown {
+  opacity: 0.6;
+}
+
+.unfiltered-native__note {
+  display: block;
+  font-size: 0.85em;
+  opacity: 0.8;
+}
+
+/* Fallback card (functional always): renders when a native mechanism
+   cannot produce a card for a result — plain, inherit-first. */
+.unfiltered-native__fallback {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
+.unfiltered-native__fallback-image {
+  display: block;
+  inline-size: 100%;
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.unfiltered-native__fallback-title {
+  margin-block-start: 8px;
+}

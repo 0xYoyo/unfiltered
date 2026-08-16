@@ -177,11 +177,14 @@ apps/
     scripts/
       evidence.mts
       ingest.mts
+      native-render-template.mts
     shopify.app.toml
     shopify.web.toml
     tsconfig.json
     vite.config.ts
     widget/
+      harness/
+        theme-card.css
       hostile-css.html
       index.html
       native-predictive.html
@@ -190,6 +193,9 @@ apps/
         env.d.ts
         format.ts
         main.ts
+        native-render.config.ts
+        native-render.css
+        native-render.ts
         overlay.ts
         search-client.ts
         session.ts
@@ -208,9 +214,24 @@ apps/
           zero-hit-he-darwin.png
           zero-hit-he-linux.png
         native-predictive.spec.ts
+        native-render.spec.ts
+        native-render.spec.ts-snapshots/
+          native-A-en-desktop-darwin.png
+          native-A-en-desktop-linux.png
+          native-A-en-mobile-darwin.png
+          native-A-en-mobile-linux.png
+          native-A-he-desktop-darwin.png
+          native-A-he-desktop-linux.png
+          native-B-en-desktop-darwin.png
+          native-B-en-desktop-linux.png
+          native-B-en-mobile-darwin.png
+          native-B-en-mobile-linux.png
+          native-B-he-desktop-darwin.png
+          native-B-he-desktop-linux.png
         preview-submit.spec.ts
         search-takeover.spec.ts
         widget.spec.ts
+      theme-native.html
       vite.config.ts
 config/
   ai-prices.json
@@ -225,6 +246,15 @@ docs/
   M3-LIVE-RUN.md
   PORTABILITY.md
   PRD.md
+  evidence/
+    YOY-70/
+      live-A-desktop-panel.jpg
+      live-A-he-rtl.jpg
+      live-A-mobile.jpg
+      live-B-desktop-panel.jpg
+      live-B-desktop-titles-prices.jpg
+      live-flag-off-overlay.jpg
+      live-theme-native-results-same-page.jpg
 package.json
 packages/
   engine/
@@ -263,7 +293,7 @@ vitest.setup.ts
 
 ## Key locations
 
-- **Config files**: .claude/yoyo.md, .github/workflows/ci.yml, apps/shopify-app/package.json, apps/shopify-app/tsconfig.json, apps/shopify-app/vite.config.ts, apps/shopify-app/widget/vite.config.ts, package.json, packages/engine/package.json, packages/engine/tsconfig.json, packages/provider-gemini/package.json, packages/provider-gemini/tsconfig.json, playwright.config.ts, vitest.config.ts
+- **Config files**: .claude/yoyo.md, .github/workflows/ci.yml, apps/shopify-app/package.json, apps/shopify-app/tsconfig.json, apps/shopify-app/vite.config.ts, apps/shopify-app/widget/src/native-render.config.ts, apps/shopify-app/widget/vite.config.ts, package.json, packages/engine/package.json, packages/engine/tsconfig.json, packages/provider-gemini/package.json, packages/provider-gemini/tsconfig.json, playwright.config.ts, vitest.config.ts
 - **Env files (paths only — contents never read)**: .env (declared in .gitignore), .env.* (declared in .gitignore), .env.example, apps/shopify-app/.env (declared in .gitignore), apps/shopify-app/.env.example
 - **Entrypoints**: apps/shopify-app/app/routes/app.tsx, apps/shopify-app/widget/src/main.ts, packages/engine/src/index.ts, packages/provider-gemini/src/index.ts
 - **Scripts**: scripts/repo-map.mjs
@@ -327,8 +357,10 @@ vitest.setup.ts
 - apps/shopify-app/app/session-storage.test.ts → apps/shopify-app/app/testing/helpers.server.ts
 - apps/shopify-app/app/shopify.server.ts → apps/shopify-app/app/db.server.ts
 - apps/shopify-app/scripts/ingest.mts → apps/shopify-app/app/catalog/embed.server.ts, apps/shopify-app/app/catalog/enrich.server.ts, apps/shopify-app/app/catalog/ingest.server.ts
+- apps/shopify-app/scripts/native-render-template.mts → apps/shopify-app/widget/src/native-render.config.ts
 - apps/shopify-app/widget/src/format.ts → apps/shopify-app/widget/src/strings.ts
-- apps/shopify-app/widget/src/main.ts → apps/shopify-app/widget/src/overlay.ts, apps/shopify-app/widget/src/search-client.ts, apps/shopify-app/widget/src/session.ts, apps/shopify-app/widget/src/strings.ts
+- apps/shopify-app/widget/src/main.ts → apps/shopify-app/widget/src/native-render.config.ts, apps/shopify-app/widget/src/native-render.ts, apps/shopify-app/widget/src/overlay.ts, apps/shopify-app/widget/src/search-client.ts, apps/shopify-app/widget/src/session.ts, apps/shopify-app/widget/src/strings.ts
+- apps/shopify-app/widget/src/native-render.ts → apps/shopify-app/widget/src/format.ts, apps/shopify-app/widget/src/native-render.config.ts, apps/shopify-app/widget/src/native-render.css?inline (unresolved), apps/shopify-app/widget/src/overlay.ts, apps/shopify-app/widget/src/search-client.ts, apps/shopify-app/widget/src/strings.ts
 - apps/shopify-app/widget/src/overlay.ts → apps/shopify-app/widget/src/format.ts, apps/shopify-app/widget/src/search-client.ts, apps/shopify-app/widget/src/strings.ts, apps/shopify-app/widget/src/widget.css?inline (unresolved)
 - apps/shopify-app/widget/test-ui/localization.spec.ts → apps/shopify-app/widget/src/strings.ts
 - packages/engine/src/classic.ts → packages/engine/src/retrieve.ts

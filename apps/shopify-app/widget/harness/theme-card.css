@@ -1,0 +1,125 @@
+/* Harness stand-in for the theme's own card CSS (YOY-70): a Dawn-shaped
+   subset (grid, card, media ratio, heading, price) so the theme-native
+   fixture page renders recognizable product cards and injected cards prove
+   that HOST CSS — not widget CSS — styles them. Loaded by theme-native.html
+   and re-declared by the stubbed alternate template as a <link>, exactly
+   like Dawn's card snippet ships component-rating.css. */
+
+:root {
+  --harness-card-bg: #f6f6f6;
+  --harness-text: #121212;
+}
+
+body {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  color: var(--harness-text);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  border-bottom: 1px solid #ddd;
+}
+
+.page-width {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.grid {
+  display: grid;
+  gap: 16px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.product-grid.grid--4-col-desktop {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+@media (max-width: 749px) {
+  .product-grid.grid--2-col-tablet-down {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.card-wrapper {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
+.card {
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--harness-card-bg);
+}
+
+.card__inner.ratio {
+  position: relative;
+  padding-bottom: var(--ratio-percent, 125%);
+}
+
+.card__media {
+  position: absolute;
+  inset: 0;
+}
+
+.card__media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.card__content {
+  padding: 10px 12px 14px;
+}
+
+.card__heading {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: normal;
+  letter-spacing: 0.02em;
+}
+
+.card__heading a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.price {
+  margin-top: 6px;
+  font-size: 0.95rem;
+}
+
+.price__sale,
+.unit-price {
+  display: none;
+}
+
+.price--on-sale .price__sale {
+  display: block;
+}
+
+.card__badge .badge {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 2px 8px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 0.8rem;
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}

@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Unfiltered widget harness — theme-native rendering</title>
+    <link rel="stylesheet" href="/harness/theme-card.css" />
+  </head>
+  <body>
+    <!-- A Dawn-shaped fake storefront (YOY-70): the theme's own product
+         grid and card markup (the selectors the native-render config
+         targets), a standard search form, and stubs for the app proxy AND
+         for Shopify's alternate-template URL
+         `/products/<handle>?view=unfiltered-card`, which answers with the
+         same Dawn-shaped card for the requested handle. Variant B harvests
+         THIS page (its first card is the clone template); Variant A fetches
+         the stubbed alternate template per result. No Shopify, no network. -->
+    <header class="header">
+      <a href="/theme-native.html">Harness store</a>
+      <form action="/search" method="get" role="search">
+        <input type="search" name="q" placeholder="Theme search" />
+        <button type="submit">Search</button>
+      </form>
+    </header>
+    <main id="MainContent" class="page-width">
+      <h1>Featured</h1>
+      <ul
+        class="grid product-grid grid--2-col-tablet-down grid--4-col-desktop"
+        role="list"
+        data-testid="theme-grid"
+      >
+        <li class="grid__item">
+          <div class="card-wrapper product-card-wrapper underline-links-hover">
+            <div class="card card--standard card--media" style="--ratio-percent: 125.0%;">
+              <div class="card__inner color-background-2 gradient ratio" style="--ratio-percent: 125.0%;">
+                <div class="card__media">
+                  <div class="media media--transparent media--hover-effect">
+                    <img
+                      srcset="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'%3E%3Crect width='4' height='5' fill='%23b7c9d6'/%3E%3C/svg%3E 165w"
+                      src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'%3E%3Crect width='4' height='5' fill='%23b7c9d6'/%3E%3C/svg%3E"
+                      alt="Harvest Source Tee"
+                      width="400"
+                      height="500"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div class="card__content">
+                <div class="card__information">
+                  <h3 class="card__heading h5" id="title--1001">
+                    <a
+                      href="/products/harvest-source-tee"
+                      id="CardLink--1001"
+                      class="full-unstyled-link"
+                      aria-labelledby="CardLink--1001 Badge--1001"
+                    >Harvest Source Tee</a>
+                  </h3>
+                  <div class="card-information">
+                    <div class="price">
+                      <div class="price__container">
+                        <div class="price__regular">
+                          <span class="visually-hidden">Regular price</span>
+                          <span class="price-item price-item--regular">₪ 80</span>
+                        </div>
+                        <div class="price__sale">
+                          <span><s class="price-item price-item--regular">₪ 120</s></span>
+                          <span class="price-item price-item--sale price-item--last">₪ 80</span>
+                        </div>
+                        <small class="unit-price caption hidden"><span></span></small>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="card__badge bottom left" id="Badge--1001"></div>
+              </div>
+            </div>
+          </div>
+        </li>
+        <li class="grid__item">
+          <div class="card-wrapper product-card-wrapper underline-links-hover">
+            <div class="card card--standard card--media" style="--ratio-percent: 125.0%;">
+              <div class="card__inner color-background-2 gradient ratio" style="--ratio-percent: 125.0%;">
+                <div class="card__media">
+                  <div class="media media--transparent media--hover-effect">
+                    <img
+                      src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'%3E%3Crect width='4' height='5' fill='%23d6c9b7'/%3E%3C/svg%3E"
+                      alt="Second Theme Card"
+                      width="400"
+                      height="500"
+                    />
+                  </div>
+                </div>
+              </div>
+              <div class="card__content">
+                <div class="card__information">
+                  <h3 class="card__heading h5" id="title--1002">
+                    <a href="/products/second-theme-card" id="CardLink--1002" class="full-unstyled-link">Second Theme Card</a>
+                  </h3>
+                  <div class="card-information">
+                    <div class="price">
+                      <div class="price__container">
+                        <div class="price__regular">
+                          <span class="price-item price-item--regular">₪ 95</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="card__badge bottom left" id="Badge--1002"></div>
+              </div>
+            </div>
+          </div>
+        </li>
+      </ul>
+    </main>
+    <script type="module">
+      import { init } from "/src/main.ts";
+
+      const params = new URLSearchParams(window.location.search);
+      const fixture = params.get("fixture") ?? "results";
+      // `template=missing`: the alternate template is not installed on the
+      // theme (every ?view= fetch 404s) — the functional-always fallback.
+      const templateMissing = params.get("template") === "missing";
+
+      window.__searchRequests = [];
+      window.__altTemplateRequests = [];
+
+      const svg = (fill) =>
+        `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'%3E%3Crect width='4' height='5' fill='%23${fill}'/%3E%3C/svg%3E`;
+
+      const RESULTS = [
+        {
+          productId: "gid://shopify/Product/1",
+          title: "Nike Air 90",
+          handle: "nike-air-90",
+          imageUrl: svg("9fb8a8"),
+          priceMin: 100,
+          priceMax: 100,
+          currencyCode: "ILS",
+          available: true,
+        },
+        {
+          productId: "gid://shopify/Product/2",
+          title: "Runner Range",
+          handle: "runner-range",
+          imageUrl: null,
+          priceMin: 100,
+          priceMax: 150,
+          currencyCode: "ILS",
+          available: true,
+        },
+        {
+          productId: "gid://shopify/Product/3",
+          title: "Sold Out Boot",
+          handle: "sold-out-boot",
+          imageUrl: svg("c9a8b8"),
+          priceMin: 200,
+          priceMax: 200,
+          currencyCode: "ILS",
+          available: false,
+        },
+      ];
+
+      const RESULTS_RESPONSE = {
+        searchId: "harness-search-1",
+        route: "classic",
+        degraded: false,
+        results: RESULTS,
+        chips: [],
+        intent: null,
+      };
+
+      const AI_INTENT = {
+        category: "dress",
+        priceMin: null,
+        priceMax: 400,
+        currency: "ILS",
+        colorsInclude: ["blue"],
+        colorsExclude: [],
+        occasion: null,
+        size: null,
+        availabilityRequired: false,
+        softAttributes: [],
+      };
+      const AI_CHIPS = [
+        { field: "category", value: "dress" },
+        { field: "priceMax", value: "400" },
+        { field: "colorsInclude", value: "blue" },
+      ];
+      const AI_RESPONSE = {
+        searchId: "harness-ai-1",
+        route: "ai",
+        degraded: false,
+        results: [
+          { ...RESULTS[0], colorUnknown: false },
+          { ...RESULTS[1], colorUnknown: false },
+          { ...RESULTS[2], colorUnknown: true },
+        ],
+        chips: AI_CHIPS,
+        intent: AI_INTENT,
+      };
+      const AI_ZERO_HIT_RESPONSE = {
+        ...AI_RESPONSE,
+        searchId: "harness-ai-zero-1",
+        results: [],
+        closeMatches: [RESULTS[0]],
+      };
+
+      const chipRemovalResponse = (request) => ({
+        ...AI_RESPONSE,
+        searchId: "harness-ai-removal-1",
+        chips: AI_CHIPS.filter(
+          (chip) =>
+            !(
+              chip.field === request.removeChip.field &&
+              chip.value === request.removeChip.value
+            ),
+        ),
+        intent: request.previousIntent,
+        // Same three products (cache reuse) plus one the constraint excluded.
+        results: [
+          ...AI_RESPONSE.results,
+          {
+            productId: "gid://shopify/Product/4",
+            title: "Unfiltered By Removal",
+            handle: "unfiltered-by-removal",
+            imageUrl: svg("a8c9c9"),
+            priceMin: 500,
+            priceMax: 500,
+            currencyCode: "ILS",
+            available: true,
+          },
+        ],
+      });
+
+      // The stubbed alternate template: what Shopify would render for
+      // `templates/product.unfiltered-card.liquid` — the theme's card
+      // snippet for that product, preceded by the card's stylesheet link
+      // (Dawn's snippet emits component-rating.css the same way).
+      const altTemplateHtml = (product) => `
+<link href="/harness/theme-card.css" rel="stylesheet" type="text/css" media="all" />
+<div class="card-wrapper product-card-wrapper underline-links-hover" data-alt-template="true">
+  <div class="card card--standard ${product.imageUrl ? "card--media" : "card--text"}" style="--ratio-percent: 125.0%;">
+    <div class="card__inner color-background-2 gradient ratio" style="--ratio-percent: 125.0%;">
+      ${
+        product.imageUrl
+          ? `<div class="card__media"><div class="media media--transparent media--hover-effect"><img src="${product.imageUrl}" alt="${product.title}" width="400" height="500"></div></div>`
+          : ""
+      }
+    </div>
+    <div class="card__content">
+      <div class="card__information">
+        <h3 class="card__heading h5" id="title--${product.handle}">
+          <a href="/products/${product.handle}" id="CardLink--${product.handle}" class="full-unstyled-link">${product.title}</a>
+        </h3>
+        <div class="card-information">
+          <div class="price">
+            <div class="price__container">
+              <div class="price__regular">
+                <span class="price-item price-item--regular">₪ ${product.priceMin}${
+                  product.priceMax !== product.priceMin ? ` – ₪ ${product.priceMax}` : ""
+                }</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card__badge bottom left">${
+        product.available ? "" : '<span class="badge">Sold out</span>'
+      }</div>
+    </div>
+  </div>
+</div>
+<script>window.__altTemplateScriptRan = true;<\/script>
+`;
+
+      const PRODUCTS = new Map(
+        [...RESULTS, ...chipRemovalResponse({ removeChip: {}, previousIntent: {} }).results].map(
+          (product) => [product.handle, product],
+        ),
+      );
+
+      const jsonResponse = (body) =>
+        new Response(JSON.stringify(body), {
+          headers: { "Content-Type": "application/json" },
+        });
+
+      const realFetch = window.fetch.bind(window);
+      window.fetch = (input, requestInit) => {
+        const url = typeof input === "string" ? input : input.url;
+        const parsed = new URL(url, window.location.origin);
+        if (parsed.pathname.startsWith("/products/") && parsed.searchParams.has("view")) {
+          const handle = decodeURIComponent(parsed.pathname.slice("/products/".length));
+          window.__altTemplateRequests.push({
+            handle,
+            view: parsed.searchParams.get("view"),
+          });
+          const product = PRODUCTS.get(handle);
+          if (templateMissing || product === undefined) {
+            return Promise.resolve(new Response("Not found", { status: 404 }));
+          }
+          const body = altTemplateHtml(product);
+          const delay = Number(params.get("templateDelay") ?? 0);
+          return new Promise((resolve) =>
+            setTimeout(
+              () =>
+                resolve(
+                  new Response(body, { headers: { "Content-Type": "text/html" } }),
+                ),
+              delay,
+            ),
+          );
+        }
+        if (url.startsWith("/apps/unfiltered/search")) {
+          const request = {
+            query: parsed.searchParams.get("query"),
+            sessionId: parsed.searchParams.get("sessionId"),
+          };
+          if (parsed.searchParams.has("previousIntent")) {
+            request.previousIntent = JSON.parse(parsed.searchParams.get("previousIntent"));
+          }
+          if (parsed.searchParams.has("removeChip")) {
+            request.removeChip = JSON.parse(parsed.searchParams.get("removeChip"));
+          }
+          if (parsed.searchParams.has("mode")) {
+            request.mode = parsed.searchParams.get("mode");
+          }
+          window.__searchRequests.push(request);
+          if (fixture === "error") {
+            return Promise.resolve(new Response(null, { status: 500 }));
+          }
+          let body;
+          if (request.mode === "preview") {
+            body = RESULTS_RESPONSE;
+          } else if (request.removeChip !== undefined) {
+            body = chipRemovalResponse(request);
+          } else if (fixture === "ai") {
+            body = AI_RESPONSE;
+          } else if (fixture === "ai-zero-hit") {
+            body = AI_ZERO_HIT_RESPONSE;
+          } else if (fixture === "empty") {
+            body = { ...RESULTS_RESPONSE, results: [] };
+          } else {
+            body = RESULTS_RESPONSE;
+          }
+          return Promise.resolve(jsonResponse(body));
+        }
+        if (url.startsWith("/apps/unfiltered/click")) {
+          const log = JSON.parse(sessionStorage.getItem("harness:clickBeacons") ?? "[]");
+          log.push({
+            searchId: parsed.searchParams.get("searchId"),
+            sessionId: parsed.searchParams.get("sessionId"),
+            productId: parsed.searchParams.get("productId"),
+            position: Number(parsed.searchParams.get("position")),
+          });
+          sessionStorage.setItem("harness:clickBeacons", JSON.stringify(log));
+          return Promise.resolve(new Response(null, { status: 204 }));
+        }
+        return realFetch(input, requestInit);
+      };
+
+      // `?native=A|B` opts in through init config (what an embed setting
+      // would pass); absent, only the dev URL flag can turn it on.
+      const native = params.get("native");
+      const nativeRender =
+        native === "A" || native === "B"
+          ? {
+              variant: native,
+              // Variant B harvests this very page; `harvest=missing` points
+              // at a page with no recognizable card.
+              harvest: {
+                url:
+                  params.get("harvest") === "missing"
+                    ? "/no-search-form.html"
+                    : "/theme-native.html",
+              },
+            }
+          : undefined;
+
+      init({
+        locale: params.get("locale") ?? "en",
+        shopDomain: "harness.myshopify.com",
+        debounceMs: Number(params.get("debounce") ?? 50),
+        searchTimeoutMs: 5000,
+        nativeRender,
+      });
+    </script>
+  </body>
+</html>
