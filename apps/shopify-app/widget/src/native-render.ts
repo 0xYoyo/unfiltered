@@ -60,8 +60,6 @@ export const NATIVE_LOADING_TESTID = "unfiltered-native-loading";
 export const NATIVE_NO_RESULTS_TESTID = "unfiltered-native-no-results";
 export const NATIVE_ZERO_HIT_TESTID = "unfiltered-native-zero-hit";
 export const NATIVE_CLOSE_MATCHES_TESTID = "unfiltered-native-close-matches";
-export const NATIVE_CLOSE_TESTID = "unfiltered-native-close";
-export const NATIVE_NEW_SEARCH_TESTID = "unfiltered-native-new-search";
 export const NATIVE_STYLE_ATTR = "data-unfiltered-native-style";
 
 /**
@@ -140,8 +138,6 @@ declare global {
 export interface NativeSurfaceOptions {
   locale: string;
   config: NativeRenderConfig;
-  onClose: () => void;
-  onNewSearch: () => void;
   /** The query of the response being shown — the results view's URL and
    * the theme's count line carry it (YOY-100 AC-2/AC-4). */
   query: () => string;
@@ -380,29 +376,28 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
   section.setAttribute("aria-label", strings.searchResults);
   section.setAttribute("dir", locale === "he" ? "rtl" : "ltr");
 
-  const bar = document.createElement("div");
-  bar.className = "unfiltered-native__bar";
-  const newSearch = document.createElement("button");
-  newSearch.type = "button";
-  newSearch.className = "unfiltered-native__new-search";
-  newSearch.setAttribute("data-testid", NATIVE_NEW_SEARCH_TESTID);
-  newSearch.textContent = strings.newSearch;
-  newSearch.addEventListener("click", () => options.onNewSearch());
-  const close = document.createElement("button");
-  close.type = "button";
-  close.className = "unfiltered-native__close";
-  close.setAttribute("data-testid", NATIVE_CLOSE_TESTID);
-  close.setAttribute("aria-label", strings.closeSearch);
-  close.textContent = "×";
-  close.addEventListener("click", () => options.onClose());
-  bar.append(newSearch, close);
-
+  // No owned buttons above the results (YOY-82 AC-1, Mirror Bar): closing
+  // the view rides browser Back / navigating away (and Escape), a new
+  // search rides the theme's own search input. The only owned elements are
+  // the filter chips with their remove control, and status text.
   const chipsRow = document.createElement("div");
   chipsRow.className = "unfiltered-native__chips";
   chipsRow.setAttribute("data-testid", NATIVE_CHIPS_TESTID);
   chipsRow.setAttribute("role", "list");
   chipsRow.setAttribute("aria-label", strings.appliedFilters);
   chipsRow.hidden = true;
+  // Chip geometry derived from the host (YOY-82 AC-2): the theme's own
+  // button radius and border width, read through the configured custom
+  // properties; the stylesheet's neutral values apply when the host exposes
+  // neither. Font and color are inherited outright.
+  chipsRow.style.setProperty(
+    "--unfiltered-chip-radius",
+    `var(${config.chip.radiusVar}, 999px)`,
+  );
+  chipsRow.style.setProperty(
+    "--unfiltered-chip-border-width",
+    `var(${config.chip.borderWidthVar}, 1px)`,
+  );
 
   const status = (testId: string, text: string): HTMLElement => {
     const element = document.createElement("div");
@@ -438,7 +433,6 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
   closeMatches.append(closeMatchesHeading, closeMatchesList);
 
   section.append(
-    bar,
     chipsRow,
     loading,
     noResults,

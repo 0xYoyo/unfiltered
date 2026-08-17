@@ -388,22 +388,79 @@ test.describe("composite: previews are the theme's, submits go native (YOY-101)"
     await expect(overlay(page)).toBeHidden();
   });
 
-  test("New search clears the native panel; the close control closes it", async ({
+  test("no owned buttons above the results: a new query from the theme's input replaces the view, Escape closes it (YOY-82 AC-1)", async ({
     page,
   }) => {
     await page.goto("/theme-native.html?native=A&fixture=ai&debounce=30000");
 
     await submitQuery(page, "blue dress");
     await expect(items(page)).toHaveCount(3);
-    await page.getByTestId("unfiltered-native-new-search").click();
-    await expect(items(page)).toHaveCount(0);
-    await expect(nativeChips(page)).toHaveCount(0);
-    await expect(themeInput(page)).toHaveValue("");
+    await expect(nativeChips(page)).toHaveCount(3);
+    // The Mirror Bar leaves only chips and status text as owned chrome:
+    // no New search, no × — and no owned <button> at all outside the chips.
+    await expect(page.getByTestId("unfiltered-native-new-search")).toHaveCount(0);
+    await expect(page.getByTestId("unfiltered-native-close")).toHaveCount(0);
+    await expect(
+      panel(page).locator("button:not([data-testid='unfiltered-native-chip'])"),
+    ).toHaveCount(0);
 
-    await submitQuery(page, "blue dress");
+    // "New search" rides the theme's own input: editing it and submitting
+    // replaces the view's results in place.
+    await submitQuery(page, "runner");
     await expect(items(page)).toHaveCount(3);
-    await page.getByTestId("unfiltered-native-close").click();
+    await expect(themeCount(page)).toHaveText("3 results found for “runner”");
+    // Chips are still removable filters (W-7): removing one re-renders.
+    await nativeChips(page).first().click();
+    await expect(nativeChips(page)).toHaveCount(2);
+    await expect(items(page)).toHaveCount(4);
+
+    // "Close" rides Escape (and Back, covered by the mirror block below).
+    await themeInput(page).press("Escape");
     await expect(panel(page)).toBeHidden();
+  });
+
+  test("chips wear the host's button geometry through the configured custom properties, with neutral fallbacks (YOY-82 AC-2)", async ({
+    page,
+  }) => {
+    // The Dawn-shaped harness exposes --buttons-radius / --buttons-border-width.
+    await page.goto("/theme-native.html?native=A&fixture=ai&debounce=30000");
+    await submitQuery(page, "blue dress");
+    await expect(nativeChips(page)).toHaveCount(3);
+    const chipStyle = () =>
+      nativeChips(page)
+        .first()
+        .evaluate((element) => {
+          const style = getComputedStyle(element);
+          return {
+            radius: style.borderTopLeftRadius,
+            borderWidth: style.borderTopWidth,
+            fontFamily: style.fontFamily,
+            color: style.color,
+            background: style.backgroundColor,
+            borderColor: style.borderTopColor,
+          };
+        });
+    const host = await page.evaluate(() => {
+      const style = getComputedStyle(document.body);
+      return { fontFamily: style.fontFamily, color: style.color };
+    });
+    const themed = await chipStyle();
+    expect(themed.radius).toBe("4px");
+    expect(themed.borderWidth).toBe("2px");
+    // Typography and color inherited from the host, no fill, border in the
+    // host's text color (currentColor) — no palette of our own (W-3/W-4).
+    expect(themed.fontFamily).toBe(host.fontFamily);
+    expect(themed.color).toBe(host.color);
+    expect(themed.borderColor).toBe(host.color);
+    expect(themed.background).toBe("rgba(0, 0, 0, 0)");
+
+    // A theme exposing neither property: the neutral fallbacks apply.
+    await page.addStyleTag({
+      content: ":root { --buttons-radius: initial; --buttons-border-width: initial; }",
+    });
+    const neutral = await chipStyle();
+    expect(neutral.radius).toBe("999px");
+    expect(neutral.borderWidth).toBe("1px");
   });
 
   test("a failed submitted search resolves to a quiet no-results state on the surface that showed loading", async ({
@@ -559,7 +616,7 @@ test.describe("full-page mirror — the theme's own search page (YOY-100)", () =
     expect(new URL(page.url()).pathname).toBe("/theme-native.html");
   });
 
-  test("Back returns to the page the shopper searched from, Forward re-enters the results view; Escape and the close control leave it and pop the entry (AC-4)", async ({
+  test("Back returns to the page the shopper searched from, Forward re-enters the results view; Escape leaves it and pops the entry (AC-4)", async ({
     page,
   }) => {
     await page.goto("/theme-native.html?native=A&fixture=ai&debounce=30000");
@@ -594,11 +651,12 @@ test.describe("full-page mirror — the theme's own search page (YOY-100)", () =
     await expect(panel(page)).toHaveCount(0);
     await expect.poll(() => new URL(page.url()).pathname).toBe("/theme-native.html");
 
-    // And again via the close control.
+    // And again via Back — the close affordance under the Mirror Bar
+    // (YOY-82 AC-1: no owned close control on the view).
     await submitQuery(page, "blue dress under 400");
     await expect(items(page)).toHaveCount(3);
     expect(new URL(page.url()).pathname).toBe("/search");
-    await page.getByTestId("unfiltered-native-close").click();
+    await page.goBack();
     await expect(page.getByTestId("theme-grid")).toBeVisible();
     await expect.poll(() => new URL(page.url()).pathname).toBe("/theme-native.html");
     await expect(originHidden(page)).toHaveCount(0);
@@ -737,7 +795,8 @@ test.describe("dev flag (spike-only)", () => {
 // Design-gate evidence (YOY-70 AC-5, YOY-100 AC-7): the mirrored search
 // page holding our results — desktop and mobile, LTR and RTL — for both
 // variants. Theme-native page content (shell, cards) is judged against the
-// theme's own rendering, chips and bar against the W-* invariants.
+// theme's own rendering, chips and status text against the W-* invariants
+// (YOY-82: no owned bar above the results).
 for (const variant of ["A", "B"] as const) {
   for (const locale of ["en", "he"] as const) {
     test(`Variant ${variant} panel beside the theme grid matches the ${locale} desktop baseline`, async ({

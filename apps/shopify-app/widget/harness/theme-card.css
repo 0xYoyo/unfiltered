@@ -8,6 +8,10 @@
 :root {
   --harness-card-bg: #f6f6f6;
   --harness-text: #121212;
+  /* Dawn exposes its button geometry as root custom properties; the
+     widget's chips derive theirs from these (YOY-82 AC-2). */
+  --buttons-radius: 4px;
+  --buttons-border-width: 2px;
 }
 
 body {

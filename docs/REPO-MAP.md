@@ -311,6 +311,23 @@ docs/
       live-B-desktop-titles-prices.jpg
       live-flag-off-overlay.jpg
       live-theme-native-results-same-page.jpg
+    YOY-82/
+      after-1-ai-results-chips-desktop.png
+      after-1m-ai-results-chips-mobile-390.png
+      after-2-he-rtl-ai-results-desktop.png
+      after-3-zero-hit-close-matches-desktop.png
+      after-4-empty-classic-desktop.png
+      after-5-loading-desktop.png
+      after-6-error-quiet-no-results-desktop.png
+      after-9-flag-off-overlay-desktop.png
+      before-1-ai-results-chips-desktop.png
+      before-1m-ai-results-chips-mobile-390.png
+      before-2-he-rtl-ai-results-desktop.png
+      before-3-zero-hit-close-matches-desktop.png
+      before-4-empty-classic-desktop.png
+      before-5-loading-desktop.png
+      before-6-error-quiet-no-results-desktop.png
+      before-9-flag-off-overlay-desktop.png
     YOY-87/
       1-linked-cards-desktop.png
       1-linked-cards-mobile.png
