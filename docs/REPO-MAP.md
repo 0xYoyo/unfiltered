@@ -275,6 +275,18 @@ docs/
       dev-5b-he-second-query-template-input-desktop.jpg
       dev-5c-he-second-query-loading-stale-count-desktop.jpg
       dev-9-flag-off-overlay-desktop.jpg
+    YOY-101/
+      1-native-typing-theme-predictive-desktop.png
+      1m-native-typing-theme-predictive-mobile-390.png
+      2-native-enter-results-view-desktop.png
+      3-native-typing-on-theme-page-nothing-owned-desktop.png
+      4-native-enter-theme-page-results-desktop.png
+      5-native-he-rtl-typing-then-enter-desktop.png
+      5m-native-he-rtl-results-mobile-390.png
+      6-native-error-quiet-no-results-desktop.png
+      7-native-empty-input-nothing-owned-desktop.png
+      9-flag-off-owned-preview-box-unchanged-desktop.png
+      9m-flag-off-owned-preview-box-mobile-390.png
     YOY-70/
       live-A-desktop-panel.jpg
       live-A-he-rtl.jpg

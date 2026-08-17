@@ -25,6 +25,15 @@
          theme's /search results page by script as well as by form submit.
          The M3 live run proved the widget suppressed none of it; this
          fixture pins the suppression in CI. -->
+    <!-- Native mode (YOY-101): `?native=A` opts the widget into theme-native
+         rendering, where the SAME fixture must prove the opposite of the
+         suppression above — typing and focus reach the theme's predictive
+         search untouched (the dropdown renders, its event log fills), the
+         owned preview box never mounts, no preview request leaves for the
+         proxy, and only Enter/submit are taken over. The theme's own
+         /search shell and alternate template answer 404 here (not
+         installed): the native view enters bare with fallback cards, which
+         is enough to prove the submit tier still runs. -->
     <header>
       <h1>Native predictive store</h1>
       <predictive-search>
@@ -55,9 +64,20 @@
         connectedCallback() {
           this.input = this.querySelector('input[type="search"]');
           this.results = this.querySelector("[data-testid]");
-          this.input.addEventListener("input", () => this.render());
-          this.input.addEventListener("focus", () => this.render());
+          // Every event the theme's listeners actually receive, in order —
+          // the un-suppressed-events evidence for YOY-101 AC-5.
+          window.__themeEvents = [];
+          const log = (event) => window.__themeEvents.push(event.type + ":" + (event.key ?? ""));
+          this.input.addEventListener("input", (event) => {
+            log(event);
+            this.render();
+          });
+          this.input.addEventListener("focus", (event) => {
+            log(event);
+            this.render();
+          });
           this.input.addEventListener("keydown", (event) => {
+            log(event);
             if (event.key === "Enter") {
               // Some themes navigate by script rather than form submit.
               window.location.assign(
@@ -87,10 +107,16 @@
       const params = new URLSearchParams(window.location.search);
       const fixture = params.get("fixture") ?? "results";
 
+      window.__searchRequests = [];
       const realFetch = window.fetch.bind(window);
       window.fetch = (input, requestInit) => {
         const url = typeof input === "string" ? input : input.url;
         if (url.startsWith("/apps/unfiltered/search")) {
+          const parsed = new URL(url, window.location.origin);
+          window.__searchRequests.push({
+            query: parsed.searchParams.get("query"),
+            mode: parsed.searchParams.get("mode"),
+          });
           if (fixture === "error") {
             return Promise.resolve(new Response(null, { status: 500 }));
           }
@@ -122,13 +148,24 @@
         if (url.startsWith("/apps/unfiltered/click")) {
           return Promise.resolve(new Response(null, { status: 204 }));
         }
+        const parsed = new URL(url, window.location.origin);
+        if (
+          parsed.pathname === "/search" ||
+          (parsed.pathname.startsWith("/products/") && parsed.searchParams.has("view"))
+        ) {
+          // No search shell, no alternate template on this fixture.
+          return Promise.resolve(new Response("Not found", { status: 404 }));
+        }
         return realFetch(input, requestInit);
       };
 
+      const native = params.get("native");
       init({
         locale: params.get("locale") ?? "en",
         storeId: "harness.myshopify.com",
         debounceMs: 50,
+        nativeRender:
+          native === "A" || native === "B" ? { variant: native } : undefined,
       });
     </script>
   </body>

@@ -2,10 +2,11 @@ import { expect, test, type Page } from "@playwright/test";
 
 // Theme-native result rendering (YOY-70 spike), driven against the
 // Dawn-shaped harness page theme-native.html: Variant A (alternate-template
-// fetch), Variant B (harvest-clone), the composite with the preview overlay,
-// the fallback path, the dev flag, and the flag-off invariant. Every
-// submitted search here goes through the full pipeline (fill + Enter with
-// the preview debounce stretched past the test timeout).
+// fetch), Variant B (harvest-clone), the composite (previews are the
+// theme's on the native path — YOY-101), the fallback path, the dev flag,
+// and the flag-off invariant. Every submitted search here goes through the
+// full pipeline (fill + Enter; the flag-off case stretches the preview
+// debounce past the test timeout).
 //
 // The native view is a full-page mirror (YOY-100): the results section sits
 // inside the theme's own search-results page (fetched from the stubbed
@@ -342,31 +343,46 @@ test.describe("Variant B — harvest-clone (AC-2)", () => {
   });
 });
 
-test.describe("composite: previews stay on the overlay, submits go native (NG-3)", () => {
-  test("typing previews in the shadow overlay; Enter closes it and renders natively; Escape closes both", async ({
+test.describe("composite: previews are the theme's, submits go native (YOY-101)", () => {
+  test("typing renders nothing of ours and sends no preview request; Enter renders natively; Escape closes the view", async ({
     page,
   }) => {
     await page.goto("/theme-native.html?native=A&debounce=20");
+    const searchRequests = () =>
+      page.evaluate(
+        () =>
+          (window as unknown as { __searchRequests: { mode?: string }[] })
+            .__searchRequests,
+      );
 
+    // Native mode: keystroke previews ride the theme's own predictive
+    // search (YOY-101 AC-1/AC-3) — the owned preview box never appears and
+    // no debounced request leaves for the proxy.
     await themeInput(page).fill("run");
-    await expect(overlayCards(page)).toHaveCount(3);
-    await expect(overlay(page)).toBeVisible();
+    await page.waitForTimeout(200);
+    await expect(overlay(page)).toBeHidden();
+    await expect(overlayCards(page)).toHaveCount(0);
     await expect(panel(page)).toHaveCount(0);
+    expect(await searchRequests()).toEqual([]);
 
     await themeInput(page).press("Enter");
     await expect(items(page)).toHaveCount(3);
     await expect(overlay(page)).toBeHidden();
+    expect(await searchRequests()).toHaveLength(1);
+    expect((await searchRequests())[0].mode).toBeUndefined();
 
-    // Typing again previews in the overlay ABOVE the results view — the
-    // native view is a page (YOY-100), it stays until the shopper leaves it.
+    // Typing on the results view — the native view is a page (YOY-100), it
+    // stays until the shopper leaves it — still previews nothing of ours.
     await themeInput(page).fill("runn");
-    await expect(overlayCards(page)).toHaveCount(3);
-    await expect(overlay(page)).toBeVisible();
+    await page.waitForTimeout(200);
+    await expect(overlay(page)).toBeHidden();
     await expect(panel(page)).toBeVisible();
+    await expect(items(page)).toHaveCount(3);
+    expect(await searchRequests()).toHaveLength(1);
 
     await themeInput(page).press("Enter");
     await expect(items(page)).toHaveCount(3);
-    await expect(overlay(page)).toBeHidden();
+    expect(await searchRequests()).toHaveLength(2);
     await themeInput(page).press("Escape");
     await expect(panel(page)).toBeHidden();
     await expect(overlay(page)).toBeHidden();

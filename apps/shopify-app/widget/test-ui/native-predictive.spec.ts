@@ -92,3 +92,98 @@ test("an inert widget hands the input back: native predictive search and Enter n
   await page.waitForURL(/\/search\?/);
   expect(new URL(page.url()).searchParams.get("q")).toBe("nike again");
 });
+
+// Native mode (YOY-101): the SAME fixture, opposite contract — keystroke
+// previews ride the theme's own predictive search. Typing and focus reach
+// the theme's listeners untouched (the SUGGESTIONS dropdown renders, its
+// event log fills), the owned preview box never mounts, no preview request
+// leaves for the proxy, and only Enter / the form submit are taken over.
+test.describe("native mode: keystroke previews ride the theme's predictive search (YOY-101)", () => {
+  const themeEvents = (page: Page) =>
+    page.evaluate(
+      () => (window as unknown as { __themeEvents: string[] }).__themeEvents,
+    );
+  const searchRequests = (page: Page) =>
+    page.evaluate(
+      () =>
+        (window as unknown as { __searchRequests: unknown[] }).__searchRequests,
+    );
+  const nativeItems = (page: Page) => page.getByTestId("unfiltered-native-item");
+
+  test("typing renders the theme's SUGGESTIONS dropdown, never the owned preview box, and sends no preview request (AC-1, AC-3, AC-5)", async ({
+    page,
+  }) => {
+    await page.goto("/native-predictive.html?native=A");
+
+    // Focus reaches the theme (its focus listener runs, nothing to render
+    // for an empty input yet) and the widget still renders nothing.
+    await themeInput(page).focus();
+    await themeInput(page).pressSequentially("nike");
+    await expect(nativeResults(page)).toBeVisible();
+    await expect(nativeResults(page)).toContainText("SUGGESTIONS: nike");
+
+    // Well past the widget's debounce (50 ms): still no owned overlay, no
+    // owned card, and no request of any kind to the proxy.
+    await page.waitForTimeout(300);
+    await expect(overlay(page)).toBeHidden();
+    await expect(page.getByTestId("unfiltered-widget-card")).toHaveCount(0);
+    expect(await searchRequests(page)).toEqual([]);
+
+    // The theme's listeners received every keystroke un-suppressed: focus,
+    // one keydown + one input per typed character.
+    const events = await themeEvents(page);
+    expect(events).toContain("focus:");
+    expect(events.filter((e) => e === "input:")).toHaveLength(4);
+    expect(events).toEqual(
+      expect.arrayContaining(["keydown:n", "keydown:i", "keydown:k", "keydown:e"]),
+    );
+  });
+
+  test("Enter runs our pipeline and renders the native view; the theme's scripted /search navigation and form submit stay prevented (AC-2)", async ({
+    page,
+  }) => {
+    await page.goto("/native-predictive.html?native=A");
+    // A marker on the live document: any real navigation (the theme's
+    // `location.assign` or the form's GET) would produce a fresh document
+    // without it.
+    await page.evaluate(() => {
+      (window as unknown as { __sameDocument: boolean }).__sameDocument = true;
+    });
+
+    await themeInput(page).pressSequentially("nike");
+    await expect(nativeResults(page)).toContainText("SUGGESTIONS: nike");
+    await themeInput(page).press("Enter");
+
+    await expect(nativeItems(page)).toHaveCount(1);
+    await expect(overlay(page)).toBeHidden();
+    expect(
+      await page.evaluate(
+        () => (window as unknown as { __sameDocument?: boolean }).__sameDocument,
+      ),
+    ).toBe(true);
+    // Exactly one request, the submitted search — never a preview.
+    expect(await searchRequests(page)).toEqual([{ query: "nike", mode: null }]);
+    // Enter is the one keystroke the theme's listeners never see.
+    expect(await themeEvents(page)).not.toContain("keydown:Enter");
+  });
+
+  test("the magnifier submit button runs our pipeline instead of navigating (AC-2)", async ({
+    page,
+  }) => {
+    await page.goto("/native-predictive.html?native=A");
+    await page.evaluate(() => {
+      (window as unknown as { __sameDocument: boolean }).__sameDocument = true;
+    });
+
+    await themeInput(page).pressSequentially("nike");
+    await page.locator('predictive-search button[type="submit"]').click();
+
+    await expect(nativeItems(page)).toHaveCount(1);
+    expect(
+      await page.evaluate(
+        () => (window as unknown as { __sameDocument?: boolean }).__sameDocument,
+      ),
+    ).toBe(true);
+    expect(await searchRequests(page)).toEqual([{ query: "nike", mode: null }]);
+  });
+});
