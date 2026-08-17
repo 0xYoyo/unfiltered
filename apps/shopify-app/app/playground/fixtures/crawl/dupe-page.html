@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Duplicate Belt</title>
+  <link rel="canonical" href="https://shop.example/product/dupe-page">
+  <!-- Two JSON-LD blocks (a plugin conflict) describing the same product with
+       the same sku: counts once (AC-4). The second block is also malformed-
+       trailing-comma-free but carries a broken sibling block that is skipped. -->
+  <script type="application/ld+json">
+  { "@context": "https://schema.org", "@type": "Product", "sku": "DUP-1", "name": "Duplicate Belt",
+    "offers": { "@type": "Offer", "price": "75", "priceCurrency": "ILS", "availability": "https://schema.org/InStock" } }
+  </script>
+  <script type='application/ld+json'>
+  { "@context": "https://schema.org", "@type": "Product", "sku": "DUP-1", "name": "Duplicate Belt (SEO plugin)",
+    "offers": { "@type": "Offer", "price": "75", "priceCurrency": "ILS", "availability": "https://schema.org/InStock" } }
+  </script>
+  <script type="application/ld+json">{ this is not json</script>
+</head>
+<body><h1>Duplicate Belt</h1></body>
+</html>

@@ -519,31 +519,67 @@ beside the Shopify Admin API one. Everything lives under
   backoff (max 3 retries), one request in flight per host, and `robots.txt`
   `Disallow` rules for our agent (or `*`) respected: a disallowed path is
   never fetched — it raises `RobotsDisallowedError` and is counted.
-- **Adapters**: today only the Shopify public storefront feed
-  (`shopify-public-source.server.ts`, `kind: "shopify-public"`): pages
-  `/products.json?limit=250&page=N` until an empty page, maps the feed's
-  fields (`body_html` → text, variant price min/max and any-available,
-  first image, alt texts, `updated_at`), resolves `url` as
-  `https://<host>/products/<handle>`, and reads the currency (and the store
-  name) from `/meta.json` with `/cart.js` as the currency fallback, failing
-  loudly when neither answers. The sitemap → schema.org Product source is
-  YOY-89.
+- **Sources**:
+  - The Shopify public storefront feed (`shopify-public-source.server.ts`,
+    `kind: "shopify-public"`, an adapter): pages
+    `/products.json?limit=250&page=N` until an empty page, maps the feed's
+    fields (`body_html` → text, variant price min/max and any-available,
+    first image, alt texts, `updated_at`), resolves `url` as
+    `https://<host>/products/<handle>`, and reads the currency (and the
+    store name) from `/meta.json` with `/cart.js` as the currency fallback,
+    failing loudly when neither answers.
+  - The generic sitemap → schema.org Product JSON-LD crawler (YOY-89;
+    `jsonld-crawl-source.server.ts`, `kind: "jsonld-crawl"`, platform-free):
+    discovers sitemaps from `robots.txt` `Sitemap:` lines, else
+    `/sitemap.xml` (`sitemap.server.ts`: indexes followed recursively,
+    `.xml.gz` / gzip bodies inflated), fetches page URLs product-ish paths
+    first (`/product/`, `/products/`, `/p/`, `/item/`, `/shop/`) through the
+    polite helper — the CLI configures it with 4 in flight per host and
+    ≥250 ms between request starts — until the page budget (`--pages`,
+    default 3000) is spent or `maxProducts` are in hand; non-HTML responses
+    are skipped without parsing. Extraction (`jsonld.server.ts`) parses
+    every `<script type="application/ld+json">` (arrays and `@graph`
+    included): `Product` nodes (any subtype, `@type` string or array) become
+    one `SourceProduct` each — `name`, `description` (HTML stripped),
+    `brand.name`, `category`, first `image`, `offers`
+    (`Offer`/`AggregateOffer`: `price` | `lowPrice`/`highPrice`,
+    `priceCurrency`, availability ending in `InStock`/`PreOrder`), `sku` |
+    `productID` | `@id` | page canonical → `sourceId`, `url` = JSON-LD `url`
+    else `<link rel=canonical>` else the fetched URL; a `ProductGroup` (or
+    `hasVariant`) collapses to one product spanning its variants' prices and
+    any-in-stock availability. Products without a price or currency are
+    skipped and counted; a page yielding two Products with one `sourceId`
+    counts once; robots-disallowed pages are skipped (never fetched) and
+    the crawl continues. Limits: no JavaScript rendering (pages that only
+    inject JSON-LD client-side are unsupported), no microdata / RDFa /
+    OpenGraph fallback, no crawl state between runs (each run is a full
+    crawl; the pipeline's hashing makes it idempotent downstream). An
+    opt-in live smoke test runs only under `LIVE_CRAWL_TESTS=1` with
+    `LIVE_CRAWL_URL`.
 - **CLI** (`scripts/ingest-public.mts`, logic in
   `ingest-public-cli.server.ts`): `npm run ingest:public -- --url <store URL>
-  --slug <slug> [--name "<Store>"] [--max <N, default 2000>]` from
+  --slug <slug> [--name "<Store>"] [--max <N, default 2000>] [--source
+  shopify-public|jsonld-crawl] [--pages <N, default 3000>]` from
   `apps/shopify-app` (env-loaded like `npm run ingest`; `PLAYGROUND_URL`
   becomes the User-Agent contact when set) detects a Shopify storefront
   (`/products.json?limit=1` answers JSON with a `products` array) and uses
-  the adapter; any other URL exits 1 with `no supported catalog source for
-  <url>`; a robots-disallowed feed aborts with a robots message and writes
-  nothing. It prints ingest/enrich/embed counts, the skips, the `AiCall`
-  cost of the run, and the fetch counters. `--delete --slug <slug>` removes
-  the catalog. No HTTP/admin trigger exists; re-ingestion is a manual
-  re-run.
+  the adapter; any other URL uses the JSON-LD crawler; `--source` forces one
+  (`--source shopify-public` on a non-Shopify URL exits 1 with `no supported
+  catalog source for <url>`); a robots-disallowed feed, or a site with no
+  sitemap at all, aborts with a clear message and writes nothing. It prints
+  ingest/enrich/embed counts, the skips, the crawl report (sitemaps, URLs,
+  pages fetched vs budget, products found, per-reason skips, budget
+  exhaustion) with progress every 100 pages, the `AiCall` cost of the run,
+  and the fetch counters. `--delete --slug <slug>` removes the catalog. No
+  HTTP/admin trigger exists; re-ingestion is a manual re-run.
 
 Tests (`app/playground/*.test.ts`) run fully offline against fixture feed
-pages served by an in-memory fake store (`app/testing/fake-store.server.ts`),
-fixture LLM/embedding clients, and the PGlite test DB.
+pages and a fixture crawl store (`app/playground/fixtures/crawl/**`: robots
+→ sitemap index → two child sitemaps, one gzipped → WooCommerce-, Magento-,
+and ProductGroup-shaped pages, a priceless product, a duplicate-sku page, a
+no-product page, a PDF, and a robots-disallowed section) served by an
+in-memory fake store (`app/testing/fake-store.server.ts`), fixture
+LLM/embedding clients, and the PGlite test DB.
 
 ## Quality gates
 

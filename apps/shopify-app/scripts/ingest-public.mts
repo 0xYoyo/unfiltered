@@ -11,7 +11,7 @@
  * Usage, from apps/shopify-app:
  *
  *   set -a && source .env && set +a
- *   npm run ingest:public -- --url https://store.example --slug store [--name "Store"] [--max 2000]
+ *   npm run ingest:public -- --url https://store.example --slug store [--name "Store"] [--max 2000] [--source shopify-public|jsonld-crawl] [--pages 3000]
  *   npm run ingest:public -- --delete --slug store
  */
 
@@ -20,6 +20,10 @@ import { PrismaClient } from "@prisma/client";
 import { createCatalogEmbeddingClient } from "../app/catalog/embed.server";
 import { createEnrichmentLlmClient } from "../app/catalog/enrich.server";
 import { runIngestPublicCli } from "../app/playground/ingest-public-cli.server";
+import {
+  CRAWL_CONCURRENCY,
+  CRAWL_MIN_SPACING_MS,
+} from "../app/playground/jsonld-crawl-source.server";
 import { createPoliteFetch } from "../app/playground/polite-fetch.server";
 
 const db = new PrismaClient();
@@ -31,6 +35,11 @@ try {
     fetch: createPoliteFetch({
       contactUrl:
         process.env.PLAYGROUND_URL ?? "https://github.com/0xYoyo/unfiltered",
+      // Page-crawl politeness (YOY-89 AC-1): up to 4 in flight per host,
+      // ≥250 ms between request starts. The Shopify feed adapter pages
+      // sequentially by construction, so this only widens the crawler.
+      maxInFlightPerHost: CRAWL_CONCURRENCY,
+      minSpacingMs: CRAWL_MIN_SPACING_MS,
     }),
     aiClients: () => ({
       llm: createEnrichmentLlmClient(db),

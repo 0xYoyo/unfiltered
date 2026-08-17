@@ -11,9 +11,8 @@ import {
   FIXTURE_PAGE_1,
   FIXTURE_PAGE_2,
 } from "./fixtures/shopify-public-products";
-import {
-  DEFAULT_MAX_PRODUCTS,
-} from "./ingest-public.server";
+import { DEFAULT_MAX_PRODUCTS } from "./ingest-public.server";
+import { DEFAULT_CRAWL_PAGE_BUDGET } from "./jsonld-crawl-source.server";
 import {
   detectCatalogSource,
   IngestPublicUsageError,
@@ -103,12 +102,33 @@ describe("argument parsing (AC-6)", () => {
   it("parses --url/--slug/--name/--max and --delete", () => {
     expect(
       parseIngestPublicArgs(["--url", "https://s.example", "--slug", "s", "--name", "My Store", "--max", "50"]),
-    ).toEqual({ url: "https://s.example", slug: "s", name: "My Store", max: 50, delete: false });
+    ).toEqual({
+      url: "https://s.example",
+      slug: "s",
+      name: "My Store",
+      max: 50,
+      delete: false,
+      source: null,
+      pages: DEFAULT_CRAWL_PAGE_BUDGET,
+    });
     expect(parseIngestPublicArgs(["--url", "https://s.example", "--slug", "s"])).toMatchObject({
       max: DEFAULT_MAX_PRODUCTS,
       name: null,
     });
     expect(parseIngestPublicArgs(["--delete", "--slug", "s"])).toMatchObject({ delete: true, url: null });
+    // YOY-89 AC-5: forced source and the crawler's page budget.
+    expect(
+      parseIngestPublicArgs(["--url", "https://s.example", "--slug", "s", "--source", "jsonld-crawl", "--pages", "5"]),
+    ).toMatchObject({ source: "jsonld-crawl", pages: 5 });
+    expect(
+      parseIngestPublicArgs(["--url", "https://s.example", "--slug", "s", "--source", "shopify-public"]),
+    ).toMatchObject({ source: "shopify-public" });
+    for (const argv of [
+      ["--url", "https://s.example", "--slug", "s", "--source", "rss"],
+      ["--url", "https://s.example", "--slug", "s", "--pages", "0"],
+    ]) {
+      expect(() => parseIngestPublicArgs(argv)).toThrow(IngestPublicUsageError);
+    }
   });
 
   it("rejects a missing slug, a bad slug, a missing url, a bad --max, and an unknown flag", () => {
@@ -138,10 +158,21 @@ describe("detection (AC-6)", () => {
     expect(named?.name).toBe("Given");
   });
 
-  it("returns null for anything that is not a supported feed", async () => {
+  it("falls back to the JSON-LD crawler for a non-Shopify URL; a forced source wins; forcing shopify-public on a non-Shopify URL is unsupported (YOY-89 AC-5)", async () => {
     const store = createFakeStore({ "/products.json?limit=1": "<html>Welcome</html>" });
     const fetch = createPoliteFetch({ contactUrl: "https://playground.example", fetch: store.fetch });
-    expect(await detectCatalogSource({ url: "https://example.invalid", fetch, name: null })).toBeNull();
+    const detected = await detectCatalogSource({ url: "https://example.invalid", fetch, name: null });
+    expect(detected?.source.kind).toBe("jsonld-crawl");
+    expect(detected?.name).toBe("example.invalid");
+    expect(
+      await detectCatalogSource({ url: "https://example.invalid", fetch, name: null, force: "shopify-public" }),
+    ).toBeNull();
+    // Forcing the crawler skips Shopify detection even on a Shopify feed.
+    const shopify = createFakeStore(fixtureRoutes());
+    const shopifyFetch = createPoliteFetch({ contactUrl: "https://playground.example", fetch: shopify.fetch });
+    const forced = await detectCatalogSource({ url: FIXTURE_ORIGIN, fetch: shopifyFetch, name: null, force: "jsonld-crawl" });
+    expect(forced?.source.kind).toBe("jsonld-crawl");
+    expect(shopify.requests.map((r) => new URL(r.url).pathname)).not.toContain("/products.json");
   });
 });
 
@@ -153,12 +184,23 @@ describe("runIngestPublicCli", () => {
     expect(aiBuilt()).toBe(0);
   });
 
-  it("an unsupported URL exits 1 with `no supported catalog source for <url>` (verify step 5)", async () => {
+  it("`--source shopify-public` on a non-Shopify URL exits 1 with `no supported catalog source for <url>` (verify step 5)", async () => {
     const { run, err, aiBuilt } = harness({ "*": "<html>Not a store</html>" });
-    expect(await run(["--url", "https://example.invalid", "--slug", "x"])).toBe(1);
+    expect(
+      await run(["--url", "https://example.invalid", "--slug", "x", "--source", "shopify-public"]),
+    ).toBe(1);
     expect(err).toEqual(["no supported catalog source for https://example.invalid"]);
     expect(await db.playgroundCatalog.count()).toBe(0);
     expect(aiBuilt()).toBe(0);
+  });
+
+  it("a non-Shopify URL without any sitemap aborts the crawl with a clear message and writes no rows", async () => {
+    const { run, err } = harness({ "*": "<html>Not a store</html>" });
+    expect(await run(["--url", "https://example.invalid", "--slug", "x"])).toBe(1);
+    expect(err).toHaveLength(1);
+    expect(err[0]).toMatch(/ingest aborted: JSON-LD crawl: no sitemap URLs found for https:\/\/example\.invalid/);
+    expect(await db.playgroundCatalog.count()).toBe(0);
+    expect(await db.catalogProduct.count()).toBe(0);
   });
 
   it("robots.txt disallowing the feed aborts with a robots message and writes no rows (verify step 6)", async () => {
