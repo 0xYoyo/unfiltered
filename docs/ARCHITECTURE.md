@@ -476,6 +476,75 @@ CI; `.claude/yoyo.md` records it as `ui_test_command` with `ui_paths`
 covering the widget and extension directories, so every future UI-touching
 pull request must extend this lane.
 
+## Playground catalogs and generic ingestion (YOY-88)
+
+The M4 playground's store-preload mode ingests arbitrary PUBLIC catalogs
+without an app install — the first consumer of a generic ingestion path
+beside the Shopify Admin API one. Everything lives under
+`apps/shopify-app/app/playground/`:
+
+- **Catalog-source port** (`catalog-source.server.ts`): `SourceProduct`
+  (`sourceId`, `title`, plain-text `description`, `tags`, `vendor`,
+  `productType`, `priceMin`/`priceMax`/`currencyCode`, `available`,
+  `imageAltTexts`, `imageUrl`, `url`, `sourceUpdatedAt`) and
+  `CatalogSource` (`kind`, `fetchProducts({ maxProducts, onProgress })`).
+  Nothing in the port or the pipeline names a commerce platform; a source
+  may stop reading once `maxProducts` are in hand.
+- **Registry** (`PlaygroundCatalog` model): one row per catalog — `slug`
+  (`[a-z0-9-]{1,40}`, unique), `name`, `storeKey` (unique; always
+  `playground:<slug>`, the tenant-key value the catalog's rows carry in the
+  `shopDomain` column of `CatalogProduct` / `ProductEnrichment` /
+  `ProductEmbedding` / `SearchEvent` / `ClickEvent` / `AiCall`, so a
+  playground tenant can never collide with a real shop domain), `sourceUrl`,
+  `sourceKind`, `productCount`, `lastIngestedAt`.
+- **Pipeline** (`ingest-public.server.ts`): `ingestPublicCatalog({ db, slug,
+  name, source, sourceUrl, maxProducts, llm, embeddings })` maps
+  `SourceProduct`s to `CatalogProduct` rows under the store key
+  (`productId = sourceId`, `status = "ACTIVE"`, `publishedAt = now`,
+  `handle = ""`, `featuredImageUrl`/`url` display-only, `contentHash` via
+  the shared `computeContentHash` so caching is keyed identically to the
+  Shopify path), upserts idempotently (unchanged hash → untouched; a drifted
+  display-only field is refreshed without dirtying the hash; gone from the
+  source → deleted with its enrichment and embedding rows in one
+  transaction), then runs the existing `enrichCatalog` and `embedCatalog`
+  for that key and upserts the registry row. Products beyond `maxProducts`
+  and products with no title or no price are skipped and counted, never
+  ingested. A second run over an unchanged source reports all
+  `unchanged`/`cached` and makes zero LLM/embedding calls.
+  `deletePublicCatalog({ db, slug })` removes one catalog's rows across all
+  four tables and nothing else.
+- **Polite fetch** (`polite-fetch.server.ts`): the one HTTP helper every
+  source reads through — `User-Agent: UnfilteredBot/1.0 (+<contact URL>)`,
+  15 s timeout, `429`/`503` honored via `Retry-After` with exponential
+  backoff (max 3 retries), one request in flight per host, and `robots.txt`
+  `Disallow` rules for our agent (or `*`) respected: a disallowed path is
+  never fetched — it raises `RobotsDisallowedError` and is counted.
+- **Adapters**: today only the Shopify public storefront feed
+  (`shopify-public-source.server.ts`, `kind: "shopify-public"`): pages
+  `/products.json?limit=250&page=N` until an empty page, maps the feed's
+  fields (`body_html` → text, variant price min/max and any-available,
+  first image, alt texts, `updated_at`), resolves `url` as
+  `https://<host>/products/<handle>`, and reads the currency (and the store
+  name) from `/meta.json` with `/cart.js` as the currency fallback, failing
+  loudly when neither answers. The sitemap → schema.org Product source is
+  YOY-89.
+- **CLI** (`scripts/ingest-public.mts`, logic in
+  `ingest-public-cli.server.ts`): `npm run ingest:public -- --url <store URL>
+  --slug <slug> [--name "<Store>"] [--max <N, default 2000>]` from
+  `apps/shopify-app` (env-loaded like `npm run ingest`; `PLAYGROUND_URL`
+  becomes the User-Agent contact when set) detects a Shopify storefront
+  (`/products.json?limit=1` answers JSON with a `products` array) and uses
+  the adapter; any other URL exits 1 with `no supported catalog source for
+  <url>`; a robots-disallowed feed aborts with a robots message and writes
+  nothing. It prints ingest/enrich/embed counts, the skips, the `AiCall`
+  cost of the run, and the fetch counters. `--delete --slug <slug>` removes
+  the catalog. No HTTP/admin trigger exists; re-ingestion is a manual
+  re-run.
+
+Tests (`app/playground/*.test.ts`) run fully offline against fixture feed
+pages served by an in-memory fake store (`app/testing/fake-store.server.ts`),
+fixture LLM/embedding clients, and the PGlite test DB.
+
 ## Quality gates
 
 Vitest, ESLint, and `tsc --noEmit` run from the root as `npm test`,
