@@ -197,6 +197,7 @@ apps/
         env.d.ts
         format.ts
         main.ts
+        native-page.ts
         native-render.config.ts
         native-render.css
         native-render.ts
@@ -251,6 +252,29 @@ docs/
   PORTABILITY.md
   PRD.md
   evidence/
+    YOY-100/
+      0-origin-home-desktop.png
+      1-results-view-desktop.png
+      1-results-view-mobile.png
+      2-results-view-he-rtl-desktop.png
+      3-from-header-modal-desktop.png
+      4-after-back-desktop.png
+      5-loading-desktop.png
+      6-empty-classic-desktop.png
+      7-ai-zero-hit-desktop.png
+      8-shell-unavailable-bare-desktop.png
+      9-flag-off-overlay-desktop.png
+      dev-1-home-origin-results-desktop.jpg
+      dev-1b-results-bottom-no-origin-sections-desktop.jpg
+      dev-1m-results-view-mobile-390.png
+      dev-2-search-origin-blue-dress-desktop.jpg
+      dev-2b-product-origin-results-desktop.jpg
+      dev-3-chip-removed-refinement-desktop.jpg
+      dev-4-after-back-home-desktop.jpg
+      dev-5-he-rtl-results-desktop.jpg
+      dev-5b-he-second-query-template-input-desktop.jpg
+      dev-5c-he-second-query-loading-stale-count-desktop.jpg
+      dev-9-flag-off-overlay-desktop.jpg
     YOY-70/
       live-A-desktop-panel.jpg
       live-A-he-rtl.jpg
@@ -385,8 +409,9 @@ vitest.setup.ts
 - apps/shopify-app/scripts/ingest.mts → apps/shopify-app/app/catalog/embed.server.ts, apps/shopify-app/app/catalog/enrich.server.ts, apps/shopify-app/app/catalog/ingest.server.ts, apps/shopify-app/app/catalog/offline-token.server.ts
 - apps/shopify-app/scripts/native-render-template.mts → apps/shopify-app/widget/src/native-render.config.ts
 - apps/shopify-app/widget/src/format.ts → apps/shopify-app/widget/src/strings.ts
-- apps/shopify-app/widget/src/main.ts → apps/shopify-app/widget/src/native-render.config.ts, apps/shopify-app/widget/src/native-render.ts, apps/shopify-app/widget/src/overlay.ts, apps/shopify-app/widget/src/search-client.ts, apps/shopify-app/widget/src/session.ts, apps/shopify-app/widget/src/strings.ts
-- apps/shopify-app/widget/src/native-render.ts → apps/shopify-app/widget/src/format.ts, apps/shopify-app/widget/src/native-render.config.ts, apps/shopify-app/widget/src/native-render.css?inline (unresolved), apps/shopify-app/widget/src/overlay.ts, apps/shopify-app/widget/src/search-client.ts, apps/shopify-app/widget/src/strings.ts
+- apps/shopify-app/widget/src/main.ts → apps/shopify-app/widget/src/native-page.ts, apps/shopify-app/widget/src/native-render.config.ts, apps/shopify-app/widget/src/native-render.ts, apps/shopify-app/widget/src/overlay.ts, apps/shopify-app/widget/src/search-client.ts, apps/shopify-app/widget/src/session.ts, apps/shopify-app/widget/src/strings.ts
+- apps/shopify-app/widget/src/native-page.ts → apps/shopify-app/widget/src/native-render.config.ts
+- apps/shopify-app/widget/src/native-render.ts → apps/shopify-app/widget/src/format.ts, apps/shopify-app/widget/src/native-page.ts, apps/shopify-app/widget/src/native-render.config.ts, apps/shopify-app/widget/src/native-render.css?inline (unresolved), apps/shopify-app/widget/src/overlay.ts, apps/shopify-app/widget/src/search-client.ts, apps/shopify-app/widget/src/strings.ts
 - apps/shopify-app/widget/src/overlay.ts → apps/shopify-app/widget/src/format.ts, apps/shopify-app/widget/src/search-client.ts, apps/shopify-app/widget/src/strings.ts, apps/shopify-app/widget/src/widget.css?inline (unresolved)
 - apps/shopify-app/widget/test-ui/localization.spec.ts → apps/shopify-app/widget/src/strings.ts
 - packages/engine/src/classic.ts → packages/engine/src/retrieve.ts

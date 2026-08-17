@@ -42,6 +42,12 @@ body {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+/* The theme's search page (YOY-100 shell) is denser than its collection
+   grid — the mirror must pick up the search page's own list classes. */
+.product-grid.grid--3-col-desktop {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 @media (max-width: 749px) {
   .product-grid.grid--2-col-tablet-down {
     grid-template-columns: repeat(2, minmax(0, 1fr));
