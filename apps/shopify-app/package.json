@@ -20,6 +20,7 @@
     "vite": "vite",
     "typecheck": "react-router typegen && tsc --noEmit",
     "ingest": "npx tsx scripts/ingest.mts",
+    "ingest:public": "npx tsx scripts/ingest-public.mts",
     "build:widget": "vite build --config widget/vite.config.ts",
     "widget:harness": "vite --config widget/vite.config.ts --host 127.0.0.1 --port 4173 --strictPort"
   },

@@ -159,6 +159,27 @@ model ClickEvent {
   @@index([shopDomain, createdAt])
 }
 
+// Playground catalog registry (YOY-88): one row per PUBLIC catalog the
+// playground's store-preload mode has ingested through the generic
+// catalog-source port. `storeKey` is the tenant key value the catalog's rows
+// carry in CatalogProduct / ProductEnrichment / ProductEmbedding /
+// SearchEvent / ClickEvent / AiCall (the `shopDomain` column) — always
+// `playground:<slug>`, so playground tenants can never collide with a real
+// shop domain. `sourceKind` is whatever the ingesting source declares
+// (e.g. "shopify-public"); the registry itself knows no platform.
+model PlaygroundCatalog {
+  id             String    @id @default(uuid())
+  slug           String    @unique
+  name           String
+  storeKey       String    @unique
+  sourceUrl      String
+  sourceKind     String
+  productCount   Int       @default(0)
+  lastIngestedAt DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
 model Session {
   id            String    @id
   shop          String

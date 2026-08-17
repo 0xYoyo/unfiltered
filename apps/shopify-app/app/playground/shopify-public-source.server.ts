@@ -1,0 +1,218 @@
+import type {
+  CatalogSource,
+  SourceProduct,
+} from "./catalog-source.server";
+import { htmlToPlainText } from "./catalog-source.server";
+import type { PoliteFetch } from "./polite-fetch.server";
+
+/**
+ * Shopify public storefront source (YOY-88 AC-4): reads a store's public
+ * `/products.json` feed — no app install, no Admin API, no token — and maps
+ * it onto the platform-free `SourceProduct` shape. This file is the adapter:
+ * every Shopify-specific field name, URL scheme, and endpoint lives here and
+ * nowhere else in the playground ingestion path.
+ */
+
+export const SHOPIFY_PUBLIC_SOURCE_KIND = "shopify-public";
+export const PRODUCTS_JSON_PAGE_SIZE = 250;
+
+/** The `products.json` product shape, only the fields the mapping consumes. */
+export interface ShopifyPublicProduct {
+  id: number | string;
+  title: string;
+  handle: string;
+  body_html: string | null;
+  vendor: string | null;
+  product_type: string | null;
+  tags: string[] | string | null;
+  updated_at?: string | null;
+  variants: Array<{ price: string | number | null; available?: boolean }>;
+  images: Array<{ src: string; alt: string | null }>;
+}
+
+/** Storefront-level facts the feed does not carry per product. */
+export interface ShopifyPublicStoreMeta {
+  name: string | null;
+  currency: string;
+}
+
+/**
+ * Whether the URL is a Shopify storefront readable through the public feed
+ * (AC-6 detection): `/products.json?limit=1` answers JSON with a `products`
+ * array. Anything else — HTML, a 404, JSON of another shape — is not.
+ */
+export async function detectShopifyPublicStore(
+  storeUrl: string,
+  fetch: PoliteFetch,
+): Promise<boolean> {
+  const origin = originOf(storeUrl);
+  const response = await fetch.fetch(`${origin}/products.json?limit=1`);
+  if (!response.ok) {
+    return false;
+  }
+  try {
+    const body = (await response.json()) as { products?: unknown };
+    return Array.isArray(body?.products);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Store name and currency: `/meta.json` (`name`, `currency`) first, `/cart.js`
+ * (`currency`) as the currency fallback. Fails loudly when neither answers a
+ * currency — every price row needs one and guessing would corrupt every
+ * price filter downstream.
+ */
+export async function fetchShopifyPublicStoreMeta(
+  storeUrl: string,
+  fetch: PoliteFetch,
+): Promise<ShopifyPublicStoreMeta> {
+  const origin = originOf(storeUrl);
+  let name: string | null = null;
+  let currency: string | null = null;
+  const meta = await readJson<{ name?: unknown; currency?: unknown }>(
+    fetch,
+    `${origin}/meta.json`,
+  );
+  if (meta !== null) {
+    name = typeof meta.name === "string" && meta.name !== "" ? meta.name : null;
+    currency =
+      typeof meta.currency === "string" && meta.currency !== ""
+        ? meta.currency
+        : null;
+  }
+  if (currency === null) {
+    const cart = await readJson<{ currency?: unknown }>(fetch, `${origin}/cart.js`);
+    if (cart !== null && typeof cart.currency === "string" && cart.currency !== "") {
+      currency = cart.currency;
+    }
+  }
+  if (currency === null) {
+    throw new Error(
+      `Shopify public source: no currency from ${origin}/meta.json or ${origin}/cart.js`,
+    );
+  }
+  return { name, currency };
+}
+
+/**
+ * Map one feed product to the port shape. Prices are the min/max over the
+ * variants' `price` (strings in the feed); availability is any variant
+ * `available`; the first image is the card image; alt texts are every
+ * non-empty image alt. Tags arrive as an array or a comma-separated string
+ * depending on the storefront's feed version.
+ */
+export function mapShopifyPublicProduct(
+  product: ShopifyPublicProduct,
+  { origin, currency }: { origin: string; currency: string },
+): SourceProduct {
+  const prices = product.variants
+    .map((variant) => Number(variant.price))
+    .filter((price) => Number.isFinite(price));
+  const tags = Array.isArray(product.tags)
+    ? product.tags
+    : typeof product.tags === "string"
+      ? product.tags
+          .split(",")
+          .map((tag) => tag.trim())
+          .filter((tag) => tag !== "")
+      : [];
+  return {
+    sourceId: String(product.id),
+    title: product.title ?? "",
+    description: htmlToPlainText(product.body_html),
+    tags,
+    vendor: product.vendor ?? "",
+    productType: product.product_type ?? "",
+    priceMin: prices.length > 0 ? Math.min(...prices) : Number.NaN,
+    priceMax: prices.length > 0 ? Math.max(...prices) : Number.NaN,
+    currencyCode: currency,
+    available: product.variants.some((variant) => variant.available === true),
+    imageAltTexts: product.images
+      .map((image) => image.alt ?? "")
+      .filter((alt) => alt !== ""),
+    imageUrl: product.images[0]?.src ?? null,
+    url:
+      product.handle !== undefined && product.handle !== ""
+        ? `${origin}/products/${product.handle}`
+        : null,
+    sourceUpdatedAt:
+      typeof product.updated_at === "string" && product.updated_at !== ""
+        ? new Date(product.updated_at)
+        : null,
+  };
+}
+
+/**
+ * The source: pages `/products.json?limit=250&page=N` until an empty page
+ * (or until `maxProducts` are in hand — the pipeline enforces the bound),
+ * with the store meta fetched once up front.
+ */
+export function createShopifyPublicSource({
+  storeUrl,
+  fetch,
+  meta,
+}: {
+  storeUrl: string;
+  fetch: PoliteFetch;
+  /** Pre-fetched meta (the CLI reads it for the store name); fetched when absent. */
+  meta?: ShopifyPublicStoreMeta;
+}): CatalogSource {
+  const origin = originOf(storeUrl);
+  return {
+    kind: SHOPIFY_PUBLIC_SOURCE_KIND,
+    async fetchProducts({ maxProducts, onProgress }) {
+      const { currency } =
+        meta ?? (await fetchShopifyPublicStoreMeta(storeUrl, fetch));
+      const products: SourceProduct[] = [];
+      for (let page = 1; ; page += 1) {
+        const url = `${origin}/products.json?limit=${PRODUCTS_JSON_PAGE_SIZE}&page=${page}`;
+        const response = await fetch.fetch(url);
+        if (!response.ok) {
+          throw new Error(
+            `Shopify public source: ${url} answered HTTP ${response.status}`,
+          );
+        }
+        const body = (await response.json()) as { products?: unknown };
+        if (!Array.isArray(body?.products)) {
+          throw new Error(
+            `Shopify public source: ${url} did not answer a products array`,
+          );
+        }
+        const pageProducts = body.products as ShopifyPublicProduct[];
+        if (pageProducts.length === 0) {
+          return products;
+        }
+        for (const product of pageProducts) {
+          products.push(mapShopifyPublicProduct(product, { origin, currency }));
+        }
+        onProgress?.({ fetched: products.length, stage: `page ${page}` });
+        if (products.length >= maxProducts) {
+          // Enough in hand: the pipeline drops the overflow and reports it;
+          // pages beyond this one are never requested.
+          return products;
+        }
+      }
+    },
+  };
+}
+
+function originOf(storeUrl: string): string {
+  const url = new URL(storeUrl.includes("://") ? storeUrl : `https://${storeUrl}`);
+  return url.origin;
+}
+
+async function readJson<T>(fetch: PoliteFetch, url: string): Promise<T | null> {
+  try {
+    const response = await fetch.fetch(url);
+    if (!response.ok) {
+      return null;
+    }
+    return (await response.json()) as T;
+  } catch {
+    // A disallowed or unreachable meta endpoint is not fatal on its own —
+    // the caller decides whether the missing fact is.
+    return null;
+  }
+}
