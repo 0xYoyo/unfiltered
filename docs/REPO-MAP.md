@@ -252,6 +252,29 @@ docs/
   PORTABILITY.md
   PRD.md
   evidence/
+    YOY-100/
+      0-origin-home-desktop.png
+      1-results-view-desktop.png
+      1-results-view-mobile.png
+      2-results-view-he-rtl-desktop.png
+      3-from-header-modal-desktop.png
+      4-after-back-desktop.png
+      5-loading-desktop.png
+      6-empty-classic-desktop.png
+      7-ai-zero-hit-desktop.png
+      8-shell-unavailable-bare-desktop.png
+      9-flag-off-overlay-desktop.png
+      dev-1-home-origin-results-desktop.jpg
+      dev-1b-results-bottom-no-origin-sections-desktop.jpg
+      dev-1m-results-view-mobile-390.png
+      dev-2-search-origin-blue-dress-desktop.jpg
+      dev-2b-product-origin-results-desktop.jpg
+      dev-3-chip-removed-refinement-desktop.jpg
+      dev-4-after-back-home-desktop.jpg
+      dev-5-he-rtl-results-desktop.jpg
+      dev-5b-he-second-query-template-input-desktop.jpg
+      dev-5c-he-second-query-loading-stale-count-desktop.jpg
+      dev-9-flag-off-overlay-desktop.jpg
     YOY-70/
       live-A-desktop-panel.jpg
       live-A-he-rtl.jpg
