@@ -283,7 +283,8 @@ export function init(config: WidgetConfig): void {
             createNativeSurface({
               locale: config.locale,
               config: nativeConfig,
-              ...surfaceOptions,
+              // The native view owns no close / new-search control (YOY-82
+              // AC-1): Back, Escape, and the theme's own input serve them.
               // The submitted query behind the response being rendered:
               // set right before showResponse, so the native view's URL
               // and the theme's count line name it (YOY-100 AC-2/AC-4).

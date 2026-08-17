@@ -138,8 +138,24 @@ export interface NativeRenderConfig {
   sectionClass: string;
   /** Classes of the results list / item — the theme's own grid classes. */
   grid: { listClass: string; itemClass: string };
+  /**
+   * Chip derivation (YOY-82 AC-2): the host custom properties the owned
+   * filter chips read their border radius and border width from, so the
+   * chips wear the theme's own button geometry instead of a fixed pill.
+   * When the theme exposes neither, the neutral fallbacks in
+   * native-render.css apply. Typography and color are inherited outright
+   * (`font: inherit`, `currentColor`) and need no configuration.
+   */
+  chip: NativeRenderChipConfig;
   /** Variant A: parallel alternate-template fetches in flight at once. */
   concurrency: number;
+}
+
+export interface NativeRenderChipConfig {
+  /** Host custom property holding the theme's button/pill radius. */
+  radiusVar: string;
+  /** Host custom property holding the theme's button border width. */
+  borderWidthVar: string;
 }
 
 /** Everything a caller may override; the rest falls back to Dawn defaults. */
@@ -212,6 +228,9 @@ export const DAWN_NATIVE_RENDER: NativeRenderConfig = {
       "grid product-grid grid--2-col-tablet-down grid--4-col-desktop",
     itemClass: "grid__item",
   },
+  // Dawn exposes its button geometry as root custom properties
+  // (theme.liquid: `--buttons-radius`, `--buttons-border-width`).
+  chip: { radiusVar: "--buttons-radius", borderWidthVar: "--buttons-border-width" },
   concurrency: 6,
 };
 
@@ -230,6 +249,7 @@ export function resolveNativeRenderConfig(
       fill: { ...DAWN_NATIVE_RENDER.harvest.fill, ...overrides.harvest?.fill },
     },
     grid: { ...DAWN_NATIVE_RENDER.grid, ...overrides.grid },
+    chip: { ...DAWN_NATIVE_RENDER.chip, ...overrides.chip },
   };
 }
 
