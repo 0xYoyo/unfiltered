@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Magento Linen Shirt</title>
+  <link rel='canonical' href='https://shop.example/product/magento-shirt'/>
+  <!-- Magento-shaped: an @graph holding WebPage, BreadcrumbList, and the Product
+       with an AggregateOffer; @type as an array; image as an ImageObject. -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      { "@type": "WebPage", "@id": "https://shop.example/product/magento-shirt#webpage", "name": "Magento Linen Shirt" },
+      { "@type": "BreadcrumbList", "itemListElement": [] },
+      {
+        "@type": ["Product", "IndividualProduct"],
+        "productID": "MAG-SHIRT",
+        "name": "Magento Linen Shirt",
+        "description": "Breathable linen shirt, relaxed fit.",
+        "image": { "@type": "ImageObject", "url": "https://shop.example/img/magento-shirt.jpg" },
+        "brand": "Magento House",
+        "category": { "@type": "Thing", "name": "Shirts" },
+        "offers": {
+          "@type": "AggregateOffer",
+          "lowPrice": "180",
+          "highPrice": "220",
+          "priceCurrency": "ILS",
+          "offerCount": 3,
+          "availability": "http://schema.org/OutOfStock"
+        }
+      }
+    ]
+  }
+  </script>
+</head>
+<body><h1>Magento Linen Shirt</h1></body>
+</html>

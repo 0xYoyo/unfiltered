@@ -170,27 +170,42 @@ export function parseRetryAfterMs(
 
 /**
  * Build the helper. `contactUrl` lands in the User-Agent (`(+<url>)`) so a
- * host operator can find out who is crawling; `sleep` and `fetch` are
- * injectable so tests run instantly and offline.
+ * host operator can find out who is crawling; `sleep`, `now`, and `fetch`
+ * are injectable so tests run instantly and offline.
+ *
+ * Per-host politeness: `maxInFlightPerHost` requests at once (default 1 —
+ * pagination never fans out against a store) and at least `minSpacingMs`
+ * between request starts to the same host (default 0). The page crawler
+ * (YOY-89) runs with 4 in flight and 250 ms spacing.
  */
 export function createPoliteFetch({
   contactUrl,
   fetch: fetchImpl = globalThis.fetch as FetchLike,
   timeoutMs = DEFAULT_FETCH_TIMEOUT_MS,
   sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)),
+  now = () => Date.now(),
   respectRobots = true,
+  maxInFlightPerHost = 1,
+  minSpacingMs = 0,
 }: {
   contactUrl: string;
   fetch?: FetchLike;
   timeoutMs?: number;
   sleep?: (ms: number) => Promise<void>;
+  now?: () => number;
   respectRobots?: boolean;
+  maxInFlightPerHost?: number;
+  minSpacingMs?: number;
 }): PoliteFetch {
   const userAgent = `${POLITE_USER_AGENT_PRODUCT} (+${contactUrl})`;
   const stats: PoliteFetchStats = { requests: 0, retries: 0, robotsSkipped: 0 };
-  // One request in flight per host: each host's requests chain behind the
-  // previous one, so pagination never fans out against a store.
-  const hostQueues = new Map<string, Promise<unknown>>();
+  // Per-host gate: at most `maxInFlightPerHost` tasks running, the rest
+  // waiting in FIFO order; request starts to one host are spaced by at
+  // least `minSpacingMs`.
+  const hostGates = new Map<
+    string,
+    { active: number; waiting: Array<() => void>; nextStartAt: number }
+  >();
   const robotsByHost = new Map<string, Promise<RobotsRule[]>>();
 
   const rawFetch = async (url: string): Promise<Response> => {
@@ -255,17 +270,36 @@ export function createPoliteFetch({
     return pending;
   };
 
-  const enqueue = <T>(host: string, task: () => Promise<T>): Promise<T> => {
-    const previous = hostQueues.get(host) ?? Promise.resolve();
-    const run = previous.then(task, task);
-    hostQueues.set(
-      host,
-      run.then(
-        () => undefined,
-        () => undefined,
-      ),
-    );
-    return run;
+  const gateFor = (host: string) => {
+    let gate = hostGates.get(host);
+    if (gate === undefined) {
+      gate = { active: 0, waiting: [], nextStartAt: 0 };
+      hostGates.set(host, gate);
+    }
+    return gate;
+  };
+
+  const enqueue = async <T>(host: string, task: () => Promise<T>): Promise<T> => {
+    const gate = gateFor(host);
+    if (gate.active >= maxInFlightPerHost) {
+      await new Promise<void>((resolve) => gate.waiting.push(resolve));
+    }
+    gate.active += 1;
+    try {
+      // Spacing between request starts to this host, whichever slot runs:
+      // reserve the next start time before waiting, so concurrent slots
+      // never compute the same start.
+      const startAt = Math.max(now(), gate.nextStartAt);
+      gate.nextStartAt = startAt + minSpacingMs;
+      const wait = startAt - now();
+      if (wait > 0) {
+        await sleep(wait);
+      }
+      return await task();
+    } finally {
+      gate.active -= 1;
+      gate.waiting.shift()?.();
+    }
   };
 
   return {

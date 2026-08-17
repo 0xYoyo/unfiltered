@@ -148,6 +148,41 @@ describe("one request in flight per host (AC-5)", () => {
   });
 });
 
+describe("per-host concurrency and spacing (YOY-89 AC-1)", () => {
+  it("allows up to maxInFlightPerHost requests at once and spaces request starts by minSpacingMs", async () => {
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const fetch = async () => {
+      inFlight += 1;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      inFlight -= 1;
+      return new Response("{}", { headers: { "Content-Type": "application/json" } });
+    };
+    let clock = 0;
+    const waits: number[] = [];
+    const polite = createPoliteFetch({
+      contactUrl: CONTACT,
+      fetch,
+      respectRobots: false,
+      maxInFlightPerHost: 4,
+      minSpacingMs: 250,
+      now: () => clock,
+      sleep: async (ms) => {
+        waits.push(ms);
+        clock += ms;
+      },
+    });
+    await Promise.all(Array.from({ length: 6 }, (_, i) => polite.fetch(`https://a.example/${i}`)));
+    expect(maxInFlight).toBeGreaterThan(1);
+    expect(maxInFlight).toBeLessThanOrEqual(4);
+    // Every start after the first waited for the 250 ms spacing.
+    expect(waits).toHaveLength(5);
+    expect(waits.every((ms) => ms === 250)).toBe(true);
+    expect(polite.stats.requests).toBe(6);
+  });
+});
+
 describe("robots.txt (AC-5)", () => {
   it("skips a disallowed path without fetching it and counts the skip", async () => {
     const store = createFakeStore({

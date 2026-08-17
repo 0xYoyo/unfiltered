@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://shop.example/product/woo-dress</loc><lastmod>2026-08-01</lastmod></url>
+  <url><loc>https://shop.example/product/magento-shirt</loc></url>
+  <url><loc>https://shop.example/product/group-sneaker</loc></url>
+  <url><loc>https://shop.example/product/priceless-scarf</loc></url>
+  <url><loc>https://shop.example/product/dupe-page</loc></url>
+  <url><loc><![CDATA[https://shop.example/products/tee-5]]></loc></url>
+  <url><loc>https://shop.example/p/cap-6</loc></url>
+  <url><loc>https://shop.example/item/hat-7?color=red&amp;size=m</loc></url>
+  <url><loc>https://shop.example/shop/bag-9?utm=sitemap</loc></url>
+  <url><loc>https://shop.example/products/coat-8</loc></url>
+</urlset>

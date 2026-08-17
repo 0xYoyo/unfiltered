@@ -9,12 +9,20 @@ import {
   isValidCatalogSlug,
   playgroundStoreKey,
 } from "./ingest-public.server";
+import {
+  CrawlSetupError,
+  createJsonLdCrawlSource,
+  DEFAULT_CRAWL_PAGE_BUDGET,
+  JSONLD_CRAWL_SOURCE_KIND,
+  type JsonLdCrawlSource,
+} from "./jsonld-crawl-source.server";
 import type { PoliteFetch } from "./polite-fetch.server";
 import { RobotsDisallowedError } from "./polite-fetch.server";
 import {
   createShopifyPublicSource,
   detectShopifyPublicStore,
   fetchShopifyPublicStoreMeta,
+  SHOPIFY_PUBLIC_SOURCE_KIND,
 } from "./shopify-public-source.server";
 
 /**
@@ -25,9 +33,13 @@ import {
  */
 
 export const INGEST_PUBLIC_USAGE = [
-  "usage: npm run ingest:public -- --url <store URL> --slug <slug> [--name \"<Store>\"] [--max <N>]",
+  "usage: npm run ingest:public -- --url <store URL> --slug <slug> [--name \"<Store>\"] [--max <N>] [--source shopify-public|jsonld-crawl] [--pages <N>]",
   "       npm run ingest:public -- --delete --slug <slug>",
 ].join("\n");
+
+/** The sources the CLI can force with `--source` (YOY-89 AC-5). */
+export const SOURCE_KINDS = [SHOPIFY_PUBLIC_SOURCE_KIND, JSONLD_CRAWL_SOURCE_KIND] as const;
+export type SourceKind = (typeof SOURCE_KINDS)[number];
 
 export interface IngestPublicArgs {
   url: string | null;
@@ -35,6 +47,10 @@ export interface IngestPublicArgs {
   name: string | null;
   max: number;
   delete: boolean;
+  /** Forced source, or null for detection. */
+  source: SourceKind | null;
+  /** Page-fetch budget for the crawler (`--pages`, YOY-89 AC-1). */
+  pages: number;
 }
 
 /** Thrown for a malformed command line; the message is the whole report. */
@@ -53,6 +69,8 @@ export function parseIngestPublicArgs(argv: string[]): IngestPublicArgs {
     name: null,
     max: DEFAULT_MAX_PRODUCTS,
     delete: false,
+    source: null,
+    pages: DEFAULT_CRAWL_PAGE_BUDGET,
   };
   for (let index = 0; index < argv.length; index += 1) {
     const flag = argv[index];
@@ -83,6 +101,25 @@ export function parseIngestPublicArgs(argv: string[]): IngestPublicArgs {
         args.max = max;
         break;
       }
+      case "--source": {
+        const raw = takeValue();
+        if (!(SOURCE_KINDS as readonly string[]).includes(raw)) {
+          throw new IngestPublicUsageError(
+            `--source must be one of ${SOURCE_KINDS.join("|")}, got "${raw}"`,
+          );
+        }
+        args.source = raw as SourceKind;
+        break;
+      }
+      case "--pages": {
+        const raw = takeValue();
+        const pages = Number(raw);
+        if (!Number.isInteger(pages) || pages <= 0) {
+          throw new IngestPublicUsageError(`--pages must be a positive integer, got "${raw}"`);
+        }
+        args.pages = pages;
+        break;
+      }
       case "--delete":
         args.delete = true;
         break;
@@ -105,28 +142,43 @@ export function parseIngestPublicArgs(argv: string[]): IngestPublicArgs {
 }
 
 /**
- * Detect which source can read `url` (AC-6): today only the Shopify public
- * feed. Null means no supported source — the CLI exits non-zero. Detection
- * goes through the polite fetch, so a robots-disallowed feed surfaces as
- * `RobotsDisallowedError` here rather than as "unsupported".
+ * Detect which source reads `url` (YOY-88 AC-6, extended by YOY-89 AC-5):
+ * a Shopify storefront (public feed answers) uses the Shopify adapter; any
+ * other URL uses the generic JSON-LD crawler. `force` picks one regardless
+ * of detection — forcing `shopify-public` on a non-Shopify URL is the
+ * unsupported case (null). Detection goes through the polite fetch, so a
+ * robots-disallowed feed surfaces as `RobotsDisallowedError` here rather
+ * than as "unsupported".
  */
 export async function detectCatalogSource({
   url,
   fetch,
   name,
+  force = null,
+  pages = DEFAULT_CRAWL_PAGE_BUDGET,
 }: {
   url: string;
   fetch: PoliteFetch;
   name: string | null;
+  force?: SourceKind | null;
+  pages?: number;
 }): Promise<{ source: CatalogSource; name: string } | null> {
-  if (await detectShopifyPublicStore(url, fetch)) {
+  const isShopify =
+    force === JSONLD_CRAWL_SOURCE_KIND ? false : await detectShopifyPublicStore(url, fetch);
+  if (isShopify) {
     const meta = await fetchShopifyPublicStoreMeta(url, fetch);
     return {
       source: createShopifyPublicSource({ storeUrl: url, fetch, meta }),
       name: name ?? meta.name ?? new URL(url).host,
     };
   }
-  return null;
+  if (force === SHOPIFY_PUBLIC_SOURCE_KIND) {
+    return null;
+  }
+  return {
+    source: createJsonLdCrawlSource({ storeUrl: url, fetch, pageBudget: pages }),
+    name: name ?? new URL(url.includes("://") ? url : `https://${url}`).host,
+  };
 }
 
 /**
@@ -178,7 +230,13 @@ export async function runIngestPublicCli({
 
   const url = args.url as string;
   try {
-    const detected = await detectCatalogSource({ url, fetch, name: args.name });
+    const detected = await detectCatalogSource({
+      url,
+      fetch,
+      name: args.name,
+      force: args.source,
+      pages: args.pages,
+    });
     if (detected === null) {
       error(`no supported catalog source for ${url}`);
       return 1;
@@ -210,6 +268,14 @@ export async function runIngestPublicCli({
     if (result.ingest.skippedInvalid > 0) {
       log(`skipped ${result.ingest.skippedInvalid} product(s) with no title or no price`);
     }
+    if (detected.source.kind === JSONLD_CRAWL_SOURCE_KIND) {
+      const { stats } = detected.source as JsonLdCrawlSource;
+      log(
+        `crawl: sitemaps ${stats.sitemapsRead}, urls ${stats.urlsDiscovered}, pages fetched ${stats.pagesFetched} (budget ${args.pages}), products found ${stats.productsFound}, skipped no-price ${stats.skippedNoPrice}, non-html ${stats.skippedNonHtml}, robots ${stats.skippedRobots}, fetch errors ${stats.fetchErrors}${
+          stats.budgetExhausted ? " — page budget exhausted, more pages remain" : ""
+        }`,
+      );
+    }
     log(
       `enrich: enriched ${result.enrich.enriched}, cached ${result.enrich.cached}, failed ${result.enrich.failed}`,
     );
@@ -229,7 +295,7 @@ export async function runIngestPublicCli({
     );
     return 0;
   } catch (caught) {
-    if (caught instanceof RobotsDisallowedError) {
+    if (caught instanceof RobotsDisallowedError || caught instanceof CrawlSetupError) {
       error(`ingest aborted: ${caught.message} — nothing was written`);
       return 1;
     }
