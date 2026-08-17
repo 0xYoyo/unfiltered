@@ -38,9 +38,9 @@ import { getStrings, resolveLocale } from "./strings";
  *   Pure DOM — the portable (Door-2) analog.
  *
  * Both fill an `Overlay`-shaped surface so main.ts's state machine drives
- * them unchanged; the composite below keeps keystroke previews on the
- * existing shadow overlay (YOY-70 NG-3) and routes submitted responses to
- * the native view. Everything is off unless a caller opts in
+ * them unchanged; the composite below routes submitted responses to the
+ * native view and leaves keystroke previews to the theme's own predictive
+ * search (YOY-101). Everything is off unless a caller opts in
  * (`WidgetConfig.nativeRender`) or the dev flag is set (NG-1).
  *
  * The native view is a full-page mirror (YOY-100, native-page.ts): the
@@ -766,13 +766,16 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
 }
 
 /**
- * The composite the widget runs when native rendering is on: keystroke
- * previews stay on the existing shadow overlay (NG-3 — the preview tier is
- * untouched), submitted responses render natively. The native view is a
- * page (YOY-100): typing on it previews in the floating overlay above it,
- * exactly as on any other page, and the view stays until the shopper
- * leaves it (Back, Escape, close) or submits again. main.ts drives this
- * exactly as it drives the plain overlay.
+ * The composite the widget runs when native rendering is on: submitted
+ * responses render natively; the shadow overlay stays for the states that
+ * precede or replace a native view (loading before the mirror is entered, a
+ * failed first search). Keystroke previews are the THEME's on this path
+ * (YOY-101): typing rides the theme's own predictive search and main.ts
+ * never asks for a preview, so `showPreview` renders nothing — the owned
+ * preview box is the overlay path's fallback surface only (YOY-101 AC-4).
+ * The native view is a page (YOY-100): it stays until the shopper leaves it
+ * (Back, Escape, close) or submits again. main.ts drives this exactly as it
+ * drives the plain overlay.
  */
 export function createNativeComposite(overlay: Overlay, native: Overlay): Overlay {
   return {
@@ -809,8 +812,9 @@ export function createNativeComposite(overlay: Overlay, native: Overlay): Overla
       overlay.close();
       native.showResponse(response, handlers);
     },
-    showPreview(response, handlers) {
-      overlay.showPreview(response, handlers);
+    showPreview() {
+      // Previews are the theme's on the native path (YOY-101 AC-1): the
+      // owned preview box never appears here.
     },
     destroy() {
       overlay.destroy();

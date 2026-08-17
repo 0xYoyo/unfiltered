@@ -570,25 +570,41 @@ test.describe("global takeover of every search input (YOY-99)", () => {
     await expectResultsViewSameDocument(page);
   });
 
-  test("Escape dismisses identically from every bound input, and typing previews from each (AC-3)", async ({
+  test("Escape dismisses identically from every bound input, and typing previews nothing of ours from any of them (AC-3)", async ({
     page,
   }) => {
     await page.goto("/theme-native.html?native=A&multi=1");
+    const searchRequests = () =>
+      page.evaluate(
+        () =>
+          (window as unknown as { __searchRequests: unknown[] })
+            .__searchRequests,
+      );
 
-    // Preview from the modal input opens the overlay; Escape closes it and
-    // retains the query.
+    // Typing in the modal input previews nothing of ours — on the native
+    // path keystrokes are the theme's predictive search's (YOY-101 AC-1/
+    // AC-3): no overlay, no request. Submit renders the native view;
+    // Escape leaves it and retains the query.
     await page.getByTestId("header-search-summary").click();
     await modalInput(page).fill("runner");
-    await expect(overlay(page)).toBeVisible();
-    await modalInput(page).press("Escape");
+    await page.waitForTimeout(200);
     await expect(overlay(page)).toBeHidden();
+    expect(await searchRequests()).toEqual([]);
+    await modalInput(page).press("Enter");
+    await expect(nativeItems(page)).toHaveCount(3);
+    await modalInput(page).press("Escape");
+    await expect(page.getByTestId("unfiltered-native-results")).toBeHidden();
     await expect(modalInput(page)).toHaveValue("runner");
 
     // The same from the in-page input.
     await pageInput(page).fill("nike");
-    await expect(overlay(page)).toBeVisible();
-    await pageInput(page).press("Escape");
+    await page.waitForTimeout(200);
     await expect(overlay(page)).toBeHidden();
+    expect(await searchRequests()).toHaveLength(1);
+    await pageInput(page).press("Enter");
+    await expect(nativeItems(page)).toHaveCount(3);
+    await pageInput(page).press("Escape");
+    await expect(page.getByTestId("unfiltered-native-results")).toBeHidden();
     await expect(pageInput(page)).toHaveValue("nike");
 
     // After a dismissal, Enter on the still-focused input submits natively

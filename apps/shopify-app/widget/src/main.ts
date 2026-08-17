@@ -271,7 +271,9 @@ export function init(config: WidgetConfig): void {
     });
     // Theme-native rendering (YOY-70): off unless configured or dev-flagged,
     // in which case submitted responses render as the theme's own cards in
-    // the host document while previews keep the shadow overlay (NG-3).
+    // the host document and keystroke previews are the theme's own
+    // predictive search (YOY-101) — the shadow overlay stays for the
+    // loading/failure states that precede a native view.
     const nativeConfig = resolveNativeRender(config.nativeRender);
     const overlay =
       nativeConfig === null
@@ -448,13 +450,24 @@ export function init(config: WidgetConfig): void {
     // nothing until a first query produces a loading state or response —
     // the shield below stays, because native predictive suppression
     // (YOY-60 AC-3) is about the theme's listeners, not our overlay.
+    // Native mode (YOY-101): keystroke previews RIDE the theme's own
+    // predictive search — the shopper sees exactly what they would see
+    // with the app embed off, and our surface appears only on submit. So
+    // focus/focusin/input propagate untouched to the theme's listeners
+    // (AC-1), typing sends nothing to the proxy (AC-3), and only Enter and
+    // the form submit are intercepted (AC-2). The overlay path keeps the
+    // shield and the owned preview box exactly as shipped (AC-4).
+    const themePredictive = nativeConfig !== null;
+
     document.addEventListener(
       "focus",
       (event) => {
         if (inert || !isBound(event.target)) {
           return;
         }
-        event.stopPropagation();
+        if (!themePredictive) {
+          event.stopPropagation();
+        }
         engage(event.target);
         // Refocusing re-engages the widget (Enter searches in-widget again)
         // without rendering anything (YOY-67 AC-6).
@@ -468,7 +481,9 @@ export function init(config: WidgetConfig): void {
         if (inert || !isBound(event.target)) {
           return;
         }
-        event.stopPropagation();
+        if (!themePredictive) {
+          event.stopPropagation();
+        }
         engage(event.target);
       },
       true,
@@ -480,8 +495,15 @@ export function init(config: WidgetConfig): void {
         if (inert || !isBound(event.target)) {
           return;
         }
-        event.stopPropagation();
         engage(event.target);
+        if (themePredictive) {
+          // Typing re-engages the widget for the next Enter (as on the
+          // overlay path) and otherwise belongs to the theme: no debounce,
+          // no preview request, nothing rendered (YOY-101 AC-1/AC-3).
+          dismissed = false;
+          return;
+        }
+        event.stopPropagation();
         onType();
       },
       true,
@@ -526,11 +548,17 @@ export function init(config: WidgetConfig): void {
         if (inert || !isBound(event.target)) {
           return;
         }
-        event.stopPropagation();
         engage(event.target);
         if (event.key === "Enter" && !dismissed) {
+          // The theme's own Enter listener (a scripted /search navigation)
+          // must not fire either: on the native path this is the ONLY key
+          // the widget takes from the theme (YOY-101 AC-2) — every other
+          // keystroke reaches the theme's predictive search untouched.
+          event.stopPropagation();
           event.preventDefault();
           searchNow();
+        } else if (!themePredictive) {
+          event.stopPropagation();
         }
         if (event.key === "Escape" && (overlay.isOpen() || searchActive())) {
           // Mirrors the document-level Escape handler below, which this
