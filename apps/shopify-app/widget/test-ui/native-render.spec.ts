@@ -6,9 +6,22 @@ import { expect, test, type Page } from "@playwright/test";
 // the fallback path, the dev flag, and the flag-off invariant. Every
 // submitted search here goes through the full pipeline (fill + Enter with
 // the preview debounce stretched past the test timeout).
+//
+// The native view is a full-page mirror (YOY-100): the results section sits
+// inside the theme's own search-results page (fetched from the stubbed
+// `/search?q=*`), the origin page's main content is hidden, and the URL is
+// the theme's search URL — see the "full-page mirror" block below.
 
-const themeInput = (page: Page) => page.locator('input[type="search"]');
+// The header's search input — the origin page's; the mirrored search page
+// adds the template's own input inside main.
+const themeInput = (page: Page) => page.locator('input[type="search"]').first();
 const panel = (page: Page) => page.getByTestId("unfiltered-native-results");
+const shellNodes = (page: Page) => page.locator("[data-unfiltered-mirror]");
+const originHidden = (page: Page) =>
+  page.locator("[data-unfiltered-origin-hidden]");
+const themeCount = (page: Page) => page.getByTestId("theme-results-count");
+const mirrorState = (page: Page) =>
+  page.evaluate(() => window.history.state as unknown);
 const items = (page: Page) => page.getByTestId("unfiltered-native-item");
 const nativeChips = (page: Page) => page.getByTestId("unfiltered-native-chip");
 const overlay = (page: Page) => page.getByTestId("unfiltered-widget-overlay");
@@ -47,6 +60,14 @@ test("flag off: the shadow overlay renders exactly as before and no native panel
   await expect(overlayCards(page)).toHaveCount(3);
   await expect(panel(page)).toHaveCount(0);
   expect(await altTemplateRequests(page)).toEqual([]);
+  // No mirror either (YOY-100 AC-5): no shell fetch, origin content shown,
+  // URL and history untouched.
+  expect(await page.evaluate(() => (window as unknown as { __shellRequests: unknown[] }).__shellRequests)).toEqual([]);
+  await expect(shellNodes(page)).toHaveCount(0);
+  await expect(originHidden(page)).toHaveCount(0);
+  await expect(page.getByTestId("theme-grid")).toBeVisible();
+  expect(new URL(page.url()).pathname).toBe("/theme-native.html");
+  expect(await mirrorState(page)).toBeNull();
 });
 
 test.describe("Variant A — alternate-template fetch (AC-1)", () => {
@@ -58,9 +79,14 @@ test.describe("Variant A — alternate-template fetch (AC-1)", () => {
     await submitQuery(page, "runner");
     await expect(items(page)).toHaveCount(3);
 
-    // The panel is light DOM inside the theme's main content, marked A.
+    // The panel is light DOM inside the theme's main content — inside the
+    // mirrored search page's results container (YOY-100) — marked A.
     await expect(panel(page)).toHaveAttribute("data-variant", "A");
-    await expect(page.locator("main#MainContent > section.unfiltered-native")).toHaveCount(1);
+    await expect(
+      page.locator(
+        "main#MainContent [data-unfiltered-mirror] #product-grid > section.unfiltered-native",
+      ),
+    ).toHaveCount(1);
     await expect(page.getByTestId("unfiltered-native-list")).toHaveClass(
       /product-grid/,
     );
@@ -270,9 +296,11 @@ test.describe("Variant B — harvest-clone (AC-2)", () => {
       "Sold out",
     );
 
-    // The harvested list's classes become the panel grid's classes.
+    // The grid classes are the theme's SEARCH page list's (3-col in the
+    // harness shell), not the harvest page's 4-col collection grid: the
+    // mirror's list wins over the harvest (YOY-100).
     await expect(page.getByTestId("unfiltered-native-list")).toHaveClass(
-      /grid--4-col-desktop/,
+      /grid--3-col-desktop/,
     );
     await expect(panel(page)).toHaveAttribute("data-native-count", "3");
   });
@@ -329,14 +357,16 @@ test.describe("composite: previews stay on the overlay, submits go native (NG-3)
     await expect(items(page)).toHaveCount(3);
     await expect(overlay(page)).toBeHidden();
 
-    // Typing again returns to a preview: native panel closes, overlay back.
+    // Typing again previews in the overlay ABOVE the results view — the
+    // native view is a page (YOY-100), it stays until the shopper leaves it.
     await themeInput(page).fill("runn");
     await expect(overlayCards(page)).toHaveCount(3);
     await expect(overlay(page)).toBeVisible();
-    await expect(panel(page)).toBeHidden();
+    await expect(panel(page)).toBeVisible();
 
     await themeInput(page).press("Enter");
     await expect(items(page)).toHaveCount(3);
+    await expect(overlay(page)).toBeHidden();
     await themeInput(page).press("Escape");
     await expect(panel(page)).toBeHidden();
     await expect(overlay(page)).toBeHidden();
@@ -390,6 +420,282 @@ test.describe("composite: previews stay on the overlay, submits go native (NG-3)
   });
 });
 
+test.describe("full-page mirror — the theme's own search page (YOY-100)", () => {
+  test("after a submit the view is the theme's search page holding our results; origin content is absent (AC-1, AC-2, AC-7)", async ({
+    page,
+  }) => {
+    await page.goto("/theme-native.html?native=A&fixture=ai&debounce=30000");
+    await expect(page.getByTestId("theme-grid")).toBeVisible();
+
+    await submitQuery(page, "blue dress under 400");
+    await expect(items(page)).toHaveCount(3);
+
+    // The theme's search page furniture is on the page: its heading, its
+    // own template search input carrying the query, its count line — the
+    // theme's wording and markup, OUR count and the shopper's query.
+    await expect(page.getByTestId("theme-search-heading")).toBeVisible();
+    await expect(page.getByTestId("theme-search-heading")).toHaveText(
+      "Search results",
+    );
+    await expect(page.locator("#Search-In-Template")).toHaveValue(
+      "blue dress under 400",
+    );
+    await expect(themeCount(page)).toBeVisible();
+    await expect(themeCount(page)).toHaveText(
+      "3 results found for “blue dress under 400”",
+    );
+    // Chips above the grid, inside the theme's results container.
+    await expect(nativeChips(page)).toHaveCount(3);
+    await expect(
+      page.locator(
+        "#product-grid > section.unfiltered-native [data-testid='unfiltered-native-chips'] ~ [data-testid='unfiltered-native-list']",
+      ),
+    ).toHaveCount(1);
+    // The theme's grid classes come from the search page's list.
+    await expect(page.getByTestId("unfiltered-native-list")).toHaveClass(
+      /grid--3-col-desktop/,
+    );
+
+    // Nothing of the origin page is visible: every main-content child of
+    // the origin is hidden in place (never removed), the theme's own
+    // featured grid included.
+    await expect(page.getByTestId("theme-grid")).toBeHidden();
+    await expect(page.getByTestId("theme-grid")).toHaveCount(1);
+    await expect(originHidden(page)).toHaveCount(
+      await page.evaluate(
+        () =>
+          [...document.querySelector("main#MainContent")!.children].filter(
+            (child) => !child.hasAttribute("data-unfiltered-mirror"),
+          ).length,
+      ),
+    );
+    await expect(page.locator("main#MainContent h1:visible")).toHaveText([
+      "Search results",
+    ]);
+
+    // The theme's own hits for the shell fetch never survive, and neither
+    // do the furniture pieces that only make sense against them; the
+    // fetched page's scripts never ran.
+    await expect(page.getByTestId("theme-search-grid")).toHaveCount(0);
+    await expect(page.getByText("Theme Own Hit")).toHaveCount(0);
+    await expect(page.getByTestId("theme-facets")).toHaveCount(0);
+    await expect(page.getByTestId("theme-sorting")).toHaveCount(0);
+    await expect(page.getByTestId("theme-pagination")).toHaveCount(0);
+    await expect(page.getByTestId("theme-loading-overlay")).toHaveCount(0);
+    expect(
+      await page.evaluate(
+        () => (window as unknown as { __shellScriptRan?: boolean }).__shellScriptRan,
+      ),
+    ).toBeUndefined();
+
+    // One shell fetch — the theme's search page for the every-product term,
+    // products only — cached for the page view.
+    expect(
+      await page.evaluate(
+        () => (window as unknown as { __shellRequests: unknown[] }).__shellRequests,
+      ),
+    ).toEqual([{ q: "*", type: "product" }]);
+
+    // URL state: the theme's own search URL for the query, under the
+    // mirror's history entry (AC-4).
+    const url = new URL(page.url());
+    expect(url.pathname).toBe("/search");
+    expect(url.searchParams.get("q")).toBe("blue dress under 400");
+    expect(await mirrorState(page)).toEqual({ unfilteredNativeMirror: true });
+  });
+
+  test("a refinement and a second query update the same view in place: count line follows, one history entry, one shell fetch (AC-2, AC-3, AC-4)", async ({
+    page,
+  }) => {
+    await page.goto("/theme-native.html?native=A&fixture=ai&debounce=30000");
+    await submitQuery(page, "blue dress under 400");
+    await expect(items(page)).toHaveCount(3);
+
+    // Chip removal: same query, our new count.
+    await nativeChips(page).filter({ hasText: "Under 400" }).click();
+    await expect(items(page)).toHaveCount(4);
+    await expect(themeCount(page)).toHaveText(
+      "4 results found for “blue dress under 400”",
+    );
+    expect(new URL(page.url()).searchParams.get("q")).toBe(
+      "blue dress under 400",
+    );
+
+    // A second query, submitted from the mirrored page's OWN template
+    // input this time (the /search-origin case): identical outcome, URL
+    // updated in place, no second shell fetch, no second history entry.
+    const templateInput = page.locator("#Search-In-Template");
+    await templateInput.fill("runner");
+    await templateInput.press("Enter");
+    await expect(themeCount(page)).toHaveText("3 results found for “runner”");
+    await expect(items(page)).toHaveCount(3);
+    await expect(page.locator("#Search-In-Template")).toHaveCount(1);
+    expect(new URL(page.url()).searchParams.get("q")).toBe("runner");
+    expect(
+      await page.evaluate(
+        () => (window as unknown as { __shellRequests: unknown[] }).__shellRequests,
+      ),
+    ).toHaveLength(1);
+
+    // One Back leaves the results view straight to the origin page.
+    await page.goBack();
+    await expect(page.getByTestId("theme-grid")).toBeVisible();
+    expect(new URL(page.url()).pathname).toBe("/theme-native.html");
+  });
+
+  test("Back returns to the page the shopper searched from, Forward re-enters the results view; Escape and the close control leave it and pop the entry (AC-4)", async ({
+    page,
+  }) => {
+    await page.goto("/theme-native.html?native=A&fixture=ai&debounce=30000");
+    await submitQuery(page, "blue dress under 400");
+    await expect(items(page)).toHaveCount(3);
+    await expect(page.getByTestId("theme-grid")).toBeHidden();
+
+    await page.goBack();
+    // Same document, no reload: the origin's content is back exactly (the
+    // hidden markers are gone), the mirror's nodes are out of the page.
+    await expect(page.getByTestId("theme-grid")).toBeVisible();
+    await expect(shellNodes(page)).toHaveCount(0);
+    await expect(originHidden(page)).toHaveCount(0);
+    await expect(panel(page)).toHaveCount(0);
+    expect(new URL(page.url()).pathname).toBe("/theme-native.html");
+    expect(await mirrorState(page)).toBeNull();
+    // The widget survived: still bound (placeholder), still the same page.
+    await expect(themeInput(page)).toHaveAttribute("placeholder", /.+/);
+
+    await page.goForward();
+    await expect(items(page)).toHaveCount(3);
+    await expect(page.getByTestId("theme-grid")).toBeHidden();
+    await expect(themeCount(page)).toHaveText(
+      "3 results found for “blue dress under 400”",
+    );
+    expect(new URL(page.url()).pathname).toBe("/search");
+
+    // Escape leaves the results view: origin back, entry popped.
+    await themeInput(page).focus();
+    await themeInput(page).press("Escape");
+    await expect(page.getByTestId("theme-grid")).toBeVisible();
+    await expect(panel(page)).toHaveCount(0);
+    await expect.poll(() => new URL(page.url()).pathname).toBe("/theme-native.html");
+
+    // And again via the close control.
+    await submitQuery(page, "blue dress under 400");
+    await expect(items(page)).toHaveCount(3);
+    expect(new URL(page.url()).pathname).toBe("/search");
+    await page.getByTestId("unfiltered-native-close").click();
+    await expect(page.getByTestId("theme-grid")).toBeVisible();
+    await expect.poll(() => new URL(page.url()).pathname).toBe("/theme-native.html");
+    await expect(originHidden(page)).toHaveCount(0);
+  });
+
+  test("the outcome is identical whichever input the search came from — header modal or in-page form (AC-3)", async ({
+    page,
+  }) => {
+    await page.goto(
+      "/theme-native.html?native=A&fixture=ai&multi=1&debounce=30000",
+    );
+    // From the header modal.
+    await page.getByTestId("header-search-summary").click();
+    const modalInput = page.locator("#Search-In-Modal");
+    await modalInput.fill("blue dress under 400");
+    await modalInput.press("Enter");
+    await expect(items(page)).toHaveCount(3);
+    const fromModal = {
+      heading: await page.getByTestId("theme-search-heading").textContent(),
+      count: await themeCount(page).textContent(),
+      url: page.url(),
+      originVisible: await page.getByTestId("theme-grid").isVisible(),
+      listClass: await page.getByTestId("unfiltered-native-list").getAttribute("class"),
+    };
+    // Modal closed and dim gone (YOY-99) — the results page stands alone.
+    await expect(page.locator("details[data-section='header']")).not.toHaveAttribute("open", /.*/);
+
+    // Fresh page, from the in-page form.
+    await page.goto(
+      "/theme-native.html?native=A&fixture=ai&multi=1&debounce=30000",
+    );
+    const inPage = page.locator("#Search-In-Page");
+    await inPage.fill("blue dress under 400");
+    await inPage.press("Enter");
+    await expect(items(page)).toHaveCount(3);
+    expect({
+      heading: await page.getByTestId("theme-search-heading").textContent(),
+      count: await themeCount(page).textContent(),
+      url: page.url(),
+      originVisible: await page.getByTestId("theme-grid").isVisible(),
+      listClass: await page.getByTestId("unfiltered-native-list").getAttribute("class"),
+    }).toEqual(fromModal);
+    expect(fromModal.originVisible).toBe(false);
+  });
+
+  test("shell unavailable: the bare section shows in the theme's main content, origin still hidden, functional always", async ({
+    page,
+  }) => {
+    await page.goto(
+      "/theme-native.html?native=A&fixture=ai&shell=missing&debounce=30000",
+    );
+    await submitQuery(page, "blue dress under 400");
+    await expect(items(page)).toHaveCount(3);
+    await expect(nativeChips(page)).toHaveCount(3);
+    await expect(shellNodes(page)).toHaveCount(0);
+    await expect(page.getByTestId("theme-grid")).toBeHidden();
+    await expect(page.locator("main#MainContent > section.unfiltered-native")).toHaveCount(1);
+    await expect(panel(page)).toHaveClass(/page-width/);
+    expect(new URL(page.url()).pathname).toBe("/search");
+
+    await page.goBack();
+    await expect(page.getByTestId("theme-grid")).toBeVisible();
+    await expect(panel(page)).toHaveCount(0);
+  });
+
+  test("a slow shell never delays the view: it enters bare and the theme's page wraps the results when the shell lands", async ({
+    page,
+  }) => {
+    await page.goto(
+      "/theme-native.html?native=A&fixture=ai&shellDelay=1500&debounce=30000",
+    );
+    await submitQuery(page, "blue dress under 400");
+    // Loading shows in the theme's main content while the shell and cards
+    // are in flight — the origin content is already gone.
+    await expect(page.getByTestId("unfiltered-native-loading")).toBeVisible();
+    await expect(page.getByTestId("theme-grid")).toBeHidden();
+    await expect(items(page)).toHaveCount(3);
+    await expect(shellNodes(page).first()).toBeAttached();
+    await expect(themeCount(page)).toHaveText(
+      "3 results found for “blue dress under 400”",
+    );
+  });
+
+  test("a results-view URL loaded fresh (reload, or Back from a product page) re-runs its query (AC-4)", async ({
+    page,
+  }) => {
+    // The mirror's history entry survives a reload of its URL; without the
+    // widget's own DOM the query is re-run from the URL. Simulated on the
+    // harness URL itself, since the harness has no server route at /search.
+    await page.goto("/theme-native.html?native=A&fixture=ai&q=blue+dress+under+400&debounce=30000");
+    await expect(panel(page)).toHaveCount(0);
+    await page.evaluate(() =>
+      window.history.replaceState({ unfilteredNativeMirror: true }, "", window.location.href),
+    );
+    await page.reload();
+    await expect(items(page)).toHaveCount(3);
+    await expect(themeCount(page)).toHaveText(
+      "3 results found for “blue dress under 400”",
+    );
+    await expect(themeInput(page)).toHaveValue("blue dress under 400");
+    // Re-entered in place: no extra history entry stacked on the reload.
+    expect(new URL(page.url()).pathname).toBe("/search");
+    expect(await mirrorState(page)).toEqual({ unfilteredNativeMirror: true });
+
+    // The same URL WITHOUT the mirror's state is the theme's own page: the
+    // widget does nothing on load.
+    await page.goto("/theme-native.html?native=A&fixture=ai&q=runner&debounce=30000");
+    await page.waitForTimeout(300);
+    await expect(panel(page)).toHaveCount(0);
+    await expect(overlay(page)).toBeHidden();
+  });
+});
+
 test.describe("dev flag (spike-only)", () => {
   test("?unfiltered_native=B turns native rendering on without any config and persists for the session; off clears it", async ({
     page,
@@ -412,10 +718,10 @@ test.describe("dev flag (spike-only)", () => {
   });
 });
 
-// Design-gate evidence (AC-5): the native panel next to the theme's own grid
-// — desktop and mobile, LTR and RTL — for both variants. Cloned-card
-// fidelity is judged against the theme's rendering (the harness cards
-// above the panel), chips and bar against the W-* invariants.
+// Design-gate evidence (YOY-70 AC-5, YOY-100 AC-7): the mirrored search
+// page holding our results — desktop and mobile, LTR and RTL — for both
+// variants. Theme-native page content (shell, cards) is judged against the
+// theme's own rendering, chips and bar against the W-* invariants.
 for (const variant of ["A", "B"] as const) {
   for (const locale of ["en", "he"] as const) {
     test(`Variant ${variant} panel beside the theme grid matches the ${locale} desktop baseline`, async ({
@@ -431,6 +737,13 @@ for (const variant of ["A", "B"] as const) {
       await expect(panel(page)).toHaveAttribute(
         "dir",
         locale === "he" ? "rtl" : "ltr",
+      );
+      // The theme's count line in the theme's own language, our count and
+      // the shopper's query rewritten mid-sentence (YOY-100 AC-2).
+      await expect(themeCount(page)).toHaveText(
+        locale === "he"
+          ? "נמצאו 3 תוצאות עבור “blue dress under 400”"
+          : "3 results found for “blue dress under 400”",
       );
       await expect(page.locator("main#MainContent")).toHaveScreenshot(
         `native-${variant}-${locale}-desktop.png`,

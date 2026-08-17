@@ -459,6 +459,22 @@ test.describe("global takeover of every search input (YOY-99)", () => {
   const dim = (page: Page) => page.getByTestId("header-search-overlay");
   const nativeItems = (page: Page) =>
     page.getByTestId("unfiltered-native-item");
+  // A takeover submit never navigates: the document survives (the harness
+  // request log lives on `window`, and a real navigation would empty it),
+  // and the URL is the native view's own state — the theme's search URL,
+  // pushed by the full-page mirror (YOY-100 AC-4), not loaded.
+  const expectResultsViewSameDocument = async (page: Page) => {
+    expect(new URL(page.url()).pathname).toBe("/search");
+    expect(
+      await page.evaluate(
+        () =>
+          Array.isArray(
+            (window as unknown as { __searchRequests?: unknown[] })
+              .__searchRequests,
+          ),
+      ),
+    ).toBe(true);
+  };
   const bodyScrollLocked = (page: Page) =>
     page.evaluate(() =>
       [...document.body.classList].some((name) =>
@@ -483,12 +499,12 @@ test.describe("global takeover of every search input (YOY-99)", () => {
     expect(await bodyScrollLocked(page)).toBe(true);
 
     // A takeover submit from the modal input: native results render in the
-    // page, no navigation to /search — and the theme's modal state is gone
-    // without any further click.
+    // page, no navigation (the results view's URL is pushed, YOY-100) — and
+    // the theme's modal state is gone without any further click.
     await modalInput(page).fill("runner");
     await modalInput(page).press("Enter");
     await expect(nativeItems(page)).toHaveCount(3);
-    expect(new URL(page.url()).pathname).toBe("/theme-native.html");
+    await expectResultsViewSameDocument(page);
     await expect(headerDetails(page)).not.toHaveAttribute("open");
     await expect(dim(page)).toBeHidden();
     expect(await bodyScrollLocked(page)).toBe(false);
@@ -507,7 +523,7 @@ test.describe("global takeover of every search input (YOY-99)", () => {
       )
       .toEqual(["runner", "nike"]);
     await expect(nativeItems(page)).toHaveCount(3);
-    expect(new URL(page.url()).pathname).toBe("/theme-native.html");
+    await expectResultsViewSameDocument(page);
   });
 
   test("the magnifier of either form submits through the takeover (AC-1)", async ({
@@ -521,7 +537,7 @@ test.describe("global takeover of every search input (YOY-99)", () => {
       .locator("details-modal.header__search button[type='submit']")
       .click();
     await expect(nativeItems(page)).toHaveCount(3);
-    expect(new URL(page.url()).pathname).toBe("/theme-native.html");
+    await expectResultsViewSameDocument(page);
     await expect(headerDetails(page)).not.toHaveAttribute("open");
 
     await pageInput(page).fill("nike");
@@ -535,7 +551,7 @@ test.describe("global takeover of every search input (YOY-99)", () => {
         ),
       )
       .toBe(2);
-    expect(new URL(page.url()).pathname).toBe("/theme-native.html");
+    await expectResultsViewSameDocument(page);
   });
 
   test("an input mounted after init is bound and taken over (AC-1)", async ({
@@ -551,7 +567,7 @@ test.describe("global takeover of every search input (YOY-99)", () => {
     await lazyInput(page).fill("runner");
     await lazyInput(page).press("Enter");
     await expect(nativeItems(page)).toHaveCount(3);
-    expect(new URL(page.url()).pathname).toBe("/theme-native.html");
+    await expectResultsViewSameDocument(page);
   });
 
   test("Escape dismisses identically from every bound input, and typing previews from each (AC-3)", async ({

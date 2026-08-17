@@ -15,6 +15,15 @@
          same Dawn-shaped card for the requested product. Variant B harvests
          THIS page (its first card is the clone template); Variant A fetches
          the stubbed alternate template per result. No Shopify, no network. -->
+    <!-- Full-page mirror (YOY-100): the fetch stub also answers the theme's
+         search page, `/search?q=*&type=product`, with a Dawn-shaped
+         search-results page (header + main: `template-search` heading,
+         the template's own search form, the "N results found for “*”"
+         status line, a facets bar and pagination to strip, and the
+         theme's `ul.product-grid` holding the theme's OWN hits, which must
+         never survive into the results view). `?shell=missing` makes that
+         fetch 404 (the bare fallback); `?locale=he` serves the Hebrew
+         wording so the count rewrite is proven mid-sentence. -->
     <!-- Multi-input storefront (YOY-99): `?multi=1` adds a Dawn-shaped
          header search modal — `<details-modal><details>` with a page-dim
          overlay and a body scroll lock while open — beside the in-page
@@ -225,9 +234,63 @@
       // `template=missing`: the alternate template is not installed on the
       // theme (every ?view= fetch 404s) — the functional-always fallback.
       const templateMissing = params.get("template") === "missing";
+      // `shell=missing`: the theme's search page cannot be fetched — the
+      // results view falls back to the bare section (origin still hidden).
+      const shellMissing = params.get("shell") === "missing";
+      const shellLocale = params.get("locale") ?? "en";
+      const shellHtml = (term) => `<!doctype html>
+<html lang="${shellLocale}">
+<head><meta charset="utf-8"><title>Search: 95 results found for “${term}”</title>
+<link rel="stylesheet" href="/harness/theme-card.css"></head>
+<body>
+<header class="header"><a href="/theme-native.html">Harness store</a>
+  <form action="/search" method="get" role="search"><input type="search" name="q" value="${term}" placeholder="Theme search"><button type="submit">Search</button></form>
+</header>
+<main id="MainContent" class="page-width">
+  <section id="shopify-section-template--search__main" class="shopify-section">
+    <link rel="stylesheet" href="/harness/theme-card.css">
+    <div class="template-search section-template--search__main-padding">
+      <div class="template-search__header page-width center">
+        <h1 class="h2" data-testid="theme-search-heading">${
+          shellLocale === "he" ? "תוצאות חיפוש" : "Search results"
+        }</h1>
+        <div class="template-search__search">
+          <form action="/search" method="get" role="search" class="search">
+            <input class="search__input" id="Search-In-Template" type="search" name="q" value="${term}" placeholder="Search">
+            <button type="submit">Search</button>
+          </form>
+        </div>
+        <p role="status" data-testid="theme-results-count">${
+          shellLocale === "he"
+            ? `נמצאו 95 תוצאות עבור “${term}”`
+            : `95 results found for “${term}”`
+        }</p>
+      </div>
+      <div class="facets-container">
+        <facet-filters-form class="facets"><form class="facets__form">
+          <div class="facets__wrapper" data-testid="theme-facets">Filter: Availability, Price</div>
+          <div class="facet-filters sorting" data-testid="theme-sorting">Sort by: Relevance</div>
+        </form></facet-filters-form>
+      </div>
+      <div class="product-grid-container" id="ProductGridContainer">
+        <div class="template-search__results collection page-width" id="product-grid">
+          <div class="loading-overlay gradient" data-testid="theme-loading-overlay"></div>
+          <ul class="grid product-grid grid--2-col-tablet-down grid--3-col-desktop" role="list" data-testid="theme-search-grid">
+            <li class="grid__item"><div class="card-wrapper product-card-wrapper"><div class="card card--standard"><div class="card__content"><div class="card__information"><h3 class="card__heading h5"><a href="/products/theme-own-hit" class="full-unstyled-link">Theme Own Hit</a></h3></div></div></div></div></li>
+          </ul>
+          <div class="pagination-wrapper" data-testid="theme-pagination">1 2 3 4</div>
+        </div>
+      </div>
+    </div>
+    <script>window.__shellScriptRan = true;<\/script>
+  </section>
+</main>
+<footer class="footer">Harness footer</footer>
+</body></html>`;
 
       window.__searchRequests = [];
       window.__altTemplateRequests = [];
+      window.__shellRequests = [];
 
       const svg = (fill) =>
         `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 5'%3E%3Crect width='4' height='5' fill='%23${fill}'/%3E%3C/svg%3E`;
@@ -401,6 +464,27 @@
       window.fetch = (input, requestInit) => {
         const url = typeof input === "string" ? input : input.url;
         const parsed = new URL(url, window.location.origin);
+        if (parsed.pathname === "/search") {
+          window.__shellRequests.push({
+            q: parsed.searchParams.get("q"),
+            type: parsed.searchParams.get("type"),
+          });
+          if (shellMissing) {
+            return Promise.resolve(new Response("Not found", { status: 404 }));
+          }
+          const delay = Number(params.get("shellDelay") ?? 0);
+          return new Promise((resolve) =>
+            setTimeout(
+              () =>
+                resolve(
+                  new Response(shellHtml(parsed.searchParams.get("q") ?? ""), {
+                    headers: { "Content-Type": "text/html" },
+                  }),
+                ),
+              delay,
+            ),
+          );
+        }
         if (parsed.pathname.startsWith("/products/") && parsed.searchParams.has("view")) {
           const handle = decodeURIComponent(parsed.pathname.slice("/products/".length));
           window.__altTemplateRequests.push({

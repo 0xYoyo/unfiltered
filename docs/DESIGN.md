@@ -103,6 +103,21 @@ Each is imperative, atomic, and checkable from a screenshot or the diff.
   page is visually identical to never having installed the widget
   (placeholder restored, no orphaned host node or style).
 
+**Theme-native path (Mirror Bar, PRD amendment 2026-08-16; YOY-100).**
+When the widget renders results through the theme's own surfaces — the
+theme's search-results page (its heading, results-count line, containers,
+layout) holding cards the theme itself rendered — that theme-native page
+content is judged against the theme's own rendering, not against W-3–W-6:
+the bar is "indistinguishable from the store's native results page for
+these results", and the count line states the widget's result count in the
+theme's own wording and language. Owned chrome on that page — the filter
+chips and their immediate controls, and status text — still judges against
+the W-* invariants (inherit-first, no foreign hue, chips-level footprint).
+On this path the light-DOM placement of that owned chrome is the mechanism,
+not a W-5 violation: its rules are prefixed to its own elements and never
+restyle host elements; the theme's page content it hides is hidden in place
+and restored exactly (W-10 applies to leaving the results view too).
+
 ### Platform-inherits — merchant admin (A)
 
 - **A-1 Polaris only.** Admin UI is composed from Polaris components and

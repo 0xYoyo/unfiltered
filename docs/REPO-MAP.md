@@ -197,6 +197,7 @@ apps/
         env.d.ts
         format.ts
         main.ts
+        native-page.ts
         native-render.config.ts
         native-render.css
         native-render.ts
@@ -385,8 +386,9 @@ vitest.setup.ts
 - apps/shopify-app/scripts/ingest.mts → apps/shopify-app/app/catalog/embed.server.ts, apps/shopify-app/app/catalog/enrich.server.ts, apps/shopify-app/app/catalog/ingest.server.ts, apps/shopify-app/app/catalog/offline-token.server.ts
 - apps/shopify-app/scripts/native-render-template.mts → apps/shopify-app/widget/src/native-render.config.ts
 - apps/shopify-app/widget/src/format.ts → apps/shopify-app/widget/src/strings.ts
-- apps/shopify-app/widget/src/main.ts → apps/shopify-app/widget/src/native-render.config.ts, apps/shopify-app/widget/src/native-render.ts, apps/shopify-app/widget/src/overlay.ts, apps/shopify-app/widget/src/search-client.ts, apps/shopify-app/widget/src/session.ts, apps/shopify-app/widget/src/strings.ts
-- apps/shopify-app/widget/src/native-render.ts → apps/shopify-app/widget/src/format.ts, apps/shopify-app/widget/src/native-render.config.ts, apps/shopify-app/widget/src/native-render.css?inline (unresolved), apps/shopify-app/widget/src/overlay.ts, apps/shopify-app/widget/src/search-client.ts, apps/shopify-app/widget/src/strings.ts
+- apps/shopify-app/widget/src/main.ts → apps/shopify-app/widget/src/native-page.ts, apps/shopify-app/widget/src/native-render.config.ts, apps/shopify-app/widget/src/native-render.ts, apps/shopify-app/widget/src/overlay.ts, apps/shopify-app/widget/src/search-client.ts, apps/shopify-app/widget/src/session.ts, apps/shopify-app/widget/src/strings.ts
+- apps/shopify-app/widget/src/native-page.ts → apps/shopify-app/widget/src/native-render.config.ts
+- apps/shopify-app/widget/src/native-render.ts → apps/shopify-app/widget/src/format.ts, apps/shopify-app/widget/src/native-page.ts, apps/shopify-app/widget/src/native-render.config.ts, apps/shopify-app/widget/src/native-render.css?inline (unresolved), apps/shopify-app/widget/src/overlay.ts, apps/shopify-app/widget/src/search-client.ts, apps/shopify-app/widget/src/strings.ts
 - apps/shopify-app/widget/src/overlay.ts → apps/shopify-app/widget/src/format.ts, apps/shopify-app/widget/src/search-client.ts, apps/shopify-app/widget/src/strings.ts, apps/shopify-app/widget/src/widget.css?inline (unresolved)
 - apps/shopify-app/widget/test-ui/localization.spec.ts → apps/shopify-app/widget/src/strings.ts
 - packages/engine/src/classic.ts → packages/engine/src/retrieve.ts

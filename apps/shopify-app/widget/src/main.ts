@@ -1,3 +1,4 @@
+import { isMirrorState } from "./native-page";
 import {
   createNativeComposite,
   createNativeSurface,
@@ -281,6 +282,10 @@ export function init(config: WidgetConfig): void {
               locale: config.locale,
               config: nativeConfig,
               ...surfaceOptions,
+              // The submitted query behind the response being rendered:
+              // set right before showResponse, so the native view's URL
+              // and the theme's count line name it (YOY-100 AC-2/AC-4).
+              query: () => lastQuery,
             }),
           );
 
@@ -585,6 +590,22 @@ export function init(config: WidgetConfig): void {
     });
 
     document.body.appendChild(overlay.host);
+
+    // Coherent URL state for the native view (YOY-100 AC-4): the results
+    // view lives at the theme's own search URL under a marked history
+    // entry. Reloading it, or returning to it from a product page (a fresh
+    // document — the mirror's DOM is gone), re-runs its query, so the URL
+    // means the same thing whichever way the shopper reaches it. Without
+    // the marker the theme's own results page stays exactly as it is.
+    if (nativeConfig !== null && isMirrorState(window.history.state)) {
+      const resumed = new URLSearchParams(window.location.search)
+        .get(nativeConfig.page.queryParam)
+        ?.trim();
+      if (resumed !== undefined && resumed !== "") {
+        input.value = resumed;
+        void runSearch(resumed);
+      }
+    }
   } catch {
     // Never break the merchant's storefront: a widget that fails to mount
     // must degrade to the theme's own search, silently.

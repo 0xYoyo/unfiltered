@@ -5,6 +5,12 @@ import {
   resolveNativeRenderConfig,
 } from "./native-render.config";
 import styles from "./native-render.css?inline";
+import {
+  createPageMirror,
+  ensureStylesheet,
+  isMirrorState,
+  parseHtml,
+} from "./native-page";
 import type { Overlay, ResponseHandlers } from "./overlay";
 import type {
   ProxyChip,
@@ -34,8 +40,15 @@ import { getStrings, resolveLocale } from "./strings";
  * Both fill an `Overlay`-shaped surface so main.ts's state machine drives
  * them unchanged; the composite below keeps keystroke previews on the
  * existing shadow overlay (YOY-70 NG-3) and routes submitted responses to
- * the native panel. Everything is off unless a caller opts in
+ * the native view. Everything is off unless a caller opts in
  * (`WidgetConfig.nativeRender`) or the dev flag is set (NG-1).
+ *
+ * The native view is a full-page mirror (YOY-100, native-page.ts): the
+ * results section is not prepended over the origin page but placed inside
+ * the theme's own search-results page, whose furniture (heading, count
+ * line, containers) is fetched from the theme and rewritten to our count
+ * and the shopper's query, with the origin page's content hidden and the
+ * URL moved to the theme's search URL — Back returns to the origin page.
  */
 
 export const NATIVE_TESTID = "unfiltered-native-results";
@@ -129,6 +142,9 @@ export interface NativeSurfaceOptions {
   config: NativeRenderConfig;
   onClose: () => void;
   onNewSearch: () => void;
+  /** The query of the response being shown — the results view's URL and
+   * the theme's count line carry it (YOY-100 AC-2/AC-4). */
+  query: () => string;
 }
 
 /** A theme card produced for one result, or null when the mechanism could
@@ -136,33 +152,6 @@ export interface NativeSurfaceOptions {
 type CardProducer = (
   result: ProxyResult,
 ) => Promise<{ element: HTMLElement; cached: boolean } | null>;
-
-/**
- * Hoist a stylesheet link into <head> once: the alternate template (and the
- * harvested page) ship the card's CSS as <link> tags; injecting them per
- * card would duplicate them, dropping them would strip the card's styles on
- * pages that never loaded component-card.css.
- */
-function ensureStylesheet(link: HTMLLinkElement): void {
-  const href = new URL(link.getAttribute("href") ?? "", window.location.href)
-    .href;
-  for (const existing of document.querySelectorAll<HTMLLinkElement>(
-    'link[rel="stylesheet"]',
-  )) {
-    if (existing.href === href) {
-      return;
-    }
-  }
-  const clone = document.createElement("link");
-  clone.rel = "stylesheet";
-  clone.href = href;
-  document.head.appendChild(clone);
-}
-
-/** Parse fetched storefront HTML into an inert document (scripts never run). */
-function parseHtml(html: string): Document {
-  return new DOMParser().parseFromString(html, "text/html");
-}
 
 /**
  * Variant A producer: fetch the alternate template per product with a small
@@ -390,7 +379,6 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
   section.setAttribute("role", "region");
   section.setAttribute("aria-label", strings.searchResults);
   section.setAttribute("dir", locale === "he" ? "rtl" : "ltr");
-  section.hidden = true;
 
   const bar = document.createElement("div");
   bar.className = "unfiltered-native__bar";
@@ -460,15 +448,35 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
     closeMatches,
   );
 
+  // The full-page mirror (YOY-100): the theme's search-results page around
+  // this section. Its results list hands the section its place and its
+  // classes — the theme's real search grid, which beats both the configured
+  // default and (Variant B) the harvest page's list, whose density can
+  // differ from the search page's.
+  let gridFromShell = false;
+  const mirror = createPageMirror({
+    config,
+    section,
+    onListClass(className) {
+      gridFromShell = true;
+      list.className = className;
+      closeMatchesList.className = className;
+    },
+  });
+  /** The query the view currently shows (URL, count line, template input). */
+  let currentQuery = "";
+
   const fetchMs: number[] = [];
   const produce: CardProducer =
     config.variant === "A"
       ? createAlternateTemplateProducer(config, fetchMs)
       : createHarvestCloneProducer(config, strings, fetchMs, (className) => {
           // The harvested list's classes are the theme's real grid classes;
-          // prefer them over the configured default.
-          list.className = className;
-          closeMatchesList.className = className;
+          // prefer them over the configured default (never over the shell's).
+          if (!gridFromShell) {
+            list.className = className;
+            closeMatchesList.className = className;
+          }
         });
 
   /** Chrome styles go into the host document once. */
@@ -481,15 +489,30 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
     }
   }
 
-  /** Mount lazily on first show — prepended into the theme's main content. */
+  /**
+   * Show the results view for the current query: the mirror hides the
+   * origin page's content and places this section inside the theme's own
+   * search page (or bare, until the shell arrives / when it never does),
+   * recording the history entry on first entry.
+   */
   function ensureMounted(): void {
-    if (section.isConnected) {
-      return;
-    }
     ensureStyles();
-    const target =
-      document.querySelector(config.mountSelector) ?? document.body;
-    target.prepend(section);
+    currentQuery = options.query();
+    mirror.enter(currentQuery);
+  }
+
+  /** Leave the results view: origin content back, and the history entry
+   * the mirror pushed popped so the URL returns to the origin page. */
+  function leaveView(): void {
+    const onOwnEntry = mirror.isEntered() && isMirrorState(window.history.state);
+    mirror.leave();
+    if (onOwnEntry) {
+      try {
+        window.history.back();
+      } catch {
+        // History unavailable: the origin content is restored regardless.
+      }
+    }
   }
 
   function fallbackCard(result: ProxyResult): HTMLElement {
@@ -619,6 +642,7 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
 
   function clearAll(): void {
     renderToken += 1;
+    mirror.setResult(currentQuery, null);
     loading.hidden = true;
     noResults.hidden = true;
     zeroHit.hidden = true;
@@ -636,7 +660,7 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
     preview: boolean,
   ): Promise<void> {
     ensureMounted();
-    section.hidden = false;
+    const query = currentQuery;
     const token = ++renderToken;
     const started = performance.now();
     const fetchesBefore = fetchMs.length;
@@ -657,15 +681,21 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
     const aiZeroHit = !preview && empty && response.route === "ai";
     const matches = aiZeroHit ? (response.closeMatches ?? []) : [];
 
+    // The shell (first render only — cached afterwards) and the cards are
+    // fetched together, so the theme's page and our grid appear in one paint.
     const [built, builtMatches] = await Promise.all([
       buildItems(response.results, handlers),
       buildItems(matches, handlers),
+      mirror.ready(),
     ]);
     if (token !== renderToken) {
       return; // Superseded while fetching.
     }
 
     loading.hidden = true;
+    // The theme's own count line now states OUR count for the shopper's
+    // query (AC-2); close matches are not results and are not counted.
+    mirror.setResult(query, response.results.length);
     chipsRow.replaceChildren(
       ...chips.map((chip) => chipElement(chip, currency, handlers.onChipRemove)),
     );
@@ -695,18 +725,18 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
     host: section,
     open() {
       ensureMounted();
-      section.hidden = false;
     },
     close() {
       renderToken += 1;
-      section.hidden = true;
+      leaveView();
     },
     isOpen() {
-      return !section.hidden;
+      return mirror.isEntered();
     },
     showLoading() {
-      ensureMounted();
-      section.hidden = false;
+      if (!mirror.isEntered()) {
+        ensureMounted();
+      }
       renderToken += 1;
       loading.hidden = false;
       noResults.hidden = true;
@@ -728,6 +758,8 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
     },
     destroy() {
       renderToken += 1;
+      leaveView();
+      mirror.destroy();
       section.remove();
     },
   };
@@ -736,8 +768,11 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
 /**
  * The composite the widget runs when native rendering is on: keystroke
  * previews stay on the existing shadow overlay (NG-3 — the preview tier is
- * untouched), submitted responses render natively, and the two never show
- * together. main.ts drives this exactly as it drives the plain overlay.
+ * untouched), submitted responses render natively. The native view is a
+ * page (YOY-100): typing on it previews in the floating overlay above it,
+ * exactly as on any other page, and the view stays until the shopper
+ * leaves it (Back, Escape, close) or submits again. main.ts drives this
+ * exactly as it drives the plain overlay.
  */
 export function createNativeComposite(overlay: Overlay, native: Overlay): Overlay {
   return {
@@ -775,7 +810,6 @@ export function createNativeComposite(overlay: Overlay, native: Overlay): Overla
       native.showResponse(response, handlers);
     },
     showPreview(response, handlers) {
-      native.close();
       overlay.showPreview(response, handlers);
     },
     destroy() {
