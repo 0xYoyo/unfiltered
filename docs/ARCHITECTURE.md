@@ -621,6 +621,79 @@ no-product page, a PDF, and a robots-disallowed section) served by an
 in-memory fake store (`app/testing/fake-store.server.ts`), fixture
 LLM/embedding clients, and the PGlite test DB.
 
+## Playground search and click API (YOY-90)
+
+The playground has no widget and no Shopify proxy, so its pages reach the
+engine through a first-party, unauthenticated API on our own origin. It runs
+the SAME orchestrator the storefront proxy runs — `getProxySearchOrchestrator`
+— over a catalog chosen per request, and answers the proxy's card contract
+plus the engine details the playground shows on demand.
+
+- **`GET /api/playground/search`** (`app/routes/api.playground.search.tsx`)
+  takes the proxy's own parameters — `query`, `sessionId`, `mode=preview`,
+  `previousIntent`, `removeChip` — parsed by the proxy's own
+  `parseProxySearchParams`, so preview, refinement, and chip-removal
+  semantics cannot drift between the two APIs. Plus `catalog`, a registry
+  slug: absent means the seed catalog, whose tenant key comes from
+  `PLAYGROUND_SEED_STORE_KEY`. An unset seed with no `catalog` answers `503`
+  (a deployment gap, not a visitor error); an unknown slug answers `404`
+  rather than silently searching the seed; a malformed request answers `400`.
+  Every response — every status — carries `Cache-Control: no-store` and no
+  CORS headers at all: the playground's pages are same-origin, and a third
+  party must not be able to spend our AI budget from their site.
+- **Response body** = the proxy contract (`searchId`, `route`, `degraded`,
+  `results[]`, `chips`, `intent`, `closeMatches?`) plus
+  `details: { routeReason, latencyMs, limited }`, built by
+  `serializePlaygroundSearchResponse` (`app/playground/api.server.ts`), which
+  delegates the card/chip/intent mapping to the proxy's own serializer and
+  adds exactly those three fields. A shape test pins the top-level keys, so a
+  later orchestrator field cannot leak out. Primary hits are capped at 24.
+- **`POST /api/playground/click`** (`app/routes/api.playground.click.tsx`)
+  takes the beacon body `{ searchId, sessionId, productId, position }` and
+  the same `catalog` parameter. POST rather than the proxy's GET because
+  there is no proxy edge here to work around. The `searchId` must name a
+  search THAT catalog ran — the body is visitor-controlled — else `404` and
+  no row.
+
+### Abuse guards
+
+Unauthenticated means the exposure is the AI bill, so three guards sit in
+front of the AI path. Every one degrades to classic results rather than to an
+error: a visitor who trips a ceiling still gets a working search, told
+honestly through `degraded` and `details.limited`.
+
+| Guard | Env var | Default | `details.limited` |
+|---|---|---|---|
+| Per-IP AI searches per minute | `PLAYGROUND_AI_THROTTLE_PER_MINUTE` | 10 | `"ip"` |
+| Daily AI searches, all playground tenants | `PLAYGROUND_DAILY_AI_CAP` | 2000 | `"daily-global"` |
+| Daily AI searches, one catalog | `PLAYGROUND_CATALOG_DAILY_AI_CAP` | 500 | `"daily-catalog"` |
+
+The per-IP guard keys the proxy's sliding-window throttle by the visitor's IP
+— the first `X-Forwarded-For` entry, then the connection address the runtime
+supplies, then a shared `"unknown"` bucket so a request with neither is still
+limited rather than exempt. It is in-process, so it is per-instance and
+resets on restart, exactly like the proxy's session throttle.
+
+The two daily ceilings are counted from `SearchEvent` rows with `route = "ai"`
+since 00:00 UTC — from the log, not from memory, so a restart cannot reset a
+spend guard and multiple instances share one count. Only AI-routed rows
+count: a search served classic (throttled, capped, or simply keyword-routed)
+spent no LLM budget and must not consume the ceiling it was denied.
+
+Precedence when several would bind is broadest-first — global, then catalog,
+then IP — because the broadest binding constraint is the one that explains
+the degradation; naming `"ip"` while the whole playground is capped would
+send a visitor chasing their own behavior for a condition they cannot affect.
+
+Previews and chip removals are never limited and never counted: a preview is
+classic-only by contract and a chip removal makes no LLM call, so neither can
+burn budget. Previews write no `SearchEvent`; every submitted search writes
+exactly one, limited ones included — the ceilings are counted from that table.
+
+Route tests (`app/playground-api.test.ts`) run on the PGlite test DB with a
+fake orchestrator threaded through the real `getProxySearchOrchestrator`, so
+the production wiring is what they exercise.
+
 ## Quality gates
 
 Vitest, ESLint, and `tsc --noEmit` run from the root as `npm test`,
