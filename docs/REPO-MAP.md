@@ -320,6 +320,23 @@ docs/
       7-native-empty-input-nothing-owned-desktop.png
       9-flag-off-owned-preview-box-unchanged-desktop.png
       9m-flag-off-owned-preview-box-mobile-390.png
+    YOY-106/
+      after-1-loading-first-search-desktop.png
+      after-1m-loading-first-search-mobile-390.png
+      after-2-loading-he-rtl-desktop.png
+      after-3-results-desktop.png
+      after-4-loading-chip-removal-desktop.png
+      after-5-empty-classic-desktop.png
+      after-6-error-quiet-no-results-desktop.png
+      after-7-flag-off-overlay-loading-desktop.png
+      before-1-loading-first-search-desktop.png
+      before-1m-loading-first-search-mobile-390.png
+      before-2-loading-he-rtl-desktop.png
+      before-3-results-desktop.png
+      before-4-loading-chip-removal-desktop.png
+      before-5-empty-classic-desktop.png
+      before-6-error-quiet-no-results-desktop.png
+      before-7-flag-off-overlay-loading-desktop.png
     YOY-107/
       after-1-full-set-page-1-desktop.png
       after-1m-full-set-page-1-mobile-390.png
