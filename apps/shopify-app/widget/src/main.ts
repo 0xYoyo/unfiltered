@@ -1,4 +1,4 @@
-import { isMirrorState } from "./native-page";
+import { isMirrorState, pageFromSearch } from "./native-page";
 import {
   createNativeComposite,
   createNativeSurface,
@@ -258,6 +258,14 @@ export function init(config: WidgetConfig): void {
      * search starts — not the previous one.
      */
     let viewQuery = "";
+    /**
+     * The page a resumed results view opens on (YOY-107): a results-view URL
+     * loaded fresh names its own page, and the view must land there rather
+     * than silently on page 1. Consumed by the first render and reset, so
+     * every later search starts at page 1 — a new set makes the old page
+     * meaningless.
+     */
+    let resumePage = 1;
 
     const surfaceOptions = {
       onClose: () => {
@@ -305,6 +313,11 @@ export function init(config: WidgetConfig): void {
               // into the results view they just left.
               onLeave: () => {
                 dismiss();
+              },
+              initialPage: () => {
+                const page = resumePage;
+                resumePage = 1;
+                return page;
               },
             }),
           );
@@ -654,6 +667,9 @@ export function init(config: WidgetConfig): void {
         ?.trim();
       if (resumed !== undefined && resumed !== "") {
         input.value = resumed;
+        // The URL names its page as well as its query (YOY-107), so a
+        // reloaded or shared results link lands where it says it does.
+        resumePage = pageFromSearch(window.location.search);
         void runSearch(resumed);
       }
     }

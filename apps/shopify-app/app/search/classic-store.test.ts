@@ -103,7 +103,9 @@ async function searchIds(
     storeId: request.shopDomain ?? SHOP,
     query: request.query,
     constraints: request.constraints,
-    limit: request.limit ?? 10,
+    // Forwarded verbatim, absence included: no limit is the full match set
+    // (YOY-107), which is what the storefront asks for.
+    ...(request.limit !== undefined ? { limit: request.limit } : {}),
   });
   return result.hits.map((hit) => hit.productId);
 }
@@ -458,5 +460,49 @@ describe("zero AI calls and index usage (AC-1, AC-5)", () => {
     } finally {
       await db.$queryRawUnsafe(`RESET enable_seqscan`);
     }
+  });
+});
+
+describe("the full match set, uncapped (YOY-107 AC-1)", () => {
+  let db: PrismaClient;
+
+  beforeAll(async () => {
+    db = await createTestDb();
+    // Comfortably more than the retired 10-result default, so a surviving
+    // cap anywhere on this path would show up as a short list.
+    await seed(
+      db,
+      Array.from({ length: 25 }, (_, index) => ({
+        productId: `dress-${String(index).padStart(2, "0")}`,
+        title: `Aurora Dress ${index}`,
+        productType: "Dresses",
+      })),
+    );
+  });
+
+  it("returns every keyword match when the request carries no limit", async () => {
+    const ids = await searchIds(db, { query: "dress" });
+    expect(ids).toHaveLength(25);
+  });
+
+  it("returns every constraint-only match when the request carries no limit", async () => {
+    const ids = await searchIds(db, {
+      constraints: { ...noConstraints(), priceMax: 1000 },
+    });
+    expect(ids).toHaveLength(25);
+  });
+
+  it("still honors an explicit limit, and its page is the top of the same ranking", async () => {
+    // Close matches are the caller that still states a cap (AC-5).
+    const capped = await searchIds(db, { query: "dress", limit: 10 });
+    const full = await searchIds(db, { query: "dress" });
+    expect(capped).toHaveLength(10);
+    expect(capped).toEqual(full.slice(0, 10));
+  });
+
+  it("rejects a non-positive explicit limit as before", async () => {
+    await expect(searchIds(db, { query: "dress", limit: 0 })).rejects.toThrow(
+      RangeError,
+    );
   });
 });

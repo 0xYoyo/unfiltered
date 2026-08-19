@@ -48,8 +48,6 @@ const WORD_SIMILARITY_THRESHOLD = 0.3;
 const TITLE_WEIGHT = 0.7;
 const SECONDARY_WEIGHT = 0.3;
 
-const DEFAULT_LIMIT = 10;
-
 /**
  * The searchable-text expression; must match the migration's index exactly.
  * Exported for the EXPLAIN test proving the index serves this expression.
@@ -69,8 +67,11 @@ function buildClassicSearchSql(request: ClassicSearchRequest): {
 } {
   const constraints = request.constraints ?? NO_CONSTRAINTS;
   const query = normalizeQuery(request.query ?? "");
-  const limit = request.limit ?? DEFAULT_LIMIT;
-  if (!Number.isInteger(limit) || limit <= 0) {
+  // Absent limit = the full ranked match set (YOY-107): the parity floor is
+  // every product matching the query and constraints, and the consumer
+  // paginates it. A present limit is still validated.
+  const limit = request.limit;
+  if (limit !== undefined && (!Number.isInteger(limit) || limit <= 0)) {
     throw new RangeError(`limit must be a positive integer, got ${limit}`);
   }
 
@@ -160,8 +161,8 @@ function buildClassicSearchSql(request: ClassicSearchRequest): {
        ON en."shopDomain" = p."shopDomain" AND en."productId" = p."productId"
       AND en."status" = 'enriched'
      WHERE ${where.join("\n       AND ")}
-     ORDER BY ${orderBy}
-     LIMIT ${limit}`;
+     ORDER BY ${orderBy}${limit === undefined ? "" : `
+     LIMIT ${limit}`}`;
   return { sql, params };
 }
 
