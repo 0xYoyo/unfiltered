@@ -166,6 +166,7 @@ apps/
       testing/
         fake-store.server.ts
         helpers.server.ts
+      workspace-resolution.test.ts
     env.d.ts
     extensions/
       .gitkeep
@@ -398,12 +399,13 @@ playwright.config.ts
 scripts/
   repo-map.mjs
 vitest.config.ts
+vitest.dist-seam.config.ts
 vitest.setup.ts
 ```
 
 ## Key locations
 
-- **Config files**: .claude/yoyo.md, .github/workflows/ci.yml, apps/shopify-app/package.json, apps/shopify-app/tsconfig.json, apps/shopify-app/vite.config.ts, apps/shopify-app/widget/src/native-render.config.ts, apps/shopify-app/widget/vite.config.ts, package.json, packages/engine/package.json, packages/engine/tsconfig.json, packages/provider-gemini/package.json, packages/provider-gemini/tsconfig.json, playwright.config.ts, vitest.config.ts
+- **Config files**: .claude/yoyo.md, .github/workflows/ci.yml, apps/shopify-app/package.json, apps/shopify-app/tsconfig.json, apps/shopify-app/vite.config.ts, apps/shopify-app/widget/src/native-render.config.ts, apps/shopify-app/widget/vite.config.ts, package.json, packages/engine/package.json, packages/engine/tsconfig.json, packages/provider-gemini/package.json, packages/provider-gemini/tsconfig.json, playwright.config.ts, vitest.config.ts, vitest.dist-seam.config.ts
 - **Env files (paths only — contents never read)**: .env (declared in .gitignore), .env.* (declared in .gitignore), .env.example, apps/shopify-app/.env (declared in .gitignore), apps/shopify-app/.env.example
 - **Entrypoints**: apps/shopify-app/app/routes/app.tsx, apps/shopify-app/widget/src/main.ts, packages/engine/src/index.ts, packages/provider-gemini/src/index.ts
 - **Scripts**: scripts/repo-map.mjs
@@ -482,6 +484,7 @@ vitest.setup.ts
 - apps/shopify-app/app/session-storage.test.ts → apps/shopify-app/app/testing/helpers.server.ts
 - apps/shopify-app/app/shopify.server.ts → apps/shopify-app/app/db.server.ts
 - apps/shopify-app/app/testing/fake-store.server.ts → apps/shopify-app/app/playground/polite-fetch.server.ts
+- apps/shopify-app/app/workspace-resolution.test.ts → apps/shopify-app/app/eval/source-guard.server.ts, apps/shopify-app/vite.config.ts, vitest.config.ts
 - apps/shopify-app/scripts/ingest-public.mts → apps/shopify-app/app/catalog/embed.server.ts, apps/shopify-app/app/catalog/enrich.server.ts, apps/shopify-app/app/playground/ingest-public-cli.server.ts, apps/shopify-app/app/playground/jsonld-crawl-source.server.ts, apps/shopify-app/app/playground/polite-fetch.server.ts
 - apps/shopify-app/scripts/ingest.mts → apps/shopify-app/app/catalog/embed.server.ts, apps/shopify-app/app/catalog/enrich.server.ts, apps/shopify-app/app/catalog/ingest.server.ts, apps/shopify-app/app/catalog/offline-token.server.ts
 - apps/shopify-app/scripts/native-render-template.mts → apps/shopify-app/widget/src/native-render.config.ts

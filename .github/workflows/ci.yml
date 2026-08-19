@@ -35,3 +35,25 @@ jobs:
       - run: git diff --exit-code -- apps/shopify-app/extensions/unfiltered-widget/assets/
       - run: npx playwright install --with-deps chromium
       - run: npm run test:ui
+
+  # Dist-seam guard (YOY-104 AC-3): the app and every test execute the
+  # workspace packages' TypeScript source (apps/shopify-app/vite.config.ts and
+  # vitest.config.ts alias @unfiltered/* to src), so nothing in the repo runs
+  # compiled dist/ any more — but the app↔engine port contract must hold for
+  # the built artifact too. This job builds the workspaces and runs the
+  # retrieval-path suites WITHOUT the src alias (vitest.dist-seam.config.ts),
+  # resolving @unfiltered/* through each package's `exports` → dist/. PR #74's
+  # shopDomain → storeId rename would have gone red here and nowhere else.
+  dist-seam:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm run build
+      - run: >-
+          npx vitest run --config vitest.dist-seam.config.ts
+          apps/shopify-app/app/search/orchestrator.test.ts
+          apps/shopify-app/app/search/retrieval-store.test.ts
