@@ -1,3 +1,5 @@
+import { fileURLToPath } from "node:url";
+
 import { reactRouter } from "@react-router/dev/vite";
 import { defineConfig, type UserConfig } from "vite";
 import tsconfigPaths from "vite-tsconfig-paths";
@@ -35,7 +37,35 @@ if (host === "localhost") {
   };
 }
 
+// Workspace packages resolve to their TypeScript source, never to compiled
+// dist/ (YOY-104, Option A). Each package's package.json `exports` points at
+// dist/, which is gitignored and rebuilt only by npm install's prepare hook —
+// so the running app used to execute whatever dist happened to be on disk,
+// while every test ran the source through the root vitest.config.ts alias.
+// PR #74's port rename (shopDomain → storeId) landed in src and in the app
+// but not in a dev tree's Aug-9 dist: every AI-routed search returned zero
+// rows and every AiCall lost its tenant, and nothing went red because no
+// test ran through dist. Aliasing the app to src makes the app, the tests,
+// and the eval runs execute one and the same code; dist/ is off every
+// execution path in this repo (kept for future package publishing only).
+// Keep these two entries identical to the root vitest.config.ts alias
+// (app/workspace-resolution.test.ts asserts it); CI's dist-seam job
+// (vitest.dist-seam.config.ts, no alias) separately proves the built
+// artifact still honours the same port contract. See docs/ARCHITECTURE.md,
+// "How the app resolves the workspace packages".
+export const workspaceSourceAlias = {
+  "@unfiltered/engine": fileURLToPath(
+    new URL("../../packages/engine/src/index.ts", import.meta.url),
+  ),
+  "@unfiltered/provider-gemini": fileURLToPath(
+    new URL("../../packages/provider-gemini/src/index.ts", import.meta.url),
+  ),
+} as const;
+
 export default defineConfig({
+  resolve: {
+    alias: workspaceSourceAlias,
+  },
   server: {
     allowedHosts: [host],
     cors: {

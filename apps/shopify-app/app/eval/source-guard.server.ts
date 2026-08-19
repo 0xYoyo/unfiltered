@@ -1,13 +1,16 @@
 import * as engine from "@unfiltered/engine";
 
 // Source-execution guard (YOY-52 run-6 root cause): vitest invoked with its
-// working directory inside apps/shopify-app picks up the app's vite.config.ts
-// — which carries no engine alias — instead of the root vitest.config.ts, so
-// @unfiltered/engine silently resolves to the gitignored compiled dist/ and
-// the run scores stale logic. The engine exports ENGINE_SOURCE_URL, the URL
-// it was actually loaded from; anything outside packages/engine/src means the
-// alias was bypassed. Path-based, so every future dist-skew layer trips it,
-// not just one missing symbol.
+// working directory inside apps/shopify-app picked up the app's vite.config.ts
+// — which, at the time, carried no engine alias — instead of the root
+// vitest.config.ts, so @unfiltered/engine silently resolved to the gitignored
+// compiled dist/ and the run scored stale logic. The engine exports
+// ENGINE_SOURCE_URL, the URL it was actually loaded from; anything outside
+// packages/engine/src means the alias was bypassed. Path-based, so every
+// future dist-skew layer trips it, not just one missing symbol. Since
+// YOY-104 the app's vite.config.ts aliases to src as well, so both configs
+// now agree — the guard stays as the loud backstop for any resolution path
+// that does not.
 
 const SOURCE_PATH = "/packages/engine/src/";
 

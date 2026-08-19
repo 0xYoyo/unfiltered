@@ -32,6 +32,46 @@ npm-workspaces monorepo (`apps/*`, `packages/*`) with three workspaces:
   `GEMINI_API_KEY`. Fixture tests only by default; live round-trips run
   solely under `LIVE_LLM_TESTS=1` locally, never in CI.
 
+### How the app resolves the workspace packages (YOY-104)
+
+The app, the tests, and the eval runs all execute the workspace packages'
+**TypeScript source** — never their compiled `dist/`:
+
+- `apps/shopify-app/vite.config.ts` aliases `@unfiltered/engine` and
+  `@unfiltered/provider-gemini` to `packages/*/src/index.ts`, so
+  `shopify app dev`, `react-router dev`, and `react-router build` all compile
+  the engine from source (Vite handles linked-workspace TypeScript natively;
+  the production server bundle inlines it).
+- The root `vitest.config.ts` carries the identical alias for every test run
+  (YOY-52 run-5 directive), and
+  `apps/shopify-app/app/workspace-resolution.test.ts` asserts the two stay
+  equal and that `ENGINE_SOURCE_URL` — the URL the engine was loaded from —
+  lands under `packages/engine/src` when loaded through the app's own Vite
+  resolution.
+
+Each package's `package.json` still `exports` `dist/` (gitignored, rebuilt
+only by `npm install`'s `prepare` hook) for future package publishing, and
+`tsc --noEmit` in the app reads types from `dist/index.d.ts` — but `dist/`
+is on no execution path in this repository. Why this matters: PR #74 renamed
+the engine port key `shopDomain → storeId` in `src` and in the app; a dev
+tree whose `dist/` predated it kept executing the old retriever, so every
+AI-routed search returned zero rows and every `AiCall` lost its tenant while
+every source-aliased test stayed green (YOY-104 M1).
+
+**After pulling engine or provider changes:** nothing — restart the dev
+server if it is running and the new source is what executes. `npm install`
+is needed only when dependencies or the Prisma schema changed, exactly as
+before. If `npm run typecheck` in the app complains about engine types that
+clearly exist in source, the stale part is `dist/index.d.ts`: run
+`npm run build --workspace @unfiltered/engine --workspace @unfiltered/provider-gemini`.
+
+The seam is still guarded for consumers of the built artifact: CI's
+`dist-seam` job runs `npm run build` and then `orchestrator.test.ts` +
+`retrieval-store.test.ts` through `vitest.dist-seam.config.ts` — the same
+suites **without** the src alias, resolving `@unfiltered/*` through
+`exports` → `dist/`. A src/dist port-contract divergence fails there and
+nowhere else.
+
 ## Engine-boundary rule (binding constraint)
 
 The search engine is a separate module/service with its own API, and the
@@ -586,7 +626,9 @@ LLM/embedding clients, and the PGlite test DB.
 Vitest, ESLint, and `tsc --noEmit` run from the root as `npm test`,
 `npm run lint`, and `npm run typecheck`; `.github/workflows/ci.yml` runs all
 three on every pull request, plus the `ui` job running `npm run test:ui`
-(Playwright, Chromium) against the widget harness. The engine-boundary rule
+(Playwright, Chromium) against the widget harness, plus the `dist-seam` job
+that builds the workspaces and runs the retrieval-path suites through
+compiled `dist/` (see "How the app resolves the workspace packages"). The engine-boundary rule
 is mechanically enforced by `packages/engine/test/boundary.test.ts`, which
 fails the suite if the engine's manifest or source ever references a
 `@shopify/*` package.
