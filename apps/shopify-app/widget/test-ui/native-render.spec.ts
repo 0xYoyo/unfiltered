@@ -553,8 +553,11 @@ test.describe("full-page mirror — the theme's own search page (YOY-100)", () =
     await expect(page.getByText("Theme Own Hit")).toHaveCount(0);
     await expect(page.getByTestId("theme-facets")).toHaveCount(0);
     await expect(page.getByTestId("theme-sorting")).toHaveCount(0);
-    await expect(page.getByTestId("theme-pagination")).toHaveCount(0);
     await expect(page.getByTestId("theme-loading-overlay")).toHaveCount(0);
+    // Pagination is the exception since YOY-107: it is kept, emptied of the
+    // theme's own page links, and hidden while our set fits one page.
+    await expect(page.getByTestId("theme-pagination")).toBeHidden();
+    await expect(page.getByText("Theme Own Hit")).toHaveCount(0);
     expect(
       await page.evaluate(
         () => (window as unknown as { __shellScriptRan?: boolean }).__shellScriptRan,
@@ -767,6 +770,168 @@ test.describe("full-page mirror — the theme's own search page (YOY-100)", () =
     await page.waitForTimeout(300);
     await expect(panel(page)).toHaveCount(0);
     await expect(overlay(page)).toBeHidden();
+  });
+});
+
+test.describe("the full match set, paged by the theme (YOY-107)", () => {
+  const themePages = (page: Page) =>
+    page.locator('[data-testid="theme-pagination"] a');
+  const currentPage = (page: Page) =>
+    page.locator('[data-testid="theme-pagination"] a[aria-current="page"]');
+  const titles = (page: Page) => items(page).locator(".card__heading a");
+
+
+  // 30 products, 12 per page: 3 pages of the widened set, and the blue
+  // subset (every third) is 10 products — a single page.
+  const FULL_SET = "/theme-native.html?native=A&fixture=full-set&results=30&pageSize=12&debounce=30000";
+
+  test("a page holds the theme's page size, the count line states the true total, and the theme's own pagination spans the set (AC-1, AC-2)", async ({
+    page,
+  }) => {
+    await page.goto(`${FULL_SET}&removeChipFirst=1`);
+    await submitQuery(page, "dress");
+    await expect(items(page)).toHaveCount(10);
+
+    // The blue subset: 10 results, one page — the theme renders no
+    // pagination for a single page, and neither does the mirror.
+    await expect(themeCount(page)).toHaveText('10 results found for “dress”');
+    await expect(page.getByTestId("theme-pagination")).toBeHidden();
+
+    // Widen the set by removing the colour chip: 30 results over 3 pages.
+    await nativeChips(page).filter({ hasText: "blue" }).click();
+    await expect(items(page)).toHaveCount(12);
+    await expect(themeCount(page)).toHaveText('30 results found for “dress”');
+    await expect(page.getByTestId("theme-pagination")).toBeVisible();
+    await expect(themePages(page)).toHaveCount(3);
+    await expect(currentPage(page)).toHaveText("1");
+    // The theme's own item markup and classes, cloned — not a control of
+    // ours (NG-3).
+    await expect(themePages(page).first()).toHaveClass(/pagination__item/);
+    await expect(themePages(page).nth(1)).toHaveAttribute(
+      "href",
+      "/search?q=dress&page=2",
+    );
+  });
+
+  test("clicking a page renders that page in place: its cards, the same total, the URL's own page (AC-1)", async ({
+    page,
+  }) => {
+    await page.goto(FULL_SET);
+    await submitQuery(page, "dress");
+    await nativeChips(page).filter({ hasText: "blue" }).click();
+    await expect(items(page)).toHaveCount(12);
+    await expect(titles(page).first()).toHaveText("Full Set Dress 00");
+
+    await themePages(page).nth(1).click();
+
+    await expect(titles(page).first()).toHaveText("Full Set Dress 12");
+    await expect(items(page)).toHaveCount(12);
+    await expect(currentPage(page)).toHaveText("2");
+    // The count line still states the whole set, never the page.
+    await expect(themeCount(page)).toHaveText('30 results found for “dress”');
+    expect(new URL(page.url()).searchParams.get("page")).toBe("2");
+    // No new search: paging is a render over the set already in hand.
+    expect(
+      await page.evaluate(
+        () => (window as unknown as { __searchRequests: unknown[] }).__searchRequests.length,
+      ),
+    ).toBe(2);
+
+    // The last page carries the remainder, and page 1 drops the parameter
+    // exactly as the theme's own first page does.
+    await themePages(page).nth(2).click();
+    await expect(items(page)).toHaveCount(6);
+    await themePages(page).first().click();
+    await expect(titles(page).first()).toHaveText("Full Set Dress 00");
+    expect(new URL(page.url()).searchParams.has("page")).toBe(false);
+  });
+
+  test("card fetches happen per rendered page, never for the whole set (AC-4)", async ({
+    page,
+  }) => {
+    await page.goto(FULL_SET);
+    await submitQuery(page, "dress");
+    await nativeChips(page).filter({ hasText: "blue" }).click();
+    await expect(items(page)).toHaveCount(12);
+
+    // Page 1 of 30 results cost 12 template fetches (the 10 blue ones came
+    // first), not 30 — and never more than a page's worth per page.
+    const afterFirstPage = (await altTemplateRequests(page)).length;
+    expect(afterFirstPage).toBeLessThanOrEqual(22);
+    expect(await timing(page)).toMatchObject({
+      page: 1,
+      pageCount: 3,
+      total: 30,
+    });
+
+    await themePages(page).nth(1).click();
+    // Page 2 holds a page's worth too, so wait on its first card, not the
+    // count — the count alone is satisfied by page 1 still being on screen.
+    await expect(titles(page).first()).toHaveText("Full Set Dress 12");
+    await expect(items(page)).toHaveCount(12);
+    const afterSecondPage = (await altTemplateRequests(page)).length;
+    expect(afterSecondPage - afterFirstPage).toBeLessThanOrEqual(12);
+    expect(await timing(page)).toMatchObject({ page: 2, pageCount: 3 });
+  });
+
+  test("refinement recomputes over the full set: nothing previously shown is dropped by a size cap (AC-3)", async ({
+    page,
+  }) => {
+    await page.goto(FULL_SET);
+    await submitQuery(page, "dress");
+    await expect(items(page)).toHaveCount(10);
+    const before = await titles(page).allTextContents();
+    expect(before).toHaveLength(10);
+
+    await nativeChips(page).filter({ hasText: "blue" }).click();
+    await expect(items(page)).toHaveCount(12);
+
+    // Every product from the narrower set is still in the widened one —
+    // somewhere across its pages, which is what the cap used to prevent.
+    const after: string[] = [];
+    for (const index of [0, 1, 2]) {
+      await themePages(page).nth(index).click();
+      await expect(currentPage(page)).toHaveText(String(index + 1));
+      after.push(...(await titles(page).allTextContents()));
+    }
+    expect(after).toHaveLength(30);
+    for (const title of before) {
+      expect(after).toContain(title);
+    }
+  });
+
+  test("a results-view URL naming a page opens on that page (AC-1)", async ({
+    page,
+  }) => {
+    await page.goto(`${FULL_SET}&q=dress&page=3&removeChip=1`);
+    await page.evaluate(() =>
+      window.history.replaceState(
+        { unfilteredNativeMirror: true },
+        "",
+        window.location.href,
+      ),
+    );
+    await page.reload();
+
+    await expect(items(page)).toHaveCount(10);
+    await expect(themeCount(page)).toHaveText('10 results found for “dress”');
+    // The blue subset is one page, so page 3 clamps to the only page there
+    // is rather than rendering an empty grid.
+    await expect(page.getByTestId("theme-pagination")).toBeHidden();
+    expect(new URL(page.url()).searchParams.has("page")).toBe(false);
+  });
+
+  test("a shell without usable pagination markup still serves the full set, on one page", async ({
+    page,
+  }) => {
+    await page.goto(`${FULL_SET}&shell=missing`);
+    await submitQuery(page, "dress");
+    await nativeChips(page).filter({ hasText: "blue" }).click();
+
+    // No theme pagination to mirror and none invented (NG-3): every result
+    // renders, which is still the parity floor.
+    await expect(items(page)).toHaveCount(30);
+    await expect(page.getByTestId("theme-pagination")).toHaveCount(0);
   });
 });
 

@@ -68,7 +68,12 @@ import {
  * ledger rows serving one search share it.
  */
 
-const DEFAULT_LIMIT = 10;
+/**
+ * Zero-hit close matches stay a short, curated list (YOY-107 AC-5): they are
+ * a rescue gesture beside an empty result set, not a result set of their own,
+ * so they keep a cap while primary hits no longer have one.
+ */
+const CLOSE_MATCH_LIMIT = 10;
 
 /**
  * Why the response took the route it did: the classifier's reason,
@@ -120,7 +125,13 @@ export interface SearchRequest {
   preview?: boolean;
   /** Correlation ID to thread through every AI call; generated when absent. */
   searchId?: string;
-  /** Maximum primary hits (and close matches) to return; defaults to 10. */
+  /**
+   * Cap on primary hits. ABSENT — the storefront's own shape — means the FULL
+   * match set (YOY-107): both routes return every product matching the query
+   * and its hard constraints, ranked, and the consumer paginates it with the
+   * theme's own pagination. Zero-hit close matches are capped separately and
+   * always (AC-5), so this never widens them.
+   */
   limit?: number;
 }
 
@@ -238,7 +249,9 @@ export function createSearchOrchestrator(
     async runSearch(request: SearchRequest): Promise<SearchResponse> {
       const { query, shopDomain } = request;
       const searchId = request.searchId ?? randomUUID();
-      const limit = request.limit ?? DEFAULT_LIMIT;
+      // Undefined by default: the full match set (YOY-107). Forwarded to the
+      // stores as-is, where an absent limit means no LIMIT clause.
+      const limit = request.limit;
 
       const classicResponse = async (
         routeReason: SearchRouteReason,
@@ -249,7 +262,7 @@ export function createSearchOrchestrator(
         const result = await classicStore.search({
           storeId: shopDomain,
           query,
-          limit,
+          ...(limit !== undefined ? { limit } : {}),
         });
         if (
           escalateOnEmpty &&
@@ -330,7 +343,7 @@ export function createSearchOrchestrator(
           const retrieval = await retriever.retrieve({
             intent,
             storeId: shopDomain,
-            limit,
+            ...(limit !== undefined ? { limit } : {}),
             searchId,
           });
           hits = retrieval.hits;
@@ -344,7 +357,7 @@ export function createSearchOrchestrator(
             const result = await classicStore.search({
               storeId: shopDomain,
               constraints,
-              limit,
+              ...(limit !== undefined ? { limit } : {}),
             });
             return {
               searchId,
@@ -368,12 +381,14 @@ export function createSearchOrchestrator(
           const close = await classicStore.search({
             storeId: shopDomain,
             query,
-            limit,
+            // AC-5: close matches stay a short curated list, whatever the
+            // primary set's size.
+            limit: CLOSE_MATCH_LIMIT,
           });
           const closeHits: Array<{ productId: string; colorUnknown?: boolean }> =
             close.hits.length > 0
               ? close.hits
-              : await relaxedCloseMatches(intent, limit);
+              : await relaxedCloseMatches(intent, CLOSE_MATCH_LIMIT);
           return {
             searchId,
             route: "ai",

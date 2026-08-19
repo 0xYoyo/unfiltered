@@ -87,11 +87,37 @@ export function resolveSearchPath(config: NativeRenderConfig): string {
   return config.page.searchPath;
 }
 
-/** The results view's URL for a query: the theme's own search URL. */
-export function resultsViewUrl(config: NativeRenderConfig, query: string): string {
+/**
+ * The results view's URL for a query, on the given page: the theme's own
+ * search URL. Page 1 carries no `page` parameter, exactly as the theme's own
+ * first results page does (YOY-107).
+ */
+export function resultsViewUrl(
+  config: NativeRenderConfig,
+  query: string,
+  page = 1,
+): string {
   const params = new URLSearchParams();
   params.set(config.page.queryParam, query);
+  if (page > 1) {
+    params.set(PAGE_PARAM, String(page));
+  }
   return `${resolveSearchPath(config)}?${params.toString()}`;
+}
+
+/**
+ * The theme's own page parameter (Shopify: `page`, 1-based). The results
+ * view's URL carries it so a reload or a shared link lands on the same page
+ * of the same query.
+ */
+export const PAGE_PARAM = "page";
+
+/** Read a 1-based page number from a URL's search params; 1 when absent or
+ * unusable — a URL is shopper-editable and must never render nothing. */
+export function pageFromSearch(search: string): number {
+  const raw = new URLSearchParams(search).get(PAGE_PARAM);
+  const page = Number(raw);
+  return Number.isInteger(page) && page > 0 ? page : 1;
 }
 
 /**
@@ -122,6 +148,18 @@ interface Shell {
   /** Outermost count-line elements (hidden while no count is known). */
   countElements: HTMLElement[];
   termInputs: HTMLInputElement[];
+  /**
+   * The theme's pagination container and the pieces needed to rebuild it for
+   * our result set (YOY-107): the list its items live in, and a detached
+   * clone of one item to stamp per page. Null when the theme's search page
+   * rendered no pagination — a single-page shell — in which case the view
+   * shows every result on one page rather than inventing a control.
+   */
+  pagination: {
+    wrapper: HTMLElement;
+    list: HTMLElement;
+    item: HTMLElement;
+  } | null;
 }
 
 export interface PageMirrorOptions {
@@ -139,16 +177,38 @@ export interface PageMirror {
    * and record the history entry. Idempotent while entered: a new query
    * only updates the URL in place, so Back always returns to the origin.
    */
-  enter(query: string): void;
+  enter(query: string, page?: number): void;
   /** Resolves once the shell has settled (attached, or unavailable). */
   ready(): Promise<void>;
   /** Rewrite the theme's furniture: count line (hidden while `null`) and
    * the template's own search input. */
   setResult(query: string, count: number | null): void;
+  /**
+   * Page our result set with the THEME's own pagination markup (YOY-107):
+   * one item per page, cloned from the theme's own item, the current one
+   * marked the theme's way. `pageCount <= 1` hides the control, exactly as
+   * a theme renders no pagination for a single page. A shell without usable
+   * pagination markup renders none — the results still all exist, on one
+   * page. Selecting a page calls `onSelect`; the widget re-renders that
+   * page's cards and moves the URL, so no navigation happens.
+   */
+  setPages(options: {
+    pageCount: number;
+    current: number;
+    onSelect: (page: number) => void;
+  }): void;
   /** Leave the results view: origin content restored, shell detached but
    * kept (Forward re-enters it). Never touches history. */
   leave(): void;
   isEntered(): boolean;
+  /**
+   * Whether the theme's search page gave us pagination markup to mirror
+   * (YOY-107). False until the shell settles, and false forever when the
+   * shell is unavailable or renders none — in which case the consumer must
+   * show the whole set on one page rather than leaving results behind a
+   * control that does not exist.
+   */
+  canPage(): boolean;
   /** Leave for good: also drop the popstate listener. */
   destroy(): void;
 }
@@ -229,13 +289,53 @@ export function createPageMirror(options: PageMirrorOptions): PageMirror {
                 page.termInputSelector,
               ),
             ];
+      // The theme's pagination, kept and rewired rather than stripped
+      // (YOY-107). Its rendered links describe the SHELL's result set, so it
+      // starts hidden and stays hidden until our own page count is known.
+      let pagination: Shell["pagination"] = null;
+      const wrapper = root.querySelector<HTMLElement>(
+        page.pagination.selector,
+      );
+      const paginationList = wrapper?.querySelector<HTMLElement>(
+        page.pagination.listSelector,
+      );
+      const paginationItem = paginationList?.querySelector<HTMLElement>(
+        page.pagination.itemSelector,
+      );
+      if (
+        wrapper !== null &&
+        wrapper !== undefined &&
+        paginationList !== null &&
+        paginationList !== undefined &&
+        paginationItem !== null &&
+        paginationItem !== undefined
+      ) {
+        wrapper.hidden = true;
+        pagination = {
+          wrapper,
+          list: paginationList,
+          item: paginationItem.cloneNode(true) as HTMLElement,
+        };
+      } else if (wrapper !== null && wrapper !== undefined) {
+        // A wrapper with no recognizable item template is furniture we
+        // cannot drive; hiding it beats showing the theme's own page links.
+        wrapper.hidden = true;
+      }
+
       const nodes = [...root.childNodes];
       for (const node of nodes) {
         if (node instanceof Element) {
           node.setAttribute(MIRROR_SHELL_ATTR, "");
         }
       }
-      return { nodes, list, countTexts, countElements, termInputs };
+      return {
+        nodes,
+        list,
+        countTexts,
+        countElements,
+        termInputs,
+        pagination,
+      };
     } catch {
       return null;
     }
@@ -371,14 +471,14 @@ export function createPageMirror(options: PageMirrorOptions): PageMirror {
   window.addEventListener("popstate", onPopState);
 
   return {
-    enter(next) {
+    enter(next, nextPage = 1) {
       if (next !== query) {
         // A different query: the count line stays hidden until its results
         // land, never stating the previous query's count for this one.
         count = null;
       }
       query = next;
-      const url = resultsViewUrl(config, next);
+      const url = resultsViewUrl(config, next, nextPage);
       if (!entered) {
         attach();
         try {
@@ -410,6 +510,51 @@ export function createPageMirror(options: PageMirrorOptions): PageMirror {
       count = nextCount;
       applyFurniture();
     },
+    setPages({ pageCount, current, onSelect }) {
+      const pagination = shell?.pagination;
+      if (pagination === null || pagination === undefined) {
+        return; // No theme pagination to mirror; one page holds everything.
+      }
+      if (pageCount <= 1) {
+        pagination.wrapper.hidden = true;
+        pagination.list.replaceChildren();
+        return;
+      }
+      const { currentClass, linkSelector } = config.page.pagination;
+      const items: HTMLElement[] = [];
+      for (let number = 1; number <= pageCount; number += 1) {
+        const item = pagination.item.cloneNode(true) as HTMLElement;
+        const link = item.matches(linkSelector)
+          ? item
+          : item.querySelector<HTMLElement>(linkSelector);
+        if (link === null) {
+          continue;
+        }
+        link.textContent = String(number);
+        if (link instanceof HTMLAnchorElement) {
+          // A real theme URL: opening it in a new tab lands on the theme's
+          // own results page for the same query and page.
+          link.href = resultsViewUrl(config, query, number);
+        }
+        if (currentClass !== "") {
+          link.classList.toggle(currentClass, number === current);
+        }
+        if (number === current) {
+          link.setAttribute("aria-current", "page");
+        } else {
+          link.removeAttribute("aria-current");
+        }
+        link.addEventListener("click", (event) => {
+          // In-place paging: the results are already in memory, so this is
+          // a render, not a navigation.
+          event.preventDefault();
+          onSelect(number);
+        });
+        items.push(item);
+      }
+      pagination.list.replaceChildren(...items);
+      pagination.wrapper.hidden = items.length === 0;
+    },
     leave() {
       if (entered) {
         detach();
@@ -417,6 +562,9 @@ export function createPageMirror(options: PageMirrorOptions): PageMirror {
     },
     isEntered() {
       return entered;
+    },
+    canPage() {
+      return shell !== null && shell !== undefined && shell.pagination !== null;
     },
     destroy() {
       window.removeEventListener("popstate", onPopState);

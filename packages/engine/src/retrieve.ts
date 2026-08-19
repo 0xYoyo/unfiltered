@@ -55,8 +55,14 @@ export interface StoreQueryRequest {
   constraints: RetrievalConstraints;
   /** Query embedding to rank the filtered set by cosine distance. */
   vector: number[];
-  /** Maximum hits to return. */
-  limit: number;
+  /**
+   * Maximum hits to return. ABSENT MEANS NO CAP (YOY-107): the store returns
+   * every product satisfying the constraints, ranked — the parity floor is
+   * the full match set, and the consumer paginates it for display. A number
+   * is a deliberate cap, used where a short list is the contract (zero-hit
+   * close matches).
+   */
+  limit?: number;
 }
 
 /**
@@ -122,7 +128,11 @@ export interface RetrievalRequest {
   intent: Intent;
   /** Store context: which consumer store to search. */
   storeId: string;
-  /** Maximum hits to return; defaults to 10. */
+  /**
+   * Maximum hits to return. Absent means the FULL match set (YOY-107): no
+   * fixed result cap on either route. Pass a number only where a short list
+   * is the contract, e.g. zero-hit close matches.
+   */
   limit?: number;
   /** Correlation ID tying together every call serving one search. */
   searchId?: string;
@@ -148,7 +158,6 @@ export interface RetrieverOptions {
   cacheSize?: number;
 }
 
-const DEFAULT_LIMIT = 10;
 const DEFAULT_CACHE_SIZE = 1000;
 
 /**
@@ -274,7 +283,9 @@ export function createRetriever(options: RetrieverOptions): Retriever {
         storeId: request.storeId,
         constraints,
         vector,
-        limit: request.limit ?? DEFAULT_LIMIT,
+        // Forwarded verbatim, absence included: no limit means the full
+        // ranked match set (YOY-107).
+        ...(request.limit !== undefined ? { limit: request.limit } : {}),
       });
       return {
         hits: hits.map((hit) => ({

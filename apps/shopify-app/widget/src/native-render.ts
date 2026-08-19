@@ -127,6 +127,12 @@ export interface NativeRenderTiming {
   cached: number;
   /** Individual network fetch durations this render performed. */
   fetchMs: number[];
+  /** 1-based page rendered (YOY-107). */
+  page: number;
+  /** Pages the full match set spans at the theme's page size. */
+  pageCount: number;
+  /** Size of the full match set, whatever this page shows. */
+  total: number;
 }
 
 declare global {
@@ -141,6 +147,13 @@ export interface NativeSurfaceOptions {
   /** The query of the response being shown — the results view's URL and
    * the theme's count line carry it (YOY-100 AC-2/AC-4). */
   query: () => string;
+  /**
+   * The page a freshly rendered response should open on (YOY-107): 1 for an
+   * ordinary search, and the URL's own page for a results view resumed from
+   * its URL, so a reloaded or shared link lands where it says it does. Read
+   * once per response and consumed — the next search starts at page 1.
+   */
+  initialPage?: () => number;
 }
 
 /** A theme card produced for one result, or null when the mechanism could
@@ -459,6 +472,20 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
   });
   /** The query the view currently shows (URL, count line, template input). */
   let currentQuery = "";
+  /**
+   * The response the view is showing, held whole (YOY-107): the server
+   * returns the FULL match set, and the view renders one page of it at a
+   * time with the theme's own pagination, so paging is a re-render from
+   * memory — no request, and card fetches only for the page on screen
+   * (AC-4). Null until a response has been rendered.
+   */
+  let current: {
+    response: ProxySearchResponse;
+    handlers: ResponseHandlers;
+    preview: boolean;
+  } | null = null;
+  /** The 1-based page of that set currently on screen. */
+  let currentPage = 1;
 
   const fetchMs: number[] = [];
   const produce: CardProducer =
@@ -636,7 +663,10 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
 
   function clearAll(): void {
     renderToken += 1;
+    current = null;
+    currentPage = 1;
     mirror.setResult(currentQuery, null);
+    mirror.setPages({ pageCount: 1, current: 1, onSelect: () => {} });
     loading.hidden = true;
     noResults.hidden = true;
     zeroHit.hidden = true;
@@ -648,12 +678,28 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
     closeMatchesList.replaceChildren();
   }
 
-  async function render(
-    response: ProxySearchResponse,
-    handlers: ResponseHandlers,
-    preview: boolean,
-  ): Promise<void> {
-    ensureMounted();
+  /**
+   * Render one page of the held result set. The count line always states the
+   * TRUE total (YOY-107 AC-1/AC-2) — the page is a window on it, never the
+   * number of matches — and only this page's cards are fetched or cloned
+   * (AC-4). Close matches belong to the zero-hit state, which by definition
+   * has a single page, so they are never paged (AC-5).
+   */
+  async function renderPage(page: number): Promise<void> {
+    if (current === null) {
+      return;
+    }
+    const { response, handlers, preview } = current;
+    const total = response.results.length;
+    const { pageSize } = config.page;
+    const pageCount = Math.max(1, Math.ceil(total / pageSize));
+    const target = Math.min(Math.max(1, Math.trunc(page)), pageCount);
+    const moved = target !== currentPage;
+    currentPage = target;
+
+    ensureStyles();
+    currentQuery = options.query();
+    mirror.enter(currentQuery, target);
     const query = currentQuery;
     const token = ++renderToken;
     const started = performance.now();
@@ -671,14 +717,18 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
       typeof response.intent["currency"] === "string"
         ? response.intent["currency"]
         : undefined;
-    const empty = response.results.length === 0;
+    const empty = total === 0;
     const aiZeroHit = !preview && empty && response.route === "ai";
     const matches = aiZeroHit ? (response.closeMatches ?? []) : [];
+    const pageResults = response.results.slice(
+      (target - 1) * pageSize,
+      target * pageSize,
+    );
 
     // The shell (first render only — cached afterwards) and the cards are
     // fetched together, so the theme's page and our grid appear in one paint.
     const [built, builtMatches] = await Promise.all([
-      buildItems(response.results, handlers),
+      buildItems(pageResults, handlers),
       buildItems(matches, handlers),
       mirror.ready(),
     ]);
@@ -686,33 +736,93 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
       return; // Superseded while fetching.
     }
 
+    // With no theme pagination to mirror, a second page would be
+    // unreachable — a cap the shopper cannot escape is exactly what YOY-107
+    // removes, so the whole set renders on this one page instead. Known
+    // only once the shell has settled, which this render already waited for.
+    let paged = mirror.canPage();
+    let items = built;
+    let shownPage = target;
+    let shownPageCount = pageCount;
+    if (!paged && total > pageSize) {
+      const whole = await buildItems(response.results, handlers);
+      if (token !== renderToken) {
+        return;
+      }
+      items = whole;
+      shownPage = 1;
+      shownPageCount = 1;
+      mirror.enter(query, 1);
+    } else if (!paged) {
+      shownPageCount = 1;
+    }
+    paged = shownPageCount > 1;
+    currentPage = shownPage;
+
     loading.hidden = true;
     // The theme's own count line now states OUR count for the shopper's
     // query (AC-2); close matches are not results and are not counted.
-    mirror.setResult(query, response.results.length);
+    mirror.setResult(query, total);
+    // The theme's own pagination, over our set (YOY-107 AC-1/NG-3).
+    mirror.setPages({
+      pageCount: shownPageCount,
+      current: shownPage,
+      onSelect: (next) => {
+        void renderPage(next);
+      },
+    });
+    if (moved) {
+      // A page change is a navigation on the theme's own results page, and
+      // its own pagination lands the shopper at the top of the new page.
+      window.scrollTo(0, 0);
+    }
     chipsRow.replaceChildren(
       ...chips.map((chip) => chipElement(chip, currency, handlers.onChipRemove)),
     );
     chipsRow.hidden = chips.length === 0;
-    list.replaceChildren(...built.items);
+    list.replaceChildren(...items.items);
     closeMatchesList.replaceChildren(...builtMatches.items);
     closeMatches.hidden = builtMatches.items.length === 0;
     zeroHit.hidden = !aiZeroHit;
     noResults.hidden = !(!preview && empty && response.route === "classic");
     previewEmpty.hidden = !(preview && empty);
 
-    const total = built.items.length + builtMatches.items.length;
-    const nativeCount = built.native + builtMatches.native;
+    // Per-PAGE render diagnostics (AC-4): the cards this page cost, not the
+    // whole set's.
+    const rendered = items.items.length + builtMatches.items.length;
+    const nativeCount = items.native + builtMatches.native;
     section.setAttribute("data-native-count", String(nativeCount));
-    section.setAttribute("data-fallback-count", String(total - nativeCount));
+    section.setAttribute("data-fallback-count", String(rendered - nativeCount));
+    section.setAttribute("data-total-count", String(total));
+    section.setAttribute("data-page", String(shownPage));
+    section.setAttribute("data-page-count", String(shownPageCount));
     window.__unfilteredNativeTiming = {
       variant: config.variant,
       totalMs: Math.round(performance.now() - started),
       native: nativeCount,
-      fallback: total - nativeCount,
-      cached: built.cached + builtMatches.cached,
+      fallback: rendered - nativeCount,
+      cached: items.cached + builtMatches.cached,
       fetchMs: fetchMs.slice(fetchesBefore),
+      page: shownPage,
+      pageCount: shownPageCount,
+      total,
     };
+  }
+
+  /**
+   * Show a response: hold the full set, then render its first page. A new
+   * response always starts at page 1 — a refinement recomputes the set, so
+   * the page the shopper was on no longer means anything (YOY-107 AC-3).
+   */
+  function render(
+    response: ProxySearchResponse,
+    handlers: ResponseHandlers,
+    preview: boolean,
+  ): void {
+    ensureMounted();
+    current = { response, handlers, preview };
+    currentPage = 1;
+    void renderPage(options.initialPage?.() ?? 1);
   }
 
   return {
@@ -745,10 +855,10 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
       noResults.hidden = false;
     },
     showResponse(response, handlers) {
-      void render(response, handlers, false);
+      render(response, handlers, false);
     },
     showPreview(response, handlers) {
-      void render(response, handlers, true);
+      render(response, handlers, true);
     },
     destroy() {
       renderToken += 1;

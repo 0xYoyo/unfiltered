@@ -320,6 +320,25 @@ docs/
       7-native-empty-input-nothing-owned-desktop.png
       9-flag-off-owned-preview-box-unchanged-desktop.png
       9m-flag-off-owned-preview-box-mobile-390.png
+    YOY-107/
+      after-1-full-set-page-1-desktop.png
+      after-1m-full-set-page-1-mobile-390.png
+      after-2-full-set-page-2-desktop.png
+      after-3-single-page-no-pagination-desktop.png
+      after-4-full-set-he-rtl-desktop.png
+      after-5-empty-classic-desktop.png
+      after-6-ai-zero-hit-close-matches-desktop.png
+      after-7-error-quiet-no-results-desktop.png
+      after-8-flag-off-overlay-desktop.png
+      before-1-full-set-page-1-desktop.png
+      before-1m-full-set-page-1-mobile-390.png
+      before-2-full-set-page-2-desktop.png
+      before-3-single-page-no-pagination-desktop.png
+      before-4-full-set-he-rtl-desktop.png
+      before-5-empty-classic-desktop.png
+      before-6-ai-zero-hit-close-matches-desktop.png
+      before-7-error-quiet-no-results-desktop.png
+      before-8-flag-off-overlay-desktop.png
     YOY-70/
       live-A-desktop-panel.jpg
       live-A-he-rtl.jpg

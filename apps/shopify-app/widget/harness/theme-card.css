@@ -133,3 +133,36 @@ body {
   overflow: hidden;
   clip: rect(0 0 0 0);
 }
+
+/*
+ * The theme's own pagination (YOY-107): the mirror clones this markup to
+ * page OUR result set, so the harness carries the theme's styling for it
+ * exactly as it carries the card's — a Dawn-shaped centered link row.
+ */
+.pagination-wrapper {
+  margin: 2.4rem 0;
+}
+
+.pagination__list {
+  display: flex;
+  justify-content: center;
+  gap: 1.2rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pagination__item {
+  display: block;
+  min-width: 2.4rem;
+  padding: 0.4rem;
+  text-align: center;
+  text-decoration: none;
+  color: inherit;
+}
+
+.pagination__item--current {
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 0.4rem;
+}
