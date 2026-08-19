@@ -249,6 +249,15 @@ export function init(config: WidgetConfig): void {
     // removal, whose request still needs a query by the endpoint contract.
     let heldIntent: ProxyIntent | null = null;
     let lastQuery = "";
+    /**
+     * The query the native results view is currently showing or fetching.
+     * Distinct from `lastQuery` (refinement memory, which only a SETTLED
+     * submitted response updates): the mirror is entered at the loading
+     * state now (YOY-106 AC-1), so its URL, its template input, and the
+     * theme's count line must name the query in flight from the moment the
+     * search starts — not the previous one.
+     */
+    let viewQuery = "";
 
     const surfaceOptions = {
       onClose: () => {
@@ -285,10 +294,18 @@ export function init(config: WidgetConfig): void {
               config: nativeConfig,
               // The native view owns no close / new-search control (YOY-82
               // AC-1): Back, Escape, and the theme's own input serve them.
-              // The submitted query behind the response being rendered:
-              // set right before showResponse, so the native view's URL
-              // and the theme's count line name it (YOY-100 AC-2/AC-4).
-              query: () => lastQuery,
+              // The submitted query the view is showing: set when the
+              // search starts, so the native view's URL and the theme's
+              // count line name it (YOY-100 AC-2/AC-4) from the loading
+              // state onward (YOY-106 AC-1).
+              query: () => viewQuery,
+              // Leaving the view (Back, or Forward past it) cancels the
+              // search it was showing, exactly as Escape does: the shopper
+              // walked away, and a late response must not pull them back
+              // into the results view they just left.
+              onLeave: () => {
+                dismiss();
+              },
             }),
           );
 
@@ -347,6 +364,11 @@ export function init(config: WidgetConfig): void {
     ): Promise<void> => {
       const preview = context?.preview === true;
       const sequence = ++requestSequence;
+      if (!preview) {
+        // The native view enters at the loading state (YOY-106 AC-1), so
+        // the query it names has to be known before the request goes out.
+        viewQuery = query;
+      }
       // A preview over an already-open overlay keeps the current results in
       // place until the new ones land — live-search feel, no loading flicker
       // per keystroke. The first render still opens via the loading state

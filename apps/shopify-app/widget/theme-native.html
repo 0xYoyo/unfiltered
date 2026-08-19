@@ -522,8 +522,14 @@
             request.mode = parsed.searchParams.get("mode");
           }
           window.__searchRequests.push(request);
+          // Hold the response in flight so the loading state is observable.
+          const searchDelay = Number(params.get("searchDelay") ?? 0);
+          const settle = (value) =>
+            searchDelay === 0
+              ? Promise.resolve(value)
+              : new Promise((resolve) => setTimeout(() => resolve(value), searchDelay));
           if (fixture === "error") {
-            return Promise.resolve(new Response(null, { status: 500 }));
+            return settle(new Response(null, { status: 500 }));
           }
           let body;
           if (request.mode === "preview") {
@@ -539,7 +545,7 @@
           } else {
             body = RESULTS_RESPONSE;
           }
-          return Promise.resolve(jsonResponse(body));
+          return settle(jsonResponse(body));
         }
         if (url.startsWith("/apps/unfiltered/click")) {
           const log = JSON.parse(sessionStorage.getItem("harness:clickBeacons") ?? "[]");
