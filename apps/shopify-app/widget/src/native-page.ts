@@ -130,6 +130,15 @@ export interface PageMirrorOptions {
   section: HTMLElement;
   /** Called with the theme's results-list classes when the shell attaches. */
   onListClass: (className: string) => void;
+  /**
+   * The shopper navigated out of the results view (Back, or Forward past
+   * it): the view is gone and any search still running for it is work they
+   * have walked away from — the widget cancels it, exactly as it cancels on
+   * Escape. Without this a response landing after the shopper left would
+   * re-enter the view and push a fresh history entry over the page they
+   * went back to.
+   */
+  onLeave: () => void;
 }
 
 export interface PageMirror {
@@ -385,10 +394,11 @@ export function createPageMirror(options: PageMirrorOptions): PageMirror {
   function onPopState(event: PopStateEvent): void {
     if (selfBacks > 0 && !isMirrorState(event.state)) {
       // Our own `exit()` back, landing late. `exit()` already detached, so
-      // there is nothing to tear down — and if a new search re-entered the
-      // view in the meantime, this back just stole its history entry.
+      // there is nothing to tear down. A new search may have re-entered the
+      // view meanwhile: if this back also undid the entry that search
+      // pushed — the live state is no longer the mirror's — push it again.
       selfBacks -= 1;
-      if (entered) {
+      if (entered && !isMirrorState(window.history.state)) {
         pushEntry();
       }
       return;
@@ -399,6 +409,7 @@ export function createPageMirror(options: PageMirrorOptions): PageMirror {
       }
     } else if (entered) {
       detach();
+      options.onLeave();
     }
   }
   window.addEventListener("popstate", onPopState);

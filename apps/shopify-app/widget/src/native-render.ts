@@ -140,6 +140,9 @@ export interface NativeSurfaceOptions {
   /** The query of the response being shown — the results view's URL and
    * the theme's count line carry it (YOY-100 AC-2/AC-4). */
   query: () => string;
+  /** The shopper navigated out of the results view (Back / Forward past
+   * it): cancel whatever this view was still searching for. */
+  onLeave: () => void;
 }
 
 /** A theme card produced for one result, or null when the mechanism could
@@ -455,6 +458,7 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
       list.className = className;
       closeMatchesList.className = className;
     },
+    onLeave: options.onLeave,
   });
   /** The query the view currently shows (URL, count line, template input). */
   let currentQuery = "";

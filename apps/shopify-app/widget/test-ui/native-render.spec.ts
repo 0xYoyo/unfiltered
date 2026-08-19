@@ -591,6 +591,30 @@ test.describe("the loading surface is the theme's, not ours (YOY-106)", () => {
     await expect(page.getByTestId("theme-grid")).toBeVisible();
   });
 
+  test("Back during a search cancels it: the late response never pulls the shopper into the view they left", async ({
+    page,
+  }) => {
+    // The view is entered from the loading state now, so Back is available
+    // mid-search — and must mean what it means everywhere else.
+    await page.goto(
+      "/theme-native.html?native=A&fixture=ai&searchDelay=1500&debounce=30000",
+    );
+    await submitQuery(page, "blue dress under 400");
+    await expect(page.getByTestId("unfiltered-native-loading")).toBeVisible();
+
+    await page.goBack();
+    await expect(page.getByTestId("theme-grid")).toBeVisible();
+    await expect(panel(page)).toHaveCount(0);
+
+    // Long enough for the abandoned response to land: it renders nothing,
+    // takes no history entry, and leaves the origin page alone.
+    await page.waitForTimeout(2000);
+    await expect(panel(page)).toHaveCount(0);
+    await expect(overlay(page)).toBeHidden();
+    await expect(originHidden(page)).toHaveCount(0);
+    expect(new URL(page.url()).pathname).toBe("/theme-native.html");
+  });
+
   test("native off: the overlay is the loading surface exactly as before (AC-3)", async ({
     page,
   }) => {

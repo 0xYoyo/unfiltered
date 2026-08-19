@@ -299,6 +299,13 @@ export function init(config: WidgetConfig): void {
               // count line name it (YOY-100 AC-2/AC-4) from the loading
               // state onward (YOY-106 AC-1).
               query: () => viewQuery,
+              // Leaving the view (Back, or Forward past it) cancels the
+              // search it was showing, exactly as Escape does: the shopper
+              // walked away, and a late response must not pull them back
+              // into the results view they just left.
+              onLeave: () => {
+                dismiss();
+              },
             }),
           );
 
