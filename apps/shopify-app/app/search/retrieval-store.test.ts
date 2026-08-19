@@ -117,6 +117,20 @@ async function queryIds(
   return hits.map((hit) => hit.productId);
 }
 
+/** The storefront's own shape: no limit at all — the full ranked set. */
+async function allQueryIds(
+  db: PrismaClient,
+  constraints: RetrievalConstraints,
+  vector = [1, 0, 0],
+): Promise<string[]> {
+  const hits = await createPgVectorRetrievalStore(db).query({
+    storeId: SHOP,
+    constraints,
+    vector,
+  });
+  return hits.map((hit) => hit.productId);
+}
+
 describe("hard constraints are filters, never preferences (AC-2)", () => {
   let db: PrismaClient;
 
@@ -545,5 +559,45 @@ describe("end to end through the engine API (AC-1)", () => {
       field: "colorsExclude",
       value: "black",
     });
+  });
+});
+
+describe("the full match set, uncapped (YOY-107 AC-2)", () => {
+  let db: PrismaClient;
+
+  beforeEach(async () => {
+    db = await createTestDb();
+    // More than the retired 10-result default; vectors fan out along the
+    // query direction so the ranking order is unambiguous.
+    await seed(
+      db,
+      Array.from({ length: 25 }, (_, index) => ({
+        productId: `p-${String(index).padStart(2, "0")}`,
+        vector: [1, index / 100, 0],
+      })),
+    );
+  });
+
+  it("returns every constrained match when the request carries no limit", async () => {
+    const ids = await allQueryIds(db, noConstraints());
+    expect(ids).toHaveLength(25);
+  });
+
+  it("an explicit limit is the top of the same ranking, not a different one", async () => {
+    const full = await allQueryIds(db, noConstraints());
+    const capped = await queryIds(db, noConstraints());
+    expect(capped).toHaveLength(10);
+    expect(capped).toEqual(full.slice(0, 10));
+  });
+
+  it("rejects a non-positive explicit limit as before", async () => {
+    await expect(
+      createPgVectorRetrievalStore(db).query({
+        storeId: SHOP,
+        constraints: noConstraints(),
+        vector: [1, 0, 0],
+        limit: 0,
+      }),
+    ).rejects.toThrow(RangeError);
   });
 });

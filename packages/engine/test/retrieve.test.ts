@@ -140,14 +140,18 @@ describe("retrieve (AC-1, AC-3)", () => {
     ]);
   });
 
-  it("defaults the store limit to 10", async () => {
+  it("asks the store for the full match set when no limit is given (YOY-107)", async () => {
+    // No cap on either route is the parity floor: the store sees no `limit`
+    // at all, so it returns every product satisfying the constraints and the
+    // consumer paginates. A cap exists only where a caller states one.
     const { embeddings } = embeddingStub();
     const { store, queries } = storeStub();
     await createRetriever({ embeddings, store }).retrieve({
       intent,
       storeId: "shop-a.myshopify.com",
     });
-    expect(queries[0]!.limit).toBe(10);
+    expect(queries[0]!.limit).toBeUndefined();
+    expect("limit" in queries[0]!).toBe(false);
   });
 
   it('meters the query embedding as operation "embedding" with context (AC-3)', async () => {

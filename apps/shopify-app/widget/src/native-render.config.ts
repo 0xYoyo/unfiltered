@@ -68,13 +68,35 @@ export interface NativeRenderHarvestConfig {
 }
 
 /**
+ * The theme's own pagination, mirrored (YOY-107 NG-3): our result set is
+ * paged with the theme's markup, cloned from its search page — never an
+ * owned control and never infinite scroll. The wrapper is kept out of
+ * `stripSelector` for exactly this reason; its own page links describe the
+ * theme's result set, so the widget empties it and rebuilds one item per
+ * page of OUR set, using the theme's item and link markup verbatim.
+ */
+export interface NativeRenderPaginationConfig {
+  /** The pagination container inside the theme's search page. */
+  selector: string;
+  /** The list element inside it that holds the page items. */
+  listSelector: string;
+  /** One page item; cloned once per page of our result set. */
+  itemSelector: string;
+  /** The link inside an item, whose text and href we rewrite. */
+  linkSelector: string;
+  /** Class the theme puts on the current page's link. */
+  currentClass: string;
+}
+
+/**
  * Full-page mirror (YOY-100): the results view IS the theme's own
  * search-results page. The widget fetches that page once per page view —
  * for a term whose results page always carries the results-state furniture
  * — hides the origin page's main content, and shows the fetched page's
  * main content in its place, with the theme's results list replaced by our
- * grid and the theme's own results-count line rewritten to our count and
- * the shopper's query. Every selector below is data, never hardcoded.
+ * grid, the theme's own results-count line rewritten to our count and the
+ * shopper's query, and the theme's own pagination paging our result set
+ * (YOY-107). Every selector below is data, never hardcoded.
  */
 export interface NativeRenderPageConfig {
   /**
@@ -107,12 +129,23 @@ export interface NativeRenderPageConfig {
   countSelector: string;
   /**
    * Elements that only make sense against the theme's own result set —
-   * filter facets, sorting, pagination, loading overlays — removed from the
-   * mirror. Everything else on the page stays the theme's.
+   * filter facets, sorting, loading overlays — removed from the mirror.
+   * Pagination is deliberately NOT among them (YOY-107): the theme's own
+   * pagination markup is what pages our results. Everything else on the
+   * page stays the theme's.
    */
   stripSelector: string;
   /** The template's own search input(s), filled with the shopper's query. */
   termInputSelector: string;
+  /**
+   * Results per rendered page (YOY-107). The theme's own search page size:
+   * a theme setting we cannot read from the storefront, so it is config data
+   * like every other theme-specific value here — Dawn's search template
+   * paginates by 24. A theme that pages differently overrides it.
+   */
+  pageSize: number;
+  /** The theme's pagination markup, cloned to page OUR result set. */
+  pagination: NativeRenderPaginationConfig;
 }
 
 export interface NativeRenderConfig {
@@ -163,7 +196,9 @@ export type NativeRenderOverrides = Partial<
   Omit<NativeRenderConfig, "template" | "harvest" | "page" | "grid">
 > & {
   template?: Partial<NativeRenderTemplateConfig>;
-  page?: Partial<NativeRenderPageConfig>;
+  page?: Partial<Omit<NativeRenderPageConfig, "pagination">> & {
+    pagination?: Partial<NativeRenderPaginationConfig>;
+  };
   harvest?: Partial<Omit<NativeRenderHarvestConfig, "fill">> & {
     fill?: Partial<NativeRenderHarvestConfig["fill"]>;
   };
@@ -209,17 +244,26 @@ export const DAWN_NATIVE_RENDER: NativeRenderConfig = {
     // Dawn renders the count in the search header (filtering/sorting off)
     // or in the facets bar's product-count (filtering on).
     countSelector: '.template-search__header [role="status"], .product-count',
+    // Pagination is NOT stripped any more (YOY-107): the theme's own
+    // pagination markup is what pages our result set.
     stripSelector: [
       ".facets__wrapper",
       ".facet-filters",
       ".facets__disclosure-vertical",
       ".mobile-facets__wrapper",
       ".active-facets",
-      ".pagination-wrapper",
       ".loading-overlay",
       ".loading-overlay__spinner",
     ].join(", "),
     termInputSelector: 'input[name="q"]',
+    pageSize: 24,
+    pagination: {
+      selector: ".pagination-wrapper",
+      listSelector: ".pagination__list",
+      itemSelector: "li",
+      linkSelector: "a",
+      currentClass: "pagination__item--current",
+    },
   },
   mountSelector: "main, #MainContent",
   sectionClass: "page-width",
@@ -242,7 +286,14 @@ export function resolveNativeRenderConfig(
     ...DAWN_NATIVE_RENDER,
     ...overrides,
     template: { ...DAWN_NATIVE_RENDER.template, ...overrides.template },
-    page: { ...DAWN_NATIVE_RENDER.page, ...overrides.page },
+    page: {
+      ...DAWN_NATIVE_RENDER.page,
+      ...overrides.page,
+      pagination: {
+        ...DAWN_NATIVE_RENDER.page.pagination,
+        ...overrides.page?.pagination,
+      },
+    },
     harvest: {
       ...DAWN_NATIVE_RENDER.harvest,
       ...overrides.harvest,

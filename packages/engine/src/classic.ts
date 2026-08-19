@@ -28,7 +28,13 @@ export interface ClassicSearchRequest {
    * compares against the product's minimum price.
    */
   constraints?: RetrievalConstraints;
-  /** Maximum hits to return. */
+  /**
+   * Maximum hits to return. ABSENT MEANS NO CAP (YOY-107): the store returns
+   * every product matching the query and constraints, ranked — the parity
+   * floor is the full match set, and the consumer paginates it for display.
+   * A number is a deliberate cap, used where a short list is the contract
+   * (zero-hit close matches).
+   */
   limit?: number;
 }
 

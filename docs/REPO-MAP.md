@@ -337,6 +337,25 @@ docs/
       before-5-empty-classic-desktop.png
       before-6-error-quiet-no-results-desktop.png
       before-7-flag-off-overlay-loading-desktop.png
+    YOY-107/
+      after-1-full-set-page-1-desktop.png
+      after-1m-full-set-page-1-mobile-390.png
+      after-2-full-set-page-2-desktop.png
+      after-3-single-page-no-pagination-desktop.png
+      after-4-full-set-he-rtl-desktop.png
+      after-5-empty-classic-desktop.png
+      after-6-ai-zero-hit-close-matches-desktop.png
+      after-7-error-quiet-no-results-desktop.png
+      after-8-flag-off-overlay-desktop.png
+      before-1-full-set-page-1-desktop.png
+      before-1m-full-set-page-1-mobile-390.png
+      before-2-full-set-page-2-desktop.png
+      before-3-single-page-no-pagination-desktop.png
+      before-4-full-set-he-rtl-desktop.png
+      before-5-empty-classic-desktop.png
+      before-6-ai-zero-hit-close-matches-desktop.png
+      before-7-error-quiet-no-results-desktop.png
+      before-8-flag-off-overlay-desktop.png
     YOY-108/
       after-1-native-rescued-classic-results-desktop.png
       after-1m-native-rescued-classic-results-mobile-390.png

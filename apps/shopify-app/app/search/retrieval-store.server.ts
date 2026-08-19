@@ -41,7 +41,10 @@ export function createPgVectorRetrievalStore(db: PrismaClient): RetrievalStore {
           `query vector dimension must be a positive integer, got ${dimension}`,
         );
       }
-      if (!Number.isInteger(limit) || limit <= 0) {
+      // Absent limit = the full ranked match set (YOY-107): the parity floor
+      // is every product satisfying the constraints, and the consumer
+      // paginates it. A present limit is still validated.
+      if (limit !== undefined && (!Number.isInteger(limit) || limit <= 0)) {
         throw new RangeError(`limit must be a positive integer, got ${limit}`);
       }
 
@@ -126,8 +129,10 @@ export function createPgVectorRetrievalStore(db: PrismaClient): RetrievalStore {
            ON en."shopDomain" = e."shopDomain" AND en."productId" = e."productId"
           AND en."status" = 'enriched'
          WHERE ${where.join("\n           AND ")}
-         ORDER BY ${colorUnknownExpr === null ? "" : `${colorUnknownExpr} ASC, `}distance ASC
-         LIMIT ${limit}`,
+         ORDER BY ${colorUnknownExpr === null ? "" : `${colorUnknownExpr} ASC, `}distance ASC${
+           limit === undefined ? "" : `
+         LIMIT ${limit}`
+         }`,
         ...params,
       );
       return rows.map((row) => ({

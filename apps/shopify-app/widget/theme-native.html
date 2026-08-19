@@ -278,7 +278,15 @@
           <ul class="grid product-grid grid--2-col-tablet-down grid--3-col-desktop" role="list" data-testid="theme-search-grid">
             <li class="grid__item"><div class="card-wrapper product-card-wrapper"><div class="card card--standard"><div class="card__content"><div class="card__information"><h3 class="card__heading h5"><a href="/products/theme-own-hit" class="full-unstyled-link">Theme Own Hit</a></h3></div></div></div></div></li>
           </ul>
-          <div class="pagination-wrapper" data-testid="theme-pagination">1 2 3 4</div>
+          <div class="pagination-wrapper" data-testid="theme-pagination">
+            <nav class="pagination" role="navigation" aria-label="Pagination">
+              <ul class="pagination__list list-unstyled" role="list">
+                <li><a href="/search?q=${term}" class="pagination__item pagination__item--current link" aria-current="page">1</a></li>
+                <li><a href="/search?q=${term}&amp;page=2" class="pagination__item link">2</a></li>
+                <li><a href="/search?q=${term}&amp;page=3" class="pagination__item link">3</a></li>
+              </ul>
+            </nav>
+          </div>
         </div>
       </div>
     </div>
@@ -336,6 +344,33 @@
         chips: [],
         intent: null,
       };
+
+      /**
+       * The full match set the server now returns (YOY-107): a broad query
+       * answers with every match, and the view pages it with the theme's own
+       * pagination. `?results=<N>` sizes it; each product is distinguishable
+       * so a test can name the exact card it expects on a given page.
+       */
+      const manyResults = (count) =>
+        Array.from({ length: count }, (_, index) => ({
+          productId: `gid://shopify/Product/many-${index}`,
+          title: `Full Set Dress ${String(index).padStart(2, "0")}`,
+          url: `/products/full-set-${index}`,
+          imageUrl: null,
+          priceMin: 100 + index,
+          priceMax: 100 + index,
+          currencyCode: "ILS",
+          available: true,
+          colorUnknown: false,
+        }));
+
+      /**
+       * The blue subset of that set, for the refinement contract (AC-3):
+       * every third product, which must all still be present — somewhere in
+       * the paginated set — once the colour chip is removed and it widens.
+       */
+      const blueSubset = (count) =>
+        manyResults(count).filter((_, index) => index % 3 === 0);
 
       const AI_INTENT = {
         category: "dress",
@@ -450,9 +485,13 @@
 `;
 
       const PRODUCTS = new Map(
-        [...RESULTS, ...chipRemovalResponse({ removeChip: {}, previousIntent: {} }).results].map(
-          (product) => [handleOf(product), product],
-        ),
+        [
+          ...RESULTS,
+          ...chipRemovalResponse({ removeChip: {}, previousIntent: {} }).results,
+          // The full-set fixture's products, so paging renders the theme's
+          // real cards rather than the fallback (YOY-107).
+          ...manyResults(200),
+        ].map((product) => [handleOf(product), product]),
       );
 
       const jsonResponse = (body) =>
@@ -553,7 +592,23 @@
             return Promise.resolve(jsonResponse(RESULTS_RESPONSE));
           }
           let body;
-          if (request.mode === "preview") {
+          if (fixture === "full-set") {
+            // YOY-107: the full match set on both routes. A chip removal
+            // widens the set (the colour constraint comes off) instead of
+            // returning a different window of the same one.
+            const total = Number(params.get("results") ?? 30);
+            const removed = request.removeChip !== undefined;
+            body = {
+              searchId: "harness-full-set-1",
+              route: "ai",
+              degraded: false,
+              results: removed ? manyResults(total) : blueSubset(total),
+              chips: removed
+                ? AI_CHIPS.filter((chip) => chip.field !== "colorsInclude")
+                : AI_CHIPS,
+              intent: AI_INTENT,
+            };
+          } else if (request.mode === "preview") {
             body = RESULTS_RESPONSE;
           } else if (request.removeChip !== undefined) {
             body = chipRemovalResponse(request);
@@ -597,6 +652,12 @@
                     ? "/no-search-form.html"
                     : "/theme-native.html",
               },
+              // The theme's search page size (YOY-107). Overridable here so
+              // a handful of fixture products still span several pages;
+              // Dawn's own default is 24.
+              page: params.has("pageSize")
+                ? { pageSize: Number(params.get("pageSize")) }
+                : undefined,
             }
           : undefined;
 

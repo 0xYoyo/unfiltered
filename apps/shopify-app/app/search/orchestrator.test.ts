@@ -951,3 +951,159 @@ describe("searchId threading (AC-7)", () => {
     expect(response.searchId).toBe("caller-search-1");
   });
 });
+
+describe("the full match set on both routes, uncapped (YOY-107)", () => {
+  /** More than the retired 10-result default, so any surviving cap shows. */
+  const BLUE_DRESSES = 12;
+  const OTHER_DRESSES = 15;
+
+  /** The intent for "blue dress": category + one included color. */
+  const BLUE_DRESS_INTENT = {
+    ...DRESS_INTENT,
+    occasion: null,
+    colorsInclude: ["blue"],
+    softAttributes: ["dress"],
+  };
+
+  async function seedDresses(db: PrismaClient): Promise<void> {
+    await seed(db, [
+      ...Array.from({ length: BLUE_DRESSES }, (_, index) => ({
+        productId: `blue-${String(index).padStart(2, "0")}`,
+        title: `Blue Dress ${index}`,
+        vector: [1, index / 100, 0],
+        enrichment: { category: "dress", colors: ["blue"] },
+      })),
+      ...Array.from({ length: OTHER_DRESSES }, (_, index) => ({
+        productId: `red-${String(index).padStart(2, "0")}`,
+        title: `Red Dress ${index}`,
+        vector: [1, index / 100, 0.1],
+        enrichment: { category: "dress", colors: ["red"] },
+      })),
+    ]);
+  }
+
+  it("AC-1 — a classic-routed query returns every keyword match", async () => {
+    const db = await createTestDb();
+    await seedDresses(db);
+    const orchestrator = buildOrchestrator(db, {
+      llm: fakeLlm({ classification: () => ({ route: "classic" }) }),
+    });
+
+    const response = await orchestrator.runSearch({
+      query: "dress",
+      shopDomain: SHOP,
+    });
+
+    expect(response.route).toBe("classic");
+    expect(response.hits).toHaveLength(BLUE_DRESSES + OTHER_DRESSES);
+  });
+
+  it("AC-2 — an AI-routed query returns every product satisfying the hard constraints", async () => {
+    const db = await createTestDb();
+    await seedDresses(db);
+    const orchestrator = buildOrchestrator(db, {
+      llm: fakeLlm({
+        classification: () => ({ route: "ai" }),
+        intent: () => BLUE_DRESS_INTENT,
+      }),
+    });
+
+    const response = await orchestrator.runSearch({
+      query: "blue dress",
+      shopDomain: SHOP,
+    });
+
+    expect(response.route).toBe("ai");
+    expect(response.hits).toHaveLength(BLUE_DRESSES);
+    expect(response.hits.every((hit) => hit.productId.startsWith("blue-"))).toBe(
+      true,
+    );
+  });
+
+  it("AC-3 — chip removal recomputes over the full set: nothing previously shown drops out", async () => {
+    const db = await createTestDb();
+    await seedDresses(db);
+    const orchestrator = buildOrchestrator(db, {
+      llm: fakeLlm({
+        classification: () => ({ route: "ai" }),
+        intent: () => BLUE_DRESS_INTENT,
+      }),
+    });
+
+    const constrained = await orchestrator.runSearch({
+      query: "blue dress",
+      shopDomain: SHOP,
+    });
+    const blueIds = constrained.hits.map((hit) => hit.productId);
+    expect(blueIds).toHaveLength(BLUE_DRESSES);
+
+    // Removing the colour chip: same query, the intent minus colorsInclude —
+    // exactly what the proxy's chip-removal surgery produces. No LLM call.
+    const widened = await orchestrator.runSearch({
+      query: "blue dress",
+      shopDomain: SHOP,
+      resolvedIntent: {
+        category: "dress",
+        colorsInclude: [],
+        colorsExclude: [],
+        availabilityRequired: false,
+        softAttributes: ["dress"],
+      },
+    });
+
+    expect(widened.route).toBe("ai");
+    expect(widened.hits).toHaveLength(BLUE_DRESSES + OTHER_DRESSES);
+    // The pool grew and may reorder, but every previously visible product is
+    // still in the set — the size cap was what used to drop them.
+    const widenedIds = new Set(widened.hits.map((hit) => hit.productId));
+    for (const id of blueIds) {
+      expect(widenedIds.has(id)).toBe(true);
+    }
+  });
+
+  it("AC-5 — zero-hit close matches stay a short curated list", async () => {
+    const db = await createTestDb();
+    // Every product keyword-matches the raw query, so the classic backfill
+    // has far more than a short list to offer; retrieval matches none of
+    // them, because their category fails the intent's hard constraint.
+    await seed(
+      db,
+      Array.from({ length: 25 }, (_, index) => ({
+        productId: `coat-${String(index).padStart(2, "0")}`,
+        title: AI_QUERY,
+        vector: [1, 0, 0],
+        enrichment: { category: "coat", occasions: ["wedding"] },
+      })),
+    );
+    const orchestrator = buildOrchestrator(db, {
+      llm: fakeLlm({
+        classification: () => ({ route: "ai" }),
+        intent: () => DRESS_INTENT,
+      }),
+    });
+
+    const response = await orchestrator.runSearch({
+      query: AI_QUERY,
+      shopDomain: SHOP,
+    });
+
+    expect(response.hits).toEqual([]);
+    expect(response.closeMatches).toHaveLength(10);
+  });
+
+  it("an explicit limit still caps the primary hits", async () => {
+    const db = await createTestDb();
+    await seedDresses(db);
+    const orchestrator = buildOrchestrator(db, {
+      llm: fakeLlm({ classification: () => ({ route: "classic" }) }),
+    });
+
+    const response = await orchestrator.runSearch({
+      query: "dress",
+      shopDomain: SHOP,
+      limit: 5,
+    });
+
+    expect(response.hits).toHaveLength(5);
+  });
+});
