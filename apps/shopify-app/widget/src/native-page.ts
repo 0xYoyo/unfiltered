@@ -145,9 +145,18 @@ export interface PageMirror {
   /** Rewrite the theme's furniture: count line (hidden while `null`) and
    * the template's own search input. */
   setResult(query: string, count: number | null): void;
-  /** Leave the results view: origin content restored, shell detached but
-   * kept (Forward re-enters it). Never touches history. */
-  leave(): void;
+  /**
+   * Leave the results view — origin content restored, shell detached but
+   * kept (Forward re-enters it) — and pop the history entry this mirror
+   * pushed, so the URL returns to the origin page.
+   *
+   * `history.back()` is asynchronous, and the shopper can start a new
+   * search before its popstate lands (the view is entered from the loading
+   * state now, YOY-106): that popstate is this mirror's own, so it never
+   * tears the view down, and when a new search has already re-entered, the
+   * results entry the late back stole is pushed again.
+   */
+  exit(): void;
   isEntered(): boolean;
   /** Leave for good: also drop the popstate listener. */
   destroy(): void;
@@ -166,6 +175,8 @@ export function createPageMirror(options: PageMirrorOptions): PageMirror {
   let query = "";
   let count: number | null = null;
   let everEntered = false;
+  /** History pops this mirror asked for itself and has yet to see. */
+  let selfBacks = 0;
 
   async function loadShell(): Promise<Shell | null> {
     try {
@@ -359,7 +370,29 @@ export function createPageMirror(options: PageMirrorOptions): PageMirror {
     target = null;
   }
 
+  function pushEntry(): void {
+    try {
+      window.history.pushState(
+        { [MIRROR_HISTORY_KEY]: true },
+        "",
+        resultsViewUrl(config, query),
+      );
+    } catch {
+      // History unavailable (sandboxed document): the view still shows.
+    }
+  }
+
   function onPopState(event: PopStateEvent): void {
+    if (selfBacks > 0 && !isMirrorState(event.state)) {
+      // Our own `exit()` back, landing late. `exit()` already detached, so
+      // there is nothing to tear down — and if a new search re-entered the
+      // view in the meantime, this back just stole its history entry.
+      selfBacks -= 1;
+      if (entered) {
+        pushEntry();
+      }
+      return;
+    }
     if (isMirrorState(event.state)) {
       if (!entered && everEntered) {
         attach();
@@ -385,7 +418,7 @@ export function createPageMirror(options: PageMirrorOptions): PageMirror {
           if (isMirrorState(window.history.state)) {
             window.history.replaceState({ [MIRROR_HISTORY_KEY]: true }, "", url);
           } else {
-            window.history.pushState({ [MIRROR_HISTORY_KEY]: true }, "", url);
+            pushEntry();
           }
         } catch {
           // History unavailable (sandboxed document): the view still shows.
@@ -410,9 +443,19 @@ export function createPageMirror(options: PageMirrorOptions): PageMirror {
       count = nextCount;
       applyFurniture();
     },
-    leave() {
+    exit() {
+      const onOwnEntry = entered && isMirrorState(window.history.state);
       if (entered) {
         detach();
+      }
+      if (!onOwnEntry) {
+        return;
+      }
+      selfBacks += 1;
+      try {
+        window.history.back();
+      } catch {
+        selfBacks -= 1; // The origin content is restored regardless.
       }
     },
     isEntered() {

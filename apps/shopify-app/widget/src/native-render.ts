@@ -8,7 +8,6 @@ import styles from "./native-render.css?inline";
 import {
   createPageMirror,
   ensureStylesheet,
-  isMirrorState,
   parseHtml,
 } from "./native-page";
 import type { Overlay, ResponseHandlers } from "./overlay";
@@ -38,9 +37,9 @@ import { getStrings, resolveLocale } from "./strings";
  *   Pure DOM — the portable (Door-2) analog.
  *
  * Both fill an `Overlay`-shaped surface so main.ts's state machine drives
- * them unchanged; the composite below routes submitted responses to the
- * native view and leaves keystroke previews to the theme's own predictive
- * search (YOY-101). Everything is off unless a caller opts in
+ * them unchanged; the composite below routes submitted responses and their
+ * loading state to the native view and leaves keystroke previews to the
+ * theme's own predictive search (YOY-101). Everything is off unless a caller opts in
  * (`WidgetConfig.nativeRender`) or the dev flag is set (NG-1).
  *
  * The native view is a full-page mirror (YOY-100, native-page.ts): the
@@ -498,15 +497,7 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
   /** Leave the results view: origin content back, and the history entry
    * the mirror pushed popped so the URL returns to the origin page. */
   function leaveView(): void {
-    const onOwnEntry = mirror.isEntered() && isMirrorState(window.history.state);
-    mirror.leave();
-    if (onOwnEntry) {
-      try {
-        window.history.back();
-      } catch {
-        // History unavailable: the origin content is restored regardless.
-      }
-    }
+    mirror.exit();
   }
 
   function fallbackCard(result: ProxyResult): HTMLElement {
@@ -761,9 +752,11 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
 
 /**
  * The composite the widget runs when native rendering is on: submitted
- * responses render natively; the shadow overlay stays for the states that
- * precede or replace a native view (loading before the mirror is entered, a
- * failed first search). Keystroke previews are the THEME's on this path
+ * responses AND the loading state that precedes them render natively — the
+ * theme's own results page is the only surface a search ever shows (YOY-106
+ * AC-1/AC-2, the Mirror Bar). The shadow overlay stays for the one state
+ * YOY-106 leaves where it was: a search that fails before any native
+ * results existed (NG-2). Keystroke previews are the THEME's on this path
  * (YOY-101): typing rides the theme's own predictive search and main.ts
  * never asks for a preview, so `showPreview` renders nothing — the owned
  * preview box is the overlay path's fallback surface only (YOY-101 AC-4).
@@ -772,12 +765,22 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
  * drives the plain overlay.
  */
 export function createNativeComposite(overlay: Overlay, native: Overlay): Overlay {
+  /**
+   * Whether the native view holds a rendered response, as opposed to
+   * having just been entered for a loading state. Since the loading state
+   * is the native surface's from the first search (YOY-106 AC-1),
+   * `native.isOpen()` alone no longer separates "the shopper is looking at
+   * native results" from "we entered to show loading" — and failure
+   * routing must keep its pre-YOY-106 behavior (YOY-106 NG-2).
+   */
+  let nativeShowingResults = false;
   return {
     host: overlay.host,
     open() {
       overlay.open();
     },
     close() {
+      nativeShowingResults = false;
       overlay.close();
       native.close();
     },
@@ -785,25 +788,40 @@ export function createNativeComposite(overlay: Overlay, native: Overlay): Overla
       return overlay.isOpen() || native.isOpen();
     },
     showLoading() {
-      if (native.isOpen()) {
-        native.showLoading();
-      } else {
-        overlay.showLoading();
+      // Mirror Bar (YOY-106 AC-1): the loading state renders in the theme's
+      // own results region from the very first search — never in the owned
+      // overlay panel, which on this path never becomes visible at all.
+      if (!native.isOpen()) {
+        // Entering fresh for this search: no results are on screen yet.
+        nativeShowingResults = false;
       }
+      native.showLoading();
     },
     showIdle() {
       overlay.showIdle();
       native.showIdle();
     },
     showFailure() {
-      if (native.isOpen()) {
+      // Unchanged from before YOY-106 (NG-2): a failure resolves inside the
+      // native view only when that view already held results; a search that
+      // fails before any native results existed withdraws the view it had
+      // entered for loading and resolves quietly on the overlay, exactly as
+      // it did when loading itself lived there.
+      if (native.isOpen() && nativeShowingResults) {
         native.showFailure();
       } else {
+        native.close();
+        // `overlay.showFailure` assumes the panel is already open — the
+        // overlay's own loading state used to open it. It no longer runs on
+        // this path (AC-1), so the composite opens the panel itself and the
+        // shopper sees exactly the quiet no-results panel they saw before.
+        overlay.open();
         overlay.showFailure();
       }
     },
     showResponse(response, handlers) {
       overlay.close();
+      nativeShowingResults = true;
       native.showResponse(response, handlers);
     },
     showPreview() {
@@ -811,6 +829,7 @@ export function createNativeComposite(overlay: Overlay, native: Overlay): Overla
       // owned preview box never appears here.
     },
     destroy() {
+      nativeShowingResults = false;
       overlay.destroy();
       native.destroy();
     },
