@@ -47,6 +47,48 @@ const timing = (page: Page) =>
         .__unfilteredNativeTiming,
   );
 
+/**
+ * Record every moment the shadow overlay's panel is not hidden, from before
+ * the widget mounts (YOY-106 AC-2: "never becomes visible at any point").
+ * The shadow root is open, so the panel is reachable from the page; a
+ * mutation observer on its `hidden` attribute catches a flash too short for
+ * a Playwright assertion to land on.
+ */
+async function watchOverlayVisibility(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    const recorder = window as unknown as { __overlayVisible: number };
+    recorder.__overlayVisible = 0;
+    const watch = (): void => {
+      const root = document.querySelector(
+        '[data-testid="unfiltered-widget-root"]',
+      );
+      const found = root?.shadowRoot?.querySelector(
+        '[data-testid="unfiltered-widget-overlay"]',
+      );
+      if (!(found instanceof HTMLElement)) {
+        requestAnimationFrame(watch);
+        return;
+      }
+      const record = (): void => {
+        if (!found.hidden) {
+          recorder.__overlayVisible += 1;
+        }
+      };
+      record();
+      new MutationObserver(record).observe(found, {
+        attributes: true,
+        attributeFilter: ["hidden"],
+      });
+    };
+    requestAnimationFrame(watch);
+  });
+}
+
+const overlayEverVisible = (page: Page) =>
+  page.evaluate(
+    () => (window as unknown as { __overlayVisible: number }).__overlayVisible,
+  );
+
 const clickBeacons = (page: Page) =>
   page.evaluate(() =>
     JSON.parse(sessionStorage.getItem("harness:clickBeacons") ?? "[]"),
@@ -537,6 +579,104 @@ test.describe("a timed-out search falls back to classic results (YOY-108)", () =
       timeout: 5000,
     });
     await expect(items(page)).toHaveCount(0);
+  });
+});
+
+test.describe("the loading surface is the theme's, not ours (YOY-106)", () => {
+  test("the first search loads inside the native surface and the overlay never becomes visible across the lifecycle (AC-1, AC-2)", async ({
+    page,
+  }) => {
+    await watchOverlayVisibility(page);
+    await page.goto(
+      "/theme-native.html?native=A&fixture=ai&searchDelay=700&debounce=30000",
+    );
+    await expect(page.getByTestId("theme-grid")).toBeVisible();
+
+    // First search of the session, from a page whose results view is not
+    // open: before YOY-106 this rendered the loading state in the owned
+    // white overlay panel — a Mirror Bar violation for the whole wait.
+    await submitQuery(page, "blue dress under 400");
+    await expect(page.getByTestId("unfiltered-native-loading")).toBeVisible();
+    // The theme's own results page IS the loading surface: the origin
+    // content is already gone and the URL already names this query.
+    await expect(page.getByTestId("theme-grid")).toBeHidden();
+    await expect(overlay(page)).toBeHidden();
+    await expect(page.getByTestId("unfiltered-widget-loading")).toBeHidden();
+    expect(new URL(page.url()).searchParams.get("q")).toBe(
+      "blue dress under 400",
+    );
+
+    await expect(items(page)).toHaveCount(3);
+    await expect(page.getByTestId("unfiltered-native-loading")).toBeHidden();
+
+    // A chip edit reloads inside the same native view.
+    await nativeChips(page).filter({ hasText: "Under 400" }).click();
+    await expect(page.getByTestId("unfiltered-native-loading")).toBeVisible();
+    await expect(items(page)).toHaveCount(4);
+
+    // As does a second submitted query from the theme's input.
+    await submitQuery(page, "runner");
+    await expect(page.getByTestId("unfiltered-native-loading")).toBeVisible();
+    await expect(items(page)).toHaveCount(3);
+
+    expect(await overlayEverVisible(page)).toBe(0);
+  });
+
+  test("a first search that fails still resolves quietly on the overlay, and the view it entered is withdrawn (NG-2)", async ({
+    page,
+  }) => {
+    // Failure routing is untouched by YOY-106: the native view entered for
+    // the loading state leaves again, exactly as if it had never been.
+    await page.goto(
+      "/theme-native.html?native=A&fixture=error&searchDelay=300&debounce=30000",
+    );
+    await submitQuery(page, "runner");
+    await expect(page.getByTestId("unfiltered-native-loading")).toBeVisible();
+
+    await expect(page.getByTestId("unfiltered-widget-no-results")).toBeVisible();
+    await expect(panel(page)).toHaveCount(0);
+    await expect(page.getByTestId("theme-grid")).toBeVisible();
+  });
+
+  test("Back during a search cancels it: the late response never pulls the shopper into the view they left", async ({
+    page,
+  }) => {
+    // The view is entered from the loading state now, so Back is available
+    // mid-search — and must mean what it means everywhere else.
+    await page.goto(
+      "/theme-native.html?native=A&fixture=ai&searchDelay=1500&debounce=30000",
+    );
+    await submitQuery(page, "blue dress under 400");
+    await expect(page.getByTestId("unfiltered-native-loading")).toBeVisible();
+
+    await page.goBack();
+    await expect(page.getByTestId("theme-grid")).toBeVisible();
+    await expect(panel(page)).toHaveCount(0);
+
+    // Long enough for the abandoned response to land: it renders nothing,
+    // takes no history entry, and leaves the origin page alone.
+    await page.waitForTimeout(2000);
+    await expect(panel(page)).toHaveCount(0);
+    await expect(overlay(page)).toBeHidden();
+    await expect(originHidden(page)).toHaveCount(0);
+    expect(new URL(page.url()).pathname).toBe("/theme-native.html");
+  });
+
+  test("native off: the overlay is the loading surface exactly as before (AC-3)", async ({
+    page,
+  }) => {
+    await page.goto(
+      "/theme-native.html?native=A&unfiltered_native=off&fixture=ai&searchDelay=700&debounce=30000",
+    );
+
+    await submitQuery(page, "blue dress under 400");
+    await expect(page.getByTestId("unfiltered-widget-loading")).toBeVisible();
+    await expect(overlay(page)).toBeVisible();
+    await expect(panel(page)).toHaveCount(0);
+
+    await expect(overlayCards(page)).toHaveCount(3);
+    await expect(page.getByTestId("unfiltered-widget-loading")).toBeHidden();
+    await expect(page.getByTestId("theme-grid")).toBeVisible();
   });
 });
 

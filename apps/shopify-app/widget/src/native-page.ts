@@ -130,6 +130,15 @@ export interface PageMirrorOptions {
   section: HTMLElement;
   /** Called with the theme's results-list classes when the shell attaches. */
   onListClass: (className: string) => void;
+  /**
+   * The shopper navigated out of the results view (Back, or Forward past
+   * it): the view is gone and any search still running for it is work they
+   * have walked away from — the widget cancels it, exactly as it cancels on
+   * Escape. Without this a response landing after the shopper left would
+   * re-enter the view and push a fresh history entry over the page they
+   * went back to.
+   */
+  onLeave: () => void;
 }
 
 export interface PageMirror {
@@ -145,9 +154,18 @@ export interface PageMirror {
   /** Rewrite the theme's furniture: count line (hidden while `null`) and
    * the template's own search input. */
   setResult(query: string, count: number | null): void;
-  /** Leave the results view: origin content restored, shell detached but
-   * kept (Forward re-enters it). Never touches history. */
-  leave(): void;
+  /**
+   * Leave the results view — origin content restored, shell detached but
+   * kept (Forward re-enters it) — and pop the history entry this mirror
+   * pushed, so the URL returns to the origin page.
+   *
+   * `history.back()` is asynchronous, and the shopper can start a new
+   * search before its popstate lands (the view is entered from the loading
+   * state now, YOY-106): that popstate is this mirror's own, so it never
+   * tears the view down, and when a new search has already re-entered, the
+   * results entry the late back stole is pushed again.
+   */
+  exit(): void;
   isEntered(): boolean;
   /** Leave for good: also drop the popstate listener. */
   destroy(): void;
@@ -166,6 +184,8 @@ export function createPageMirror(options: PageMirrorOptions): PageMirror {
   let query = "";
   let count: number | null = null;
   let everEntered = false;
+  /** History pops this mirror asked for itself and has yet to see. */
+  let selfBacks = 0;
 
   async function loadShell(): Promise<Shell | null> {
     try {
@@ -359,13 +379,37 @@ export function createPageMirror(options: PageMirrorOptions): PageMirror {
     target = null;
   }
 
+  function pushEntry(): void {
+    try {
+      window.history.pushState(
+        { [MIRROR_HISTORY_KEY]: true },
+        "",
+        resultsViewUrl(config, query),
+      );
+    } catch {
+      // History unavailable (sandboxed document): the view still shows.
+    }
+  }
+
   function onPopState(event: PopStateEvent): void {
+    if (selfBacks > 0 && !isMirrorState(event.state)) {
+      // Our own `exit()` back, landing late. `exit()` already detached, so
+      // there is nothing to tear down. A new search may have re-entered the
+      // view meanwhile: if this back also undid the entry that search
+      // pushed — the live state is no longer the mirror's — push it again.
+      selfBacks -= 1;
+      if (entered && !isMirrorState(window.history.state)) {
+        pushEntry();
+      }
+      return;
+    }
     if (isMirrorState(event.state)) {
       if (!entered && everEntered) {
         attach();
       }
     } else if (entered) {
       detach();
+      options.onLeave();
     }
   }
   window.addEventListener("popstate", onPopState);
@@ -385,7 +429,7 @@ export function createPageMirror(options: PageMirrorOptions): PageMirror {
           if (isMirrorState(window.history.state)) {
             window.history.replaceState({ [MIRROR_HISTORY_KEY]: true }, "", url);
           } else {
-            window.history.pushState({ [MIRROR_HISTORY_KEY]: true }, "", url);
+            pushEntry();
           }
         } catch {
           // History unavailable (sandboxed document): the view still shows.
@@ -410,9 +454,19 @@ export function createPageMirror(options: PageMirrorOptions): PageMirror {
       count = nextCount;
       applyFurniture();
     },
-    leave() {
+    exit() {
+      const onOwnEntry = entered && isMirrorState(window.history.state);
       if (entered) {
         detach();
+      }
+      if (!onOwnEntry) {
+        return;
+      }
+      selfBacks += 1;
+      try {
+        window.history.back();
+      } catch {
+        selfBacks -= 1; // The origin content is restored regardless.
       }
     },
     isEntered() {
