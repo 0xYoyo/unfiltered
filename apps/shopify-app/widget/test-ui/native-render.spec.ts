@@ -493,6 +493,53 @@ test.describe("composite: previews are the theme's, submits go native (YOY-101)"
   });
 });
 
+test.describe("a timed-out search falls back to classic results (YOY-108)", () => {
+  test("the rescue renders in the native surface, not the failure state (AC-1)", async ({
+    page,
+  }) => {
+    // AC-1 names the ACTIVE surface: with native rendering armed the
+    // rescued classic response is the theme's own results page, exactly as
+    // a classic-routed response would be.
+    await page.goto(
+      "/theme-native.html?native=A&fixture=timeout-rescue&debounce=30000",
+    );
+
+    await submitQuery(page, "runner");
+
+    await expect(items(page)).toHaveCount(3, { timeout: 5000 });
+    await expect(page.getByTestId("unfiltered-native-no-results")).toBeHidden();
+    await expect(overlay(page)).toBeHidden();
+    // The theme's own count line states the rescued set's count.
+    await expect(themeCount(page)).toHaveText('3 results found for “runner”');
+
+    const requests = await page.evaluate(
+      () =>
+        (window as unknown as { __searchRequests: { mode?: string }[] })
+          .__searchRequests,
+    );
+    expect(requests).toHaveLength(2);
+    expect(requests[0].mode).toBeUndefined();
+    expect(requests[1].mode).toBe("preview");
+  });
+
+  test("a rescue that fails in turn resolves to the quiet no-results state (AC-2)", async ({
+    page,
+  }) => {
+    await page.goto(
+      "/theme-native.html?native=A&fixture=timeout-rescue-error&debounce=30000",
+    );
+
+    await submitQuery(page, "runner");
+
+    // Failure routing is untouched by this issue: before the native view
+    // ever opened, the quiet state lives on the shadow overlay.
+    await expect(page.getByTestId("unfiltered-widget-no-results")).toBeVisible({
+      timeout: 5000,
+    });
+    await expect(items(page)).toHaveCount(0);
+  });
+});
+
 test.describe("full-page mirror — the theme's own search page (YOY-100)", () => {
   test("after a submit the view is the theme's search page holding our results; origin content is absent (AC-1, AC-2, AC-7)", async ({
     page,

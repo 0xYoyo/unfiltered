@@ -320,6 +320,23 @@ docs/
       7-native-empty-input-nothing-owned-desktop.png
       9-flag-off-owned-preview-box-unchanged-desktop.png
       9m-flag-off-owned-preview-box-mobile-390.png
+    YOY-108/
+      after-1-native-rescued-classic-results-desktop.png
+      after-1m-native-rescued-classic-results-mobile-390.png
+      after-2-loading-during-primary-desktop.png
+      after-3-native-rescue-failed-quiet-no-results-desktop.png
+      after-4-native-rescued-he-rtl-desktop.png
+      after-5-overlay-rescued-classic-results-desktop.png
+      after-6-overlay-rescue-failed-quiet-no-results-desktop.png
+      after-7-ordinary-ai-search-unchanged-desktop.png
+      before-1-native-rescued-classic-results-desktop.png
+      before-1m-native-rescued-classic-results-mobile-390.png
+      before-2-loading-during-primary-desktop.png
+      before-3-native-rescue-failed-quiet-no-results-desktop.png
+      before-4-native-rescued-he-rtl-desktop.png
+      before-5-overlay-rescued-classic-results-desktop.png
+      before-6-overlay-rescue-failed-quiet-no-results-desktop.png
+      before-7-ordinary-ai-search-unchanged-desktop.png
     YOY-70/
       live-A-desktop-panel.jpg
       live-A-he-rtl.jpg

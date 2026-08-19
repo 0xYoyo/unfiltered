@@ -315,14 +315,32 @@
               setTimeout(() => resolve(jsonResponse(RESULTS_RESPONSE)), 800);
             });
           }
-          if (fixture === "timeout") {
+          const stall = () =>
             // Never answers, but honors the abort signal the way real fetch
             // does — the widget's timeout depends on it.
-            return new Promise((resolve, reject) => {
+            new Promise((resolve, reject) => {
               requestInit.signal?.addEventListener("abort", () =>
                 reject(new DOMException("aborted", "AbortError")),
               );
             });
+          if (fixture === "timeout") {
+            return stall();
+          }
+          // YOY-108: the submitted (AI) request outlives its budget while
+          // the classic-only rescue answers — `timeout-rescue` serves it,
+          // `timeout-rescue-error` fails it so the failure state is the
+          // honest answer (AC-2).
+          if (
+            fixture === "timeout-rescue" ||
+            fixture === "timeout-rescue-error"
+          ) {
+            if (request.mode !== "preview") {
+              return stall();
+            }
+            if (fixture === "timeout-rescue-error") {
+              return Promise.resolve(new Response(null, { status: 500 }));
+            }
+            return Promise.resolve(jsonResponse(RESULTS_RESPONSE));
           }
           let body;
           if (request.mode === "preview") {
@@ -397,7 +415,15 @@
         // (YOY-52 AC-14) rather than a fast debounce firing.
         debounceMs: Number(params.get("debounce") ?? 50),
         searchTimeoutMs:
-          fixture === "timeout" || fixture === "slow-then-fast" ? 300 : 5000,
+          fixture === "timeout" ||
+          fixture === "slow-then-fast" ||
+          fixture === "timeout-rescue" ||
+          fixture === "timeout-rescue-error"
+            ? 300
+            : 5000,
+        // The classic rescue's own budget (YOY-108 AC-4), short here so a
+        // rescue that is meant to fail does so inside the test timeout.
+        searchFallbackTimeoutMs: Number(params.get("fallbackTimeout") ?? 300),
       });
     </script>
   </body>

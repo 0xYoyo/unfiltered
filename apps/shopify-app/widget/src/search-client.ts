@@ -84,6 +84,14 @@ export interface SearchClientOptions {
   basePath?: string;
   /** Abort an unanswered search after this long. */
   timeoutMs?: number;
+  /**
+   * Budget for the classic rescue that follows a timed-out search (YOY-108
+   * AC-4). Short by design: the rescue exists because the shopper has
+   * already waited out the primary budget, and the classic path answers in
+   * well under a second — a rescue that itself hangs is worse than the
+   * quiet no-results state it was meant to prevent.
+   */
+  fallbackTimeoutMs?: number;
 }
 
 const DEFAULT_BASE_PATH = "/apps/unfiltered";
@@ -94,6 +102,27 @@ const DEFAULT_BASE_PATH = "/apps/unfiltered";
  * once the server-side latency work lands.
  */
 const DEFAULT_TIMEOUT_MS = 30_000;
+/**
+ * The classic rescue's own budget (YOY-108). Unrelated to the primary
+ * budget above, which stays untouched in this issue (NG-1): the rescue runs
+ * the zero-LLM keyword path, measured in hundreds of milliseconds.
+ */
+const DEFAULT_FALLBACK_TIMEOUT_MS = 3_000;
+
+/**
+ * The request hit its own budget and the widget aborted it — distinct from
+ * a network failure, an HTTP error, or a malformed body, because only a
+ * timeout is rescuable: the server may still be working on an AI answer
+ * while the classic path can answer the same query immediately (YOY-108
+ * AC-1). Every other failure means the endpoint itself is unreachable or
+ * broken, and a second request would fail the same way.
+ */
+export class SearchTimeoutError extends Error {
+  constructor(timeoutMs: number) {
+    super(`search timed out after ${timeoutMs}ms`);
+    this.name = "SearchTimeoutError";
+  }
+}
 
 /**
  * Serialize one search request onto the wire. Objects (previousIntent,
@@ -150,6 +179,16 @@ export interface SearchClient {
     context?: SearchRequestContext,
   ): Promise<ProxySearchResponse>;
   /**
+   * The classic rescue (YOY-108 AC-1): the same query down the zero-LLM
+   * keyword path, on the short fallback budget. Rides the existing
+   * classic-only wire mode — the server needs no new parameter — and
+   * rejects exactly like `search` when it fails in turn (AC-2).
+   */
+  searchClassic(
+    query: string,
+    sessionId: string,
+  ): Promise<ProxySearchResponse>;
+  /**
    * Fire the click beacon and return immediately (AC-5): the request is
    * keepalive so it survives the navigation that follows, and any failure
    * is swallowed — a beacon must never block or delay the shopper.
@@ -167,34 +206,65 @@ export function createSearchClient(
 ): SearchClient {
   const basePath = options.basePath ?? DEFAULT_BASE_PATH;
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const fallbackTimeoutMs =
+    options.fallbackTimeoutMs ?? DEFAULT_FALLBACK_TIMEOUT_MS;
+
+  const request = async (
+    query: string,
+    sessionId: string,
+    context: SearchRequestContext | undefined,
+    budgetMs: number,
+  ): Promise<ProxySearchResponse> => {
+    const controller = new AbortController();
+    // Whether OUR timer aborted, as opposed to any other abort reason: the
+    // rescue is offered for a timeout alone (YOY-108 AC-1), so the cause
+    // has to be known rather than inferred from the abort itself.
+    let timedOut = false;
+    const timer = window.setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, budgetMs);
+    try {
+      const params = buildSearchParams(query, sessionId, context);
+      const response = await fetch(`${basePath}/search?${params}`, {
+        method: "GET",
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        throw new Error(`search failed: ${response.status}`);
+      }
+      const body = (await response.json()) as ProxySearchResponse;
+      if (
+        typeof body !== "object" ||
+        body === null ||
+        typeof body.searchId !== "string" ||
+        !Array.isArray(body.results) ||
+        !Array.isArray(body.chips)
+      ) {
+        throw new Error("search response not contract-shaped");
+      }
+      return body;
+    } catch (error) {
+      if (timedOut) {
+        throw new SearchTimeoutError(budgetMs);
+      }
+      throw error;
+    } finally {
+      window.clearTimeout(timer);
+    }
+  };
 
   return {
     async search(query, sessionId, context) {
-      const controller = new AbortController();
-      const timer = window.setTimeout(() => controller.abort(), timeoutMs);
-      try {
-        const params = buildSearchParams(query, sessionId, context);
-        const response = await fetch(`${basePath}/search?${params}`, {
-          method: "GET",
-          signal: controller.signal,
-        });
-        if (!response.ok) {
-          throw new Error(`search failed: ${response.status}`);
-        }
-        const body = (await response.json()) as ProxySearchResponse;
-        if (
-          typeof body !== "object" ||
-          body === null ||
-          typeof body.searchId !== "string" ||
-          !Array.isArray(body.results) ||
-          !Array.isArray(body.chips)
-        ) {
-          throw new Error("search response not contract-shaped");
-        }
-        return body;
-      } finally {
-        window.clearTimeout(timer);
-      }
+      return request(query, sessionId, context, timeoutMs);
+    },
+
+    async searchClassic(query, sessionId) {
+      // `mode=preview` is the wire's existing classic-only fast path
+      // (YOY-68 AC-1): keyword results, zero LLM calls, no throttle budget.
+      // The widget renders this response as the submitted answer it is;
+      // see main.ts for what that costs in attribution.
+      return request(query, sessionId, { preview: true }, fallbackTimeoutMs);
     },
 
     sendClickBeacon(beacon) {
