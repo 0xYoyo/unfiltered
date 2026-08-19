@@ -8,6 +8,7 @@ import type { NativeRenderOverrides } from "./native-render.config";
 import { createOverlay, ROOT_TESTID } from "./overlay";
 import {
   createSearchClient,
+  SearchTimeoutError,
   type ProxyChip,
   type ProxyIntent,
   type SearchRequestContext,
@@ -47,6 +48,12 @@ export interface WidgetConfig {
   proxyBasePath?: string;
   /** Abort an unanswered search after this long (harness shortens it). */
   searchTimeoutMs?: number;
+  /**
+   * Budget for the classic rescue that follows a timed-out search (YOY-108
+   * AC-4). Both budgets are init-configurable; neither default changes in
+   * this issue (NG-1).
+   */
+  searchFallbackTimeoutMs?: number;
   /** Debounce for typing → search (harness shortens it). */
   debounceMs?: number;
   /**
@@ -222,6 +229,7 @@ export function init(config: WidgetConfig): void {
     const client = createSearchClient({
       basePath: config.proxyBasePath,
       timeoutMs: config.searchTimeoutMs,
+      fallbackTimeoutMs: config.searchFallbackTimeoutMs,
     });
     const debounceMs = config.debounceMs ?? DEFAULT_DEBOUNCE_MS;
 
@@ -371,6 +379,46 @@ export function init(config: WidgetConfig): void {
       }
     };
 
+    /**
+     * The classic rescue (YOY-108 AC-1): re-ask the same query down the
+     * zero-LLM keyword path on its own short budget and render the answer
+     * as the submitted response it is, in whichever surface is active.
+     * Resolves true when the shopper got results, false when the rescue
+     * failed in turn and the caller should fall through to the failure
+     * state (AC-2).
+     *
+     * The rescued response is NOT attributable: it rides the wire's
+     * existing classic-only mode, which writes no SearchEvent row
+     * server-side (YOY-68 AC-3), so `currentSearchId` stays null and a
+     * click on a rescued card fires no beacon. That is the cost of adding
+     * no server parameter (YOY-108 NG-2) and is called out on the PR.
+     */
+    const rescueWithClassic = async (
+      query: string,
+      sequence: number,
+    ): Promise<boolean> => {
+      let response;
+      try {
+        response = await client.searchClassic(query, getSessionId());
+      } catch {
+        return false; // AC-2: the failure state is now the honest answer.
+      }
+      if (inert || sequence !== requestSequence) {
+        return true; // Superseded; rendering nothing is correct, not a fail.
+      }
+      settledSequence = sequence;
+      // AC-3: the shopper got results, so this search is a rescue, not a
+      // failure — the self-removal counter must never fire on AI slowness.
+      consecutiveFailures = 0;
+      currentSearchId = null;
+      lastQuery = query;
+      // A classic response carries no intent, exactly as a server-degraded
+      // one does; refinement has nothing to hold either way.
+      heldIntent = response.intent;
+      overlay.showResponse(response, { onCardClick, onChipRemove });
+      return true;
+    };
+
     const runSearch = async (
       query: string,
       context?: SearchRequestContext,
@@ -412,9 +460,23 @@ export function init(config: WidgetConfig): void {
         // when it is null (a classic response holds no intent to refine).
         heldIntent = response.intent;
         overlay.showResponse(response, { onCardClick, onChipRemove });
-      } catch {
+      } catch (error) {
         if (inert || sequence !== requestSequence) {
           return; // A newer keystroke (or a dismissal) superseded this.
+        }
+        // Instant fallback (YOY-108 AC-1, PRD capability 6): a SUBMITTED
+        // search that ran out its own budget is not an answer of "nothing
+        // exists" — the AI path is merely slow, and the classic path can
+        // answer the same query immediately. Rescue it before considering
+        // any failure state. Previews are already the classic path, so a
+        // preview timing out has nothing to fall back to.
+        if (error instanceof SearchTimeoutError && !preview) {
+          if (await rescueWithClassic(query, sequence)) {
+            return;
+          }
+          if (inert || sequence !== requestSequence) {
+            return; // Superseded while the rescue was in flight.
+          }
         }
         settledSequence = sequence;
         // Failure containment (YOY-61 AC-4): one slow or failed search

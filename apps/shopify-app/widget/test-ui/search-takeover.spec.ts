@@ -112,6 +112,123 @@ test("an over-timeout search leaves the widget functional for the next query (YO
   await expect(noResults(page)).toBeHidden();
 });
 
+
+test.describe("a timed-out search falls back to classic results (YOY-108)", () => {
+  const searchRequests = (page: Page) =>
+    page.evaluate(
+      () =>
+        (window as unknown as { __searchRequests: { mode?: string }[] })
+          .__searchRequests,
+    );
+
+  test("the rescue renders classic results, and no failure state is shown (AC-1)", async ({
+    page,
+  }) => {
+    // The submitted request outlives its budget; the classic-only rescue
+    // answers. PRD capability 6: the shopper never sees an error caused by
+    // us when classic results for the same query exist.
+    await page.goto("/?fixture=timeout-rescue&debounce=30000");
+
+    await themeInput(page).fill("nike");
+    await themeInput(page).press("Enter");
+
+    await expect(cards(page).first()).toBeVisible({ timeout: 5000 });
+    await expect(noResults(page)).toBeHidden();
+    await expect(overlay(page)).toBeVisible();
+
+    // Two requests: the submitted one that timed out, then the rescue on
+    // the wire's classic-only mode.
+    const requests = await searchRequests(page);
+    expect(requests).toHaveLength(2);
+    expect(requests[0].mode).toBeUndefined();
+    expect(requests[1].mode).toBe("preview");
+  });
+
+  test("the failure state returns only when the rescue fails too (AC-2)", async ({
+    page,
+  }) => {
+    await page.goto("/?fixture=timeout-rescue-error&debounce=30000");
+
+    await themeInput(page).fill("nike");
+    await themeInput(page).press("Enter");
+
+    await expect(noResults(page)).toBeVisible({ timeout: 5000 });
+    await expect(cards(page)).toHaveCount(0);
+    expect(await searchRequests(page)).toHaveLength(2);
+  });
+
+  test("a rescued search never counts toward self-removal (AC-3)", async ({
+    page,
+  }) => {
+    // Three consecutive AI timeouts, each rescued: the kill switch exists
+    // for structural failure, and AI slowness alone is not that.
+    await page.goto("/?fixture=timeout-rescue&debounce=30000");
+
+    for (const query of ["nike one", "nike two", "nike three"]) {
+      await themeInput(page).fill("");
+      await themeInput(page).fill(query);
+      await themeInput(page).press("Enter");
+      await expect(cards(page).first()).toBeVisible({ timeout: 5000 });
+    }
+
+    // Still mounted, still bound, still answering.
+    await expect(page.getByTestId("unfiltered-widget-root")).toHaveCount(1);
+    await expect(noResults(page)).toBeHidden();
+    expect(await searchRequests(page)).toHaveLength(6);
+  });
+
+  test("a rescue that fails still counts, so genuine failure still removes the widget (AC-3)", async ({
+    page,
+  }) => {
+    // The mirror of the test above: when the rescue cannot save the search
+    // either, the pre-YOY-108 accounting is untouched.
+    await page.goto("/?fixture=timeout-rescue-error&debounce=30000");
+
+    for (const query of ["nike one", "nike two"]) {
+      await themeInput(page).fill("");
+      await expect(noResults(page)).toBeHidden();
+      await themeInput(page).fill(query);
+      await themeInput(page).press("Enter");
+      await expect(noResults(page)).toBeVisible({ timeout: 5000 });
+    }
+    await themeInput(page).fill("");
+    await themeInput(page).fill("nike three");
+    await themeInput(page).press("Enter");
+
+    await expect(page.getByTestId("unfiltered-widget-root")).toHaveCount(0, {
+      timeout: 5000,
+    });
+  });
+
+  test("the fallback budget comes from init (AC-4)", async ({ page }) => {
+    // Both requests stall, so the failure state waits out the rescue's own
+    // budget. With a 100ms budget from init it lands almost immediately;
+    // the built-in default is 3s, so a config value that was ignored would
+    // blow past this window.
+    await page.goto("/?fixture=timeout&debounce=20&fallbackTimeout=100");
+
+    await themeInput(page).fill("nike");
+    const startedAt = Date.now();
+    await expect(noResults(page)).toBeVisible({ timeout: 5000 });
+    expect(Date.now() - startedAt).toBeLessThan(2000);
+  });
+
+  test("a keystroke preview that times out is not rescued: it is already the classic path", async ({
+    page,
+  }) => {
+    // The preview IS the classic request, so there is nothing to fall back
+    // to — a second identical request would only double the load.
+    await page.goto("/?fixture=timeout&debounce=20");
+
+    await themeInput(page).fill("nike");
+    await expect(noResults(page)).toBeVisible({ timeout: 5000 });
+
+    const requests = await searchRequests(page);
+    expect(requests).toHaveLength(1);
+    expect(requests[0].mode).toBe("preview");
+  });
+});
+
 test("the magnifier fires an immediate search, skipping the debounce, without navigating (YOY-52 AC-14)", async ({
   page,
 }) => {
