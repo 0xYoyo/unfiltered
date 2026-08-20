@@ -5,6 +5,7 @@ import {
   fixtureOutcome,
   playgroundFixturesEnabled,
   selectFixture,
+  selectFixtureForRemoval,
   sleep,
 } from "../playground/fixture-mode.server";
 import {
@@ -68,8 +69,12 @@ export const loader = async ({
   // The branch sits after parsing so a malformed request still answers 400
   // in the lane exactly as it does in production.
   if (playgroundFixturesEnabled()) {
+    // A chip removal is answered by its own echo rather than by the query
+    // text, because the query has not changed — only the constraint set has.
     const outcome = fixtureOutcome(
-      selectFixture(body.query, body.mode === "preview"),
+      body.removeChip !== undefined
+        ? selectFixtureForRemoval(body.removeChip)
+        : selectFixture(body.query, body.mode === "preview"),
     );
     await sleep(outcome.delayMs);
     return outcome.body === null

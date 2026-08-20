@@ -12,6 +12,7 @@
  * common, and those come from the server module.
  */
 
+import type { ProxyChip, ProxyIntent } from "../search/proxy.server";
 import type { PlaygroundSearchResponse } from "./api.server";
 
 export const PREVIEW_DEBOUNCE_MS = 200;
@@ -54,6 +55,13 @@ export interface PlaygroundSearchRequest {
   preview: boolean;
   /** Registry slug; absent means the seed catalog. */
   catalog?: string;
+  /**
+   * The held intent from the last AI response, echoed so a follow-up
+   * modifies that search instead of starting a new one (YOY-93 AC-2).
+   */
+  previousIntent?: ProxyIntent;
+  /** Chip the visitor dismissed; the server adjusts `previousIntent`. */
+  removeChip?: ProxyChip;
   signal?: AbortSignal;
 }
 
@@ -62,6 +70,8 @@ export function playgroundSearchUrl(request: {
   preview: boolean;
   sessionId: string;
   catalog?: string;
+  previousIntent?: ProxyIntent;
+  removeChip?: ProxyChip;
 }): string {
   const params = new URLSearchParams({
     query: request.query,
@@ -72,6 +82,14 @@ export function playgroundSearchUrl(request: {
   }
   if (request.catalog !== undefined) {
     params.set("catalog", request.catalog);
+  }
+  // Refinement rides the wire exactly as the proxy's own parameters do
+  // (NG-3: the playground changes no contract).
+  if (request.previousIntent !== undefined) {
+    params.set("previousIntent", JSON.stringify(request.previousIntent));
+  }
+  if (request.removeChip !== undefined) {
+    params.set("removeChip", JSON.stringify(request.removeChip));
   }
   return `/api/playground/search?${params.toString()}`;
 }
@@ -85,6 +103,12 @@ export async function searchPlayground(
     preview: request.preview,
     sessionId: getPlaygroundSessionId(),
     ...(request.catalog === undefined ? {} : { catalog: request.catalog }),
+    ...(request.previousIntent === undefined
+      ? {}
+      : { previousIntent: request.previousIntent }),
+    ...(request.removeChip === undefined
+      ? {}
+      : { removeChip: request.removeChip }),
   });
   const response = await fetch(url, {
     ...(request.signal === undefined ? {} : { signal: request.signal }),

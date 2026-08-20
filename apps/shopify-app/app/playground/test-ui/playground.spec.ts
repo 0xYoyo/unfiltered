@@ -435,19 +435,39 @@ test.describe("layout holds at every viewport (AC-4, F-5)", () => {
 });
 
 test.describe("keyboard and focus (AC-7, verify 7)", () => {
-  test("tab order reaches the input, magnifier, then a card link", async ({
+  test("tab order runs input → magnifier → examples → details → cards", async ({
     page,
   }) => {
     await page.goto("/");
     await submitQuery(page, "dress");
     await expect(cards(page)).toHaveCount(4);
 
-    await page.locator("body").click({ position: { x: 5, y: 5 } });
     await input(page).focus();
-    await page.keyboard.press("Tab");
-    await expect(submit(page)).toBeFocused();
-    await page.keyboard.press("Tab");
-    await expect(cards(page).nth(0).locator("a")).toBeFocused();
+
+    // Walk the sequence rather than asserting three fixed stops: the page
+    // gained controls in YOY-93, and what F-4 requires is that every one of
+    // them is reachable in the order it is read, not that the list is short.
+    const order: string[] = [];
+    for (let step = 0; step < 9; step += 1) {
+      await page.keyboard.press("Tab");
+      order.push(
+        await page.evaluate(() => {
+          const active = document.activeElement as HTMLElement | null;
+          return (
+            active?.getAttribute("data-testid") ??
+            active?.className.split(" ")[0] ??
+            "none"
+          );
+        }),
+      );
+    }
+
+    expect(order).toEqual([
+      "playground-submit",
+      ...Array.from({ length: 6 }, () => "playground-example"),
+      "playground-details-toggle",
+      "cardLink",
+    ]);
   });
 
   test("focused elements draw a visible ring", async ({ page }) => {
@@ -464,17 +484,44 @@ test.describe("keyboard and focus (AC-7, verify 7)", () => {
     expect(Number.parseFloat(outline.width)).toBeGreaterThanOrEqual(2);
   });
 
-  test("interactive controls meet the 44px hit target floor (F-3)", async ({
+  test("every interactive control meets the 44px hit target floor (F-3)", async ({
     page,
   }) => {
+    // Measured on EVERY control, not a sample: the example links shipped at
+    // ~20px tall because the original spec only checked the magnifier and
+    // the language toggle. The one carve-out F-3 allows is a chip-remove
+    // affordance at 24×24, and here the whole chip is the control.
     await page.goto("/");
-    for (const target of [
-      submit(page),
-      page.getByTestId("playground-language-toggle"),
-    ]) {
-      const box = await target.boundingBox();
-      expect(box!.width).toBeGreaterThanOrEqual(44);
-      expect(box!.height).toBeGreaterThanOrEqual(44);
+    await submitQuery(page, "ai elegant dress");
+    await expect(page.getByTestId("playground-chip")).toHaveCount(3);
+
+    const boxes = await page
+      .locator(
+        [
+          '[data-testid="playground-submit"]',
+          '[data-testid="playground-language-toggle"]',
+          '[data-testid="playground-example"]',
+          '[data-testid="playground-chip"]',
+          '[data-testid="playground-new-search"]',
+          '[data-testid="playground-details-toggle"]',
+        ].join(", "),
+      )
+      .evaluateAll((nodes) =>
+        nodes.map((node) => {
+          const rect = node.getBoundingClientRect();
+          return {
+            id: node.getAttribute("data-testid") ?? "?",
+            width: rect.width,
+            height: rect.height,
+          };
+        }),
+      );
+
+    // Guard against the selector silently matching nothing.
+    expect(boxes.length).toBeGreaterThanOrEqual(11);
+    for (const box of boxes) {
+      expect(box.height, `${box.id} is ${box.height}px tall`).toBeGreaterThanOrEqual(44);
+      expect(box.width, `${box.id} is ${box.width}px wide`).toBeGreaterThanOrEqual(44);
     }
   });
 });

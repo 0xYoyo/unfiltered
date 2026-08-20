@@ -12,6 +12,11 @@
  * and the tests that assert the guard is off would need a separate server.
  */
 
+import aiChipRemovedFixture from "./fixtures/ai-chip-removed.json";
+import aiZeroHitFixture from "./fixtures/ai-zero-hit.json";
+import aiFixture from "./fixtures/ai.json";
+import colorUnknownFixture from "./fixtures/color-unknown.json";
+import degradedFixture from "./fixtures/degraded.json";
 import emptyFixture from "./fixtures/empty.json";
 import previewFixture from "./fixtures/preview.json";
 import resultsFixture from "./fixtures/results.json";
@@ -27,7 +32,14 @@ export type PlaygroundFixtureName =
   | "error"
   | "timeout"
   | "delayed"
-  | "preview";
+  | "preview"
+  // YOY-93: the AI states.
+  | "ai"
+  | "ai-chip-removed"
+  | "ai-zero-hit"
+  | "ai-delayed"
+  | "degraded"
+  | "color-unknown";
 
 /** How long the `delayed` fixture waits — long enough to observe loading. */
 export const FIXTURE_DELAY_MS = 700;
@@ -54,9 +66,31 @@ export function selectFixture(
   query: string,
   preview: boolean,
 ): PlaygroundFixtureName {
-  const text = query.toLowerCase();
+  // Whole words, not substrings: "ai" appears inside "rail", "plain", and
+  // "available", so a substring match routed the `empty rail` query to the
+  // AI fixture. Selection has to be predictable from reading the query.
+  const words = new Set(query.toLowerCase().split(/[^a-z]+/i));
+  const has = (word: string): boolean => words.has(word);
+
+  // A preview is classic-only by contract, so it can never select an AI
+  // fixture however it is worded (AC-1: chips never render on a preview).
+  if (!preview) {
+    if (has("zero")) {
+      return "ai-zero-hit";
+    }
+    if (has("degraded")) {
+      return "degraded";
+    }
+    if (has("color")) {
+      return "color-unknown";
+    }
+    if (has("ai")) {
+      return has("delayed") ? "ai-delayed" : "ai";
+    }
+  }
+
   for (const name of ["empty", "error", "timeout", "delayed"] as const) {
-    if (text.includes(name)) {
+    if (has(name)) {
       return name;
     }
   }
@@ -90,11 +124,53 @@ export function fixtureOutcome(
       return { delayMs: 0, status: 200, body: asResponse(previewFixture) };
     case "results":
       return { delayMs: 0, status: 200, body: asResponse(resultsFixture) };
+    case "ai":
+      return { delayMs: 0, status: 200, body: asResponse(aiFixture) };
+    case "ai-chip-removed":
+      return {
+        delayMs: 0,
+        status: 200,
+        body: asResponse(aiChipRemovedFixture),
+      };
+    case "ai-zero-hit":
+      return { delayMs: 0, status: 200, body: asResponse(aiZeroHitFixture) };
+    case "ai-delayed":
+      return {
+        delayMs: FIXTURE_DELAY_MS,
+        status: 200,
+        body: asResponse(aiFixture),
+      };
+    case "degraded":
+      return { delayMs: 0, status: 200, body: asResponse(degradedFixture) };
+    case "color-unknown":
+      return {
+        delayMs: 0,
+        status: 200,
+        body: asResponse(colorUnknownFixture),
+      };
   }
 }
 
 function asResponse(fixture: unknown): PlaygroundSearchResponse {
   return fixture as PlaygroundSearchResponse;
+}
+
+/**
+ * Chip removal answers a contract-correct echo (AC-7): the same search with
+ * the dismissed constraint gone from BOTH the chip row and the intent, and
+ * the products it had excluded back in the set. Serving the unchanged AI
+ * fixture would let a broken remove-and-re-render pass its test.
+ *
+ * Only the `colorsExclude` chip has a recorded echo, because that is the one
+ * the specs remove; any other chip falls through to the plain AI fixture
+ * rather than pretending to a change the fixture cannot represent.
+ */
+export function selectFixtureForRemoval(
+  removeChip: { field: string; value: string } | null,
+): PlaygroundFixtureName {
+  return removeChip !== null && removeChip.field === "colorsExclude"
+    ? "ai-chip-removed"
+    : "ai";
 }
 
 export function sleep(ms: number): Promise<void> {

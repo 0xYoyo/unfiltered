@@ -45,6 +45,25 @@ describe("fixture selection by query text", () => {
   it("lets a named state win over the preview default, so previews are testable too", () => {
     expect(selectFixture("empty", true)).toBe("empty");
   });
+
+  it("routes the AI states, and never on a preview (AC-1)", () => {
+    expect(selectFixture("ai elegant dress", false)).toBe("ai");
+    expect(selectFixture("ai zero hit", false)).toBe("ai-zero-hit");
+    expect(selectFixture("ai delayed", false)).toBe("ai-delayed");
+    expect(selectFixture("degraded", false)).toBe("degraded");
+    expect(selectFixture("ai color beige", false)).toBe("color-unknown");
+    // A preview is classic-only however it is worded.
+    expect(selectFixture("ai elegant dress", true)).toBe("preview");
+    expect(selectFixture("ai zero hit", true)).toBe("preview");
+  });
+
+  it("matches whole words, not substrings", () => {
+    // "ai" lives inside "rail", "plain", and "available"; a substring match
+    // sent `empty rail` to the AI fixture.
+    expect(selectFixture("empty rail", false)).toBe("empty");
+    expect(selectFixture("plain dress", false)).toBe("results");
+    expect(selectFixture("available now", false)).toBe("results");
+  });
 });
 
 describe("fixture outcomes", () => {

@@ -96,7 +96,11 @@ apps/
         catalog-source.server.ts
         components/
           Card.tsx
+          ChipRow.tsx
+          EngineDetails.tsx
+          ExampleQueries.tsx
           LanguageToggle.tsx
+          NewSearch.tsx
           ResultsGrid.tsx
           SearchBar.tsx
           StatusLine.tsx
@@ -104,6 +108,10 @@ apps/
         fixture-mode.test.ts
         fixture-session-storage.server.ts
         fixtures/
+          ai-chip-removed.json
+          ai-zero-hit.json
+          ai.json
+          color-unknown.json
           crawl/
             about.html
             crawl-store.ts
@@ -115,6 +123,7 @@ apps/
             sitemap-pages.xml
             sitemap-products.xml
             woo-dress.html
+          degraded.json
           empty.json
           preview.json
           results.json
@@ -128,6 +137,7 @@ apps/
         jsonld-crawl.test.ts
         jsonld.server.ts
         playground-css.test.ts
+        playground-examples.test.ts
         playground-strings.test.ts
         playground.css
         polite-fetch.server.ts
@@ -138,10 +148,18 @@ apps/
         sitemap.server.ts
         strings.ts
         test-ui/
+          ai-states.spec.ts
+          evidence-ai.spec.ts
           evidence.spec.ts
           playground.spec.ts
           snapshots.spec.ts
           snapshots.spec.ts-snapshots/
+            playground-ai-en-darwin.png
+            playground-ai-en-linux.png
+            playground-ai-he-darwin.png
+            playground-ai-he-linux.png
+            playground-details-en-darwin.png
+            playground-details-en-linux.png
             playground-initial-en-darwin.png
             playground-initial-en-linux.png
             playground-initial-he-darwin.png
@@ -150,6 +168,10 @@ apps/
             playground-results-en-linux.png
             playground-results-he-darwin.png
             playground-results-he-linux.png
+            playground-zero-hit-en-darwin.png
+            playground-zero-hit-en-linux.png
+            playground-zero-hit-he-darwin.png
+            playground-zero-hit-he-linux.png
         tokens.css
       proxy-click.test.ts
       proxy-search.test.ts
@@ -469,6 +491,28 @@ docs/
       mobile-he-3-results.png
       mobile-he-4-empty.png
       mobile-he-5-failure-keeps-results.png
+    YOY-93/
+      desktop-en-1-initial-examples.png
+      desktop-en-2-ai-chips.png
+      desktop-en-3-zero-hit.png
+      desktop-en-4-degraded.png
+      desktop-en-5-color-unknown.png
+      desktop-en-6-details-open.png
+      desktop-he-1-initial-examples.png
+      desktop-he-2-ai-chips.png
+      desktop-he-3-zero-hit.png
+      desktop-he-4-degraded.png
+      desktop-he-5-color-unknown.png
+      mobile-en-1-initial-examples.png
+      mobile-en-2-ai-chips.png
+      mobile-en-3-zero-hit.png
+      mobile-en-4-degraded.png
+      mobile-en-5-color-unknown.png
+      mobile-he-1-initial-examples.png
+      mobile-he-2-ai-chips.png
+      mobile-he-3-zero-hit.png
+      mobile-he-4-degraded.png
+      mobile-he-5-color-unknown.png
     YOY-99/
       1-modal-open-desktop.png
       1-modal-open-mobile.png
@@ -524,7 +568,7 @@ vitest.setup.ts
 - **Env files (paths only — contents never read)**: .env (declared in .gitignore), .env.* (declared in .gitignore), .env.example, apps/shopify-app/.env (declared in .gitignore), apps/shopify-app/.env.example
 - **Entrypoints**: apps/shopify-app/app/routes/app.tsx, apps/shopify-app/widget/src/main.ts, packages/engine/src/index.ts, packages/provider-gemini/src/index.ts
 - **Scripts**: scripts/repo-map.mjs
-- **Fixtures**: apps/shopify-app/app/eval/fixtures/catalog.json, apps/shopify-app/app/eval/fixtures/goldens.json, apps/shopify-app/app/eval/fixtures/recorded/classification-synthesized.json, apps/shopify-app/app/eval/fixtures/recorded/classification.json, apps/shopify-app/app/eval/fixtures/recorded/embeddings.json, apps/shopify-app/app/eval/fixtures/recorded/enrichment.json, apps/shopify-app/app/eval/fixtures/recorded/intent-refinement.json, apps/shopify-app/app/eval/fixtures/recorded/intent.json, apps/shopify-app/app/eval/fixtures/refinement-goldens.json, apps/shopify-app/app/playground/fixtures/crawl/about.html, apps/shopify-app/app/playground/fixtures/crawl/crawl-store.ts, apps/shopify-app/app/playground/fixtures/crawl/dupe-page.html, apps/shopify-app/app/playground/fixtures/crawl/group-sneaker.html, apps/shopify-app/app/playground/fixtures/crawl/magento-shirt.html, apps/shopify-app/app/playground/fixtures/crawl/priceless-scarf.html, apps/shopify-app/app/playground/fixtures/crawl/sitemap-index.xml, apps/shopify-app/app/playground/fixtures/crawl/sitemap-pages.xml, apps/shopify-app/app/playground/fixtures/crawl/sitemap-products.xml, apps/shopify-app/app/playground/fixtures/crawl/woo-dress.html, apps/shopify-app/app/playground/fixtures/empty.json, apps/shopify-app/app/playground/fixtures/preview.json, apps/shopify-app/app/playground/fixtures/results.json, apps/shopify-app/app/playground/fixtures/shopify-public-products.ts
+- **Fixtures**: apps/shopify-app/app/eval/fixtures/catalog.json, apps/shopify-app/app/eval/fixtures/goldens.json, apps/shopify-app/app/eval/fixtures/recorded/classification-synthesized.json, apps/shopify-app/app/eval/fixtures/recorded/classification.json, apps/shopify-app/app/eval/fixtures/recorded/embeddings.json, apps/shopify-app/app/eval/fixtures/recorded/enrichment.json, apps/shopify-app/app/eval/fixtures/recorded/intent-refinement.json, apps/shopify-app/app/eval/fixtures/recorded/intent.json, apps/shopify-app/app/eval/fixtures/refinement-goldens.json, apps/shopify-app/app/playground/fixtures/ai-chip-removed.json, apps/shopify-app/app/playground/fixtures/ai-zero-hit.json, apps/shopify-app/app/playground/fixtures/ai.json, apps/shopify-app/app/playground/fixtures/color-unknown.json, apps/shopify-app/app/playground/fixtures/crawl/about.html, apps/shopify-app/app/playground/fixtures/crawl/crawl-store.ts, apps/shopify-app/app/playground/fixtures/crawl/dupe-page.html, apps/shopify-app/app/playground/fixtures/crawl/group-sneaker.html, apps/shopify-app/app/playground/fixtures/crawl/magento-shirt.html, apps/shopify-app/app/playground/fixtures/crawl/priceless-scarf.html, apps/shopify-app/app/playground/fixtures/crawl/sitemap-index.xml, apps/shopify-app/app/playground/fixtures/crawl/sitemap-pages.xml, apps/shopify-app/app/playground/fixtures/crawl/sitemap-products.xml, apps/shopify-app/app/playground/fixtures/crawl/woo-dress.html, apps/shopify-app/app/playground/fixtures/degraded.json, apps/shopify-app/app/playground/fixtures/empty.json, apps/shopify-app/app/playground/fixtures/preview.json, apps/shopify-app/app/playground/fixtures/results.json, apps/shopify-app/app/playground/fixtures/shopify-public-products.ts
 - **Migrations**: apps/shopify-app/prisma/migrations/20260803000000_init_postgres/migration.sql, apps/shopify-app/prisma/migrations/20260803134500_ai_call_ledger/migration.sql, apps/shopify-app/prisma/migrations/20260803150800_catalog_product/migration.sql, apps/shopify-app/prisma/migrations/20260804152800_product_enrichment/migration.sql, apps/shopify-app/prisma/migrations/20260805131800_product_embedding/migration.sql, apps/shopify-app/prisma/migrations/20260808160000_pg_trgm_classic_search/migration.sql, apps/shopify-app/prisma/migrations/20260808170000_product_display_snapshot/migration.sql, apps/shopify-app/prisma/migrations/20260808190000_search_click_events/migration.sql, apps/shopify-app/prisma/migrations/20260809190000_catalog_product_status/migration.sql, apps/shopify-app/prisma/migrations/20260810210000_catalog_product_published_at/migration.sql, apps/shopify-app/prisma/migrations/20260816200000_catalog_product_url/migration.sql, apps/shopify-app/prisma/migrations/20260817130000_playground_catalog/migration.sql, apps/shopify-app/prisma/migrations/migration_lock.toml
 
 ## Module dependency map
@@ -555,13 +599,17 @@ vitest.setup.ts
 - apps/shopify-app/app/intent-live.test.ts → apps/shopify-app/app/ai/cost-recorder.server.ts, apps/shopify-app/app/testing/helpers.server.ts
 - apps/shopify-app/app/pgvector.test.ts → apps/shopify-app/app/testing/helpers.server.ts
 - apps/shopify-app/app/playground-api.test.ts → apps/shopify-app/app/db.server.ts, apps/shopify-app/app/playground/api.server.ts, apps/shopify-app/app/routes/api.playground.click.tsx, apps/shopify-app/app/routes/api.playground.search.tsx, apps/shopify-app/app/search/proxy.server.ts, apps/shopify-app/app/testing/helpers.server.ts
-- apps/shopify-app/app/playground/PlaygroundPage.tsx → apps/shopify-app/app/playground/components/Card.tsx, apps/shopify-app/app/playground/components/LanguageToggle.tsx, apps/shopify-app/app/playground/components/ResultsGrid.tsx, apps/shopify-app/app/playground/components/SearchBar.tsx, apps/shopify-app/app/playground/components/StatusLine.tsx, apps/shopify-app/app/playground/search-client.ts, apps/shopify-app/app/playground/strings.ts
+- apps/shopify-app/app/playground/PlaygroundPage.tsx → apps/shopify-app/app/playground/api.server.ts, apps/shopify-app/app/playground/components/Card.tsx, apps/shopify-app/app/playground/components/ChipRow.tsx, apps/shopify-app/app/playground/components/EngineDetails.tsx, apps/shopify-app/app/playground/components/ExampleQueries.tsx, apps/shopify-app/app/playground/components/LanguageToggle.tsx, apps/shopify-app/app/playground/components/NewSearch.tsx, apps/shopify-app/app/playground/components/ResultsGrid.tsx, apps/shopify-app/app/playground/components/SearchBar.tsx, apps/shopify-app/app/playground/components/StatusLine.tsx, apps/shopify-app/app/playground/search-client.ts, apps/shopify-app/app/playground/strings.ts, apps/shopify-app/app/search/proxy.server.ts
 - apps/shopify-app/app/playground/api.server.ts → apps/shopify-app/app/playground/ingest-public.server.ts, apps/shopify-app/app/search/orchestrator.server.ts, apps/shopify-app/app/search/proxy.server.ts, apps/shopify-app/app/search/throttle.server.ts
 - apps/shopify-app/app/playground/components/Card.tsx → apps/shopify-app/app/playground/strings.ts, apps/shopify-app/widget/src/format.ts
+- apps/shopify-app/app/playground/components/ChipRow.tsx → apps/shopify-app/app/playground/strings.ts, apps/shopify-app/app/search/proxy.server.ts, apps/shopify-app/widget/src/format.ts
+- apps/shopify-app/app/playground/components/EngineDetails.tsx → apps/shopify-app/app/playground/api.server.ts, apps/shopify-app/app/playground/strings.ts
+- apps/shopify-app/app/playground/components/ExampleQueries.tsx → apps/shopify-app/app/playground/strings.ts
 - apps/shopify-app/app/playground/components/LanguageToggle.tsx → apps/shopify-app/app/playground/strings.ts
+- apps/shopify-app/app/playground/components/NewSearch.tsx → apps/shopify-app/app/playground/strings.ts
 - apps/shopify-app/app/playground/components/ResultsGrid.tsx → apps/shopify-app/app/playground/components/Card.tsx, apps/shopify-app/app/playground/strings.ts
 - apps/shopify-app/app/playground/components/SearchBar.tsx → apps/shopify-app/app/playground/strings.ts
-- apps/shopify-app/app/playground/fixture-mode.server.ts → apps/shopify-app/app/playground/api.server.ts, apps/shopify-app/app/playground/fixtures/empty.json (unresolved), apps/shopify-app/app/playground/fixtures/preview.json (unresolved), apps/shopify-app/app/playground/fixtures/results.json (unresolved)
+- apps/shopify-app/app/playground/fixture-mode.server.ts → apps/shopify-app/app/playground/api.server.ts, apps/shopify-app/app/playground/fixtures/ai-chip-removed.json (unresolved), apps/shopify-app/app/playground/fixtures/ai-zero-hit.json (unresolved), apps/shopify-app/app/playground/fixtures/ai.json (unresolved), apps/shopify-app/app/playground/fixtures/color-unknown.json (unresolved), apps/shopify-app/app/playground/fixtures/degraded.json (unresolved), apps/shopify-app/app/playground/fixtures/empty.json (unresolved), apps/shopify-app/app/playground/fixtures/preview.json (unresolved), apps/shopify-app/app/playground/fixtures/results.json (unresolved)
 - apps/shopify-app/app/playground/fixture-mode.test.ts → apps/shopify-app/app/playground/fixture-mode.server.ts
 - apps/shopify-app/app/playground/fixtures/crawl/crawl-store.ts → apps/shopify-app/app/testing/fake-store.server.ts
 - apps/shopify-app/app/playground/fixtures/shopify-public-products.ts → apps/shopify-app/app/playground/shopify-public-source.server.ts
@@ -573,12 +621,14 @@ vitest.setup.ts
 - apps/shopify-app/app/playground/jsonld-crawl-source.server.ts → apps/shopify-app/app/playground/catalog-source.server.ts, apps/shopify-app/app/playground/jsonld.server.ts, apps/shopify-app/app/playground/polite-fetch.server.ts, apps/shopify-app/app/playground/sitemap.server.ts
 - apps/shopify-app/app/playground/jsonld-crawl.test.ts → apps/shopify-app/app/playground/fixtures/crawl/crawl-store.ts, apps/shopify-app/app/playground/ingest-public-cli.server.ts, apps/shopify-app/app/playground/ingest-public.server.ts, apps/shopify-app/app/playground/jsonld-crawl-source.server.ts, apps/shopify-app/app/playground/jsonld.server.ts, apps/shopify-app/app/playground/polite-fetch.server.ts, apps/shopify-app/app/playground/sitemap.server.ts, apps/shopify-app/app/testing/fake-store.server.ts, apps/shopify-app/app/testing/helpers.server.ts
 - apps/shopify-app/app/playground/jsonld.server.ts → apps/shopify-app/app/playground/catalog-source.server.ts
+- apps/shopify-app/app/playground/playground-examples.test.ts → apps/shopify-app/app/playground/strings.ts, apps/shopify-app/widget/src/format.ts
 - apps/shopify-app/app/playground/playground-strings.test.ts → apps/shopify-app/app/playground/strings.ts
 - apps/shopify-app/app/playground/polite-fetch.test.ts → apps/shopify-app/app/playground/polite-fetch.server.ts, apps/shopify-app/app/testing/fake-store.server.ts
-- apps/shopify-app/app/playground/search-client.ts → apps/shopify-app/app/playground/api.server.ts
+- apps/shopify-app/app/playground/search-client.ts → apps/shopify-app/app/playground/api.server.ts, apps/shopify-app/app/search/proxy.server.ts
 - apps/shopify-app/app/playground/shopify-public-source.server.ts → apps/shopify-app/app/playground/catalog-source.server.ts, apps/shopify-app/app/playground/polite-fetch.server.ts
 - apps/shopify-app/app/playground/shopify-public-source.test.ts → apps/shopify-app/app/playground/catalog-source.server.ts, apps/shopify-app/app/playground/fixtures/shopify-public-products.ts, apps/shopify-app/app/playground/polite-fetch.server.ts, apps/shopify-app/app/playground/shopify-public-source.server.ts, apps/shopify-app/app/testing/fake-store.server.ts
 - apps/shopify-app/app/playground/sitemap.server.ts → apps/shopify-app/app/playground/polite-fetch.server.ts
+- apps/shopify-app/app/playground/test-ui/ai-states.spec.ts → apps/shopify-app/app/playground/strings.ts
 - apps/shopify-app/app/playground/test-ui/playground.spec.ts → apps/shopify-app/app/playground/strings.ts
 - apps/shopify-app/app/proxy-click.test.ts → apps/shopify-app/app/db.server.ts, apps/shopify-app/app/routes/apps.unfiltered.click.tsx, apps/shopify-app/app/testing/helpers.server.ts
 - apps/shopify-app/app/proxy-search.test.ts → apps/shopify-app/app/ai/cost-recorder.server.ts, apps/shopify-app/app/db.server.ts, apps/shopify-app/app/routes/apps.unfiltered.search.tsx, apps/shopify-app/app/search/classic-store.server.ts, apps/shopify-app/app/search/events.server.ts, apps/shopify-app/app/search/orchestrator.server.ts, apps/shopify-app/app/search/proxy.server.ts, apps/shopify-app/app/search/retrieval-store.server.ts, apps/shopify-app/app/search/throttle.server.ts, apps/shopify-app/app/testing/helpers.server.ts

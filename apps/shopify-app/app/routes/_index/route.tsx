@@ -34,8 +34,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     locale,
     pathname: url.pathname,
     // Carried across a language switch so the toggle does not clear a typed
-    // query (AC-3).
+    // query (YOY-92 AC-3).
     initialQuery: url.searchParams.get("query") ?? "",
+    // The engine-details panel is opt-in and its state IS the URL, so it
+    // survives a reload and can be shared as a link (YOY-93 AC-5).
+    detailsOpen: url.searchParams.get("details") === "1",
   };
 };
 
@@ -50,13 +53,15 @@ export const meta: MetaFunction<typeof loader> = ({ data }) => {
 };
 
 export default function PlaygroundRoute() {
-  const { locale, pathname, initialQuery } = useLoaderData<typeof loader>();
+  const { locale, pathname, initialQuery, detailsOpen } =
+    useLoaderData<typeof loader>();
 
   return (
     <PlaygroundPage
       locale={locale}
       pathname={pathname}
       initialQuery={initialQuery}
+      detailsOpen={detailsOpen}
     />
   );
 }
