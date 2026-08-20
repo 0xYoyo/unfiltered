@@ -135,6 +135,21 @@ curl http://localhost:3000/healthz
 `/healthz` returns the engine version and a typed empty search result from
 the engine stub.
 
+## Outreach links
+
+Ingest a public store's catalog and share the playground over it:
+
+```bash
+npm run ingest:public --workspace app -- \
+  --url https://store.example.com --slug store-example --name "Store Example"
+# then share https://<deployment>/s/store-example
+```
+
+`/s/<slug>` is the playground with that catalog preloaded; the store's name
+is the only thing the page adds, and the page is `noindex`. An unknown slug
+answers a designed 404, never the seed catalog. See
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
 ## Deployment
 
 The playground runs as a Docker web service on Render, built from the

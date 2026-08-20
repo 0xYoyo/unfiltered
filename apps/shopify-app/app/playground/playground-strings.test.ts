@@ -45,9 +45,15 @@ describe("string catalog parity", () => {
     const hebrew = /[֐-׿]/;
 
     for (const [key, value] of Object.entries(he)) {
-      // The product name is a proper noun and the toggle labels name the
-      // other language: both are correctly identical or Latin by design.
-      if (key === "productName" || key === "languageToggleTarget") {
+      // Three keys are correctly identical or Latin by design: the product
+      // name is a proper noun, the toggle label names the other language,
+      // and the store title template is two proper nouns around a dash
+      // ("{name} — Unfiltered") with nothing in it to translate.
+      if (
+        key === "productName" ||
+        key === "languageToggleTarget" ||
+        key === "storeTitle"
+      ) {
         continue;
       }
       expect(value, `he.${key} is still the English string`).not.toBe(

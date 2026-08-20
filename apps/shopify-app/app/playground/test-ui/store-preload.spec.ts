@@ -1,0 +1,186 @@
+import { expect, test, type Page } from "@playwright/test";
+
+import { PLAYGROUND_STRING_CATALOG, type PlaygroundLocale } from "../strings";
+
+/**
+ * The store-preload page (YOY-94). Every assertion is one of the issue's
+ * "How to verify" steps, driven against the built app in fixture mode where
+ * `demo-store` is the one known slug.
+ */
+
+const DESKTOP = { width: 1280, height: 800 };
+
+const input = (page: Page) => page.getByTestId("playground-input");
+const cards = (page: Page) => page.getByTestId("playground-card");
+const storeLine = (page: Page) => page.getByTestId("playground-store-line");
+const strings = (locale: PlaygroundLocale) =>
+  PLAYGROUND_STRING_CATALOG[locale];
+
+function recordSearchRequests(page: Page): URL[] {
+  const urls: URL[] = [];
+  page.on("request", (request) => {
+    if (request.url().includes("/api/playground/search")) {
+      urls.push(new URL(request.url()));
+    }
+  });
+  return urls;
+}
+
+async function submit(page: Page, query: string): Promise<void> {
+  await input(page).fill(query);
+  await input(page).press("Enter");
+}
+
+test.describe("the store's page (AC-1, AC-2, verify 1)", () => {
+  test("names the store, counts its products, and is noindex", async ({
+    page,
+  }) => {
+    await page.goto("/s/demo-store");
+
+    await expect(storeLine(page)).toContainText("Demo Store");
+    await expect(storeLine(page)).toContainText(
+      strings("en").storeProducts.replace("{count}", "120"),
+    );
+    await expect(page).toHaveTitle("Demo Store — Unfiltered");
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
+      "content",
+      "noindex",
+    );
+  });
+
+  test("the seed playground stays indexable and has no store line", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await expect(page.locator('meta[name="robots"]')).toHaveCount(0);
+    await expect(storeLine(page)).toHaveCount(0);
+  });
+
+  test("the store name is the ONLY new element (P-7)", async ({ page }) => {
+    // Same chrome, same controls: the page is the store's because it says
+    // so, not because it dressed up as the store.
+    await page.setViewportSize(DESKTOP);
+
+    const inventory = async (path: string) => {
+      await page.goto(path);
+      return page.evaluate(() =>
+        Array.from(document.querySelectorAll(".playground *"))
+          // getAttribute, not `className`: on an SVG element that property
+          // is an SVGAnimatedString, and the magnifier is an SVG.
+          .map((node) => (node.getAttribute("class") ?? "").split(" ")[0])
+          .filter((name) => name !== "" && !name.startsWith("store")),
+      );
+    };
+
+    expect(await inventory("/s/demo-store")).toEqual(await inventory("/"));
+  });
+});
+
+test.describe("every request carries the catalog (AC-1, verify 2)", () => {
+  test("a submitted search names the slug", async ({ page }) => {
+    const urls = recordSearchRequests(page);
+    await page.goto("/s/demo-store");
+    await submit(page, "dress");
+    await expect(cards(page)).toHaveCount(4);
+
+    expect(urls.length).toBeGreaterThan(0);
+    for (const url of urls) {
+      expect(url.searchParams.get("catalog")).toBe("demo-store");
+    }
+  });
+
+  test("so does a keystroke preview", async ({ page }) => {
+    const urls = recordSearchRequests(page);
+    await page.goto("/s/demo-store");
+    await input(page).pressSequentially("dre", { delay: 120 });
+    await expect
+      .poll(() =>
+        urls.filter((url) => url.searchParams.get("mode") === "preview").length,
+      )
+      .toBeGreaterThan(0);
+    for (const url of urls) {
+      expect(url.searchParams.get("catalog")).toBe("demo-store");
+    }
+  });
+
+  test("and the click beacon", async ({ page }) => {
+    const beacons: URL[] = [];
+    page.on("request", (request) => {
+      if (request.url().includes("/api/playground/click")) {
+        beacons.push(new URL(request.url()));
+      }
+    });
+    await page.goto("/s/demo-store");
+    await submit(page, "dress");
+    await expect(cards(page)).toHaveCount(4);
+
+    await cards(page).nth(0).locator("a").click({ modifiers: ["Shift"] });
+    await expect.poll(() => beacons.length).toBe(1);
+    expect(beacons[0].searchParams.get("catalog")).toBe("demo-store");
+  });
+});
+
+test.describe("an unknown slug (AC-1, verify 3)", () => {
+  test("answers 404 with a designed page, not a raw error", async ({
+    page,
+  }) => {
+    const response = await page.goto("/s/nope");
+    expect(response?.status()).toBe(404);
+
+    await expect(page.getByText(strings("en").catalogNotFound)).toBeVisible();
+    await expect(page.locator('a[href="/"]')).toBeVisible();
+    // The playground's own shell, not a framework error screen.
+    await expect(page.locator(".playground")).toBeVisible();
+    await expect(page.getByText(/stack|Unexpected Server Error/i)).toHaveCount(
+      0,
+    );
+  });
+
+  test("the link goes back to the seed playground", async ({ page }) => {
+    await page.goto("/s/nope");
+    await page.locator('a[href="/"]').click();
+    await expect(page).toHaveURL(/\/$/);
+    await expect(input(page)).toBeVisible();
+  });
+});
+
+test.describe("lang and details work as on / (AC-3, verify 4)", () => {
+  test("?lang=he mirrors the page and keeps the path", async ({ page }) => {
+    await page.goto("/s/demo-store?lang=he");
+
+    await expect(page.locator("html")).toHaveAttribute("lang", "he");
+    await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
+    await expect(storeLine(page)).toContainText(
+      strings("he").storeProducts.replace("{count}", "120"),
+    );
+
+    const href = await page
+      .getByTestId("playground-language-toggle")
+      .getAttribute("href");
+    expect(href).toContain("/s/demo-store");
+    expect(href).toContain("lang=en");
+  });
+
+  test("?details=1 opens the panel on this page too", async ({ page }) => {
+    await page.goto("/s/demo-store?details=1");
+    await submit(page, "ai elegant dress");
+    await expect(page.getByTestId("playground-details-panel")).toBeVisible();
+  });
+
+  test("the sessionId is shared with / in the same tab", async ({ page }) => {
+    const urls = recordSearchRequests(page);
+
+    await page.goto("/");
+    await submit(page, "dress");
+    await expect(cards(page)).toHaveCount(4);
+
+    await page.goto("/s/demo-store");
+    await submit(page, "dress");
+    await expect(cards(page)).toHaveCount(4);
+
+    const sessionIds = new Set(
+      urls.map((url) => url.searchParams.get("sessionId")),
+    );
+    expect(sessionIds.size).toBe(1);
+  });
+});

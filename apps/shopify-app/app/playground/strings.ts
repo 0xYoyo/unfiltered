@@ -78,6 +78,17 @@ export interface PlaygroundStrings {
   examplesLead: string;
   /** aria-label of the example-query list. */
   examplesLabel: string;
+
+  // --- Store-preload page (YOY-94) ---
+
+  /** Document title on `/s/<slug>`; {name} is the store's name. */
+  storeTitle: string;
+  /** Muted count beside the store's name; {count} is the product count. */
+  storeProducts: string;
+  /** The unknown-slug page: one sentence, no error language (F-6). */
+  catalogNotFound: string;
+  /** Label on the link back to the seed playground. */
+  backToPlayground: string;
 }
 
 export const PLAYGROUND_STRING_CATALOG: Record<
@@ -120,6 +131,11 @@ export const PLAYGROUND_STRING_CATALOG: Record<
     detailsNo: "no",
     examplesLead: "Try:",
     examplesLabel: "Example searches",
+
+    storeTitle: "{name} — Unfiltered",
+    storeProducts: "{count} products",
+    catalogNotFound: "There is no catalog at this link.",
+    backToPlayground: "Search the demo catalog",
   },
   he: {
     pageTitle: "Unfiltered — חיפוש בקטלוג אופנה במילים שלך",
@@ -157,6 +173,11 @@ export const PLAYGROUND_STRING_CATALOG: Record<
     detailsNo: "לא",
     examplesLead: "נסו:",
     examplesLabel: "חיפושים לדוגמה",
+
+    storeTitle: "{name} — Unfiltered",
+    storeProducts: "{count} מוצרים",
+    catalogNotFound: "אין קטלוג בקישור הזה.",
+    backToPlayground: "חיפוש בקטלוג ההדגמה",
   },
 };
 
@@ -247,7 +268,7 @@ export function localeFromAcceptLanguage(
  * the admin at English and LTR, and a JSON response has no direction.
  */
 export function isPlaygroundPath(pathname: string): boolean {
-  return pathname === "/";
+  return pathname === "/" || pathname === "/s" || pathname.startsWith("/s/");
 }
 
 /**
