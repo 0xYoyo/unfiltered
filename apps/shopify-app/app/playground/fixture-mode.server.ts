@@ -178,3 +178,27 @@ export function sleep(ms: number): Promise<void> {
     ? Promise.resolve()
     : new Promise((resolve) => setTimeout(resolve, ms));
 }
+
+/**
+ * The catalog registry the UI lane sees (YOY-94 AC-4). Fixture mode answers
+ * from this map instead of `PlaygroundCatalog`, so the store-preload page
+ * and its unknown-slug path are both reachable without a database. Exactly
+ * one slug is known; everything else is unknown, which is what makes the
+ * 404 page testable.
+ */
+export const FIXTURE_CATALOGS: Record<
+  string,
+  { name: string; productCount: number; storeKey: string }
+> = {
+  "demo-store": {
+    name: "Demo Store",
+    productCount: 120,
+    storeKey: "playground:demo-store",
+  },
+};
+
+export function fixtureCatalog(
+  slug: string,
+): { name: string; productCount: number; storeKey: string } | null {
+  return FIXTURE_CATALOGS[slug] ?? null;
+}

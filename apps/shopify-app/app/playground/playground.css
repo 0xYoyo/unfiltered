@@ -177,6 +177,51 @@ html:has(.playground) {
   font-size: var(--type-13);
 }
 
+/* The store's name on a preload page (P-7): body type, muted count beside
+   it, and nothing else — the page is the store's because it says so. */
+.storeLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-8);
+  margin: 0 0 var(--space-12);
+  font-size: var(--type-16);
+}
+
+.storeName {
+  color: var(--text);
+  font-weight: var(--weight-ui);
+}
+
+.storeCount {
+  color: var(--text-muted);
+  font-size: var(--type-13);
+}
+
+/* Unknown slug: the playground's own shell, one sentence, a way onward. */
+.catalogNotFound {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-16);
+  padding-block: var(--space-48);
+}
+
+.catalogNotFoundText {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--type-16);
+}
+
+.catalogNotFoundLink {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--hit-target-min);
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: var(--space-4);
+}
+
 /* Example queries (P-6). Text links, never pills: a pill here would read as
    an applied filter and collide with the chip row's meaning. */
 .examples {

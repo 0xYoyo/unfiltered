@@ -779,6 +779,28 @@ excluded back in the set, so a broken remove-and-re-render cannot pass. The
 fixture is chosen by whole words in the query, not substrings — "ai" lives
 inside "rail" and "available".
 
+### Store-preload pages (YOY-94)
+
+`GET /s/<slug>` is the same playground pointed at one store's preloaded
+public catalog — the link outreach shares. The loader resolves the slug in
+`PlaygroundCatalog` and passes the catalog's `name` and `productCount`;
+every search, preview, and click request from that page carries
+`catalog=<slug>`, so nothing else about the page has to know it is a store's.
+
+**The store's name is the only new element** (P-7): one line of body type
+above the bar with a muted product count. No logo, no colours, no per-store
+copy — the page is visibly the store's because it names the store, not
+because it dresses up as it. A Playwright spec enumerates every class on
+`/s/<slug>` and on `/` and asserts the two lists are identical apart from the
+store line, so per-store chrome cannot creep in later.
+
+An unknown slug answers a real **404** with a designed page in the
+playground's own shell — one sentence and a link back to `/`. It never falls
+back to the seed catalog: an outreach link with a typo would otherwise demo
+somebody else's catalog under that store's name. These pages are `noindex`
+(`/` stays indexable); a search engine indexing a demo of someone else's
+catalog helps nobody.
+
 ### The UI lane
 
 `playwright.config.ts` runs two projects behind the one `npm run test:ui`

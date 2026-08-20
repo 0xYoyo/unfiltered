@@ -23,6 +23,7 @@ ui_paths:
   - apps/shopify-app/widget/
   - apps/shopify-app/app/playground/
   - apps/shopify-app/app/routes/_index/
+  - apps/shopify-app/app/routes/s.$slug.tsx
 
 ui_test_command: npm run test:ui
 

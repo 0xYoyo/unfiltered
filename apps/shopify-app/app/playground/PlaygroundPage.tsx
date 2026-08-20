@@ -11,6 +11,7 @@ import { NewSearch } from "./components/NewSearch";
 import { ResultsGrid } from "./components/ResultsGrid";
 import { SearchBar } from "./components/SearchBar";
 import { StatusLine } from "./components/StatusLine";
+import { StoreLine } from "./components/StoreLine";
 import {
   PREVIEW_DEBOUNCE_MS,
   searchPlayground,
@@ -41,12 +42,16 @@ export function PlaygroundPage({
   initialQuery,
   detailsOpen: initialDetailsOpen,
   catalog,
+  store,
 }: {
   locale: PlaygroundLocale;
   pathname: string;
   initialQuery: string;
   detailsOpen: boolean;
+  /** Registry slug; every request on a preload page carries it (YOY-94). */
   catalog?: string;
+  /** The preloaded store, when this is a `/s/<slug>` page. */
+  store?: { name: string; productCount: number };
 }) {
   const strings = getPlaygroundStrings(locale);
 
@@ -306,6 +311,13 @@ export function PlaygroundPage({
       </header>
 
       <main className="main shell">
+        {store === undefined ? null : (
+          <StoreLine
+            name={store.name}
+            productCount={store.productCount}
+            strings={strings}
+          />
+        )}
         <SearchBar
           strings={strings}
           value={query}

@@ -82,3 +82,25 @@ test.describe("AI-state baselines", () => {
     await expect(page).toHaveScreenshot("playground-details-en.png");
   });
 });
+
+/**
+ * The store-preload page (YOY-94 AC-4). The baseline is what proves P-7
+ * held: the store's name is there and nothing else about the page moved.
+ */
+test.describe("store-preload baselines", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.setViewportSize(DESKTOP);
+  });
+
+  test("store page — en", async ({ page }) => {
+    await page.goto("/s/demo-store");
+    await settle(page);
+    await expect(page).toHaveScreenshot("playground-store-en.png");
+  });
+
+  test("unknown slug — en", async ({ page }) => {
+    await page.goto("/s/nope");
+    await settle(page);
+    await expect(page).toHaveScreenshot("playground-store-404-en.png");
+  });
+});

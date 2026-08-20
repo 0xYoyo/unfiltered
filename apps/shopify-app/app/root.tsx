@@ -19,9 +19,10 @@ import {
  * the Hebrew chrome is right in the first byte — a client-side flip would
  * show one frame of LTR before mirroring.
  *
- * Only the playground's own paths participate. The merchant admin is
- * English-only and LTR by design (DESIGN A-4), so a Hebrew browser must not
- * flip Polaris into RTL just by visiting.
+ * Only the playground's own paths participate — `/` and the store-preload
+ * pages at `/s/<slug>`. The merchant admin is English-only and LTR by design
+ * (DESIGN A-4), so a Hebrew browser must not flip Polaris into RTL just by
+ * visiting.
  */
 export const loader = ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
