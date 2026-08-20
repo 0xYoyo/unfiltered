@@ -8,6 +8,7 @@ import {
 } from "@unfiltered/provider-gemini";
 
 import { createPrismaCostRecorder } from "../ai/cost-recorder.server";
+import { withTenantVectorScan } from "./hnsw.server";
 
 /**
  * A vector's dimension disagreed with the embedding-model configuration.
@@ -266,17 +267,24 @@ export async function similarProducts({
   if (!Number.isInteger(limit) || limit <= 0) {
     throw new RangeError(`limit must be a positive integer, got ${limit}`);
   }
-  const rows = await db.$queryRawUnsafe<
-    Array<{ productId: string; distance: number }>
-  >(
-    `SELECT "productId",
+  // Iterative index scans plus a MATERIALIZED re-rank, for the same reason
+  // the retrieval store uses them: the HNSW index is shared by every tenant
+  // and post-filters, and `relaxed_order` trades exact scan ordering for
+  // recall (see hnsw.server.ts, YOY-105).
+  const rows = await withTenantVectorScan(db, (tx) =>
+    tx.$queryRawUnsafe<Array<{ productId: string; distance: number }>>(
+      `WITH candidates AS MATERIALIZED (
+       SELECT "productId",
             (("embedding")::vector(${dimension}) <=> $2::vector(${dimension}))::float8 AS distance
      FROM "ProductEmbedding"
      WHERE "shopDomain" = $1
      ORDER BY distance ASC
-     LIMIT ${limit}`,
-    shopDomain,
-    toVectorLiteral(vector),
+     LIMIT ${limit}
+     )
+     SELECT * FROM candidates ORDER BY distance ASC`,
+      shopDomain,
+      toVectorLiteral(vector),
+    ),
   );
   return rows.map((row) => ({
     productId: row.productId,

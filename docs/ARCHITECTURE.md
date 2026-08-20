@@ -144,6 +144,64 @@ embedded Postgres (PGlite) with pgvector and pg_trgm loaded, applies the committ
 migration SQL, and hands Prisma a driver adapter for it — so `npm test`
 passes with no `DATABASE_URL` set and no external Postgres.
 
+### Multi-tenant vector search on one shared index (YOY-105)
+
+Every tenant's vectors live in one `ProductEmbedding` table under one HNSW
+cosine index — an expression index over the dimension-typed cast, built at run
+time by `ensureEmbeddingIndex()` (`app/catalog/embed.server.ts`), because the
+`embedding` column is deliberately dimensionless.
+
+pgvector's HNSW is a **post-filtering** index. It yields its `hnsw.ef_search`
+best candidates *table-wide* and only then applies the `shopDomain` predicate,
+so a small tenant sitting beside a large one silently loses hits it genuinely
+owns: the candidate budget is spent on the large tenant's rows before the
+filter runs. The failure is invisible while one store dominates the table and
+appears the moment `ingest:public` writes a second `playground:<slug>` tenant.
+It is a recall failure, not an isolation failure — the predicate still holds,
+so no tenant ever sees another's products.
+
+**The fix: iterative index scans.** Every tenant-filtered vector query runs
+inside a transaction that sets
+
+```sql
+SET LOCAL hnsw.iterative_scan = relaxed_order
+```
+
+(`withTenantVectorScan()` in `app/catalog/hnsw.server.ts`, used by both
+`app/search/retrieval-store.server.ts` — the hard-constraint and close-matches
+paths alike, since both go through the same store port — and
+`similarProducts()` in `app/catalog/embed.server.ts`). The index then keeps
+scanning until the *filtered* result set fills, so recall no longer depends on
+the tenant-size ratio, at any asymmetry. `SET LOCAL` is transaction-scoped on
+purpose: no global Postgres configuration to keep in sync, no leakage into
+unrelated pooled sessions, and the behavior stays visible at the query site.
+
+`relaxed_order` (rather than `strict_order`) is chosen for its far lower cost.
+It may emit candidates slightly out of distance order, so each of those queries
+wraps its candidate scan in a `MATERIALIZED` CTE and re-sorts by the same keys
+outside it — the row *set* is unchanged, the row *order* is exact.
+
+Two alternatives were rejected:
+
+- **Per-tenant partial indexes** — unviable. Playground slugs are created
+  dynamically, so this means an unbounded number of indexes created at
+  ingestion time, and index count grows with the tenant count forever.
+- **Scaling `hnsw.ef_search`** — a heuristic, not a fix. Any fixed multiple
+  re-breaks at the next tenant-size asymmetry, and it inflates latency for
+  every tenant to serve the smallest. Index and search-parameter tuning is
+  separately out of scope (YOY-64 / M5).
+
+The regression test is
+`apps/shopify-app/app/search/retrieval-tenant-recall.test.ts`: a 400-row tenant
+beside a 2,400-row one whose every vector is nearer to the query, run on the
+hermetic PGlite database (its pgvector is 0.8.1, which supports iterative
+scans, so no real-Postgres lane is needed). It forces the production-shaped
+plan with **both** `enable_seqscan = off` and `enable_sort = off` — the first
+alone leaves the planner the cheap fixture-scale option of pre-filtering
+through `ProductEmbedding_shopDomain_idx` and sorting exactly, which is correct
+but not the plan under test. Without iterative scans that plan reports
+`Rows Removed by Filter: 40` and returns the small tenant **zero** rows.
+
 ## Engine public API (current surface)
 
 `packages/engine` (`@unfiltered/engine`) exports, from `src/index.ts`:
