@@ -1,0 +1,83 @@
+# Render blueprint for the playground deployment (YOY-91).
+#
+# One Docker web service built from the repo-root Dockerfile, auto-deploying
+# from main. Every value below that is a secret or environment-specific is
+# declared `sync: false`: Render prompts for it once at blueprint apply time
+# and never stores it in this file. The Shopify app record is NOT re-pointed
+# at this service (NG-1) — SHOPIFY_APP_URL here only satisfies the app's own
+# startup configuration.
+#
+# Apply: Render dashboard → Blueprints → New Blueprint Instance → this repo.
+# See docs/DEPLOY.md for where each value comes from.
+
+services:
+  - type: web
+    name: unfiltered
+    runtime: docker
+    plan: free
+    region: oregon
+    branch: main
+    autoDeploy: true
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /healthz
+    envVars:
+      # --- Database ---------------------------------------------------
+      # Neon pooled connection string. The container refuses to start
+      # without it (docker-entrypoint.sh) rather than serving a broken app.
+      - key: DATABASE_URL
+        sync: false
+
+      # --- AI provider ------------------------------------------------
+      # Google AI Studio key. Required: the playground search route builds
+      # its metered Gemini clients at request time and 500s without it.
+      - key: GEMINI_API_KEY
+        sync: false
+
+      # --- Shopify app configuration ----------------------------------
+      # Read by the app's Shopify server config at boot. Pull the first two
+      # with `npm run env -- pull --workspace app`.
+      - key: SHOPIFY_API_KEY
+        sync: false
+      - key: SHOPIFY_API_SECRET
+        sync: false
+      # This service's own https://<name>.onrender.com URL (or the custom
+      # domain, once attached). Not written back to the Shopify app record.
+      - key: SHOPIFY_APP_URL
+        sync: false
+      - key: SCOPES
+        sync: false
+
+      # --- Admin ------------------------------------------------------
+      # Guards /internal/costs; the route 404s while unset.
+      - key: ADMIN_TOKEN
+        sync: false
+
+      # --- Playground catalog -----------------------------------------
+      # Tenant key of the seed catalog searched when a request names no
+      # ?catalog= slug; unset makes those requests answer 503.
+      - key: PLAYGROUND_SEED_STORE_KEY
+        sync: false
+      # Display name of that seed catalog, for the playground's pages.
+      - key: PLAYGROUND_SEED_NAME
+        sync: false
+
+      # --- Playground abuse ceilings ----------------------------------
+      # Defaults in code (10 / 2000 / 500) apply when these are unset; they
+      # are declared here so the ceilings of an unauthenticated, AI-backed
+      # endpoint are tuneable from the dashboard without a deploy.
+      - key: PLAYGROUND_AI_THROTTLE_PER_MINUTE
+        sync: false
+      - key: PLAYGROUND_DAILY_AI_CAP
+        sync: false
+      - key: PLAYGROUND_CATALOG_DAILY_AI_CAP
+        sync: false
+
+      # --- Optional Gemini model overrides ----------------------------
+      # Unset means the documented defaults in packages/provider-gemini
+      # (gemini-3.5-flash-lite / gemini-3.6-flash / gemini-embedding-001 at
+      # dimension 768). Add as dashboard env vars only to pin a model:
+      #   GEMINI_CLASSIFICATION_MODEL
+      #   GEMINI_INTENT_MODEL
+      #   GEMINI_EMBEDDING_MODEL
+      #   GEMINI_EMBEDDING_DIMENSION

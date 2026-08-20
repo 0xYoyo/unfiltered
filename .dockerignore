@@ -1,0 +1,22 @@
+# Build context excludes (YOY-91). node_modules and dist/ are rebuilt inside
+# the image; .env* must never enter a layer; test artifacts are noise.
+node_modules
+**/node_modules
+dist
+**/dist
+.git
+.github
+.env
+.env.*
+**/.env
+**/.env.*
+test-results
+**/test-results
+playwright-report
+**/playwright-report
+apps/shopify-app/build
+apps/shopify-app/.react-router
+apps/shopify-app/.shopify
+apps/shopify-app/prisma/dev.sqlite
+**/.cache
+.DS_Store

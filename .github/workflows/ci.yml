@@ -57,3 +57,21 @@ jobs:
           npx vitest run --config vitest.dist-seam.config.ts
           apps/shopify-app/app/search/orchestrator.test.ts
           apps/shopify-app/app/search/retrieval-store.test.ts
+
+  # Image-build guard (YOY-91 AC-4): the deployment is a Docker web service
+  # built from the repo-root Dockerfile, and Render builds it only after the
+  # merge — so without this job a PR that breaks the image (a moved workspace
+  # path, a new build step, a dependency the install order cannot satisfy)
+  # merges green and takes production down on deploy. Build only: no push, no
+  # run, no registry credentials in a pull_request context.
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

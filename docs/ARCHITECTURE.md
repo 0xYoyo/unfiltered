@@ -706,9 +706,29 @@ is mechanically enforced by `packages/engine/test/boundary.test.ts`, which
 fails the suite if the engine's manifest or source ever references a
 `@shopify/*` package.
 
+## Deployment (YOY-91)
+
+The playground is deployed as a single Docker web service on Render, built
+from the repo-root `Dockerfile` and described by the repo-root `render.yaml`
+blueprint; `docs/DEPLOY.md` is the operational record (setup, env var
+sources, free-plan behavior, logs and rollback, custom domain).
+
+Two properties are architectural rather than operational. First, the image
+builds the whole workspace, not the app alone: `apps/shopify-app`'s Vite
+build aliases `@unfiltered/engine` and `@unfiltered/provider-gemini` to their
+TypeScript source (see "How the app resolves the workspace packages"), so an
+app-only image — what the Shopify template shipped — cannot build. Second,
+`docker-entrypoint.sh` applies migrations before serving and refuses to start
+at all without `DATABASE_URL`: `/healthz` exercises the engine and never
+touches the database, so a database-less service would pass its health check
+while every search 500s. Failing loudly at boot is the only way that
+misconfiguration stays visible.
+
+The Shopify app record is not re-pointed at this deployment; the embedded app
+and its storefront proxy keep their existing configuration.
+
 ## Deferred components
 
 Real widget search behavior (calling the proxy endpoint, theme-search
-takeover, result rendering), merchant dashboard, billing, and
-deployment/hosting are all future milestones and intentionally absent from
-the current codebase.
+takeover, result rendering), merchant dashboard, and billing are future
+milestones and intentionally absent from the current codebase.

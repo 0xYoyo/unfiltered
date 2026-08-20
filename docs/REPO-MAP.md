@@ -10,11 +10,13 @@ does not match a fresh generation. -->
 .claude/
   settings.json
   yoyo.md
+.dockerignore
 .env.example
 .github/
   workflows/
     ci.yml
 .gitignore
+Dockerfile
 README.md
 apps/
   shopify-app/
@@ -37,7 +39,6 @@ apps/
     AGENTS.md
     CHANGELOG.md
     CLAUDE.md
-    Dockerfile
     LICENSE.md
     README.md
     app/
@@ -277,11 +278,13 @@ apps/
       vite.config.ts
 config/
   ai-prices.json
+docker-entrypoint.sh
 docs/
   ARCHITECTURE.md
   COMPARISON.md
   COMPETITORS.md
   DEPENDENCIES.md
+  DEPLOY.md
   DESIGN.md
   DEV-STORE.md
   M2-LIVE-RUN.md
@@ -453,6 +456,7 @@ packages/
       gemini.test.ts
     tsconfig.json
 playwright.config.ts
+render.yaml
 scripts/
   repo-map.mjs
 vitest.config.ts
