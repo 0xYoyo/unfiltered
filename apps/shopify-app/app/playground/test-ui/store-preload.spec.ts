@@ -136,6 +136,58 @@ test.describe("an unknown slug (AC-1, verify 3)", () => {
     );
   });
 
+  test("renders its language server-side, with no hydration flip (AC-3)", async ({
+    page,
+  }) => {
+    // Regression: the boundary read the language from `document`, so the
+    // server rendered English inside <html lang="he"> and the client
+    // hydrated to Hebrew — a text mismatch and a visible flip, which is the
+    // exact first-frame flicker resolving the language server-side prevents.
+    const ssr = await (await page.request.get("/s/nope?lang=he")).text();
+    expect(ssr).toContain(strings("he").catalogNotFound);
+    expect(ssr).not.toContain(strings("en").catalogNotFound);
+
+    const errors: string[] = [];
+    page.on("console", (message) => {
+      if (message.type() === "error") {
+        errors.push(message.text());
+      }
+    });
+    await page.goto("/s/nope?lang=he");
+    await expect(
+      page.getByText(strings("he").catalogNotFound),
+    ).toBeVisible();
+    expect(errors.filter((text) => /hydrat/i.test(text))).toEqual([]);
+  });
+
+  test("honours Accept-Language, not just ?lang= (AC-3)", async ({
+    browser,
+  }) => {
+    // The boundary ignored the header entirely, so a Hebrew reader whose
+    // only signal is Accept-Language never saw Hebrew on this page.
+    const context = await browser.newContext({ locale: "he-IL" });
+    const hebrew = await context.newPage();
+    await hebrew.goto("/s/nope");
+
+    await expect(hebrew.locator("html")).toHaveAttribute("lang", "he");
+    await expect(
+      hebrew.getByText(strings("he").catalogNotFound),
+    ).toBeVisible();
+    await context.close();
+  });
+
+  test("keeps the same shell, language toggle included (AC-1)", async ({
+    page,
+  }) => {
+    await page.goto("/s/nope?lang=he");
+
+    const toggle = page.getByTestId("playground-language-toggle");
+    await expect(toggle).toBeVisible();
+    const href = await toggle.getAttribute("href");
+    expect(href).toContain("/s/nope");
+    expect(href).toContain("lang=en");
+  });
+
   test("the link goes back to the seed playground", async ({ page }) => {
     await page.goto("/s/nope");
     await page.locator('a[href="/"]').click();

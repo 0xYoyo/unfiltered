@@ -1,9 +1,16 @@
 import type { LoaderFunctionArgs, MetaFunction } from "react-router";
-import { isRouteErrorResponse, useLoaderData, useRouteError } from "react-router";
+import {
+  isRouteErrorResponse,
+  useLocation,
+  useLoaderData,
+  useRouteError,
+  useRouteLoaderData,
+} from "react-router";
 
 import db from "../db.server";
 import { PlaygroundPage } from "../playground/PlaygroundPage";
 import { CatalogNotFound } from "../playground/components/CatalogNotFound";
+import { LanguageToggle } from "../playground/components/LanguageToggle";
 import {
   fixtureCatalog,
   playgroundFixturesEnabled,
@@ -109,24 +116,40 @@ export default function StorePreloadRoute() {
 }
 
 /**
- * Unknown slug. The chrome language is not available here — the loader threw
- * before resolving it — so this reads it from the URL alone, which is the
- * part of the request an error page can still trust.
+ * Unknown slug. This route's own loader threw, so its data is gone — but the
+ * ROOT loader already resolved the chrome language for this request (it runs
+ * for every playground path, `?lang=` then `Accept-Language`), and that is
+ * what stamped `<html lang dir>`. Reading it from there keeps the server and
+ * the client rendering the same words: deriving the language from
+ * `document` instead would render English on the server inside an
+ * `<html lang="he">`, then flip to Hebrew on hydration — the first-frame
+ * flicker YOY-92 resolved the language server-side to avoid — and would
+ * never honour `Accept-Language` at all.
  */
 export function ErrorBoundary() {
   const error = useRouteError();
-  const locale: PlaygroundLocale =
-    typeof document !== "undefined" &&
-    new URLSearchParams(document.location.search).get("lang") === "he"
-      ? "he"
-      : "en";
+  const location = useLocation();
+  const root = useRouteLoaderData("root") as
+    | { lang: string; dir: string }
+    | undefined;
+  const locale: PlaygroundLocale = root?.lang === "he" ? "he" : "en";
   const strings = getPlaygroundStrings(locale);
 
   if (isRouteErrorResponse(error) && error.status === 404) {
     return (
       <div className="playground">
+        {/* The same shell as `/` (AC-1), language toggle included: a reader
+            who landed here in the wrong language must still be able to
+            switch, and a shorter header would not be the same shell. */}
         <header className="header shell">
           <span className="productName">{strings.productName}</span>
+          <LanguageToggle
+            locale={locale}
+            strings={strings}
+            pathname={location.pathname}
+            query=""
+            detailsOpen={false}
+          />
         </header>
         <main className="main shell">
           <CatalogNotFound strings={strings} />

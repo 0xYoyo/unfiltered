@@ -671,7 +671,7 @@ vitest.setup.ts
 - apps/shopify-app/app/routes/auth.login/route.tsx → apps/shopify-app/app/routes/auth.login/error.server.tsx, apps/shopify-app/app/shopify.server.ts
 - apps/shopify-app/app/routes/healthz.test.ts → apps/shopify-app/app/routes/healthz.tsx
 - apps/shopify-app/app/routes/internal.costs.tsx → apps/shopify-app/app/ai/cost-aggregates.server.ts, apps/shopify-app/app/db.server.ts
-- apps/shopify-app/app/routes/s.$slug.tsx → apps/shopify-app/app/db.server.ts, apps/shopify-app/app/playground/PlaygroundPage.tsx, apps/shopify-app/app/playground/components/CatalogNotFound.tsx, apps/shopify-app/app/playground/fixture-mode.server.ts, apps/shopify-app/app/playground/playground.css (unresolved), apps/shopify-app/app/playground/strings.ts, apps/shopify-app/app/playground/tokens.css (unresolved)
+- apps/shopify-app/app/routes/s.$slug.tsx → apps/shopify-app/app/db.server.ts, apps/shopify-app/app/playground/PlaygroundPage.tsx, apps/shopify-app/app/playground/components/CatalogNotFound.tsx, apps/shopify-app/app/playground/components/LanguageToggle.tsx, apps/shopify-app/app/playground/fixture-mode.server.ts, apps/shopify-app/app/playground/playground.css (unresolved), apps/shopify-app/app/playground/strings.ts, apps/shopify-app/app/playground/tokens.css (unresolved)
 - apps/shopify-app/app/routes/webhooks.app.scopes_update.tsx → apps/shopify-app/app/db.server.ts, apps/shopify-app/app/shopify.server.ts
 - apps/shopify-app/app/routes/webhooks.app.uninstalled.tsx → apps/shopify-app/app/db.server.ts, apps/shopify-app/app/shopify.server.ts
 - apps/shopify-app/app/routes/webhooks.customers.data_request.tsx → apps/shopify-app/app/shopify.server.ts
