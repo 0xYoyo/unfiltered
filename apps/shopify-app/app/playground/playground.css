@@ -177,6 +177,195 @@ html:has(.playground) {
   font-size: var(--type-13);
 }
 
+/* Example queries (P-6). Text links, never pills: a pill here would read as
+   an applied filter and collide with the chip row's meaning. */
+.examples {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-12);
+  margin-block-start: var(--space-16);
+}
+
+.examplesLead {
+  color: var(--text-muted);
+  font-size: var(--type-13);
+}
+
+.exampleQuery {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: var(--type-13);
+  text-align: start;
+  text-decoration: underline;
+  text-underline-offset: var(--space-4);
+  cursor: pointer;
+}
+
+/* Once a search has run they stop competing with the results: one quiet
+   row rather than a list under the bar. */
+.examplesCollapsed {
+  gap: var(--space-8);
+  margin-block-start: var(--space-12);
+}
+
+/* Applied constraints, and the page's one secondary control. */
+.applied {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8);
+  margin-block-start: var(--space-16);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* The whole chip is the remove control, so the affordance clears the hit
+   target floor without a tiny × target inside it (F-3). */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  min-block-size: var(--hit-target-min);
+  padding-inline: var(--space-12);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--type-13);
+  cursor: pointer;
+  transition: border-color var(--motion-hover) var(--ease-out);
+}
+
+/* Hover darkens the border only — no fill, no accent (DESIGN §2). */
+.chip:hover {
+  border-color: var(--text-muted);
+}
+
+.chipRemove {
+  color: var(--text-muted);
+}
+
+/* Secondary: --surface on --border. The magnifier stays the one primary
+   action on the page (P-2). */
+.newSearch {
+  min-block-size: var(--hit-target-min);
+  padding-inline: var(--space-16);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--type-13);
+  font-weight: var(--weight-ui);
+  cursor: pointer;
+  transition: border-color var(--motion-hover) var(--ease-out);
+}
+
+.newSearch:hover {
+  border-color: var(--text-muted);
+}
+
+/* Engine details (P-4): opt-in, muted, no accent fill. Absent from the DOM
+   when closed — collapsed means gone, not hidden with space reserved. */
+.details {
+  margin-block-start: var(--space-16);
+}
+
+.detailsToggle {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--hit-target-min);
+  color: var(--text-muted);
+  font-size: var(--type-13);
+  text-decoration: underline;
+  text-underline-offset: var(--space-4);
+}
+
+.detailsPanel {
+  margin-block-start: var(--space-12);
+  padding: var(--space-16);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: var(--type-13);
+}
+
+.detailsRows {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-16);
+  margin: 0;
+}
+
+.detailsRow {
+  display: flex;
+  gap: var(--space-8);
+}
+
+.detailsRow dt,
+.detailsIntentLabel {
+  color: var(--text-muted);
+  font-weight: var(--weight-ui);
+}
+
+.detailsRow dd {
+  margin: 0;
+}
+
+/* The intent block stacks under its label and takes the panel's full width:
+   beside it, a wrapped JSON object reads as a stray column. */
+.detailsIntentRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-block-start: var(--space-16);
+}
+
+/* The one place monospace is permitted on the page (DESIGN §2). */
+.detailsIntent {
+  margin-block: var(--space-8) 0;
+  overflow-x: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--type-13);
+}
+
+.closeMatches {
+  margin-block-start: var(--space-32);
+}
+
+.closeMatchesHeading {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--type-16);
+  font-weight: var(--weight-ui);
+  line-height: var(--leading-heading);
+}
+
+/* A card that satisfied a colour filter without colour evidence: shown, but
+   not with the confidence of a real match (W-8 parity). */
+.cardDimmed {
+  opacity: 0.72;
+}
+
+.cardColorUnknown {
+  align-self: flex-start;
+  color: var(--text-muted);
+  font-size: var(--type-13);
+}
+
 /* Reserved so the grid appearing does not move the bar (F-8). */
 .results {
   min-block-size: var(--space-64);

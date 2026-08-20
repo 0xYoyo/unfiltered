@@ -47,6 +47,37 @@ export interface PlaygroundStrings {
   languageToggle: string;
   /** Visible label of the language toggle: the language it switches TO. */
   languageToggleTarget: string;
+
+  // --- AI states (YOY-93) ---
+
+  /** aria-label of the chip row. */
+  appliedFilters: string;
+  /** aria template for a chip's remove control; {label} is the chip's text. */
+  removeFilter: string;
+  /** AI zero-hit: nothing satisfied every applied constraint. */
+  zeroHit: string;
+  closeMatchesHeading: string;
+  /** The one secondary button, shown once an AI response is held. */
+  newSearch: string;
+  /** Label on a card that passed a colour filter without colour evidence. */
+  colorNotConfirmed: string;
+  /** The engine-details toggle (P-4), off by default. */
+  engineDetailsToggle: string;
+  /** Field labels inside the engine-details panel. */
+  detailsRoute: string;
+  detailsRouteReason: string;
+  detailsLatency: string;
+  detailsDegraded: string;
+  detailsLimited: string;
+  detailsIntent: string;
+  /** Value shown for a detail the response left null. */
+  detailsNone: string;
+  detailsYes: string;
+  detailsNo: string;
+  /** Lead-in on the collapsed example row after a search. */
+  examplesLead: string;
+  /** aria-label of the example-query list. */
+  examplesLabel: string;
 }
 
 export const PLAYGROUND_STRING_CATALOG: Record<
@@ -70,6 +101,25 @@ export const PLAYGROUND_STRING_CATALOG: Record<
     footerNote: "A demo catalog. Prices and stock are not real.",
     languageToggle: "Change language",
     languageToggleTarget: "עברית",
+
+    appliedFilters: "Applied filters",
+    removeFilter: "Remove filter: {label}",
+    zeroHit: "Nothing matches all of these",
+    closeMatchesHeading: "Close matches",
+    newSearch: "New search",
+    colorNotConfirmed: "Color not confirmed",
+    engineDetailsToggle: "How it understood you",
+    detailsRoute: "Route",
+    detailsRouteReason: "Reason",
+    detailsLatency: "Latency",
+    detailsDegraded: "Degraded",
+    detailsLimited: "Limited",
+    detailsIntent: "Extracted intent",
+    detailsNone: "none",
+    detailsYes: "yes",
+    detailsNo: "no",
+    examplesLead: "Try:",
+    examplesLabel: "Example searches",
   },
   he: {
     pageTitle: "Unfiltered — חיפוש בקטלוג אופנה במילים שלך",
@@ -88,6 +138,25 @@ export const PLAYGROUND_STRING_CATALOG: Record<
     footerNote: "קטלוג הדגמה. המחירים והמלאי אינם אמיתיים.",
     languageToggle: "שינוי שפה",
     languageToggleTarget: "English",
+
+    appliedFilters: "מסננים פעילים",
+    removeFilter: "הסרת מסנן: {label}",
+    zeroHit: "אין פריט שעונה על כל אלה",
+    closeMatchesHeading: "התאמות קרובות",
+    newSearch: "חיפוש חדש",
+    colorNotConfirmed: "הצבע לא אומת",
+    engineDetailsToggle: "איך זה הבין אתכם",
+    detailsRoute: "מסלול",
+    detailsRouteReason: "סיבה",
+    detailsLatency: "זמן תגובה",
+    detailsDegraded: "מצומצם",
+    detailsLimited: "הוגבל",
+    detailsIntent: "כוונה שחולצה",
+    detailsNone: "אין",
+    detailsYes: "כן",
+    detailsNo: "לא",
+    examplesLead: "נסו:",
+    examplesLabel: "חיפושים לדוגמה",
   },
 };
 
@@ -179,4 +248,73 @@ export function localeFromAcceptLanguage(
  */
 export function isPlaygroundPath(pathname: string): boolean {
   return pathname === "/";
+}
+
+/**
+ * Curated example queries (YOY-93 AC-6, P-6). Fashion only, and each one
+ * exists to show a different thing the engine does that a filter UI cannot:
+ * negation, a price ceiling, an occasion that is not a category, a soft
+ * attribute, colour plus availability, and a refinement pair.
+ *
+ * `kind` is not rendered — it is what `playground-examples.test.ts` asserts
+ * against, so a later edit cannot quietly drop a capability from the set.
+ */
+export const EXAMPLE_QUERY_KINDS = [
+  "negation",
+  "priceCap",
+  "occasion",
+  "softAttribute",
+  "colorAvailability",
+  "refinement",
+] as const;
+
+export type ExampleQueryKind = (typeof EXAMPLE_QUERY_KINDS)[number];
+
+export interface ExampleQuery {
+  kind: ExampleQueryKind;
+  text: string;
+}
+
+export const EXAMPLE_QUERIES: Record<PlaygroundLocale, ExampleQuery[]> = {
+  en: [
+    { kind: "negation", text: "summer dress, not black" },
+    { kind: "priceCap", text: "linen shirt under 300" },
+    { kind: "occasion", text: "something to wear to a wedding" },
+    { kind: "softAttribute", text: "an oversized coat that drapes well" },
+    { kind: "colorAvailability", text: "beige boots in stock" },
+    { kind: "refinement", text: "same but cheaper" },
+  ],
+  he: [
+    { kind: "negation", text: "שמלת קיץ, לא שחורה" },
+    { kind: "priceCap", text: "חולצת פשתן עד 300" },
+    { kind: "occasion", text: "משהו ללבוש לחתונה" },
+    { kind: "softAttribute", text: "מעיל אוברסייז שנופל יפה" },
+    { kind: "colorAvailability", text: "מגפיים בז' במלאי" },
+    { kind: "refinement", text: "אותו דבר אבל זול יותר" },
+  ],
+};
+
+/** How many examples the page shows, and how many come from each language. */
+export const EXAMPLES_SHOWN = 6;
+export const EXAMPLES_FROM_CHROME_LOCALE = 4;
+
+/**
+ * The six the page shows: four in the chrome language, two in the other
+ * (AC-6). Both languages appear because the playground's whole claim is that
+ * it understands either one — showing only the reader's own would prove half
+ * of it. Each carries the locale it belongs to so the markup can set `dir`
+ * per link (X-7).
+ */
+export function exampleQueriesFor(
+  locale: PlaygroundLocale,
+): { locale: PlaygroundLocale; query: ExampleQuery }[] {
+  const other: PlaygroundLocale = locale === "he" ? "en" : "he";
+  return [
+    ...EXAMPLE_QUERIES[locale]
+      .slice(0, EXAMPLES_FROM_CHROME_LOCALE)
+      .map((query) => ({ locale, query })),
+    ...EXAMPLE_QUERIES[other]
+      .slice(0, EXAMPLES_SHOWN - EXAMPLES_FROM_CHROME_LOCALE)
+      .map((query) => ({ locale: other, query })),
+  ];
 }

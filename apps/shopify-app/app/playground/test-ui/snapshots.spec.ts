@@ -40,3 +40,45 @@ test.describe("visual baselines", () => {
     });
   }
 });
+
+/**
+ * AI-state baselines (YOY-93 AC-7, verify 7). The chip row, the zero-hit
+ * rescue, and the opened details panel are where a mirrored layout or a
+ * stray accent would show first, so they get their own baselines.
+ */
+test.describe("AI-state baselines", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.setViewportSize(DESKTOP);
+  });
+
+  for (const locale of ["en", "he"] as const) {
+    const base = locale === "en" ? "/" : "/?lang=he";
+
+    test(`ai state — ${locale}`, async ({ page }) => {
+      await page.goto(base);
+      await input(page).fill("ai elegant dress");
+      await input(page).press("Enter");
+      await expect(page.getByTestId("playground-chip")).toHaveCount(3);
+      await settle(page);
+      await expect(page).toHaveScreenshot(`playground-ai-${locale}.png`);
+    });
+
+    test(`zero hit — ${locale}`, async ({ page }) => {
+      await page.goto(base);
+      await input(page).fill("ai zero hit");
+      await input(page).press("Enter");
+      await expect(page.getByTestId("playground-chip")).toHaveCount(3);
+      await settle(page);
+      await expect(page).toHaveScreenshot(`playground-zero-hit-${locale}.png`);
+    });
+  }
+
+  test("details open — en", async ({ page }) => {
+    await page.goto("/?details=1");
+    await input(page).fill("ai elegant dress");
+    await input(page).press("Enter");
+    await page.getByTestId("playground-details-panel").waitFor();
+    await settle(page);
+    await expect(page).toHaveScreenshot("playground-details-en.png");
+  });
+});

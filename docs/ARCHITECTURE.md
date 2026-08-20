@@ -743,6 +743,42 @@ waiting for review, because both invariants are greppable:
 `tokens.css` (P-8) and on any physical `left`/`right` property (F-5), and it
 asserts its own patterns catch violations so it cannot silently stop working.
 
+### AI states (YOY-93)
+
+What the shell renders is a search box; what makes the playground worth
+showing is the layer above it — the part a filter UI cannot do.
+
+- **Chips are output, not input.** An AI-routed response's applied
+  constraints render as removable pills through the widget's own
+  `chipLabel`, so Hebrew display cannot drift between the two surfaces
+  (P-5). They never render on a preview, on classic results, or on a
+  degraded response: a chip claims an understanding, and a degraded response
+  is classic results wearing the AI route's name (W-7).
+- **Refinement lives in the bar, not in a transcript.** Exactly one intent is
+  held, in memory: each response's echoed intent replaces it, a follow-up
+  rides it as `previousIntent`, and removing a chip re-requests with
+  `removeChip` and re-renders from the answer rather than editing the chip
+  row locally. "New search" drops it. There is no history and no chat
+  (NG-2, X-2), and nothing is persisted.
+- **Engine details are opt-in and live in the URL.** The toggle writes
+  `?details=1`, so an opened panel survives a reload and can be shared as a
+  link; closed, the panel is absent from the DOM rather than hidden with its
+  space reserved. The intent JSON is the one place monospace is permitted
+  (P-4, DESIGN §2).
+- **Example queries are the page's argument for itself.** Six are shown —
+  four in the chrome language and two in the other, because the claim is
+  that either works. Each is tagged with the capability it demonstrates
+  (negation, price cap, occasion, soft attribute, colour plus availability,
+  refinement) and `playground-examples.test.ts` asserts the set still covers
+  all six, so an edit cannot quietly cost the page its point.
+
+Fixture mode gains the matching states (`ai`, `ai-zero-hit`, `ai-delayed`,
+`degraded`, `color-unknown`) plus a chip-removal echo: removing a constraint
+answers a response with that chip gone from the intent AND the products it
+excluded back in the set, so a broken remove-and-re-render cannot pass. The
+fixture is chosen by whole words in the query, not substrings — "ai" lives
+inside "rail" and "available".
+
 ### The UI lane
 
 `playwright.config.ts` runs two projects behind the one `npm run test:ui`

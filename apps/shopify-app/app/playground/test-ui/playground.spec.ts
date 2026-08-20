@@ -435,19 +435,39 @@ test.describe("layout holds at every viewport (AC-4, F-5)", () => {
 });
 
 test.describe("keyboard and focus (AC-7, verify 7)", () => {
-  test("tab order reaches the input, magnifier, then a card link", async ({
+  test("tab order runs input → magnifier → examples → details → cards", async ({
     page,
   }) => {
     await page.goto("/");
     await submitQuery(page, "dress");
     await expect(cards(page)).toHaveCount(4);
 
-    await page.locator("body").click({ position: { x: 5, y: 5 } });
     await input(page).focus();
-    await page.keyboard.press("Tab");
-    await expect(submit(page)).toBeFocused();
-    await page.keyboard.press("Tab");
-    await expect(cards(page).nth(0).locator("a")).toBeFocused();
+
+    // Walk the sequence rather than asserting three fixed stops: the page
+    // gained controls in YOY-93, and what F-4 requires is that every one of
+    // them is reachable in the order it is read, not that the list is short.
+    const order: string[] = [];
+    for (let step = 0; step < 9; step += 1) {
+      await page.keyboard.press("Tab");
+      order.push(
+        await page.evaluate(() => {
+          const active = document.activeElement as HTMLElement | null;
+          return (
+            active?.getAttribute("data-testid") ??
+            active?.className.split(" ")[0] ??
+            "none"
+          );
+        }),
+      );
+    }
+
+    expect(order).toEqual([
+      "playground-submit",
+      ...Array.from({ length: 6 }, () => "playground-example"),
+      "playground-details-toggle",
+      "cardLink",
+    ]);
   });
 
   test("focused elements draw a visible ring", async ({ page }) => {

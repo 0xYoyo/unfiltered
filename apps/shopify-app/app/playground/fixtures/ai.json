@@ -1,0 +1,75 @@
+{
+  "searchId": "fixture-ai",
+  "route": "ai",
+  "degraded": false,
+  "results": [
+    {
+      "productId": "p-1",
+      "title": "Silk slip dress",
+      "url": "https://example.test/products/silk-slip-dress",
+      "imageUrl": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 4'><rect width='4' height='4' fill='%23d9d4cd'/></svg>",
+      "priceMin": 320,
+      "priceMax": 320,
+      "currencyCode": "ILS",
+      "available": true,
+      "colorUnknown": false
+    },
+    {
+      "productId": "p-2",
+      "title": "Pleated midi skirt with a deliberately long title so the card title clamps after two lines",
+      "url": "https://example.test/products/pleated-midi-skirt",
+      "imageUrl": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 4'><rect width='4' height='4' fill='%23cfc9c1'/></svg>",
+      "priceMin": 280,
+      "priceMax": 320,
+      "currencyCode": "ILS",
+      "available": true,
+      "colorUnknown": false
+    },
+    {
+      "productId": "p-3",
+      "title": "Linen shirt dress",
+      "url": "https://example.test/products/linen-shirt-dress",
+      "imageUrl": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 4'><rect width='4' height='4' fill='%23c4beb5'/></svg>",
+      "priceMin": 210,
+      "priceMax": 210,
+      "currencyCode": "ILS",
+      "available": false,
+      "colorUnknown": false
+    }
+  ],
+  "chips": [
+    {
+      "field": "category",
+      "value": "dress"
+    },
+    {
+      "field": "priceMax",
+      "value": "400"
+    },
+    {
+      "field": "colorsExclude",
+      "value": "black"
+    }
+  ],
+  "intent": {
+    "category": "dress",
+    "priceMin": null,
+    "priceMax": 400,
+    "currency": "ILS",
+    "colorsInclude": [],
+    "colorsExclude": [
+      "black"
+    ],
+    "occasion": null,
+    "size": null,
+    "availabilityRequired": false,
+    "softAttributes": [
+      "elegant"
+    ]
+  },
+  "details": {
+    "routeReason": "model",
+    "latencyMs": 812,
+    "limited": null
+  }
+}

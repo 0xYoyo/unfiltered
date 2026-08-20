@@ -15,16 +15,22 @@ export function LanguageToggle({
   strings,
   pathname,
   query,
+  detailsOpen,
 }: {
   locale: PlaygroundLocale;
   strings: PlaygroundStrings;
   pathname: string;
   query: string;
+  detailsOpen: boolean;
 }) {
   const target: PlaygroundLocale = locale === "he" ? "en" : "he";
   const params = new URLSearchParams({ lang: target });
   if (query !== "") {
     params.set("query", query);
+  }
+  // Switching language must not close an opened details panel (AC-5).
+  if (detailsOpen) {
+    params.set("details", "1");
   }
 
   return (
