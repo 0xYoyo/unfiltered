@@ -59,15 +59,13 @@ import db from "./db.server";
 import {
   clientIp,
   playgroundLimitsFromEnv,
+  resetPlaygroundIpThrottle,
   resolveCatalog,
   startOfUtcDay,
   SEED_STORE_KEY_ENV,
 } from "./playground/api.server";
 import { action as clickAction } from "./routes/api.playground.click";
-import {
-  loader as searchLoader,
-  resetPlaygroundIpThrottle,
-} from "./routes/api.playground.search";
+import { loader as searchLoader } from "./routes/api.playground.search";
 
 // Route tests for the playground's own search/click API (YOY-90), on the
 // embedded PGlite database with a fake orchestrator — zero network, zero

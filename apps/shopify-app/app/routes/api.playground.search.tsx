@@ -3,7 +3,9 @@ import type { LoaderFunctionArgs } from "react-router";
 import db from "../db.server";
 import {
   clientIp,
+  getPlaygroundIpThrottle,
   playgroundLimitsFromEnv,
+  PLAYGROUND_RESPONSE_HEADERS,
   PLAYGROUND_RESULT_LIMIT,
   resolveCatalog,
   resolveLimit,
@@ -15,7 +17,6 @@ import {
   parseProxySearchParams,
   removeChipFromIntent,
 } from "../search/proxy.server";
-import { createSessionThrottle } from "../search/throttle.server";
 
 /**
  * The playground's search endpoint (YOY-90): `GET /api/playground/search` on
@@ -40,36 +41,11 @@ import { createSessionThrottle } from "../search/throttle.server";
  * bodies are per-visitor and must never land in a shared cache.
  */
 
-export const PLAYGROUND_RESPONSE_HEADERS = {
-  "Cache-Control": "no-store",
-} as const;
-
 function emptyResponse(status: number): Response {
   return new Response(null, {
     status,
     headers: PLAYGROUND_RESPONSE_HEADERS,
   });
-}
-
-/**
- * The per-IP AI throttle, process-wide. Separate instance from the proxy's
- * session throttle: the two count different things (a shopper session there,
- * a visitor IP here) and must not share a budget.
- */
-let ipThrottle: ReturnType<typeof createSessionThrottle> | undefined;
-
-export function getPlaygroundIpThrottle(): ReturnType<
-  typeof createSessionThrottle
-> {
-  ipThrottle ??= createSessionThrottle({
-    limit: playgroundLimitsFromEnv().ipPerMinute,
-  });
-  return ipThrottle;
-}
-
-/** Drop the memoized throttle so tests can install their own clock/limit. */
-export function resetPlaygroundIpThrottle(): void {
-  ipThrottle = undefined;
 }
 
 export const loader = async ({

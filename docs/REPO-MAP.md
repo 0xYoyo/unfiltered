@@ -497,7 +497,7 @@ vitest.setup.ts
 - apps/shopify-app/app/intent-live.test.ts → apps/shopify-app/app/ai/cost-recorder.server.ts, apps/shopify-app/app/testing/helpers.server.ts
 - apps/shopify-app/app/pgvector.test.ts → apps/shopify-app/app/testing/helpers.server.ts
 - apps/shopify-app/app/playground-api.test.ts → apps/shopify-app/app/db.server.ts, apps/shopify-app/app/playground/api.server.ts, apps/shopify-app/app/routes/api.playground.click.tsx, apps/shopify-app/app/routes/api.playground.search.tsx, apps/shopify-app/app/search/proxy.server.ts, apps/shopify-app/app/testing/helpers.server.ts
-- apps/shopify-app/app/playground/api.server.ts → apps/shopify-app/app/playground/ingest-public.server.ts, apps/shopify-app/app/search/orchestrator.server.ts, apps/shopify-app/app/search/proxy.server.ts
+- apps/shopify-app/app/playground/api.server.ts → apps/shopify-app/app/playground/ingest-public.server.ts, apps/shopify-app/app/search/orchestrator.server.ts, apps/shopify-app/app/search/proxy.server.ts, apps/shopify-app/app/search/throttle.server.ts
 - apps/shopify-app/app/playground/fixtures/crawl/crawl-store.ts → apps/shopify-app/app/testing/fake-store.server.ts
 - apps/shopify-app/app/playground/fixtures/shopify-public-products.ts → apps/shopify-app/app/playground/shopify-public-source.server.ts
 - apps/shopify-app/app/playground/ingest-public-cli.server.ts → apps/shopify-app/app/playground/catalog-source.server.ts, apps/shopify-app/app/playground/ingest-public.server.ts, apps/shopify-app/app/playground/jsonld-crawl-source.server.ts, apps/shopify-app/app/playground/polite-fetch.server.ts, apps/shopify-app/app/playground/shopify-public-source.server.ts
@@ -515,8 +515,8 @@ vitest.setup.ts
 - apps/shopify-app/app/proxy-click.test.ts → apps/shopify-app/app/db.server.ts, apps/shopify-app/app/routes/apps.unfiltered.click.tsx, apps/shopify-app/app/testing/helpers.server.ts
 - apps/shopify-app/app/proxy-search.test.ts → apps/shopify-app/app/ai/cost-recorder.server.ts, apps/shopify-app/app/db.server.ts, apps/shopify-app/app/routes/apps.unfiltered.search.tsx, apps/shopify-app/app/search/classic-store.server.ts, apps/shopify-app/app/search/events.server.ts, apps/shopify-app/app/search/orchestrator.server.ts, apps/shopify-app/app/search/proxy.server.ts, apps/shopify-app/app/search/retrieval-store.server.ts, apps/shopify-app/app/search/throttle.server.ts, apps/shopify-app/app/testing/helpers.server.ts
 - apps/shopify-app/app/routes/_index/route.tsx → apps/shopify-app/app/routes/_index/styles.module.css (unresolved), apps/shopify-app/app/shopify.server.ts
-- apps/shopify-app/app/routes/api.playground.click.tsx → apps/shopify-app/app/db.server.ts, apps/shopify-app/app/playground/api.server.ts, apps/shopify-app/app/routes/api.playground.search.tsx, apps/shopify-app/app/search/events.server.ts, apps/shopify-app/app/search/proxy.server.ts
-- apps/shopify-app/app/routes/api.playground.search.tsx → apps/shopify-app/app/db.server.ts, apps/shopify-app/app/playground/api.server.ts, apps/shopify-app/app/search/events.server.ts, apps/shopify-app/app/search/proxy.server.ts, apps/shopify-app/app/search/throttle.server.ts
+- apps/shopify-app/app/routes/api.playground.click.tsx → apps/shopify-app/app/db.server.ts, apps/shopify-app/app/playground/api.server.ts, apps/shopify-app/app/search/events.server.ts, apps/shopify-app/app/search/proxy.server.ts
+- apps/shopify-app/app/routes/api.playground.search.tsx → apps/shopify-app/app/db.server.ts, apps/shopify-app/app/playground/api.server.ts, apps/shopify-app/app/search/events.server.ts, apps/shopify-app/app/search/proxy.server.ts
 - apps/shopify-app/app/routes/app._index.tsx → apps/shopify-app/app/shopify.server.ts
 - apps/shopify-app/app/routes/app.auth.test.ts → apps/shopify-app/app/routes/app.tsx, apps/shopify-app/app/testing/helpers.server.ts
 - apps/shopify-app/app/routes/app.tsx → apps/shopify-app/app/shopify.server.ts

@@ -1,11 +1,12 @@
 import type { ActionFunctionArgs } from "react-router";
 
 import db from "../db.server";
-import { resolveCatalog } from "../playground/api.server";
+import {
+  PLAYGROUND_RESPONSE_HEADERS,
+  resolveCatalog,
+} from "../playground/api.server";
 import { writeClickEvent } from "../search/events.server";
 import { parseClickBeaconBody } from "../search/proxy.server";
-
-import { PLAYGROUND_RESPONSE_HEADERS } from "./api.playground.search";
 
 /**
  * The playground's click beacon (YOY-90 AC-6): `POST /api/playground/click`

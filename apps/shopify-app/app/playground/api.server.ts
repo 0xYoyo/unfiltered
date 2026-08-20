@@ -6,6 +6,10 @@ import {
   serializeProxySearchResponse,
   type ProxySearchResponse,
 } from "../search/proxy.server";
+import {
+  createSessionThrottle,
+  type SessionThrottle,
+} from "../search/throttle.server";
 
 /**
  * The playground's own search API (YOY-90): a first-party, unauthenticated
@@ -259,6 +263,38 @@ export async function resolveLimit({
     return "daily-catalog";
   }
   return ipThrottled ? "ip" : null;
+}
+
+/**
+ * Headers every playground response carries — every status, both routes.
+ * `no-store` because the bodies are per-visitor and must never land in a
+ * shared cache; no CORS header appears anywhere (NG-2), so a third party
+ * cannot spend our AI budget from their site.
+ */
+export const PLAYGROUND_RESPONSE_HEADERS = {
+  "Cache-Control": "no-store",
+} as const;
+
+let ipThrottle: SessionThrottle | undefined;
+
+/**
+ * The one process-wide per-IP AI throttle the playground search route
+ * consults, mirroring `getSessionThrottle` in `search/throttle.server.ts`.
+ * A separate instance from the proxy's session throttle: the two count
+ * different things — a shopper session there, a visitor IP here — and must
+ * not share a budget. Lazily constructed so the env-configured limit is read
+ * at first use, not at import.
+ */
+export function getPlaygroundIpThrottle(): SessionThrottle {
+  ipThrottle ??= createSessionThrottle({
+    limit: playgroundLimitsFromEnv().ipPerMinute,
+  });
+  return ipThrottle;
+}
+
+/** Drop the memoized throttle so tests can install their own clock/limit. */
+export function resetPlaygroundIpThrottle(): void {
+  ipThrottle = undefined;
 }
 
 /** True when the tenant key names a registry catalog rather than the seed. */
