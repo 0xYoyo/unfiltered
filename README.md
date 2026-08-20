@@ -134,3 +134,18 @@ curl http://localhost:3000/healthz
 
 `/healthz` returns the engine version and a typed empty search result from
 the engine stub.
+
+## Deployment
+
+The playground runs as a Docker web service on Render, built from the
+repo-root `Dockerfile` and described by `render.yaml`. The image builds every
+workspace and the entrypoint applies migrations before serving; a container
+without `DATABASE_URL` refuses to start. Full setup, environment values,
+free-plan behavior, rollback, and custom-domain steps live in
+[docs/DEPLOY.md](docs/DEPLOY.md).
+
+```bash
+docker build -t unfiltered .
+```
+
+CI builds the same image on every pull request.
