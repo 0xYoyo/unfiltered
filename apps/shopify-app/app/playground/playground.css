@@ -220,6 +220,13 @@ html:has(.playground) {
 }
 
 .cardTitle {
+  /* The title's own script decides its direction. `-webkit-line-clamp` puts
+     the ellipsis at the line's logical end, so a Latin title inside RTL
+     chrome would clamp on its LEFT — overwriting the title's beginning and
+     leaving the real truncation point unmarked (X-7). `plaintext` gives each
+     title the direction of its first strong character, so Latin clamps right
+     and Hebrew clamps left, in either chrome. */
+  unicode-bidi: plaintext;
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
@@ -273,10 +280,10 @@ html:has(.playground) {
     block-size: var(--search-height-compact);
   }
 
-  .searchInput,
-  .searchInput::placeholder {
-    font-size: var(--type-20);
-  }
+  /* The bar gets shorter on mobile (48px), but the input type does NOT drop
+     below the display size: AC-4 fixes it at >=25px everywhere, and 25px at
+     1.2 line-height still sits inside a 48px field. The search input is the
+     page's one display-size element (P-3) at every viewport. */
 
   /* Two columns minimum on mobile (DESIGN §2 spacing). */
   .grid {

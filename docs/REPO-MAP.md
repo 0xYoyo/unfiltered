@@ -143,9 +143,13 @@ apps/
           snapshots.spec.ts
           snapshots.spec.ts-snapshots/
             playground-initial-en-darwin.png
+            playground-initial-en-linux.png
             playground-initial-he-darwin.png
+            playground-initial-he-linux.png
             playground-results-en-darwin.png
+            playground-results-en-linux.png
             playground-results-he-darwin.png
+            playground-results-he-linux.png
         tokens.css
       proxy-click.test.ts
       proxy-search.test.ts

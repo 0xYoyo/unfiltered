@@ -161,13 +161,27 @@ test.describe("the hero search bar (AC-4, verify 2)", () => {
     expect(rtl!.x).toBeLessThan(rtlField!.x + rtlField!.width / 2);
   });
 
-  test("the input is the only display-size type on the page (P-3, AC-4)", async ({
+  // Runs at BOTH viewports: the bar gets shorter on mobile but its type must
+  // not drop below the display size (AC-4), and nothing else may reach it.
+  for (const [device, viewport] of [
+    ["desktop", DESKTOP],
+    ["mobile", MOBILE],
+  ] as const) {
+  test(`the input is the only display-size type on the page — ${device} (P-3, AC-4)`, async ({
     page,
   }) => {
-    await page.setViewportSize(DESKTOP);
+    await page.setViewportSize(viewport);
     await page.goto("/");
     await submitQuery(page, "dress");
     await expect(cards(page)).toHaveCount(4);
+
+    await expect
+      .poll(async () =>
+        input(page).evaluate((element) =>
+          Number.parseFloat(getComputedStyle(element).fontSize),
+        ),
+      )
+      .toBeGreaterThanOrEqual(25);
 
     const oversized = await page.evaluate(() => {
       const found: string[] = [];
@@ -184,6 +198,7 @@ test.describe("the hero search bar (AC-4, verify 2)", () => {
     });
     expect(oversized).toEqual(["INPUT.searchInput"]);
   });
+  }
 });
 
 test.describe("preview and submit (AC-5, verify 3)", () => {
@@ -296,6 +311,28 @@ test.describe("result cards (AC-6, verify 4)", () => {
     // Open in this tab's context without navigating away from the page.
     await link.click({ modifiers: ["Shift"] });
     await expect.poll(() => beacons.length).toBe(1);
+  });
+
+  test("a clamped Latin title keeps its beginning under Hebrew chrome (X-7)", async ({
+    page,
+  }) => {
+    // -webkit-line-clamp puts the ellipsis at the line's LOGICAL end, so
+    // without a per-title direction a Latin title inside RTL chrome clamped
+    // on its left: the visible text began "…eliberately long title so",
+    // overwriting the title's start and hiding where it was actually cut.
+    //
+    // Asserted on the computed style rather than the text, because clamping
+    // is purely visual — `textContent` holds the whole title either way, so
+    // a text assertion would pass with the bug present. The HE results
+    // baseline is the second half of this guard: it shows where the ellipsis
+    // actually lands.
+    await page.setViewportSize(DESKTOP);
+    await page.goto("/?lang=he");
+    await submitQuery(page, "dress");
+    await expect(cards(page)).toHaveCount(4);
+
+    const clamped = cards(page).nth(1).locator(".cardTitle");
+    await expect(clamped).toHaveCSS("unicode-bidi", "plaintext");
   });
 
   test("a null-url card has no anchor at all", async ({ page }) => {

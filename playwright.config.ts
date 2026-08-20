@@ -45,10 +45,13 @@ export default defineConfig({
       use: { baseURL: `http://127.0.0.1:${PLAYGROUND_PORT}` },
       // The @evidence specs capture design-review screenshots into
       // docs/evidence/ rather than asserting anything, so they are off the
-      // default lane — otherwise every run rewrites committed PNGs. Capture
-      // them deliberately:
-      //   npx playwright test --project=playground -g @evidence
-      grepInvert: /@evidence/,
+      // default lane — otherwise every run rewrites committed PNGs. Opting
+      // in has to lift the filter itself, because grep and grepInvert both
+      // apply and `-g @evidence` alone would still match nothing:
+      //   PLAYGROUND_EVIDENCE=1 npx playwright test --project=playground
+      ...(process.env.PLAYGROUND_EVIDENCE === "1"
+        ? {}
+        : { grepInvert: /@evidence/ }),
     },
   ],
   use: {
