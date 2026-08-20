@@ -1,0 +1,302 @@
+/**
+ * Playground layout (YOY-92). Tokens only — no colour or pixel literal
+ * appears below except inside a media query's prelude, which cannot take a
+ * custom property (P-8, enforced by playground-css.test.ts).
+ *
+ * Every box uses logical properties so the Hebrew chrome mirrors without a
+ * second rule (F-5, also enforced by that test).
+ */
+
+/* The scrollbar's own arrival is a layout shift: without a reserved gutter
+   the first result set narrows the viewport and moves the search bar, which
+   is precisely what F-8 forbids. Scoped to the playground so the admin's
+   scrolling is untouched. */
+html:has(.playground) {
+  scrollbar-gutter: stable;
+}
+
+/* No global reset ships with this app, so padding would otherwise add to
+   every 100%-wide box: `.shell` alone overflowed a 360px viewport by its own
+   32px of inline padding. Scoped to the playground, which owns its own
+   layout, rather than imposed on the Polaris admin. */
+.playground,
+.playground *,
+.playground *::before,
+.playground *::after {
+  box-sizing: border-box;
+}
+
+.playground {
+  min-block-size: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--text);
+  font-family:
+    Inter,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
+  font-size: var(--type-16);
+  font-weight: var(--weight-body);
+  line-height: var(--leading-body);
+}
+
+.shell {
+  inline-size: 100%;
+  max-inline-size: var(--content-max-inline-size);
+  margin-inline: auto;
+  padding-inline: var(--space-16);
+}
+
+/* Header: the product name in body type and the language toggle. Nothing
+   else — no logo, no mark, no tagline (P-1, P-3, X-1, X-3, X-6). */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-16);
+  padding-block: var(--space-16);
+}
+
+.productName {
+  font-size: var(--type-16);
+  font-weight: var(--weight-ui);
+  color: var(--text);
+}
+
+.languageToggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-inline-size: var(--hit-target-min);
+  min-block-size: var(--hit-target-min);
+  padding-inline: var(--space-12);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--type-13);
+  font-weight: var(--weight-ui);
+  cursor: pointer;
+  text-decoration: none;
+  transition: border-color var(--motion-hover) var(--ease-out);
+}
+
+.languageToggle:hover {
+  border-color: var(--text-muted);
+}
+
+.main {
+  flex: 1 1 auto;
+  padding-block-start: var(--space-32);
+  padding-block-end: var(--space-48);
+}
+
+/* The search bar is the hero: the largest interactive element, the only
+   display-size type on the page, above the fold on every viewport (P-3). */
+.searchForm {
+  position: relative;
+  display: block;
+  inline-size: 100%;
+}
+
+.searchField {
+  position: relative;
+  display: flex;
+  align-items: center;
+  block-size: var(--search-height);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  transition: border-color var(--motion-hover) var(--ease-out);
+}
+
+.searchField:focus-within {
+  border-color: var(--accent);
+  border-width: var(--border-width-active);
+}
+
+.searchInput {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  block-size: 100%;
+  padding-inline-start: var(--space-16);
+  padding-inline-end: var(--space-8);
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--type-25);
+  line-height: var(--leading-heading);
+}
+
+.searchInput::placeholder {
+  color: var(--text-muted);
+  font-size: var(--type-25);
+}
+
+/* The native search decorations sit exactly where the magnifier does, and
+   the clear button renders in the platform's own blue — a hue the page does
+   not have (P-2). The magnifier is the field's only control. */
+.searchInput::-webkit-search-cancel-button,
+.searchInput::-webkit-search-decoration,
+.searchInput::-webkit-search-results-button {
+  display: none;
+  appearance: none;
+}
+
+.searchSubmit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: var(--hit-target-min);
+  block-size: var(--hit-target-min);
+  margin-inline-end: var(--space-8);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.searchSubmit svg {
+  inline-size: var(--space-24);
+  block-size: var(--space-24);
+}
+
+/* The status line sits under the bar and is the loading, empty, and failure
+   surface alike: one quiet muted sentence, never a spinner (F-6, X-4). */
+.statusLine {
+  min-block-size: var(--space-24);
+  margin-block-start: var(--space-12);
+  color: var(--text-muted);
+  font-size: var(--type-13);
+}
+
+/* Reserved so the grid appearing does not move the bar (F-8). */
+.results {
+  min-block-size: var(--space-64);
+  margin-block-start: var(--space-32);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--card-min-inline-size), 1fr));
+  gap: var(--space-24);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  padding: var(--space-12);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+}
+
+.cardLink {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  color: inherit;
+  text-decoration: none;
+}
+
+.cardImage,
+.cardImagePlaceholder {
+  aspect-ratio: 1 / 1;
+  inline-size: 100%;
+  border-radius: var(--radius-control);
+  object-fit: cover;
+  background: var(--bg);
+}
+
+.cardTitle {
+  /* The title's own script decides its direction. `-webkit-line-clamp` puts
+     the ellipsis at the line's logical end, so a Latin title inside RTL
+     chrome would clamp on its LEFT — overwriting the title's beginning and
+     leaving the real truncation point unmarked (X-7). `plaintext` gives each
+     title the direction of its first strong character, so Latin clamps right
+     and Hebrew clamps left, in either chrome. */
+  unicode-bidi: plaintext;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  font-size: var(--type-16);
+  font-weight: var(--weight-ui);
+  color: var(--text);
+}
+
+.cardPrice {
+  font-size: var(--type-16);
+  font-weight: var(--weight-body);
+  color: var(--text-muted);
+}
+
+.cardSoldOut {
+  align-self: flex-start;
+  padding-inline: var(--space-8);
+  padding-block: var(--space-4);
+  border: var(--border-width) solid var(--border);
+  border-radius: var(--radius-pill);
+  color: var(--text-muted);
+  font-size: var(--type-13);
+}
+
+.footer {
+  padding-block: var(--space-24);
+  color: var(--text-muted);
+  font-size: var(--type-13);
+}
+
+/* One focus treatment for everything focusable (F-4). */
+.playground :focus-visible {
+  outline: var(--focus-ring-width) solid var(--accent);
+  outline-offset: var(--focus-ring-offset);
+  border-radius: var(--radius-control);
+}
+
+/* Except the search input: the field around it already turns 2px --accent
+   on focus (well past the 3:1 floor), so the generic ring would draw a
+   second box around the input alone, inside the field. Needs to outrank the
+   rule above — equal specificity would leave it to source order. */
+.playground .searchInput:focus,
+.playground .searchInput:focus-visible {
+  outline: none;
+}
+
+@media (max-width: 640px) {
+  .searchField {
+    block-size: var(--search-height-compact);
+  }
+
+  /* The bar gets shorter on mobile (48px), but the input type does NOT drop
+     below the display size: AC-4 fixes it at >=25px everywhere, and 25px at
+     1.2 line-height still sits inside a 48px field. The search input is the
+     page's one display-size element (P-3) at every viewport. */
+
+  /* Two columns minimum on mobile (DESIGN §2 spacing). */
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-12);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .playground *,
+  .playground *::before,
+  .playground *::after {
+    transition-duration: 0ms !important;
+    animation-duration: 0ms !important;
+  }
+}

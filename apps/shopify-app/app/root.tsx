@@ -1,8 +1,45 @@
-import { Links, Meta, Outlet, Scripts, ScrollRestoration } from "react-router";
+import type { LoaderFunctionArgs } from "react-router";
+import {
+  Links,
+  Meta,
+  Outlet,
+  Scripts,
+  ScrollRestoration,
+  useLoaderData,
+} from "react-router";
+
+import {
+  isPlaygroundPath,
+  localeDirection,
+  resolveChromeLocale,
+} from "./playground/strings";
+
+/**
+ * `<html lang>` and `<html dir>` are resolved server-side (YOY-92 AC-3) so
+ * the Hebrew chrome is right in the first byte — a client-side flip would
+ * show one frame of LTR before mirroring.
+ *
+ * Only the playground's own paths participate. The merchant admin is
+ * English-only and LTR by design (DESIGN A-4), so a Hebrew browser must not
+ * flip Polaris into RTL just by visiting.
+ */
+export const loader = ({ request }: LoaderFunctionArgs) => {
+  const url = new URL(request.url);
+  if (!isPlaygroundPath(url.pathname)) {
+    return { lang: "en", dir: "ltr" as const };
+  }
+  const locale = resolveChromeLocale(
+    url.searchParams,
+    request.headers.get("Accept-Language"),
+  );
+  return { lang: locale, dir: localeDirection(locale) };
+};
 
 export default function App() {
+  const { lang, dir } = useLoaderData<typeof loader>();
+
   return (
-    <html lang="en">
+    <html lang={lang} dir={dir}>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width,initial-scale=1" />

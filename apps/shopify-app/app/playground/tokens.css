@@ -1,0 +1,83 @@
+/**
+ * Playground design tokens (YOY-92 AC-2) — the only file in the playground
+ * allowed to hold raw colour and pixel literals (P-8). Every other
+ * playground stylesheet references these variables, and
+ * `playground-css.test.ts` fails the suite on any literal that escapes.
+ *
+ * The colour roles, type scale, spacing scale, radii, shadow, and motion
+ * durations are exactly those in docs/DESIGN.md §2. Nothing here is
+ * invented: adding a chromatic token is a DESIGN change, not a CSS change.
+ */
+
+:root {
+  /* Colour roles — light. */
+  --bg: #faf9f7;
+  --surface: #ffffff;
+  --text: #141414;
+  --text-muted: #5c5a56;
+  --border: #e4e1dc;
+  --accent: #1f3a93;
+  --accent-contrast: #ffffff;
+
+  /* Type scale: major third, base 16. */
+  --type-13: 13px;
+  --type-16: 16px;
+  --type-20: 20px;
+  --type-25: 25px;
+  --type-31: 31px;
+  --type-39: 39px;
+
+  --leading-body: 1.5;
+  --leading-heading: 1.2;
+
+  --weight-body: 400;
+  --weight-ui: 500;
+  --weight-emphasis: 600;
+
+  /* Spacing scale, base 4. */
+  --space-4: 4px;
+  --space-8: 8px;
+  --space-12: 12px;
+  --space-16: 16px;
+  --space-24: 24px;
+  --space-32: 32px;
+  --space-48: 48px;
+  --space-64: 64px;
+
+  /* Radii: controls, cards, pills. Nothing else. */
+  --radius-control: 8px;
+  --radius-card: 12px;
+  --radius-pill: 999px;
+
+  /* The one shadow, for a panel over content. Cards use border. */
+  --shadow-panel: 0 8px 32px rgba(0, 0, 0, 0.12);
+
+  /* Motion budget. */
+  --motion-hover: 120ms;
+  --motion-panel: 200ms;
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+
+  /* Measurements the component rules in DESIGN §2 fix. Tokens rather than
+     literals so the CSS stays free of pixel values (P-8). */
+  --border-width: 1px;
+  --border-width-active: 2px;
+  --search-height: 56px;
+  --search-height-compact: 48px;
+  --hit-target-min: 44px;
+  --card-min-inline-size: 180px;
+  --content-max-inline-size: 1200px;
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #141414;
+    --surface: #1c1c1c;
+    --text: #f2f1ee;
+    --text-muted: #a8a5a0;
+    --border: #2e2c29;
+    --accent: #8fa5ff;
+    --accent-contrast: #141414;
+  }
+}

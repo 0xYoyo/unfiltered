@@ -1,9 +1,22 @@
-import type { LoaderFunctionArgs } from "react-router";
-import { redirect, Form, useLoaderData } from "react-router";
+import type { LoaderFunctionArgs, MetaFunction } from "react-router";
+import { redirect, useLoaderData } from "react-router";
 
-import { login } from "../../shopify.server";
+import { PlaygroundPage } from "../../playground/PlaygroundPage";
+import {
+  getPlaygroundStrings,
+  resolveChromeLocale,
+  type PlaygroundLocale,
+} from "../../playground/strings";
 
-import styles from "./styles.module.css";
+import "../../playground/tokens.css";
+import "../../playground/playground.css";
+
+/**
+ * `GET /` is the playground (YOY-92 AC-1) — Unfiltered's only owned page,
+ * and the first thing anyone evaluating the product sees. The Shopify
+ * template's marketing copy and login form are gone; the `?shop=` redirect
+ * into the embedded admin is not, because that is how Shopify opens the app.
+ */
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
@@ -12,46 +25,38 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     throw redirect(`/app?${url.searchParams.toString()}`);
   }
 
-  return { showForm: Boolean(login) };
+  const locale = resolveChromeLocale(
+    url.searchParams,
+    request.headers.get("Accept-Language"),
+  );
+
+  return {
+    locale,
+    pathname: url.pathname,
+    // Carried across a language switch so the toggle does not clear a typed
+    // query (AC-3).
+    initialQuery: url.searchParams.get("query") ?? "",
+  };
 };
 
-export default function App() {
-  const { showForm } = useLoaderData<typeof loader>();
+export const meta: MetaFunction<typeof loader> = ({ data }) => {
+  const strings = getPlaygroundStrings(
+    (data?.locale ?? "en") as PlaygroundLocale,
+  );
+  return [
+    { title: strings.pageTitle },
+    { name: "description", content: strings.metaDescription },
+  ];
+};
+
+export default function PlaygroundRoute() {
+  const { locale, pathname, initialQuery } = useLoaderData<typeof loader>();
 
   return (
-    <div className={styles.index}>
-      <div className={styles.content}>
-        <h1 className={styles.heading}>A short heading about [your app]</h1>
-        <p className={styles.text}>
-          A tagline about [your app] that describes your value proposition.
-        </p>
-        {showForm && (
-          <Form className={styles.form} method="post" action="/auth/login">
-            <label className={styles.label}>
-              <span>Shop domain</span>
-              <input className={styles.input} type="text" name="shop" />
-              <span>e.g: my-shop-domain.myshopify.com</span>
-            </label>
-            <button className={styles.button} type="submit">
-              Log in
-            </button>
-          </Form>
-        )}
-        <ul className={styles.list}>
-          <li>
-            <strong>Product feature</strong>. Some detail about your feature and
-            its benefit to your customer.
-          </li>
-          <li>
-            <strong>Product feature</strong>. Some detail about your feature and
-            its benefit to your customer.
-          </li>
-          <li>
-            <strong>Product feature</strong>. Some detail about your feature and
-            its benefit to your customer.
-          </li>
-        </ul>
-      </div>
-    </div>
+    <PlaygroundPage
+      locale={locale}
+      pathname={pathname}
+      initialQuery={initialQuery}
+    />
   );
 }

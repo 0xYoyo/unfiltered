@@ -2,6 +2,12 @@ import type { LoaderFunctionArgs } from "react-router";
 
 import db from "../db.server";
 import {
+  fixtureOutcome,
+  playgroundFixturesEnabled,
+  selectFixture,
+  sleep,
+} from "../playground/fixture-mode.server";
+import {
   clientIp,
   getPlaygroundIpThrottle,
   playgroundLimitsFromEnv,
@@ -55,6 +61,20 @@ export const loader = async ({
   const body = parseProxySearchParams(url.searchParams);
   if (body === null) {
     return emptyResponse(400);
+  }
+
+  // Fixture mode (YOY-92 AC-8): the UI lane answers from committed JSON, so
+  // the page under test needs no database, no Gemini key, and no network.
+  // The branch sits after parsing so a malformed request still answers 400
+  // in the lane exactly as it does in production.
+  if (playgroundFixturesEnabled()) {
+    const outcome = fixtureOutcome(
+      selectFixture(body.query, body.mode === "preview"),
+    );
+    await sleep(outcome.delayMs);
+    return outcome.body === null
+      ? emptyResponse(outcome.status)
+      : Response.json(outcome.body, { headers: PLAYGROUND_RESPONSE_HEADERS });
   }
 
   const catalog = await resolveCatalog(db, url.searchParams.get("catalog"));

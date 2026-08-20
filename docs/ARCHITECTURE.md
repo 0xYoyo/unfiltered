@@ -706,6 +706,60 @@ is mechanically enforced by `packages/engine/test/boundary.test.ts`, which
 fails the suite if the engine's manifest or source ever references a
 `@shopify/*` package.
 
+## Playground pages and UI lane (YOY-92)
+
+`GET /` is the playground — Unfiltered's only owned page (docs/DESIGN.md
+"Owned pages"), and the surface a merchant judges the product on before
+installing anything. It replaced the Shopify template's landing page; the
+template's `?shop=` redirect into the embedded admin is preserved, because
+that is how Shopify opens the app.
+
+**Where the code lives.** `app/routes/_index/route.tsx` is the route (loader,
+meta, and nothing else); `app/playground/` holds the page: `tokens.css` and
+`playground.css`, the `strings.ts` catalog, the components, and
+`search-client.ts`. The playground shares no DOM rendering with the
+storefront widget — the two surfaces answer to different design cases (the
+widget inherits its host's design; the playground is drawn) — and imports
+only the widget's `formatPrice`, so a price never reads differently on the
+two.
+
+**Chrome language is resolved server-side.** `resolveChromeLocale` reads
+`?lang=`, then `Accept-Language`, then falls back to English, and `root.tsx`
+stamps `<html lang dir>` from it: a client-side flip would paint one frame of
+LTR before mirroring. Only the playground's own paths participate —
+`isPlaygroundPath` — because the merchant admin is English-only and LTR by
+design (DESIGN A-4), and a Hebrew browser must not flip Polaris into RTL just
+by visiting.
+
+**The interaction model is the widget's** (YOY-68): typing issues debounced
+`mode=preview` requests that are classic-only, spend no AI budget, and write
+no `SearchEvent`; Enter or the magnifier submits the full pipeline. One
+in-flight request at a time, so a slower earlier response can never overwrite
+a newer one.
+
+**Two mechanical design guards** run in the normal test suite rather than
+waiting for review, because both invariants are greppable:
+`playground-css.test.ts` fails on a raw hex or pixel literal outside
+`tokens.css` (P-8) and on any physical `left`/`right` property (F-5), and it
+asserts its own patterns catch violations so it cannot silently stop working.
+
+### The UI lane
+
+`playwright.config.ts` runs two projects behind the one `npm run test:ui`
+entry point: `widget` against the Vite harness, and `playground` against the
+REAL built app with `PLAYGROUND_FIXTURES=1`. The built app rather than a dev
+server is the point — SSR `lang`/`dir` and the meta tags cannot be proven any
+other way — so CI's `ui` job builds the app first.
+
+In fixture mode `/api/playground/*` answers from committed JSON chosen by the
+query text (`results`, `empty`, `error`, `timeout`, `delayed`, `preview`), so
+the lane needs no database, no Gemini key, and no network. Two branches make
+that work and both are unreachable without the flag: the API routes answer
+from `fixture-mode.server.ts`, and `shopify.server.ts` swaps
+`PrismaSessionStorage` — which probes the session table as it boots and exits
+the process when nothing answers — for an in-memory implementation. Visual
+baselines are per-OS, like the widget's.
+
 ## Deployment (YOY-91)
 
 The playground is deployed as a single Docker web service on Render, built
