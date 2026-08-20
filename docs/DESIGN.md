@@ -24,7 +24,7 @@ Unfiltered has three UI surfaces, and they do not share a case:
 |---|---|---|---|
 | Storefront widget | `apps/shopify-app/extensions/`, `apps/shopify-app/widget/` | **Widget-class (inherits)** | The host store's design IS the design. |
 | Merchant admin (dashboard, onboarding, settings) | `apps/shopify-app/app/routes/app.*` | **Platform-inherits** | Shopify Polaris IS the design ("Built for Shopify" is a PRD constraint). |
-| Public playground | (M4, path TBD) | **Owned pages** | The only surface Unfiltered draws itself; the direction system below applies. |
+| Public playground | `apps/shopify-app/app/playground/`, `apps/shopify-app/app/routes/_index/` | **Owned pages** | The only surface Unfiltered draws itself; the direction system below applies. |
 
 Rationale: PRD §5 rejects an Unfiltered-branded results page and caps the
 shopper-visible footprint at chips-level; PRD §3 cap. 13 makes Built for

@@ -1,0 +1,13 @@
+{
+  "searchId": "fixture-empty",
+  "route": "classic",
+  "degraded": false,
+  "results": [],
+  "chips": [],
+  "intent": null,
+  "details": {
+    "routeReason": "classic-zero-hit",
+    "latencyMs": 21,
+    "limited": null
+  }
+}

@@ -1,6 +1,7 @@
 import type { ActionFunctionArgs } from "react-router";
 
 import db from "../db.server";
+import { playgroundFixturesEnabled } from "../playground/fixture-mode.server";
 import {
   PLAYGROUND_RESPONSE_HEADERS,
   resolveCatalog,
@@ -31,11 +32,19 @@ function emptyResponse(status: number): Response {
 export const action = async ({
   request,
 }: ActionFunctionArgs): Promise<Response> => {
-  const catalog = await resolveCatalog(
-    db,
-    new URL(request.url).searchParams.get("catalog"),
-  );
-  if ("status" in catalog) {
+  // Fixture mode (YOY-92 AC-8): the beacon is observed by the UI lane
+  // through the network, not through a row, so it acknowledges without a
+  // database. The body is still parsed below, so a malformed beacon fails
+  // in the lane exactly as it would in production.
+  const fixtures = playgroundFixturesEnabled();
+
+  const catalog = fixtures
+    ? null
+    : await resolveCatalog(
+        db,
+        new URL(request.url).searchParams.get("catalog"),
+      );
+  if (catalog !== null && "status" in catalog) {
     return emptyResponse(catalog.status);
   }
 
@@ -47,6 +56,10 @@ export const action = async ({
   }
   if (body === null) {
     return emptyResponse(400);
+  }
+
+  if (catalog === null) {
+    return emptyResponse(204);
   }
 
   const recorded = await writeClickEvent(db, {

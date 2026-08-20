@@ -1,0 +1,36 @@
+{
+  "searchId": "fixture-preview",
+  "route": "classic",
+  "degraded": false,
+  "results": [
+    {
+      "productId": "p-1",
+      "title": "Silk slip dress",
+      "url": "https://example.test/products/silk-slip-dress",
+      "imageUrl": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 4'><rect width='4' height='4' fill='%23d9d4cd'/></svg>",
+      "priceMin": 320,
+      "priceMax": 320,
+      "currencyCode": "ILS",
+      "available": true,
+      "colorUnknown": false
+    },
+    {
+      "productId": "p-2",
+      "title": "Pleated midi skirt with a deliberately long title so the card title clamps after two lines",
+      "url": "https://example.test/products/pleated-midi-skirt",
+      "imageUrl": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 4'><rect width='4' height='4' fill='%23cfc9c1'/></svg>",
+      "priceMin": 280,
+      "priceMax": 320,
+      "currencyCode": "ILS",
+      "available": true,
+      "colorUnknown": false
+    }
+  ],
+  "chips": [],
+  "intent": null,
+  "details": {
+    "routeReason": "preview",
+    "latencyMs": 18,
+    "limited": null
+  }
+}

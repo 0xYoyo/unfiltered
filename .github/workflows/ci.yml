@@ -33,6 +33,10 @@ jobs:
       # here and failing on any diff makes drift impossible to merge.
       - run: npm run build:widget
       - run: git diff --exit-code -- apps/shopify-app/extensions/unfiltered-widget/assets/
+      # The playground project (YOY-92 AC-8) drives the BUILT app in fixture
+      # mode, not a dev server: SSR lang/dir and the meta tags are what its
+      # acceptance criteria are about, and only a real build can prove them.
+      - run: npm run build --workspace app
       - run: npx playwright install --with-deps chromium
       - run: npm run test:ui
 

@@ -21,6 +21,8 @@ sensitive_paths:
 ui_paths:
   - apps/shopify-app/extensions/
   - apps/shopify-app/widget/
+  - apps/shopify-app/app/playground/
+  - apps/shopify-app/app/routes/_index/
 
 ui_test_command: npm run test:ui
 
