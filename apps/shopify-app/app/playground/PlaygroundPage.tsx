@@ -39,7 +39,7 @@ export function PlaygroundPage({
   locale,
   pathname,
   initialQuery,
-  detailsOpen,
+  detailsOpen: initialDetailsOpen,
   catalog,
 }: {
   locale: PlaygroundLocale;
@@ -59,12 +59,20 @@ export function PlaygroundPage({
 
   // The held intent: the last AI response's echoed intent, in memory only.
   const [heldIntent, setHeldIntent] = useState<ProxyIntent | null>(null);
+  // Seeded from the URL by the loader, then owned here: toggling must not
+  // navigate, or the answer the panel explains would be thrown away.
+  const [detailsOpen, setDetailsOpen] = useState(initialDetailsOpen);
 
   const inputRef = useRef<HTMLInputElement | null>(null);
   // One in-flight request at a time: a slower earlier response must never
   // overwrite a newer one (results replace, and only the newest wins).
   const requestRef = useRef<AbortController | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The query text a submit has already answered. Setting `query` from a
+  // submit (an example click) re-runs the preview effect on the next render,
+  // which would schedule a preview that aborts the in-flight submitted
+  // search 200ms later and replace a real AI answer with classic cards.
+  const submittedQueryRef = useRef<string | null>(null);
   // Read inside `run` without making it a dependency: a keystroke must not
   // restart the debounce just because the held intent changed. Mirrored in
   // an effect rather than during render — a render may be discarded, and a
@@ -108,10 +116,16 @@ export function PlaygroundPage({
           return;
         }
         setResponse(next);
-        // Each response's echoed intent replaces the held one (AC-2). A
-        // classic or preview response echoes null, which correctly drops it:
-        // there is no understanding to refine.
-        setHeldIntent(next.intent);
+        // Only a SUBMITTED response replaces the held intent (AC-2). A
+        // preview echoes `intent: null` because it is classic-only, so
+        // replacing on every response would erase the refinement memory
+        // between two keystrokes — a follow-up typed at human speed would
+        // then go out with no `previousIntent` at all, and "New search"
+        // would blink out mid-typing. The widget keeps its memory across
+        // previews for exactly this reason (P-5 parity).
+        if (!preview) {
+          setHeldIntent(next.intent);
+        }
         setFailed(false);
         setPhase("settled");
       } catch (error) {
@@ -131,7 +145,8 @@ export function PlaygroundPage({
   );
 
   useEffect(() => {
-    if (query.trim() === "") {
+    const trimmed = query.trim();
+    if (trimmed === "" || trimmed === submittedQueryRef.current) {
       return;
     }
     const timer = setTimeout(() => {
@@ -153,6 +168,7 @@ export function PlaygroundPage({
         clearTimeout(debounceRef.current);
         debounceRef.current = null;
       }
+      submittedQueryRef.current = (text ?? query).trim();
       void run(text ?? query, false);
     },
     [query, run],
@@ -177,6 +193,7 @@ export function PlaygroundPage({
       debounceRef.current = null;
     }
     setQuery("");
+    submittedQueryRef.current = null;
     setHeldIntent(null);
     setResponse(null);
     setFailed(false);
@@ -236,17 +253,42 @@ export function PlaygroundPage({
               ? strings.emptyResults
               : null;
 
+  // The no-JS fallback target, and the URL the toggle writes into history.
+  // It carries the query so a real navigation still lands on this search.
   const detailsHref = useMemo(() => {
     const params = new URLSearchParams();
     if (locale === "he") {
       params.set("lang", locale);
+    }
+    if (query.trim() !== "") {
+      params.set("query", query);
     }
     if (!detailsOpen) {
       params.set("details", "1");
     }
     const search = params.toString();
     return search === "" ? pathname : `${pathname}?${search}`;
-  }, [detailsOpen, locale, pathname]);
+  }, [detailsOpen, locale, pathname, query]);
+
+  /**
+   * Flip the panel and record it in the URL without navigating, so an
+   * opened panel still survives a reload and can be shared, while the
+   * answer on screen — and the memory-only held intent — stay put (AC-5).
+   */
+  const toggleDetails = useCallback(() => {
+    const next = !detailsOpen;
+    setDetailsOpen(next);
+    if (typeof window === "undefined") {
+      return;
+    }
+    const url = new URL(window.location.href);
+    if (next) {
+      url.searchParams.set("details", "1");
+    } else {
+      url.searchParams.delete("details");
+    }
+    window.history.replaceState(window.history.state, "", url);
+  }, [detailsOpen]);
 
   const searched = response !== null || phase !== "initial";
 
@@ -301,6 +343,7 @@ export function PlaygroundPage({
             strings={strings}
             open={detailsOpen}
             toggleHref={detailsHref}
+            onToggle={toggleDetails}
           />
         )}
 

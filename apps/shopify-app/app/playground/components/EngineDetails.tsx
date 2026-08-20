@@ -13,17 +13,26 @@ import type { PlaygroundStrings } from "../strings";
  * hidden with its space reserved. Muted text throughout and no accent: this
  * is evidence, not emphasis. The intent JSON is the one place monospace is
  * permitted on the page (DESIGN §2).
+ *
+ * The control is an anchor whose click is handled in JS: navigating to
+ * `?details=1` would reload the page and throw away the very answer the
+ * panel is meant to explain — the held intent is memory-only, so the
+ * visitor would be asked to search again just to see how the last search
+ * was understood. The `href` stays correct so the toggle still works
+ * without JavaScript and can be opened in a new tab.
  */
 export function EngineDetails({
   response,
   strings,
   open,
   toggleHref,
+  onToggle,
 }: {
   response: PlaygroundSearchResponse;
   strings: PlaygroundStrings;
   open: boolean;
   toggleHref: string;
+  onToggle: () => void;
 }) {
   const rows: { label: string; value: string }[] = [
     { label: strings.detailsRoute, value: response.route },
@@ -41,13 +50,25 @@ export function EngineDetails({
 
   return (
     <div className="details">
-      {/* A link rather than a button: the state IS the URL, so this works
-          without JavaScript and the back button undoes it. */}
       <a
         className="detailsToggle"
         href={toggleHref}
         aria-expanded={open}
         data-testid="playground-details-toggle"
+        onClick={(event) => {
+          // Modified clicks keep their browser meaning (new tab, download).
+          if (
+            event.metaKey ||
+            event.ctrlKey ||
+            event.shiftKey ||
+            event.altKey ||
+            event.button !== 0
+          ) {
+            return;
+          }
+          event.preventDefault();
+          onToggle();
+        }}
       >
         {strings.engineDetailsToggle}
       </a>

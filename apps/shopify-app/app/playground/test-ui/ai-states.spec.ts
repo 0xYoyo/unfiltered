@@ -141,6 +141,40 @@ test.describe("refinement (AC-2, AC-3, verify 2 and 3)", () => {
     expect(followUp.searchParams.get("removeChip")).toBeNull();
   });
 
+  test("a follow-up typed at human speed still rides the held intent", async ({
+    page,
+  }) => {
+    // Regression: previews echo `intent: null`, and replacing the held
+    // intent on every response erased the refinement memory between two
+    // keystrokes — so a follow-up anyone actually types (any pause ≥200ms
+    // fires a preview) went out with no `previousIntent` at all. The
+    // original spec missed it because fill() + immediate Enter never lets
+    // the debounce fire.
+    const urls = recordSearchRequests(page);
+    await page.goto("/");
+    await submit(page, "ai elegant dress");
+    await expect(chips(page)).toHaveCount(3);
+
+    await input(page).fill("");
+    await input(page).pressSequentially("ai cheaper", { delay: 120 });
+    // At least one preview has fired by now — that is the point.
+    await expect
+      .poll(() =>
+        urls.filter((url) => url.searchParams.get("mode") === "preview")
+          .length,
+      )
+      .toBeGreaterThan(0);
+    // And the way out of the search is still offered while typing.
+    await expect(page.getByTestId("playground-new-search")).toBeVisible();
+
+    await input(page).press("Enter");
+    await expect.poll(() => submitted(urls).length).toBe(2);
+    const followUp = submitted(urls)[1];
+    expect(
+      JSON.parse(followUp.searchParams.get("previousIntent") ?? "null"),
+    ).toMatchObject({ colorsExclude: ["black"] });
+  });
+
   test("the first submitted search carries no previousIntent", async ({
     page,
   }) => {
@@ -266,16 +300,38 @@ test.describe("engine details (AC-5, verify 5)", () => {
     await expect(page.locator("[data-engine-details]")).toHaveCount(0);
   });
 
-  test("opens into the URL and shows route, reason, latency, and the intent", async ({
+  test("opens onto the answer already on screen, without re-searching", async ({
     page,
   }) => {
+    // Regression: the toggle was a plain link, so clicking it reloaded the
+    // page — discarding the response, the chips, and the memory-only held
+    // intent, and showing an empty panel until the visitor searched again.
+    const urls = recordSearchRequests(page);
     await page.goto("/");
     await submit(page, "ai elegant dress");
     await expect(chips(page)).toHaveCount(3);
 
     await page.getByTestId("playground-details-toggle").click();
-    await expect(page).toHaveURL(/details=1/);
 
+    await expect(page).toHaveURL(/details=1/);
+    const opened = page.getByTestId("playground-details-panel");
+    await expect(opened).toBeVisible();
+    await expect(opened).toContainText("812 ms");
+    await expect(
+      page.getByTestId("playground-details-intent"),
+    ).toContainText('"category": "dress"');
+    // The answer it explains is untouched, and nothing was re-fetched.
+    await expect(chips(page)).toHaveCount(3);
+    expect(submitted(urls)).toHaveLength(1);
+
+    // Clicking again closes it and takes the parameter back out.
+    await page.getByTestId("playground-details-toggle").click();
+    await expect(opened).toHaveCount(0);
+    await expect(page).not.toHaveURL(/details=1/);
+  });
+
+  test("shows route, reason, latency, and the intent", async ({ page }) => {
+    await page.goto("/?details=1");
     await submit(page, "ai elegant dress");
     const panel = page.getByTestId("playground-details-panel");
     await expect(panel).toBeVisible();
@@ -372,6 +428,29 @@ test.describe("example queries (AC-6, verify 6)", () => {
     await expect(input(page)).toHaveValue(text);
     await expect.poll(() => submitted(urls).length).toBeGreaterThan(0);
     expect(submitted(urls)[0].searchParams.get("query")).toBe(text);
+  });
+
+  test("a clicked example is not overridden by its own debounced preview", async ({
+    page,
+  }) => {
+    // Regression: `pickExample` set the query and submitted, and the
+    // query-change effect then scheduled a preview for the same text that
+    // aborted the in-flight submitted search 200ms later — replacing a real
+    // AI answer with classic preview cards. Any search slower than the
+    // debounce lost, which is every AI search the examples exist to show.
+    const urls = recordSearchRequests(page);
+    await page.goto("/");
+
+    await page.getByTestId("playground-example").nth(0).click();
+    await expect.poll(() => submitted(urls).length).toBe(1);
+    await expect(cards(page)).toHaveCount(4);
+
+    // Well past the debounce: nothing may follow the submit.
+    await page.waitForTimeout(500);
+    expect(
+      urls.filter((url) => url.searchParams.get("mode") === "preview"),
+    ).toHaveLength(0);
+    await expect(cards(page)).toHaveCount(4);
   });
 
   test("collapses to a single Try: row once a search has run", async ({

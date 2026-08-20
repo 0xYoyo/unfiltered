@@ -193,6 +193,11 @@ html:has(.playground) {
 }
 
 .exampleQuery {
+  /* Underlined text visually, a real 44px target for a thumb (F-3): the
+     inline-flex box carries the height without changing how it reads. */
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--hit-target-min);
   padding: 0;
   border: 0;
   background: none;
