@@ -54,6 +54,7 @@ apps/
       catalog/
         embed.server.ts
         enrich.server.ts
+        hnsw.server.ts
         ingest.server.ts
         mapping.server.ts
         mapping.test.ts
@@ -226,6 +227,7 @@ apps/
         proxy.server.ts
         retrieval-store.server.ts
         retrieval-store.test.ts
+        retrieval-tenant-recall.test.ts
         throttle.server.ts
         throttle.test.ts
       session-storage.test.ts
@@ -603,7 +605,7 @@ vitest.setup.ts
 - apps/shopify-app/app/catalog-embedding.test.ts → apps/shopify-app/app/ai/cost-recorder.server.ts, apps/shopify-app/app/catalog/embed.server.ts, apps/shopify-app/app/catalog/mapping.server.ts, apps/shopify-app/app/catalog/mapping.test.ts, apps/shopify-app/app/testing/helpers.server.ts
 - apps/shopify-app/app/catalog-enrichment.test.ts → apps/shopify-app/app/ai/cost-recorder.server.ts, apps/shopify-app/app/catalog/enrich.server.ts, apps/shopify-app/app/catalog/mapping.server.ts, apps/shopify-app/app/catalog/mapping.test.ts, apps/shopify-app/app/testing/helpers.server.ts
 - apps/shopify-app/app/catalog-ingestion.test.ts → apps/shopify-app/app/catalog/ingest.server.ts, apps/shopify-app/app/catalog/mapping.server.ts, apps/shopify-app/app/catalog/mapping.test.ts, apps/shopify-app/app/testing/helpers.server.ts
-- apps/shopify-app/app/catalog/embed.server.ts → apps/shopify-app/app/ai/cost-recorder.server.ts
+- apps/shopify-app/app/catalog/embed.server.ts → apps/shopify-app/app/ai/cost-recorder.server.ts, apps/shopify-app/app/catalog/hnsw.server.ts
 - apps/shopify-app/app/catalog/enrich.server.ts → apps/shopify-app/app/ai/cost-recorder.server.ts
 - apps/shopify-app/app/catalog/ingest.server.ts → apps/shopify-app/app/catalog/mapping.server.ts
 - apps/shopify-app/app/catalog/mapping.test.ts → apps/shopify-app/app/catalog/mapping.server.ts
@@ -686,7 +688,9 @@ vitest.setup.ts
 - apps/shopify-app/app/search/orchestrator.test.ts → apps/shopify-app/app/ai/cost-recorder.server.ts, apps/shopify-app/app/search/classic-store.server.ts, apps/shopify-app/app/search/orchestrator.server.ts, apps/shopify-app/app/search/retrieval-store.server.ts, apps/shopify-app/app/testing/helpers.server.ts
 - apps/shopify-app/app/search/proxy-contract.test.ts → apps/shopify-app/app/search/orchestrator.server.ts, apps/shopify-app/app/search/proxy.server.ts, apps/shopify-app/widget/src/search-client.ts
 - apps/shopify-app/app/search/proxy.server.ts → apps/shopify-app/app/ai/cost-recorder.server.ts, apps/shopify-app/app/search/classic-store.server.ts, apps/shopify-app/app/search/orchestrator.server.ts, apps/shopify-app/app/search/retrieval-store.server.ts
+- apps/shopify-app/app/search/retrieval-store.server.ts → apps/shopify-app/app/catalog/hnsw.server.ts
 - apps/shopify-app/app/search/retrieval-store.test.ts → apps/shopify-app/app/search/retrieval-store.server.ts, apps/shopify-app/app/testing/helpers.server.ts
+- apps/shopify-app/app/search/retrieval-tenant-recall.test.ts → apps/shopify-app/app/search/retrieval-store.server.ts, apps/shopify-app/app/testing/helpers.server.ts
 - apps/shopify-app/app/search/throttle.test.ts → apps/shopify-app/app/search/throttle.server.ts
 - apps/shopify-app/app/session-storage.test.ts → apps/shopify-app/app/testing/helpers.server.ts
 - apps/shopify-app/app/shopify.server.ts → apps/shopify-app/app/db.server.ts, apps/shopify-app/app/playground/fixture-mode.server.ts, apps/shopify-app/app/playground/fixture-session-storage.server.ts

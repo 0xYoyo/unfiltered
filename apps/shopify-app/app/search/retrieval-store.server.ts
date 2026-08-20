@@ -6,6 +6,8 @@ import type {
 } from "@unfiltered/engine";
 import { expandCategoryConstraint } from "@unfiltered/engine";
 
+import { withTenantVectorScan } from "../catalog/hnsw.server";
+
 /**
  * Postgres/pgvector implementation of the engine's RetrievalStore port.
  *
@@ -30,6 +32,10 @@ import { expandCategoryConstraint } from "@unfiltered/engine";
  * Vector comparisons cast both sides through the query vector's dimension, so
  * stored vectors of a different dimension fail loudly instead of comparing
  * garbage — same rule as app/catalog/embed.server.ts.
+ *
+ * The shared HNSW index post-filters, so the shopDomain predicate alone does
+ * not guarantee a small tenant its own nearest neighbours; the query runs
+ * under iterative index scans for that (see catalog/hnsw.server.ts, YOY-105).
  */
 export function createPgVectorRetrievalStore(db: PrismaClient): RetrievalStore {
   return {
@@ -113,10 +119,19 @@ export function createPgVectorRetrievalStore(db: PrismaClient): RetrievalStore {
       const colorUnknownExpr = colorTiering
         ? `(COALESCE(cardinality(en."colors"), 0) = 0)`
         : null;
-      const rows = await db.$queryRawUnsafe<
-        Array<{ productId: string; distance: number; colorUnknown?: boolean }>
-      >(
-        `SELECT e."productId",
+      // Ranking keys, shared by the candidate scan and the re-rank below.
+      const orderBy = `${colorUnknownExpr === null ? "" : `"colorUnknown" ASC, `}distance ASC`;
+      // The candidate scan runs inside a MATERIALIZED CTE so its rows are
+      // produced once and then re-sorted: iterative HNSW scans use
+      // `relaxed_order` (YOY-105), which may emit candidates slightly out of
+      // distance order, and the outer ORDER BY restores exact ordering
+      // without changing which rows are selected.
+      const rows = await withTenantVectorScan(db, (tx) =>
+        tx.$queryRawUnsafe<
+          Array<{ productId: string; distance: number; colorUnknown?: boolean }>
+        >(
+          `WITH candidates AS MATERIALIZED (
+           SELECT e."productId",
                 ((e."embedding")::vector(${dimension}) <=> $2::vector(${dimension}))::float8 AS distance${
                   colorUnknownExpr === null
                     ? ""
@@ -129,11 +144,16 @@ export function createPgVectorRetrievalStore(db: PrismaClient): RetrievalStore {
            ON en."shopDomain" = e."shopDomain" AND en."productId" = e."productId"
           AND en."status" = 'enriched'
          WHERE ${where.join("\n           AND ")}
-         ORDER BY ${colorUnknownExpr === null ? "" : `${colorUnknownExpr} ASC, `}distance ASC${
-           limit === undefined ? "" : `
+         ORDER BY ${orderBy}${
+           limit === undefined
+             ? ""
+             : `
          LIMIT ${limit}`
-         }`,
-        ...params,
+         }
+         )
+         SELECT * FROM candidates ORDER BY ${orderBy}`,
+          ...params,
+        ),
       );
       return rows.map((row) => ({
         productId: row.productId,
