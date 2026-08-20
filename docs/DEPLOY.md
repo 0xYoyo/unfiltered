@@ -71,11 +71,38 @@ search 500s.
 
 The free web service **spins down after roughly 15 minutes without traffic**.
 The next request pays a cold start of tens of seconds while the container
-boots and migrations re-run (a no-op once applied). For a demo where that
-matters, warm the service beforehand, or upgrade: Render dashboard →
-service → **Settings** → **Instance Type** → a paid plan removes spin-down
-with no code or blueprint change. Free services also have a monthly build-
-minute budget; a busy day of merges can exhaust it and stall auto-deploys.
+boots and migrations re-run (a no-op once applied). Free services also have a
+monthly build-minute budget; a busy day of merges can exhaust it and stall
+auto-deploys.
+
+Sleeping during development is **accepted**, not a problem to engineer around:
+no paid tier and no keep-alive infrastructure while the playground is only
+being built and tested. Handle it the cheap way instead.
+
+### Dev-phase keep-awake
+
+1. **Before any live test session, hit the URL once and wait for warm-up.**
+   A cold start takes roughly 30–60 seconds. Loading the page and waiting is
+   the entire procedure — do it before you start, not during a demo.
+2. **Optional keep-alive while actively developing or testing.** Either a free
+   uptime monitor (UptimeRobot and friends) pointed at `/healthz`, or a local
+   loop in a spare terminal:
+
+   ```bash
+   while true; do curl -s https://<service>.onrender.com/healthz > /dev/null; sleep 600; done
+   ```
+
+   A ping every ~10 minutes keeps the instance from sleeping. Render's free
+   tier allows roughly 750 instance-hours a month, so pinging continuously
+   stays within quota — but it is pointless outside an active work session, so
+   stop the loop when you stop working.
+3. **When outreach links go out (M8), flip to the paid starter tier.** That is
+   the moment always-on actually matters: a stranger clicking a shared
+   `/s/<slug>` link will not wait through a cold start. It is a one-click
+   change — Render dashboard → service → **Settings** → **Instance Type** →
+   Starter — with no code or blueprint edit, and it is the natural moment to
+   attach the custom domain as well (see "Attaching a custom domain later"
+   below).
 
 ## Logs and rollback
 
