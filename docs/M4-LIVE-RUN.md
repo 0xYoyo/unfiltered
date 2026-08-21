@@ -40,7 +40,8 @@ string into this file.
 | `PLAYGROUND_SEED_NAME` | _display name shown on `/`_ |
 | `PLAYGROUND_AI_THROTTLE_PER_MINUTE` | _blank = default 10_ |
 | `PLAYGROUND_DAILY_AI_CAP` | _blank = default 2000_ |
-| `PLAYGROUND_CATALOG_DAILY_AI_CAP` | _blank = default 500; step 22 changes this temporarily_ |
+| `PLAYGROUND_CATALOG_DAILY_AI_CAP` | _blank = default 500; step 26 changes this temporarily_ |
+| `GEMINI_*_MODEL` / `GEMINI_EMBEDDING_DIMENSION` | _blank = the documented defaults; list any pin_ |
 | Keep-awake monitor | _e.g. UptimeRobot, 5-min ping, target path_ |
 
 **Seed catalog provenance** (required by AC-2 — the recorded answer as of the
@@ -147,7 +148,7 @@ before the run; each has an expected outcome you can check.
 5. **Keep-awake monitor.** The free plan spins down after ~15 minutes idle.
    Point a free uptime monitor (UptimeRobot and friends) at
    **`SERVICE/healthz`** on a ~5-minute interval, or run the local loop from
-   [DEPLOY.md](DEPLOY.md). Do **not** enable it before step 24 — that step
+   [DEPLOY.md](DEPLOY.md). Do **not** enable it before step 27 — that step
    measures the cold start deliberately.
 
    **Expected outcome:** the monitor is configured against `/healthz` (the
