@@ -61,6 +61,7 @@ search 500s.
 | `PLAYGROUND_SEED_STORE_KEY` | the seed catalog's tenant key | Searched when a request names no `?catalog=` slug; unset makes those requests answer `503`. |
 | `PLAYGROUND_SEED_NAME` | you | Display name of the seed catalog for the playground's pages. |
 | `PLAYGROUND_AI_THROTTLE_PER_MINUTE` | optional | Default `10` AI-routed submits per IP per minute. |
+| `PLAYGROUND_TRUSTED_PROXY_HOPS` | optional | Default `1`: the visitor IP is the last `X-Forwarded-For` entry — the one Render's edge appended. Set `2` if a CDN sits in front of Render. |
 | `PLAYGROUND_DAILY_AI_CAP` | optional | Default `2000` AI searches/day across all playground catalogs. |
 | `PLAYGROUND_CATALOG_DAILY_AI_CAP` | optional | Default `500` AI searches/day per catalog. |
 | `GEMINI_*_MODEL`, `GEMINI_EMBEDDING_DIMENSION` | optional | Pin a model instead of the documented defaults in `packages/provider-gemini`. |

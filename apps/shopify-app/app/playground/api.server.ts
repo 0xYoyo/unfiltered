@@ -22,7 +22,8 @@ import {
  * owns three guards, all of which resolve to the orchestrator's existing
  * `forceClassic` path rather than to an error the visitor sees:
  *
- * - per-IP rate, in-process, reusing the proxy's sliding-window throttle;
+ * - per-IP rate, in-process, reusing the proxy's sliding-window throttle,
+ *   keyed by the last trusted `X-Forwarded-For` hop (see `clientIp`);
  * - a global daily AI ceiling across every playground tenant;
  * - a per-catalog daily AI ceiling.
  *
@@ -110,13 +111,39 @@ export function playgroundLimitsFromEnv(
 }
 
 /**
- * The visitor's IP for rate-keying (AC-4): the first `X-Forwarded-For` entry
- * — the client as the outermost proxy saw it — then the connection address
- * the runtime hands us, then a shared `"unknown"` bucket so a request with
+ * Env var: how many trailing `X-Forwarded-For` entries the deployment's own
+ * edge guarantees. Default 1 — one reverse proxy (Render) appending the peer
+ * it saw. Put a second trusted proxy (a CDN) in front and set 2.
+ */
+export const TRUSTED_PROXY_HOPS_ENV = "PLAYGROUND_TRUSTED_PROXY_HOPS";
+const DEFAULT_TRUSTED_PROXY_HOPS = 1;
+
+export function trustedProxyHopsFromEnv(
+  env: Record<string, string | undefined> = process.env,
+): number {
+  return positiveInt(env[TRUSTED_PROXY_HOPS_ENV], DEFAULT_TRUSTED_PROXY_HOPS);
+}
+
+/**
+ * The visitor's IP for rate-keying (YOY-90 AC-4 as amended by YOY-96 AC-11):
+ * the LAST TRUSTED `X-Forwarded-For` hop — the entry `trustedProxyHops`
+ * positions from the end of the header — then the connection address the
+ * runtime hands us, then a shared `"unknown"` bucket so a request with
  * neither is still rate-limited rather than exempt.
  *
+ * Why the end and not the start: every reverse proxy (Render included)
+ * APPENDS the peer address it saw to whatever header arrived, so the first
+ * entry is whatever the client chose to send. Keyed by the first entry, a
+ * visitor minting a fresh random `X-Forwarded-For` per request got a fresh
+ * throttle bucket every time and the per-IP guard never bound; only the
+ * daily caps did. The entry our own edge appended is the one the client
+ * cannot forge. With fewer entries than trusted hops, the request did not
+ * come through the configured edge, so the header is not trusted at all and
+ * the fallbacks apply.
+ *
  * `react-router-serve` exposes no connection address to a loader, so in this
- * deployment the middle arm is only reachable by a caller that supplies one;
+ * deployment the middle arm is only reachable by a caller that supplies one
+ * (a custom server's `getLoadContext`, read by `remoteAddressFromContext`);
  * behind a proxy (the playground's own deployment) the header is always
  * present. The parameter keeps the contract honest and testable rather than
  * pretending the address is unavailable everywhere.
@@ -124,14 +151,34 @@ export function playgroundLimitsFromEnv(
 export function clientIp(
   request: Request,
   remoteAddress?: string | null,
+  trustedProxyHops: number = trustedProxyHopsFromEnv(),
 ): string {
   const forwarded = request.headers.get("x-forwarded-for");
-  const first = forwarded?.split(",")[0]?.trim();
-  if (first !== undefined && first !== "") {
-    return first;
+  if (forwarded !== null) {
+    const hops = forwarded
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter((entry) => entry !== "");
+    const trusted = hops[hops.length - trustedProxyHops];
+    if (trusted !== undefined) {
+      return trusted;
+    }
   }
   const address = remoteAddress?.trim();
   return address !== undefined && address !== "" ? address : "unknown";
+}
+
+/**
+ * The connection address when the runtime's load context carries one — a
+ * custom server's `getLoadContext` would set `remoteAddress`; the default
+ * `react-router-serve` context has none, so this yields null there.
+ */
+export function remoteAddressFromContext(context: unknown): string | null {
+  if (context === null || typeof context !== "object") {
+    return null;
+  }
+  const value = (context as { remoteAddress?: unknown }).remoteAddress;
+  return typeof value === "string" ? value : null;
 }
 
 /** A resolved catalog: which tenant key the search runs against. */

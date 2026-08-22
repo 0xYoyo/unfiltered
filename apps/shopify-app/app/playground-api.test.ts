@@ -59,10 +59,13 @@ import db from "./db.server";
 import {
   clientIp,
   playgroundLimitsFromEnv,
+  remoteAddressFromContext,
   resetPlaygroundIpThrottle,
   resolveCatalog,
   startOfUtcDay,
   SEED_STORE_KEY_ENV,
+  TRUSTED_PROXY_HOPS_ENV,
+  trustedProxyHopsFromEnv,
 } from "./playground/api.server";
 import { action as clickAction } from "./routes/api.playground.click";
 import { loader as searchLoader } from "./routes/api.playground.search";
@@ -173,6 +176,7 @@ beforeEach(async () => {
   delete process.env.PLAYGROUND_AI_THROTTLE_PER_MINUTE;
   delete process.env.PLAYGROUND_DAILY_AI_CAP;
   delete process.env.PLAYGROUND_CATALOG_DAILY_AI_CAP;
+  delete process.env[TRUSTED_PROXY_HOPS_ENV];
 });
 
 afterEach(() => {
@@ -461,17 +465,75 @@ describe("per-IP AI throttle (AC-4)", () => {
     expect(other.details.limited).toBeNull();
   });
 
-  it("keys the throttle by the first X-Forwarded-For entry, then the connection address, then unknown", () => {
-    const withHeader = new Request("https://p.example.com/", {
-      headers: { "x-forwarded-for": " 9.9.9.9 , 10.0.0.1" },
+  it("keys the throttle by the last trusted X-Forwarded-For hop, then the connection address, then unknown (YOY-96 AC-11)", () => {
+    // The first entry is whatever the client sent; the edge appended the last.
+    const spoofed = new Request("https://p.example.com/", {
+      headers: { "x-forwarded-for": "spoofed, 203.0.113.9" },
     });
+    expect(clientIp(spoofed)).toBe("203.0.113.9");
+    expect(clientIp(spoofed, "127.0.0.1")).toBe("203.0.113.9");
+
+    const withHeader = new Request("https://p.example.com/", {
+      headers: { "x-forwarded-for": " 9.9.9.9 , 10.0.0.1 , " },
+    });
+    expect(clientIp(withHeader)).toBe("10.0.0.1");
+    // A second trusted hop (a CDN in front of the edge) reads one further in.
+    expect(clientIp(withHeader, null, 2)).toBe("9.9.9.9");
+    process.env[TRUSTED_PROXY_HOPS_ENV] = "2";
     expect(clientIp(withHeader)).toBe("9.9.9.9");
-    expect(clientIp(withHeader, "127.0.0.1")).toBe("9.9.9.9");
+    // Fewer entries than trusted hops: the header did not come through the
+    // configured edge, so it is not trusted at all — the fallbacks apply.
+    expect(clientIp(withHeader, "127.0.0.1", 3)).toBe("127.0.0.1");
+    expect(clientIp(withHeader, null, 3)).toBe("unknown");
+    delete process.env[TRUSTED_PROXY_HOPS_ENV];
 
     const bare = new Request("https://p.example.com/");
     expect(clientIp(bare, "127.0.0.1")).toBe("127.0.0.1");
     expect(clientIp(bare)).toBe("unknown");
     expect(clientIp(bare, "   ")).toBe("unknown");
+
+    // The hop count is env-configured, defaulting to one, falling back on nonsense.
+    expect(trustedProxyHopsFromEnv({})).toBe(1);
+    expect(trustedProxyHopsFromEnv({ [TRUSTED_PROXY_HOPS_ENV]: "2" })).toBe(2);
+    expect(trustedProxyHopsFromEnv({ [TRUSTED_PROXY_HOPS_ENV]: "0" })).toBe(1);
+    expect(trustedProxyHopsFromEnv({ [TRUSTED_PROXY_HOPS_ENV]: "abc" })).toBe(1);
+
+    // The route reads a connection address only from a load context that has one.
+    expect(remoteAddressFromContext({ remoteAddress: "10.1.1.1" })).toBe("10.1.1.1");
+    expect(remoteAddressFromContext({})).toBeNull();
+    expect(remoteAddressFromContext({ remoteAddress: 7 })).toBeNull();
+    expect(remoteAddressFromContext(undefined)).toBeNull();
+  });
+
+  it("a visitor minting a fresh first X-Forwarded-For entry per request is still throttled on the 11th submit (YOY-96 AC-11)", async () => {
+    // Default budget of 10: ten distinct spoofed first entries, one real
+    // last hop, all land in one bucket.
+    for (let index = 0; index < 10; index += 1) {
+      const body = (await (
+        await searchLoader(
+          loaderArgs(
+            searchRequest({}, { "x-forwarded-for": `10.66.0.${index}, 203.0.113.9` }),
+          ),
+        )
+      ).json()) as { details: { limited: unknown } };
+      expect(body.details.limited).toBeNull();
+    }
+    const eleventh = (await (
+      await searchLoader(
+        loaderArgs(searchRequest({}, { "x-forwarded-for": "10.66.0.99, 203.0.113.9" })),
+      )
+    ).json()) as { details: { limited: unknown }; degraded: boolean };
+    expect(eleventh.details.limited).toBe("ip");
+    expect(eleventh.degraded).toBe(true);
+    expect(orchestratorSeam.requests.at(-1)).toMatchObject({ forceClassic: true });
+
+    // A different last hop is a different visitor, whatever the first entry says.
+    const other = (await (
+      await searchLoader(
+        loaderArgs(searchRequest({}, { "x-forwarded-for": "10.66.0.0, 203.0.113.10" })),
+      )
+    ).json()) as { details: { limited: unknown } };
+    expect(other.details.limited).toBeNull();
   });
 });
 
