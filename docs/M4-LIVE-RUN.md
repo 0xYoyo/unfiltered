@@ -1,8 +1,8 @@
 # M4 live-run runbook — the deployed playground
 
-- **Date:** _fill in when executed_
-- **Executed by:** _fill in_
-- **Deployment URL:** _fill in — `https://<service>.onrender.com`_
+- **Date:** 2026-08-22
+- **Executed by:** founder (Phases A and D) + agents (Phases B and C)
+- **Deployment URL:** `https://unfiltered-3khq.onrender.com`
 - **Engine version:** 0.4.0 (expected at `/healthz`)
 - **Billing:** Gemini Tier 1
 
@@ -27,22 +27,22 @@ string into this file.
 
 | Field | Value |
 | --- | --- |
-| Deployment URL | _e.g. `https://unfiltered-3khq.onrender.com`_ |
-| Render service / plan | _service name, Free or Starter_ |
-| Commit deployed (SHA) | _from Render → Deploys_ |
-| `DATABASE_URL` | _Neon host + database only, credentials redacted_ |
-| `GEMINI_API_KEY` | _redacted; note the AI Studio project/tier_ |
-| `SHOPIFY_API_KEY` / `SHOPIFY_API_SECRET` | _redacted; note the app record they came from_ |
-| `SHOPIFY_APP_URL` | _the deployment's own origin_ |
-| `SCOPES` | _e.g. `write_products`_ |
-| `ADMIN_TOKEN` | _redacted (gates `/internal/costs`)_ |
-| `PLAYGROUND_SEED_STORE_KEY` | _e.g. `unfiltered-dev.myshopify.com`_ |
-| `PLAYGROUND_SEED_NAME` | _display name shown on `/`_ |
-| `PLAYGROUND_AI_THROTTLE_PER_MINUTE` | _blank = default 10_ |
-| `PLAYGROUND_DAILY_AI_CAP` | _blank = default 2000_ |
-| `PLAYGROUND_CATALOG_DAILY_AI_CAP` | _blank = default 500; step 26 changes this temporarily_ |
-| `GEMINI_*_MODEL` / `GEMINI_EMBEDDING_DIMENSION` | _blank = the documented defaults; list any pin_ |
-| Keep-awake monitor | _e.g. UptimeRobot, 5-min ping, target path_ |
+| Deployment URL | `https://unfiltered-3khq.onrender.com` |
+| Render service / plan | `unfiltered` / **Free** |
+| Commit deployed (SHA) | `376bd69` |
+| `DATABASE_URL` | Neon Postgres, `vector` enabled — **redacted**: `postgresql://…:…@….neon.tech/…`. Host/database not recorded on YOY-95; the deployment and the evidence scripts read the same database. |
+| `GEMINI_API_KEY` | **redacted** (`AIza…`) — Google AI Studio, Gemini **Tier 1** billing |
+| `SHOPIFY_API_KEY` / `SHOPIFY_API_SECRET` | both **redacted** (last four characters at most) — the existing app record in the Shopify Partner org; it was not re-pointed (NG-2). Record not named on YOY-95. |
+| `SHOPIFY_APP_URL` | `https://unfiltered-3khq.onrender.com` |
+| `SCOPES` | _not recorded on YOY-95_ |
+| `ADMIN_TOKEN` | **redacted** — gate verified twice: `/internal/costs` without the exact token returns `404` (steps 8 and Phase C) |
+| `PLAYGROUND_SEED_STORE_KEY` | `unfiltered-dev.myshopify.com` |
+| `PLAYGROUND_SEED_NAME` | _not recorded on YOY-95_ |
+| `PLAYGROUND_AI_THROTTLE_PER_MINUTE` | blank = default 10 — never hit (`limited=null` on every Part 3 search) |
+| `PLAYGROUND_DAILY_AI_CAP` | blank = default 2000 — never hit during the run |
+| `PLAYGROUND_CATALOG_DAILY_AI_CAP` | blank = default 500; temporarily set to `2` for step 26 (deploy Live 15:26Z), variable **deleted afterwards** — restore verified |
+| `GEMINI_*_MODEL` / `GEMINI_EMBEDDING_DIMENSION` | no pins recorded on YOY-95; the step-13 `intent` AiCall row ran on `gemini-3.6-flash` |
+| Keep-awake monitor | **UptimeRobot**, 5-min ping on `SERVICE/healthz`; paused for step 27, re-enabled afterwards |
 
 **Seed catalog provenance** (required by AC-2 — the recorded answer as of the
 2026-08-16 import; re-state it here if the catalog is re-seeded):
@@ -428,43 +428,63 @@ Fill one row per step. The issue (YOY-95) closes only when **every** step has
 a row. Every FAIL row must name the defect and, where filed, link its Linear
 issue (NG-1: file, do not fix).
 
-- **Date:** _fill in_
-- **Executed by:** _fill in_
-- **Deployment URL / commit:** _fill in_
-- **Seed catalog size (products):** _fill in_
-- **One-time indexing cost (`/internal/costs`):** _fill in_
-- **Public catalogs ingested (slug / products / cost):** _fill in_
+- **Date:** 2026-08-22
+- **Executed by:** founder (Phases A and D) + agents (Phases B and C)
+- **Deployment URL / commit:** `https://unfiltered-3khq.onrender.com` @ `376bd69`
+- **Seed catalog size (products):** 465
+- **One-time indexing cost (`/internal/costs`):** ≈ **$0.151** for the 465-product
+  seed catalog; **$0.448361** across all three catalogs (enrichment $0.423427 /
+  1483 calls + embedding $0.024934 / 95 calls)
+- **Public catalogs ingested (slug / products / cost):** `tentree` / 500 /
+  **$0.186583** · `whitestuff` / 500 / **$0.110640**
 
 | # | Scenario | Expected | Result | Evidence |
 |---|---|---|---|---|
-| 1 | Partner / Neon / Gemini accounts reachable | all three dashboards open; `vector` installed | | |
-| 2 | Fashion CSV imported into `unfiltered-dev` | ≥200 products with images | | |
-| 3 | Storefront password disabled / caveat accepted | which one applies is recorded | | |
-| 4 | Render blueprint service live | build succeeds, migrations run, server listens | | |
-| 5 | Keep-awake monitor configured on `/healthz`, paused | monitor exists and is paused | | |
-| 6 | `npm run ingest` | ingest/enrich/embed counts, `failed: 0` | | |
-| 7 | Index counts equal | products = enriched = embedded = N | | |
-| 8 | One-time cost at `/internal/costs` | AiCall ledger renders; total recorded | | |
-| 9 | `/healthz` | `200`, engine `0.4.0` | | |
-| 10 | `/api/playground/search` over curl | `200` with the playground contract | | |
-| 11 | `/` first load | shell renders; `<html lang>` correct | | |
-| 12 | EN simple query + parity floor | `route=classic`, no chips; both timings recorded | | |
-| 13 | EN NL query with chips | `route=ai`, chips, `intent` AiCall rows | | |
-| 14 | Product-card images render | images visible after 15 s (known suspect defect) | | |
-| 15 | Engine-details panel | route/reason/latency/degraded/limited + intent JSON | | |
-| 16 | Refinement honors `previousIntent` | prior constraints kept, price tightened | | |
-| 17 | Chip removal + New search | embedding-only cost; state clears | | |
-| 18 | Card click → new tab + `ClickEvent` | new tab; row with product id and position | | |
-| 19 | HE NL query, RTL chrome | `dir="rtl"`, Hebrew chips, `route=ai` | | |
-| 20 | AI zero-hit + close matches | message, chips, close-matches section | | |
-| 21 | Language toggle / dark mode / 360 px | path preserved; dark contrast; no overflow | | |
-| 22 | `ingest:public` real Shopify store | counts, `failed: 0`, catalog row, cost | | |
-| 23 | `ingest:public` non-Shopify store | counts, `failed: 0`, catalog row, cost, duration | | |
-| 24 | `/s/<slug>` on both, `catalog=` param, recall | store line, title, noindex, `catalog=` sent | | |
-| 25 | Unknown `/s/` slug | HTTP 404 with the designed page and `/` link | | |
-| 26 | Catalog daily AI cap = 2 | 3rd query classic `degraded` + `limited`; restored | | |
-| 27 | Free-tier cold start | first hit tens of seconds, then `200`; both timed | | |
+| 1 | Partner / Neon / Gemini accounts reachable | all three dashboards open; `vector` installed | **PASS** (implied — not separately recorded) | No explicit result on YOY-95; the prerequisite is evidenced indirectly by steps 6–10 running against the Neon database, the dev store and the Gemini Tier 1 key. The `vector`-extension check itself is genuinely missing. |
+| 2 | Fashion CSV imported into `unfiltered-dev` | ≥200 products with images | **PASS** | 465 products imported; 465/465 with image, description, price and availability; snowboards pruned to 0 (2026-08-16 verification). Import image-failure count not recorded. |
+| 3 | Storefront password disabled / caveat accepted | which one applies is recorded | **PASS** (caveat accepted) | Storefront password left **on** — step 18's new tab landed on `unfiltered-dev.myshopify.com/password`, the documented caveat, not a FAIL. |
+| 4 | Render blueprint service live | build succeeds, migrations run, server listens | **PASS** | Service `unfiltered` (Free) Live at `https://unfiltered-3khq.onrender.com` @ `376bd69`. A 502 window during env-var redeploy churn was observed 2026-08-20 and recovered. Build-log lines not quoted on YOY-95. |
+| 5 | Keep-awake monitor configured on `/healthz`, paused | monitor exists and is paused | **PASS** | UptimeRobot 5-min ping on `/healthz`; paused for step 27's measurement and re-enabled afterwards (founder confirmed). |
+| 6 | `npm run ingest` | ingest/enrich/embed counts, `failed: 0` | **PASS** | Idempotent re-run: `unchanged/cached: 465`, `failed: 0` (Phase A). |
+| 7 | Index counts equal | products = enriched = embedded = N | **PASS** | `counts` → products 465 / enriched 465 / embedded 465, equal (Phase A; re-confirmed at Phase B preflight). |
+| 8 | One-time cost at `/internal/costs` | AiCall ledger renders; total recorded | **PASS** | Ledger renders; `404` without the token. Totals at read time 1834 calls / $0.628616. Operations: enrichment $0.423427 (1483) + embedding $0.024934 (95) = **$0.448361** all catalogs → seed ≈ **$0.151** for 465 products. Mean cost per search $0.000980. |
+| 9 | `/healthz` | `200`, engine `0.4.0` | **PASS** | `200` with `{"status":"ok","engine":{"version":"0.4.0"}}` (Phase A; again on the first attempt at Phase B preflight). |
+| 10 | `/api/playground/search` over curl | `200` with the playground contract | **PASS** | `200` with the full playground contract; `route=classic`, `routeReason=short-query`, 1341 ms. |
+| 11 | `/` first load | shell renders; `<html lang>` correct | **PASS** | 200 in 1217 ms. `<html lang="en" dir="ltr">`, product name in body type (0 header images), 6 curated examples, muted footer disclaimer, toggle → `/?lang=he`. No store-line and no `robots` meta on `/` — both correct. |
+| 12 | EN simple query + parity floor | `route=classic`, no chips; both timings recorded | **PASS (contract) / FAIL (parity floor)** | `c707e8b7…` `route=classic`, `routeReason=short-query`, `degraded=f`, 24 results, **0 chips**, **0 AiCall rows** ($0.000000). Parity: playground warm 1.82–1.95 s (server 919–978 ms) vs the stock storefront's 0.24–0.65 s → ~**3–8× slower**. Finding F-3. |
+| 13 | EN NL query with chips | `route=ai`, chips, `intent` AiCall rows | **PASS (contract)** — F-1 | `77a5371e…` `route=ai`, `routeReason=model`, `degraded=f`, 9194 ms, `limited=null`; exactly 3 chips (`category=dress`, `priceMax=200`, `colorsExclude=black`); `intent` AiCall $0.000954. `resultCount=0` is **correct over this catalog** — only 5 dresses ≤200 and all are black; intent JSON carries no hidden constraint. Full JSON: see YOY-95 Phase B comment. |
+| 14 | Product-card images render | images visible after 15 s (known suspect defect) | **PASS** | Rigorous re-probe on 24 cards: 24 images, 0 placeholders, 0 broken (`complete=true`, `naturalWidth>0`), all 24 responses HTTP 200, zero console errors. The 2026-08-20 blank-dark-box suspicion **did not reproduce** (blank lower cards in a `fullPage` screenshot are a `loading="lazy"` capture artifact). |
+| 15 | Engine-details panel | route/reason/latency/degraded/limited + intent JSON | **PASS** | Panel shows route `ai`, reason `model`, latency `9194 ms`, degraded `no`, limited `none`, plus the intent JSON in `[data-testid="playground-details-intent"]` with `dir="ltr"`. Toggle wrote `?details=1` without navigating; results retained. |
+| 16 | Refinement honors `previousIntent` | prior constraints kept, price tightened | **PASS** | `e24e080a…` `route=ai`, `degraded=f`. Request carried `previousIntent=` with the full held intent; chips went `dress / Under 200 / Not black` → `dress / **Under 150** / Not black`. `intent` input 919 tok vs the 396-tok baseline. $0.002239. |
+| 17 | Chip removal + New search | embedding-only cost; state clears | **PASS (both parts)** | Removal: `a1424989…` `route=ai`, price chip gone and did not return, count 10 → **24**; **no AiCall rows at all** ($0.000000). New search: input empty, 0 chips, 0 cards, 6 examples visible, `New search` control gone. |
+| 18 | Card click → new tab + `ClickEvent` | new tab; row with product id and position | **PASS** (documented password caveat) | Anchor `target="_blank" rel="noopener noreferrer"`; new tab landed on the dev store's `/password` (step-3 caveat); playground tab kept its 10 results. `ClickEvent` written: searchId `3fab617c…`, productId `gid://shopify/Product/8057381748811`, position `0`. |
+| 19 | HE NL query, RTL chrome | `dir="rtl"`, Hebrew chips, `route=ai` | **FAIL** — F-2, filed as YOY-109 | `bbe39fce…` `route=classic`, `degraded=true`, `resultCount=0`, 0 chips, `intent=null` (a `classification` row but **no `intent` row**). RTL chrome itself correct: `<html lang="he" dir="rtl">`, all strings Hebrew. Rate that day: HE **5 failures / 9 attempts**, EN 0 / 8. |
+| 20 | AI zero-hit + close matches | message, chips, close-matches section | **PASS** | `e2561384…` `route=ai`, `degraded=f`, `resultCount=0`. Status line `Nothing matches all of these`; 4 chips still rendered and removable; **Close matches** section under its own heading with 2 cards. $0.001006. |
+| 21 | Language toggle / dark mode / 360 px | path preserved; dark contrast; no overflow | **PASS (a, b, c)** | (a) EN↔HE round trip preserves **path and query string** (`/?lang=he&query=dress&details=1` ↔ `…lang=en…`). (b) Dark via `prefers-color-scheme`: cards and chips **15.09:1**, details panel **6.94:1**. (c) At 360 px `scrollWidth == clientWidth == 360`, zero overflowing elements, examples 44 px tall. |
+| 22 | `ingest:public` real Shopify store | counts, `failed: 0`, catalog row, cost | **PASS** | `tentree` (`playground:tentree`, `shopify-public`): `created 500`, `enriched 500 / failed: 0`, `embedded 500`; index verified 500 / 500 / 500. Duration **8m46s**. Cost delta **$0.186583** over 505 calls. |
+| 23 | `ingest:public` non-Shopify store | counts, `failed: 0`, catalog row, cost, duration | **PASS** | `whitestuff` (`playground:whitestuff`, `jsonld-crawl`): `created 500`, `enriched 500 / failed: 0`, `embedded 500`; index 500 / 500 / 500. Crawl 17,648 urls → 505 pages, 503 products, 2 fetch errors. Duration **10m51s**. Cost delta **$0.110640** over 505 calls. |
+| 24 | `/s/<slug>` on both, `catalog=` param, recall | store line, title, noindex, `catalog=` sent | **PASS** (both stores, incl. recall) | Both: `200`, `<title> "{name} — Unfiltered"`, store line + `500 products`, `noindex`, `catalog=` param sent. tentree `50ec6093…` `route=ai` 5849 ms, 12 results, 2 chips, $0.001043; whitestuff `15689b8d…` `route=ai` 8755 ms, 15 results, 2 chips, $0.001032. Recall (YOY-105) PASS on both: `4e7f1bc8…` (top two are the pine-green tees) and `7dff2e7f…` (#1 is Foss Cotton Linen Trousers). |
+| 25 | Unknown `/s/` slug | HTTP 404 with the designed page and `/` link | **PASS** | `GET /s/definitely-not-a-store` → true network **HTTP 404** (`text/html`, 5,108 bytes), designed not-found page in the same shell with a link back to `/` and `<meta name="robots" content="noindex">`. No raw error page, no stack trace. |
+| 26 | Catalog daily AI cap = 2 | 3rd query classic `degraded` + `limited`; restored | **PASS** | Cap `2`, deploy Live 15:26Z, fresh session on `/s/tentree`: `6bc03665…` attempted AI and failed `routeReason=model-error` (another F-2 instance → YOY-109), counted as attempt 1; `11b1ca97…` `route=ai`, 2 chips, 8.8 s; `bb87e4cb…` **`route=classic`, `degraded=true`, `limited="daily-catalog"`, `routeReason=throttled`**, 24 classic cards in 2.1 s, no error UI. **Restored** (variable deleted → default 500): `9bd728de…` `route=ai`, 24 results, 11.8 s. Deployment is not left capped. |
+| 27 | Free-tier cold start | first hit tens of seconds, then `200`; both timed | **PASS** | Monitor paused, ≥20 min idle: first hit `200` in **52.79 s** (inside DEPLOY.md's 30–60 s band), second hit `200` in **0.38 s**. Monitor **re-enabled** on `/healthz` afterwards (founder confirmed). |
 
 **Findings filed (defects observed during the run, as Linear issues):**
 
-- _one line per filed issue: identifier, one-sentence symptom, status_
+- **YOY-109** — intent-extraction calls fail intermittently on the live
+  deployment (F-2), degrading AI queries to `degraded` classic with zero
+  results; Hebrew disproportionately affected (5/9 vs EN 0/8). High,
+  `agent-ready`, runs before YOY-96.
+- **YOY-110** — [M5] colour exclusion should apply to a product's primary
+  colour, not to any colourway (F-1's empty intersection). Founder decision
+  recorded; Backlog.
+- **YOY-111** — [M5] close matches must never violate an explicit exclusion and
+  must relax constraints one at a time, price first (F-1's all-black
+  close-matches optics). Founder decision recorded; Backlog.
+- **F-3** (classic parity floor missed — ~1.85 s warm vs the storefront's
+  ~0.24–0.65 s) — no new issue; recorded on **YOY-64** with the latency-bar
+  decision and the degradation-since-M3 context.
+- **F-4** (`jsonld-crawl` tenants yield almost no colour enrichment — 6 colour
+  values across 500 White Stuff products, so colour constraints are inert
+  there) plus the Phase C observations (EU sale pricing, near-duplicate
+  colourways, `--max` boundary reporting) and the vision-model comparison —
+  no issue filed; carried as the **M5 spec rider** recorded on YOY-95.
