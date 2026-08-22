@@ -732,14 +732,24 @@ honestly through `degraded` and `details.limited`.
 | Guard | Env var | Default | `details.limited` |
 |---|---|---|---|
 | Per-IP AI searches per minute | `PLAYGROUND_AI_THROTTLE_PER_MINUTE` | 10 | `"ip"` |
+| Trusted `X-Forwarded-For` hops (how the IP is read) | `PLAYGROUND_TRUSTED_PROXY_HOPS` | 1 | — |
 | Daily AI searches, all playground tenants | `PLAYGROUND_DAILY_AI_CAP` | 2000 | `"daily-global"` |
 | Daily AI searches, one catalog | `PLAYGROUND_CATALOG_DAILY_AI_CAP` | 500 | `"daily-catalog"` |
 
 The per-IP guard keys the proxy's sliding-window throttle by the visitor's IP
-— the first `X-Forwarded-For` entry, then the connection address the runtime
-supplies, then a shared `"unknown"` bucket so a request with neither is still
-limited rather than exempt. It is in-process, so it is per-instance and
-resets on restart, exactly like the proxy's session throttle.
+— the **last trusted `X-Forwarded-For` hop**, then the connection address the
+runtime supplies, then a shared `"unknown"` bucket so a request with neither
+is still limited rather than exempt (YOY-96 AC-11). "Last trusted hop" means
+the entry `PLAYGROUND_TRUSTED_PROXY_HOPS` positions from the END of the header
+(default 1: the last entry). Every reverse proxy, Render included, appends the
+peer it saw to whatever header arrived, so the first entry is client-supplied
+— keyed by it, a visitor minting a fresh `X-Forwarded-For` per request got a
+fresh bucket every time and the guard never bound. The entry our own edge
+appended is the one the client cannot forge; put a CDN in front of Render and
+set the hops to 2. A header with fewer entries than trusted hops did not come
+through the configured edge and is not trusted at all. The guard is
+in-process, so it is per-instance and resets on restart, exactly like the
+proxy's session throttle.
 
 The two daily ceilings are counted from `SearchEvent` rows with `route = "ai"`
 since 00:00 UTC — from the log, not from memory, so a restart cannot reset a

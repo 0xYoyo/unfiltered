@@ -14,6 +14,7 @@ import {
   playgroundLimitsFromEnv,
   PLAYGROUND_RESPONSE_HEADERS,
   PLAYGROUND_RESULT_LIMIT,
+  remoteAddressFromContext,
   resolveCatalog,
   resolveLimit,
   serializePlaygroundSearchResponse,
@@ -57,6 +58,7 @@ function emptyResponse(status: number): Response {
 
 export const loader = async ({
   request,
+  context,
 }: LoaderFunctionArgs): Promise<Response> => {
   const url = new URL(request.url);
   const body = parseProxySearchParams(url.searchParams);
@@ -100,7 +102,9 @@ export const loader = async ({
   // burn budget and neither is counted or limited (AC-3).
   const guarded = !preview && resolvedIntent === undefined;
   const throttle = getPlaygroundIpThrottle();
-  const ip = clientIp(request);
+  // Keyed by the last trusted X-Forwarded-For hop; the connection address is
+  // only available to a custom server's load context (YOY-96 AC-11).
+  const ip = clientIp(request, remoteAddressFromContext(context));
   const limited = guarded
     ? await resolveLimit({
         db,
