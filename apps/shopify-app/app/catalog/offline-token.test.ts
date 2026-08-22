@@ -209,6 +209,52 @@ describe("failure paths name the shop and the fix (AC-2)", () => {
     await expectActionable(resolve(neverFetch), /refresh token expired/);
   });
 
+  it("expired token with a valid refresh token but no app credentials names the missing variables and makes no request (YOY-96 AC-2)", async () => {
+    await seedSession({
+      expires: new Date(NOW.getTime() - 1000),
+      refreshToken: "refresh-1",
+    });
+    const captured: CapturedRequest[] = [];
+    const error = await resolveOfflineAccessToken({
+      db,
+      shop: SHOP,
+      apiKey: "",
+      apiSecretKey: "",
+      fetch: fakeFetch(() => json({ error: "invalid_client" }, 401), captured),
+      now,
+    }).then(
+      () => null,
+      (caught: unknown) => caught,
+    );
+    expect(error).toBeInstanceOf(OfflineAuthError);
+    const message = (error as Error).message;
+    expect(message).toContain("SHOPIFY_API_KEY");
+    expect(message).toContain("SHOPIFY_API_SECRET");
+    expect(message).toMatch(
+      /cannot be refreshed — set them in \.env \(re-authorizing does not set them\)/,
+    );
+    // The standard hint still follows, but is no longer the only fix named.
+    expect(message).toContain("re-authorize");
+    expect(captured).toHaveLength(0);
+    // One missing variable is named alone.
+    const single = await resolveOfflineAccessToken({
+      db,
+      shop: SHOP,
+      apiKey: "app-key",
+      apiSecretKey: "   ",
+      fetch: fakeFetch(() => json({}, 401), captured),
+      now,
+    }).then(
+      () => null,
+      (caught: unknown) => caught,
+    );
+    expect((single as Error).message).toMatch(
+      /SHOPIFY_API_SECRET is not set, so it cannot be refreshed — set it in \.env/,
+    );
+    expect((single as Error).message).not.toContain("SHOPIFY_API_KEY");
+    expect(captured).toHaveLength(0);
+  });
+
   it("the refresh grant is rejected", async () => {
     await seedSession({
       expires: new Date(NOW.getTime() - 1000),

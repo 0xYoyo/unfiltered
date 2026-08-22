@@ -181,6 +181,15 @@ It may emit candidates slightly out of distance order, so each of those queries
 wraps its candidate scan in a `MATERIALIZED` CTE and re-sorts by the same keys
 outside it — the row *set* is unchanged, the row *order* is exact.
 
+The transaction carries an explicit budget rather than Prisma's implicit
+interactive-transaction defaults (2 s to acquire a connection, 5 s lifetime):
+`TENANT_VECTOR_SCAN_MAX_WAIT_MS` = 5 s and `TENANT_VECTOR_SCAN_TIMEOUT_MS` =
+15 s, forwarded to `$transaction` by `withTenantVectorScan()` (YOY-96 AC-17).
+The ceiling bounds how long a wedged scan can hold a pooled connection — about
+ten times the 0.9–1.6 s the whole retrieval stage measures live, inside the
+60 s intent-call abort above it — without turning a slow-but-correct scan into
+a degraded answer; it is not the retrieval latency budget (YOY-64).
+
 Two alternatives were rejected:
 
 - **Per-tenant partial indexes** — unviable. Playground slugs are created
