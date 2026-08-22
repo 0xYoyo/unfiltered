@@ -416,6 +416,10 @@ export function createProxySearchOrchestrator(
       llm: createGeminiLlmClient({
         modelId: models.intentModel,
         costRecorder,
+        // Low thinking on the intent call (YOY-109): the model default's
+        // queue tail and hangs were the live degraded-with-intent-null
+        // failures.
+        thinkingLevel: models.intentThinkingLevel,
       }),
     }),
     retriever: createRetriever({

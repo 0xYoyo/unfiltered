@@ -9,7 +9,7 @@ import {
   type RetrievalStore,
   type StructuredCompletionRequest,
 } from "@unfiltered/engine";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createPrismaCostRecorder } from "../ai/cost-recorder.server";
 import { createTestDb } from "../testing/helpers.server";
@@ -356,6 +356,46 @@ describe("silent fallback ladder (AC-4)", () => {
       }),
     });
     await expectDegradedClassic(orchestrator);
+  });
+
+  it("intent LLM error logs one structured warn line naming the failure class (YOY-109)", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      class UpstreamError extends Error {
+        readonly status = 503;
+        readonly code = "ETIMEDOUT";
+      }
+      const orchestrator = buildOrchestrator(db, {
+        llm: fakeLlm({
+          classification: () => ({ route: "ai" }),
+          intent: () => {
+            throw new UpstreamError("Gemini API answered 503");
+          },
+        }),
+      });
+      const response = await orchestrator.runSearch({
+        query: AI_QUERY,
+        shopDomain: SHOP,
+        searchId: "search-yoy-109",
+      });
+      // The fallback itself is unchanged: silent classic, degraded.
+      expect(response.route).toBe("classic");
+      expect(response.degraded).toBe(true);
+      expect(warn).toHaveBeenCalledTimes(1);
+      const [message, payload] = warn.mock.calls[0]!;
+      expect(message).toContain("intent extraction failed");
+      expect(JSON.parse(String(payload))).toMatchObject({
+        searchId: "search-yoy-109",
+        routeReason: "model",
+        error: "Error",
+        message: "Gemini API answered 503",
+        status: 503,
+        code: "ETIMEDOUT",
+      });
+      expect(JSON.parse(String(payload)).elapsedMs).toBeTypeOf("number");
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it("IntentExtractionError (schema violation twice) → classic results, degraded", async () => {

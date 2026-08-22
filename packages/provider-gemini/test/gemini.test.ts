@@ -7,6 +7,8 @@ import {
   DEFAULT_EMBEDDING_DIMENSION,
   DEFAULT_EMBEDDING_MODEL,
   DEFAULT_INTENT_MODEL,
+  DEFAULT_INTENT_THINKING_LEVEL,
+  MODEL_DEFAULT_THINKING_LEVEL,
   GeminiApiError,
   GeminiConfigError,
   GeminiResponseError,
@@ -82,7 +84,9 @@ describe("model configuration", () => {
       intentModel: DEFAULT_INTENT_MODEL,
       embeddingModel: DEFAULT_EMBEDDING_MODEL,
       embeddingDimension: DEFAULT_EMBEDDING_DIMENSION,
+      intentThinkingLevel: DEFAULT_INTENT_THINKING_LEVEL,
     });
+    expect(DEFAULT_INTENT_THINKING_LEVEL).toBe("low");
   });
 
   it("reads every model from env overrides", () => {
@@ -91,12 +95,14 @@ describe("model configuration", () => {
       GEMINI_INTENT_MODEL: "model-b",
       GEMINI_EMBEDDING_MODEL: "model-c",
       GEMINI_EMBEDDING_DIMENSION: "1536",
+      GEMINI_INTENT_THINKING_LEVEL: "high",
     });
     expect(models).toEqual({
       classificationModel: "model-a",
       intentModel: "model-b",
       embeddingModel: "model-c",
       embeddingDimension: 1536,
+      intentThinkingLevel: "high",
     });
   });
 
@@ -108,6 +114,26 @@ describe("model configuration", () => {
       expect(() =>
         geminiModelsFromEnv({ GEMINI_EMBEDDING_DIMENSION: raw }),
       ).toThrow(/GEMINI_EMBEDDING_DIMENSION/);
+    }
+  });
+
+  it("maps GEMINI_INTENT_THINKING_LEVEL=model-default to no override and rejects a blank value (YOY-109)", () => {
+    expect(
+      geminiModelsFromEnv({
+        GEMINI_INTENT_THINKING_LEVEL: MODEL_DEFAULT_THINKING_LEVEL,
+      }).intentThinkingLevel,
+    ).toBeUndefined();
+    expect(
+      geminiModelsFromEnv({ GEMINI_INTENT_THINKING_LEVEL: " low " })
+        .intentThinkingLevel,
+    ).toBe("low");
+    for (const raw of ["", "  "]) {
+      expect(() =>
+        geminiModelsFromEnv({ GEMINI_INTENT_THINKING_LEVEL: raw }),
+      ).toThrow(GeminiConfigError);
+      expect(() =>
+        geminiModelsFromEnv({ GEMINI_INTENT_THINKING_LEVEL: raw }),
+      ).toThrow(/GEMINI_INTENT_THINKING_LEVEL/);
     }
   });
 
@@ -169,6 +195,41 @@ describe("structured completion", () => {
       (captured[0]!.body.generationConfig as { temperature?: number })
         .temperature,
     ).toBe(0);
+  });
+
+  it("sends thinkingConfig.thinkingLevel when configured and no thinkingConfig otherwise (YOY-109)", async () => {
+    const { recorder } = recorderSpy();
+    const { captured, impl } = fetchStub(200, completionFixture);
+
+    await createGeminiLlmClient({
+      modelId: "test-intent-model",
+      apiKey: "test-key-not-real",
+      costRecorder: recorder,
+      fetchImpl: impl,
+      thinkingLevel: "low",
+    }).completeStructured({
+      prompt: "Extract intent",
+      schema: SCHEMA,
+      operation: "intent",
+      temperature: 0,
+    });
+    expect(captured[0]!.body.generationConfig).toEqual({
+      responseMimeType: "application/json",
+      responseSchema: SCHEMA,
+      temperature: 0,
+      thinkingConfig: { thinkingLevel: "low" },
+    });
+
+    // The classification client (no thinkingLevel) keeps the pre-YOY-109
+    // body byte for byte: the model decides its own thinking.
+    await llmClient(impl, recorder).completeStructured({
+      prompt: "Route this query",
+      schema: SCHEMA,
+      operation: "classification",
+    });
+    expect(captured[1]!.body.generationConfig).not.toHaveProperty(
+      "thinkingConfig",
+    );
   });
 
   it("translates nullable type arrays to Gemini's nullable form in responseSchema (YOY-28)", async () => {

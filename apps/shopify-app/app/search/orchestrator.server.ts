@@ -76,6 +76,40 @@ import {
 const CLOSE_MATCH_LIMIT = 10;
 
 /**
+ * One structured line per intent-extraction failure (YOY-109). The catch
+ * below stays type-blind and the fallback stays silent for the shopper, but
+ * the failure's class — the Gemini adapter's error name, its HTTP status or
+ * code when it carries one, and how long the call ran — must reach the
+ * server log: the live degraded-with-intent-null failures were diagnosable
+ * only by reproduction because nothing recorded what actually threw.
+ */
+function warnIntentFailure(
+  searchId: string,
+  routeReason: SearchRouteReason,
+  error: unknown,
+  startedAt: number,
+): void {
+  const detail =
+    error instanceof Error
+      ? {
+          error: error.name,
+          message: error.message,
+          ...("status" in error ? { status: error.status } : {}),
+          ...("code" in error ? { code: error.code } : {}),
+        }
+      : { error: String(error) };
+  console.warn(
+    "[search] intent extraction failed; degrading to classic",
+    JSON.stringify({
+      searchId,
+      routeReason,
+      elapsedMs: Date.now() - startedAt,
+      ...detail,
+    }),
+  );
+}
+
+/**
  * Why the response took the route it did: the classifier's reason,
  * "resolved-intent" when the caller supplied the intent itself (chip
  * removal, YOY-46) and no classification ran, "throttled" when the
@@ -422,13 +456,15 @@ export function createSearchOrchestrator(
        */
       const escalatedAiPath = async (): Promise<SearchResponse> => {
         let intent: Intent;
+        const startedAt = Date.now();
         try {
           intent = await extractor.extract(query, {
             storeId: shopDomain,
             searchId,
             previousIntent: request.previousIntent,
           });
-        } catch {
+        } catch (error) {
+          warnIntentFailure(searchId, "classic-zero-hit", error, startedAt);
           return classicResponse("classic-zero-hit", true);
         }
         return aiPath(intent, "classic-zero-hit");
@@ -473,13 +509,15 @@ export function createSearchOrchestrator(
       }
 
       let intent: Intent;
+      const startedAt = Date.now();
       try {
         intent = await extractor.extract(query, {
           storeId: shopDomain,
           searchId,
           previousIntent: request.previousIntent,
         });
-      } catch {
+      } catch (error) {
+        warnIntentFailure(searchId, decision.reason, error, startedAt);
         return classicResponse(decision.reason, true);
       }
 

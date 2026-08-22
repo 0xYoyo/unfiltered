@@ -68,6 +68,18 @@ export interface GeminiClientOptions {
    * headers timeout.
    */
   requestTimeoutMs?: number;
+  /**
+   * Gemini thinking level for `generateContent`, sent as
+   * `generationConfig.thinkingConfig.thinkingLevel`. Undefined sends no
+   * thinkingConfig and leaves the model at its own default. Intent
+   * extraction runs at `DEFAULT_INTENT_THINKING_LEVEL` (YOY-109): at the
+   * model default, gemini-3.6-flash spends 350–1000 thought tokens per
+   * intent call and sits in a 3–10 s band with an upstream-queue tail to
+   * 50 s and occasional no-response hangs that run into the abort timeout
+   * — every one of which degrades the search to classic. At "low" the same
+   * prompt answers the same JSON in 1.5–5 s with no tail.
+   */
+  thinkingLevel?: string;
 }
 
 export interface GeminiEmbeddingClientOptions extends GeminiClientOptions {
@@ -83,6 +95,13 @@ export const DEFAULT_CLASSIFICATION_MODEL = "gemini-3.5-flash-lite";
 export const DEFAULT_INTENT_MODEL = "gemini-3.6-flash";
 export const DEFAULT_EMBEDDING_MODEL = "gemini-embedding-001";
 export const DEFAULT_EMBEDDING_DIMENSION = 768;
+/** Thinking level the intent client runs at unless the env overrides it. */
+export const DEFAULT_INTENT_THINKING_LEVEL = "low";
+/**
+ * `GEMINI_INTENT_THINKING_LEVEL` value that sends no thinkingConfig at all,
+ * restoring the model's own default thinking (the pre-YOY-109 behaviour).
+ */
+export const MODEL_DEFAULT_THINKING_LEVEL = "model-default";
 
 export interface GeminiModelConfig {
   /** For classification and enrichment operations. */
@@ -91,12 +110,17 @@ export interface GeminiModelConfig {
   intentModel: string;
   embeddingModel: string;
   embeddingDimension: number;
+  /**
+   * Thinking level for the intent client, or undefined to leave the model at
+   * its own default (`GEMINI_INTENT_THINKING_LEVEL=model-default`).
+   */
+  intentThinkingLevel: string | undefined;
 }
 
 /**
  * Resolve model configuration from the environment with documented defaults:
  * GEMINI_CLASSIFICATION_MODEL, GEMINI_INTENT_MODEL, GEMINI_EMBEDDING_MODEL,
- * GEMINI_EMBEDDING_DIMENSION.
+ * GEMINI_EMBEDDING_DIMENSION, GEMINI_INTENT_THINKING_LEVEL.
  */
 export function geminiModelsFromEnv(
   env: Record<string, string | undefined> = process.env,
@@ -107,7 +131,25 @@ export function geminiModelsFromEnv(
     intentModel: env.GEMINI_INTENT_MODEL ?? DEFAULT_INTENT_MODEL,
     embeddingModel: env.GEMINI_EMBEDDING_MODEL ?? DEFAULT_EMBEDDING_MODEL,
     embeddingDimension: parseEmbeddingDimension(env.GEMINI_EMBEDDING_DIMENSION),
+    intentThinkingLevel: parseThinkingLevel(env.GEMINI_INTENT_THINKING_LEVEL),
   };
+}
+
+/**
+ * Unset means the documented default; `model-default` means no override; a
+ * blank value is a misconfiguration, not a silent fallback (YOY-109).
+ */
+function parseThinkingLevel(raw: string | undefined): string | undefined {
+  if (raw === undefined) {
+    return DEFAULT_INTENT_THINKING_LEVEL;
+  }
+  const level = raw.trim();
+  if (level === "") {
+    throw new GeminiConfigError(
+      `GEMINI_INTENT_THINKING_LEVEL must name a thinking level or "${MODEL_DEFAULT_THINKING_LEVEL}", got ${JSON.stringify(raw)}`,
+    );
+  }
+  return level === MODEL_DEFAULT_THINKING_LEVEL ? undefined : level;
 }
 
 /**
@@ -134,6 +176,7 @@ interface ResolvedOptions {
   fetchImpl: typeof fetch;
   baseUrl: string;
   requestTimeoutMs: number;
+  thinkingLevel: string | undefined;
 }
 
 function resolveOptions(options: GeminiClientOptions): ResolvedOptions {
@@ -150,6 +193,7 @@ function resolveOptions(options: GeminiClientOptions): ResolvedOptions {
     fetchImpl: options.fetchImpl ?? fetch,
     baseUrl: options.baseUrl ?? DEFAULT_BASE_URL,
     requestTimeoutMs: options.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS,
+    thinkingLevel: options.thinkingLevel,
   };
 }
 
@@ -259,6 +303,9 @@ export function createGeminiLlmClient(options: GeminiClientOptions): LlmClient {
             responseSchema: toGeminiResponseSchema(request.schema),
             ...(request.temperature !== undefined
               ? { temperature: request.temperature }
+              : {}),
+            ...(resolved.thinkingLevel !== undefined
+              ? { thinkingConfig: { thinkingLevel: resolved.thinkingLevel } }
               : {}),
           },
         },

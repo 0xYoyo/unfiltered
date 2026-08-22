@@ -490,6 +490,9 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
         createGeminiLlmClient({
           modelId: models.intentModel,
           costRecorder: usage.recorder,
+          // Same thinking level production runs at (YOY-109), so the
+          // recordings stay live evidence of the deployed configuration.
+          thinkingLevel: models.intentThinkingLevel,
         }),
         usage.last,
         intentEntries,
@@ -520,6 +523,9 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
         createGeminiLlmClient({
           modelId: models.intentModel,
           costRecorder: usage.recorder,
+          // Same thinking level production runs at (YOY-109), so the
+          // recordings stay live evidence of the deployed configuration.
+          thinkingLevel: models.intentThinkingLevel,
         }),
         usage.last,
         refinementEntries,
