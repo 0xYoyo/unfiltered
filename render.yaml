@@ -81,3 +81,5 @@ services:
       #   GEMINI_INTENT_MODEL
       #   GEMINI_EMBEDDING_MODEL
       #   GEMINI_EMBEDDING_DIMENSION
+      # The intent call's thinking level defaults to `low` (YOY-109); set
+      # GEMINI_INTENT_THINKING_LEVEL to change it (`model-default` = none).

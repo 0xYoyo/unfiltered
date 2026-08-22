@@ -64,6 +64,7 @@ search 500s.
 | `PLAYGROUND_DAILY_AI_CAP` | optional | Default `2000` AI searches/day across all playground catalogs. |
 | `PLAYGROUND_CATALOG_DAILY_AI_CAP` | optional | Default `500` AI searches/day per catalog. |
 | `GEMINI_*_MODEL`, `GEMINI_EMBEDDING_DIMENSION` | optional | Pin a model instead of the documented defaults in `packages/provider-gemini`. |
+| `GEMINI_INTENT_THINKING_LEVEL` | optional | Thinking level of the intent-extraction call; default `low` (YOY-109). `model-default` sends no thinking config and restores the model's own default. |
 
 `PORT` is supplied by Render and honoured by the entrypoint; do not set it.
 
