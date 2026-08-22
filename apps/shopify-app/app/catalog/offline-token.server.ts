@@ -102,6 +102,21 @@ export async function resolveOfflineAccessToken({
       `the offline access token expired at ${expiredAt} and its refresh token expired at ${session.refreshTokenExpires.toISOString()}`,
     );
   }
+  // The refresh grant needs the app credentials. Posting empty ones gets a
+  // 4xx from Shopify whose only suggested fix would be re-authorizing — which
+  // does not set an env var (YOY-96 AC-2). Name the missing variable instead,
+  // before any network call.
+  const missingCredentials = [
+    ...(apiKey.trim() === "" ? ["SHOPIFY_API_KEY"] : []),
+    ...(apiSecretKey.trim() === "" ? ["SHOPIFY_API_SECRET"] : []),
+  ];
+  if (missingCredentials.length > 0) {
+    const plural = missingCredentials.length > 1;
+    throw new OfflineAuthError(
+      shop,
+      `the offline access token expired at ${expiredAt} and ${missingCredentials.join(" / ")} ${plural ? "are" : "is"} not set, so it cannot be refreshed — set ${plural ? "them" : "it"} in .env (re-authorizing does not set ${plural ? "them" : "it"})`,
+    );
+  }
 
   let response: Response;
   try {

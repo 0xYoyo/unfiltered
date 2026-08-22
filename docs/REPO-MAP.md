@@ -54,6 +54,7 @@ apps/
       catalog/
         embed.server.ts
         enrich.server.ts
+        hnsw.server.test.ts
         hnsw.server.ts
         ingest.server.ts
         mapping.server.ts
@@ -608,6 +609,7 @@ vitest.setup.ts
 - apps/shopify-app/app/catalog-ingestion.test.ts → apps/shopify-app/app/catalog/ingest.server.ts, apps/shopify-app/app/catalog/mapping.server.ts, apps/shopify-app/app/catalog/mapping.test.ts, apps/shopify-app/app/testing/helpers.server.ts
 - apps/shopify-app/app/catalog/embed.server.ts → apps/shopify-app/app/ai/cost-recorder.server.ts, apps/shopify-app/app/catalog/hnsw.server.ts
 - apps/shopify-app/app/catalog/enrich.server.ts → apps/shopify-app/app/ai/cost-recorder.server.ts
+- apps/shopify-app/app/catalog/hnsw.server.test.ts → apps/shopify-app/app/catalog/hnsw.server.ts
 - apps/shopify-app/app/catalog/ingest.server.ts → apps/shopify-app/app/catalog/mapping.server.ts
 - apps/shopify-app/app/catalog/mapping.test.ts → apps/shopify-app/app/catalog/mapping.server.ts
 - apps/shopify-app/app/catalog/offline-token.test.ts → apps/shopify-app/app/catalog/offline-token.server.ts, apps/shopify-app/app/testing/helpers.server.ts
