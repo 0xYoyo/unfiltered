@@ -248,6 +248,11 @@
       // results view falls back to the bare section (origin still hidden).
       const shellMissing = params.get("shell") === "missing";
       const shellLocale = params.get("locale") ?? "en";
+      // `countFormat=range`: a theme whose count line carries more than one
+      // number (a page window plus the total) — the first digit run is NOT
+      // the count, so the mirror must hide the line rather than rewrite it
+      // into a wrong statement (YOY-96 AC-3).
+      const countFormat = params.get("countFormat") ?? "dawn";
       const shellHtml = (term) => `<!doctype html>
 <html lang="${shellLocale}">
 <head><meta charset="utf-8"><title>Search: 95 results found for “${term}”</title>
@@ -274,9 +279,11 @@
           </form>
         </div>
         <p role="status" data-testid="theme-results-count">${
-          shellLocale === "he"
-            ? `נמצאו 95 תוצאות עבור “${term}”`
-            : `95 results found for “${term}”`
+          countFormat === "range"
+            ? `Showing 1–24 of 95 results for “${term}”`
+            : shellLocale === "he"
+              ? `נמצאו 95 תוצאות עבור “${term}”`
+              : `95 results found for “${term}”`
         }</p>
       </div>
       <div class="facets-container">

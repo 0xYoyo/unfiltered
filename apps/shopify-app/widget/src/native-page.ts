@@ -167,21 +167,56 @@ export function pageFromSearch(search: string): number {
 }
 
 /**
- * Rewrite one run of the theme's results-count text: the first digit run
- * (the theme's count) becomes ours, then every occurrence of the shell
- * term becomes the shopper's query — in that order, so digits inside the
- * query can never be mistaken for the count. Wording, language, and
- * markup stay the theme's.
+ * Rewrite one run of the theme's results-count text: the digit run the
+ * configured `pattern`'s `count` group names (the theme's count) becomes
+ * ours, then every occurrence of the shell term becomes the shopper's query
+ * — in that order, so digits inside the query can never be mistaken for the
+ * count. Wording, language, and markup stay the theme's.
+ *
+ * Returns null when the run carries digits but the pattern does not locate
+ * the count in it (YOY-96 AC-3): the caller hides the count element rather
+ * than render a wrong statement. A run with no digits at all is not a count
+ * run — only the term substitution applies to it.
  */
 export function substituteCountText(
   text: string,
-  values: { count: number; term: string; query: string },
-): string {
-  let out = text.replace(/\d[\d.,]*/, String(values.count));
+  values: { count: number; term: string; query: string; pattern: string },
+): string | null {
+  let out = text;
+  if (/\d/.test(text)) {
+    const located = locateCount(text, values.pattern);
+    if (located === null) {
+      return null;
+    }
+    out =
+      text.slice(0, located.start) +
+      String(values.count) +
+      text.slice(located.end);
+  }
   if (values.term !== "") {
     out = out.split(values.term).join(values.query);
   }
   return out;
+}
+
+/** The `count` group's span in `text` per `pattern`, or null (no match, no
+ * group, or an invalid pattern — all of which mean "do not guess"). */
+function locateCount(
+  text: string,
+  pattern: string,
+): { start: number; end: number } | null {
+  let regex: RegExp;
+  try {
+    regex = new RegExp(pattern, "d");
+  } catch {
+    return null;
+  }
+  const match = regex.exec(text);
+  const span = match?.indices?.groups?.count;
+  if (span === undefined) {
+    return null;
+  }
+  return { start: span[0], end: span[1] };
 }
 
 interface Shell {
@@ -189,8 +224,9 @@ interface Shell {
   nodes: Node[];
   /** The theme's results list, which the results section replaces. */
   list: HTMLElement;
-  /** Text runs of the theme's count line, with their pristine text. */
-  countTexts: Array<{ node: Text; original: string }>;
+  /** Text runs of the theme's count line, with their pristine text and the
+   * outermost count element each belongs to. */
+  countTexts: Array<{ node: Text; original: string; element: HTMLElement }>;
   /** Outermost count-line elements (hidden while no count is known). */
   countElements: HTMLElement[];
   termInputs: HTMLInputElement[];
@@ -349,7 +385,7 @@ export function createPageMirror(options: PageMirrorOptions): PageMirror {
         let node = walker.nextNode();
         while (node !== null) {
           if (node instanceof Text) {
-            countTexts.push({ node, original: node.data });
+            countTexts.push({ node, original: node.data, element });
           }
           node = walker.nextNode();
         }
@@ -433,14 +469,41 @@ export function createPageMirror(options: PageMirrorOptions): PageMirror {
     }
     for (const element of shell.countElements) {
       element.hidden = count === null;
-    }
-    if (count !== null) {
-      for (const { node, original } of shell.countTexts) {
-        node.data = substituteCountText(original, {
-          count,
-          term: page.shellTerm,
-          query,
-        });
+      if (count === null) {
+        continue;
+      }
+      // The count must be locatable in exactly one digit-bearing run of
+      // this element, and that run must match the configured pattern
+      // (YOY-96 AC-3). Otherwise the line would state something we do not
+      // mean — a range, a page window — so it is hidden and its digit runs
+      // blanked: a missing count line is theme-neutral, a wrong one is not.
+      const runs = shell.countTexts.filter((run) => run.element === element);
+      const digitRuns = runs.filter((run) => /\d/.test(run.original));
+      const rewritten = new Map<Text, string>();
+      let usable = digitRuns.length === 1;
+      for (const { node, original } of runs) {
+        const next = usable
+          ? substituteCountText(original, {
+              count,
+              term: page.shellTerm,
+              query,
+              pattern: page.countPattern,
+            })
+          : null;
+        if (next === null && /\d/.test(original)) {
+          usable = false;
+        }
+        rewritten.set(node, next ?? original);
+      }
+      if (!usable) {
+        element.hidden = true;
+        for (const { node } of digitRuns) {
+          node.data = "";
+        }
+        continue;
+      }
+      for (const [node, text] of rewritten) {
+        node.data = text;
       }
     }
     for (const input of shell.termInputs) {

@@ -846,6 +846,16 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
         ensureMounted();
       }
       renderToken += 1;
+      if (mirror.isEntered()) {
+        // A submitted query on an already-entered view (YOY-96 AC-5): the
+        // count line must never state the previous query while this one
+        // loads, and the template's input shows the new query now. No
+        // `enter`, no URL change — the URL moves once, in showResponse.
+        // (Previews never reach here while entered: main.ts skips
+        // showLoading for a preview over an open view.)
+        currentQuery = options.query();
+        mirror.setResult(currentQuery, null);
+      }
       loading.hidden = false;
       noResults.hidden = true;
       zeroHit.hidden = true;

@@ -555,12 +555,20 @@ docs/
       mobile-he-1-store-line.png
       mobile-he-2-preview-cards.png
       mobile-he-3-submitted-cards.png
+      widget-desktop-en-count-range-hidden.png
+      widget-desktop-en-loading-new-query.png
       widget-desktop-en-variant-A-sanitized-results.png
       widget-desktop-en-variant-B-sanitized-results.png
+      widget-desktop-he-count-range-hidden.png
+      widget-desktop-he-loading-new-query.png
       widget-desktop-he-variant-A-sanitized-results.png
       widget-desktop-he-variant-B-sanitized-results.png
+      widget-mobile-en-count-range-hidden.png
+      widget-mobile-en-loading-new-query.png
       widget-mobile-en-variant-A-sanitized-results.png
       widget-mobile-en-variant-B-sanitized-results.png
+      widget-mobile-he-count-range-hidden.png
+      widget-mobile-he-loading-new-query.png
       widget-mobile-he-variant-A-sanitized-results.png
       widget-mobile-he-variant-B-sanitized-results.png
     YOY-99/

@@ -128,6 +128,19 @@ export interface NativeRenderPageConfig {
    * term rewritten). Nested matches are handled once, outermost first. */
   countSelector: string;
   /**
+   * How the count is found inside the count line's text (YOY-96 AC-3): a
+   * regex source with a named `count` group. A count text run that carries
+   * digits but does not match — a theme whose line carries MORE than one
+   * number (`Showing 1–24 of 95 results for “*”`, a paginated `1 – 24 / 95`)
+   * — hides the count element instead of being rewritten: a missing count
+   * line is theme-neutral, a wrong one is not. The Dawn default requires
+   * exactly one digit run anywhere in the run, which is Dawn's EN
+   * (`95 results found for “*”`) AND HE (`נמצאו 95 תוצאות עבור “*”`, count
+   * mid-sentence) wording alike; a theme with a richer line configures the
+   * group that names its total.
+   */
+  countPattern: string;
+  /**
    * Elements that only make sense against the theme's own result set —
    * filter facets, sorting, loading overlays — removed from the mirror.
    * Pagination is deliberately NOT among them (YOY-107): the theme's own
@@ -244,6 +257,8 @@ export const DAWN_NATIVE_RENDER: NativeRenderConfig = {
     // Dawn renders the count in the search header (filtering/sorting off)
     // or in the facets bar's product-count (filtering on).
     countSelector: '.template-search__header [role="status"], .product-count',
+    // Exactly one digit run in the text run, wherever it sits (YOY-96 AC-3).
+    countPattern: "^\\D*(?<count>\\d[\\d.,]*)\\D*$",
     // Pagination is NOT stripped any more (YOY-107): the theme's own
     // pagination markup is what pages our result set.
     stripSelector: [
