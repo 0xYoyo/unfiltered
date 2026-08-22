@@ -939,6 +939,78 @@ test.describe("full-page mirror — the theme's own search page (YOY-100)", () =
     ).toBeUndefined();
   });
 
+  test("a multi-number count line is hidden rather than rewritten into a wrong statement; Dawn's EN and HE lines still rewrite (YOY-96 AC-3)", async ({
+    page,
+  }) => {
+    // A theme whose count line reads "Showing 1–24 of 95 results for “*”":
+    // the first digit run is a page window, not the count. The default
+    // pattern (exactly one digit run) does not match, so the element is
+    // hidden and its digits blanked — no text run carries 95 any more.
+    await page.goto(
+      "/theme-native.html?native=A&fixture=ai&countFormat=range&debounce=30000",
+    );
+    await submitQuery(page, "blue dress under 400");
+    await expect(items(page)).toHaveCount(3);
+    await expect(themeCount(page)).toBeHidden();
+    await expect(themeCount(page)).toHaveCount(1);
+    expect(
+      await themeCount(page).evaluate((element) =>
+        Array.from(element.childNodes)
+          .filter((node) => node.nodeType === Node.TEXT_NODE)
+          .map((node) => node.textContent ?? ""),
+      ),
+    ).not.toContainEqual(expect.stringContaining("95"));
+    expect(await themeCount(page).textContent()).not.toContain("95");
+    // The template input still carries the query: only the count is withheld.
+    await expect(page.locator("#Search-In-Template")).toHaveValue(
+      "blue dress under 400",
+    );
+
+    // Dawn's own wording keeps rewriting: EN (count leads)…
+    await page.goto("/theme-native.html?native=A&fixture=ai&debounce=30000");
+    await submitQuery(page, "blue dress under 400");
+    await expect(themeCount(page)).toBeVisible();
+    await expect(themeCount(page)).toHaveText(
+      "3 results found for “blue dress under 400”",
+    );
+    // …and HE, where the count sits mid-sentence — the default pattern
+    // finds the one digit run wherever it is.
+    await page.goto(
+      "/theme-native.html?native=A&fixture=ai&locale=he&debounce=30000",
+    );
+    await submitQuery(page, "blue dress under 400");
+    await expect(themeCount(page)).toBeVisible();
+    await expect(themeCount(page)).toHaveText(
+      "נמצאו 3 תוצאות עבור “blue dress under 400”",
+    );
+  });
+
+  test("the count line never states the previous query while a new one loads: hidden with the new query in the template input, then the new count (YOY-96 AC-5)", async ({
+    page,
+  }) => {
+    // Every search answers after 600 ms, so the loading state is observable.
+    await page.goto(
+      "/theme-native.html?native=A&fixture=ai&searchDelay=600&debounce=30000",
+    );
+    await submitQuery(page, "blue dress under 400");
+    await expect(themeCount(page)).toHaveText(
+      "3 results found for “blue dress under 400”",
+    );
+    const url = page.url();
+
+    // A second submitted query on the entered view.
+    await submitQuery(page, "runner");
+    await expect(page.getByTestId("unfiltered-native-loading")).toBeVisible();
+    await expect(themeCount(page)).toBeHidden();
+    await expect(page.locator("#Search-In-Template")).toHaveValue("runner");
+    // History untouched by the loading state: the URL still names the
+    // previous query until the response lands.
+    expect(page.url()).toBe(url);
+
+    await expect(themeCount(page)).toHaveText("3 results found for “runner”");
+    expect(new URL(page.url()).searchParams.get("q")).toBe("runner");
+  });
+
   test("a refinement and a second query update the same view in place: count line follows, one history entry, one shell fetch (AC-2, AC-3, AC-4)", async ({
     page,
   }) => {

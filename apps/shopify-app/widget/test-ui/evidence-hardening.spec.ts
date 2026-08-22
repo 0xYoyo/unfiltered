@@ -35,6 +35,31 @@ test.describe("@evidence", () => {
       ["en", ""],
       ["he", "&locale=he"],
     ] as const) {
+      test(`widget count line ${device} ${locale}`, async ({ page }) => {
+        await page.setViewportSize(viewport);
+        // AC-3: a multi-number count line is hidden, not rewritten.
+        await page.goto(
+          `/theme-native.html?native=A&fixture=ai&countFormat=range&debounce=30000${suffix}`,
+        );
+        await themeInput(page).fill("blue dress under 400");
+        await themeInput(page).press("Enter");
+        await items(page).nth(2).waitFor();
+        await shot(page, `widget-${device}-${locale}-count-range-hidden`);
+
+        // AC-5: a second query on the entered view — while it loads, the
+        // count line is hidden and the template input shows the new query.
+        await page.goto(
+          `/theme-native.html?native=A&fixture=ai&searchDelay=1500&debounce=30000${suffix}`,
+        );
+        await themeInput(page).fill("blue dress under 400");
+        await themeInput(page).press("Enter");
+        await items(page).nth(2).waitFor();
+        await themeInput(page).fill("runner");
+        await themeInput(page).press("Enter");
+        await page.getByTestId("unfiltered-native-loading").waitFor();
+        await shot(page, `widget-${device}-${locale}-loading-new-query`);
+      });
+
       for (const variant of ["A", "B"] as const) {
         test(`widget hardening ${variant} ${device} ${locale}`, async ({
           page,
