@@ -271,7 +271,7 @@ export async function runIngestPublicCli({
     if (detected.source.kind === JSONLD_CRAWL_SOURCE_KIND) {
       const { stats } = detected.source as JsonLdCrawlSource;
       log(
-        `crawl: sitemaps ${stats.sitemapsRead}, urls ${stats.urlsDiscovered}, pages fetched ${stats.pagesFetched} (budget ${args.pages}), products found ${stats.productsFound}, skipped no-price ${stats.skippedNoPrice}, non-html ${stats.skippedNonHtml}, robots ${stats.skippedRobots}, fetch errors ${stats.fetchErrors}${
+        `crawl: sitemaps ${stats.sitemapsRead}, urls ${stats.urlsDiscovered}, pages fetched ${stats.pagesFetched} (budget ${args.pages}), products found ${stats.productsFound}, skipped no-price ${stats.skippedNoPrice}, non-html ${stats.skippedNonHtml}, robots ${stats.skippedRobots}, fetch errors ${stats.fetchErrors}, extract errors ${stats.extractErrors}${
           stats.budgetExhausted ? " — page budget exhausted, more pages remain" : ""
         }`,
       );
