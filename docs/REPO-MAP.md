@@ -313,6 +313,7 @@ apps/
         widget.css
       test-ui/
         ai-results.spec.ts
+        evidence-hardening.spec.ts
         localization.spec.ts
         localization.spec.ts-snapshots/
           ai-results-en-darwin.png
@@ -554,6 +555,14 @@ docs/
       mobile-he-1-store-line.png
       mobile-he-2-preview-cards.png
       mobile-he-3-submitted-cards.png
+      widget-desktop-en-variant-A-sanitized-results.png
+      widget-desktop-en-variant-B-sanitized-results.png
+      widget-desktop-he-variant-A-sanitized-results.png
+      widget-desktop-he-variant-B-sanitized-results.png
+      widget-mobile-en-variant-A-sanitized-results.png
+      widget-mobile-en-variant-B-sanitized-results.png
+      widget-mobile-he-variant-A-sanitized-results.png
+      widget-mobile-he-variant-B-sanitized-results.png
     YOY-99/
       1-modal-open-desktop.png
       1-modal-open-mobile.png

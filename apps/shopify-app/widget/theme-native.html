@@ -86,8 +86,16 @@
         role="list"
         data-testid="theme-grid"
       >
+        <!-- The harvested card (Variant B's clone template) carries the
+             inline-script vectors a theme or app block might: an `onclick`
+             on the wrapper, an `onerror` on the image, a hidden
+             `javascript:` link. The ORIGIN keeps them; every clone must not
+             (YOY-96 AC-1). -->
         <li class="grid__item">
-          <div class="card-wrapper product-card-wrapper underline-links-hover">
+          <div
+            class="card-wrapper product-card-wrapper underline-links-hover"
+            onclick="window.__hostileHarvestClicked = true"
+          >
             <div class="card card--standard card--media" style="--ratio-percent: 125.0%;">
               <div class="card__inner color-background-2 gradient ratio" style="--ratio-percent: 125.0%;">
                 <div class="card__media">
@@ -98,6 +106,7 @@
                       alt="Harvest Source Tee"
                       width="400"
                       height="500"
+                      onerror="window.__hostileHarvestImageError = true"
                     />
                   </div>
                 </div>
@@ -131,6 +140,7 @@
                 <div class="card__badge bottom left" id="Badge--1001"></div>
               </div>
             </div>
+            <a href="javascript:void(0)" data-hostile-link hidden>Hostile</a>
           </div>
         </li>
         <li class="grid__item">
@@ -251,9 +261,10 @@
     <link rel="stylesheet" href="/harness/theme-card.css">
     <div class="template-search section-template--search__main-padding">
       <div class="template-search__header page-width center">
-        <h1 class="h2" data-testid="theme-search-heading">${
+        <h1 class="h2" data-testid="theme-search-heading" onclick="window.__hostileShellHeadingClicked = true">${
           shellLocale === "he" ? "תוצאות חיפוש" : "Search results"
         }</h1>
+        <a href="JavaScript:void(0)" data-testid="theme-hostile-link" hidden>Hostile</a>
         <div class="template-search__search">
           <form action="/search" method="get" role="search" class="search">
             <input class="search__input" id="Search-In-Template" type="search" name="q" value="${term}" placeholder="Search">
@@ -447,14 +458,18 @@
           "/products/".length,
         );
 
+      // The stubbed card also carries the inline-script vectors a theme's
+      // snippet or an app block might (an `onclick`, an `onerror`, a
+      // hidden `javascript:` link): injected as-is they would go live in
+      // the shopper's page; the widget must strip them (YOY-96 AC-1).
       const altTemplateHtml = (product) => `
 <link href="/harness/theme-card.css" rel="stylesheet" type="text/css" media="all" />
-<div class="card-wrapper product-card-wrapper underline-links-hover" data-alt-template="true">
+<div class="card-wrapper product-card-wrapper underline-links-hover" data-alt-template="true" onclick="window.__hostileAltClicked = true">
   <div class="card card--standard ${product.imageUrl ? "card--media" : "card--text"}" style="--ratio-percent: 125.0%;">
     <div class="card__inner color-background-2 gradient ratio" style="--ratio-percent: 125.0%;">
       ${
         product.imageUrl
-          ? `<div class="card__media"><div class="media media--transparent media--hover-effect"><img src="${product.imageUrl}" alt="${product.title}" width="400" height="500"></div></div>`
+          ? `<div class="card__media"><div class="media media--transparent media--hover-effect"><img src="${product.imageUrl}" alt="${product.title}" width="400" height="500" onerror="window.__hostileAltImageError = true"></div></div>`
           : ""
       }
     </div>
@@ -480,6 +495,7 @@
       }</div>
     </div>
   </div>
+  <a href=" javascript:void(0)" data-hostile-link hidden>Hostile</a>
 </div>
 <script>window.__altTemplateScriptRan = true;<\/script>
 `;

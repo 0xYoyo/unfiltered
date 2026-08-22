@@ -44,6 +44,39 @@ export function parseHtml(html: string): Document {
   return new DOMParser().parseFromString(html, "text/html");
 }
 
+/** Attributes whose value is a URL the browser will follow or execute. */
+const URL_ATTRIBUTES = new Set(["href", "src", "action"]);
+
+/**
+ * Strip the inline-script vectors from fetched theme markup before it is
+ * attached to the live document (YOY-96 AC-1 / AC-4). `parseHtml` parses
+ * inertly and the callers drop `<script>` elements, but an element injected
+ * into the host's light DOM arrives with its `on*` handler attributes and
+ * `javascript:` URLs intact — and those become live the moment it is
+ * attached. So, for the root and every element under it: drop every
+ * attribute whose name starts with `on`, and drop `href` / `src` / `action`
+ * whose trimmed value starts with `javascript:` (case-insensitively). One
+ * implementation for the alternate-template card, the harvested card, and
+ * the full-page shell; nothing else about the markup is touched.
+ */
+export function sanitizeThemeMarkup(root: Element): void {
+  const elements = [root, ...root.querySelectorAll("*")];
+  for (const element of elements) {
+    // Snapshot first: removing while iterating `attributes` skips entries.
+    for (const attribute of Array.from(element.attributes)) {
+      const name = attribute.name.toLowerCase();
+      if (name.startsWith("on")) {
+        element.removeAttribute(attribute.name);
+      } else if (
+        URL_ATTRIBUTES.has(name) &&
+        attribute.value.trim().toLowerCase().startsWith("javascript:")
+      ) {
+        element.removeAttribute(attribute.name);
+      }
+    }
+  }
+}
+
 /**
  * Hoist a stylesheet link into <head> once: fetched theme markup (the
  * alternate card template, the harvested page, the search-page shell) ships
@@ -265,6 +298,9 @@ export function createPageMirror(options: PageMirrorOptions): PageMirror {
       }
       const root = document.importNode(main, true);
       root.querySelectorAll("script").forEach((script) => script.remove());
+      // The whole of the theme's main content is about to be attached live:
+      // inline handlers and javascript: URLs go with the scripts (AC-4).
+      sanitizeThemeMarkup(root);
       root
         .querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')
         .forEach((link) => {

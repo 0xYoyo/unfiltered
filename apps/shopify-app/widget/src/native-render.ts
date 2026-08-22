@@ -9,6 +9,7 @@ import {
   createPageMirror,
   ensureStylesheet,
   parseHtml,
+  sanitizeThemeMarkup,
 } from "./native-page";
 import type { Overlay, ResponseHandlers } from "./overlay";
 import type {
@@ -219,7 +220,13 @@ function createAlternateTemplateProducer(
           link.remove();
         });
       const card = doc.body.firstElementChild;
-      return card instanceof HTMLElement ? card : null;
+      if (!(card instanceof HTMLElement)) {
+        return null;
+      }
+      // The card is injected into the host's light DOM: strip the inline
+      // handlers and javascript: URLs that would go live with it (AC-1).
+      sanitizeThemeMarkup(card);
+      return card;
     } catch {
       return null;
     } finally {
@@ -283,6 +290,8 @@ function createHarvestCloneProducer(
         onListClass(list.className);
       }
       card.querySelectorAll("script").forEach((script) => script.remove());
+      // Every clone of this template lands in the host's light DOM (AC-1).
+      sanitizeThemeMarkup(card);
       return card;
     } catch {
       return null;
