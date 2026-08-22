@@ -44,8 +44,20 @@ export function parseHtml(html: string): Document {
   return new DOMParser().parseFromString(html, "text/html");
 }
 
-/** Attributes whose value is a URL the browser will follow or execute. */
-const URL_ATTRIBUTES = new Set(["href", "src", "action"]);
+/**
+ * Attributes whose value is a URL the browser will follow or execute:
+ * links/media/forms, a button's own `formaction` override, and the SVG
+ * `xlink:href` an inline `<svg><a>` carries (matched on the lower-cased
+ * qualified name, which is how `element.attributes` reports it) — YOY-96
+ * AC-1 / AC-21.
+ */
+const URL_ATTRIBUTES = new Set([
+  "href",
+  "src",
+  "action",
+  "formaction",
+  "xlink:href",
+]);
 
 /**
  * Strip the inline-script vectors from fetched theme markup before it is
@@ -55,7 +67,8 @@ const URL_ATTRIBUTES = new Set(["href", "src", "action"]);
  * `javascript:` URLs intact — and those become live the moment it is
  * attached. So, for the root and every element under it: drop every
  * attribute whose name starts with `on`, and drop `href` / `src` / `action`
- * whose trimmed value starts with `javascript:` (case-insensitively). One
+ * / `formaction` / `xlink:href` whose trimmed value starts with
+ * `javascript:` (case-insensitively). One
  * implementation for the alternate-template card, the harvested card, and
  * the full-page shell; nothing else about the markup is touched.
  */
@@ -275,6 +288,10 @@ export function createPageMirror(options: PageMirrorOptions): PageMirror {
   let shell: Shell | null | undefined; // undefined = not settled yet
   let shellAttached = false;
   let query = "";
+  // The page the view shows, tracked next to the query so every push and
+  // re-push names it (YOY-96 AC-10): `enter(next, nextPage)` sets it, and
+  // `pushEntry` builds its URL from this state rather than assuming page 1.
+  let currentPage = 1;
   let count: number | null = null;
   let everEntered = false;
   /** History pops this mirror asked for itself and has yet to see. */
@@ -520,7 +537,7 @@ export function createPageMirror(options: PageMirrorOptions): PageMirror {
       window.history.pushState(
         { [MIRROR_HISTORY_KEY]: true },
         "",
-        resultsViewUrl(config, query),
+        resultsViewUrl(config, query, currentPage),
       );
     } catch {
       // History unavailable (sandboxed document): the view still shows.
@@ -558,7 +575,9 @@ export function createPageMirror(options: PageMirrorOptions): PageMirror {
         count = null;
       }
       query = next;
-      const url = resultsViewUrl(config, next, nextPage);
+      currentPage = nextPage;
+      // The same value `pushEntry` builds: one URL for push and replace.
+      const url = resultsViewUrl(config, query, currentPage);
       if (!entered) {
         attach();
         try {

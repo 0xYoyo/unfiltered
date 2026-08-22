@@ -189,6 +189,19 @@ test.describe("Variant A — alternate-template fetch (AC-1)", () => {
     const hostile = card.locator("[data-hostile-link]");
     await expect(hostile).toHaveCount(1);
     await expect(hostile).not.toHaveAttribute("href", /.*/);
+    // The two further URL attributes (YOY-96 AC-21): a button's own
+    // `formaction` and an inline SVG `xlink:href` — the fixture carries
+    // them, the injected card keeps the elements and drops the attributes.
+    expect(raw).toContain('formaction="javascript:void(0)"');
+    expect(raw).toContain('xlink:href=" JavaScript:void(0)"');
+    const hostileButton = card.locator("[data-hostile-formaction]");
+    await expect(hostileButton).toHaveCount(1);
+    await expect(hostileButton).not.toHaveAttribute("formaction", /.*/);
+    const hostileXlink = card.locator("[data-hostile-xlink]");
+    await expect(hostileXlink).toHaveCount(1);
+    expect(
+      await hostileXlink.evaluate((element) => element.getAttribute("xlink:href")),
+    ).toBeNull();
     // Nothing else moved: title, price, link, badge as before.
     await expect(card.locator(".card__heading a")).toHaveText("Nike Air 90");
     await expect(card.locator(".card__heading a")).toHaveAttribute(
@@ -547,11 +560,16 @@ test.describe("composite: previews are the theme's, submits go native (YOY-101)"
     await expect(nativeChips(page)).toHaveCount(3);
     // The Mirror Bar leaves only chips and status text as owned chrome:
     // no New search, no × — and no owned <button> at all outside the chips.
+    // The theme's own card markup may carry buttons of its own (a quick-add,
+    // the harness's hostile `formaction` button) — those are the theme's,
+    // not ours, so buttons inside the rendered items are not counted.
     await expect(page.getByTestId("unfiltered-native-new-search")).toHaveCount(0);
     await expect(page.getByTestId("unfiltered-native-close")).toHaveCount(0);
-    await expect(
-      panel(page).locator("button:not([data-testid='unfiltered-native-chip'])"),
-    ).toHaveCount(0);
+    const panelButtons = await panel(page)
+      .locator("button:not([data-testid='unfiltered-native-chip'])")
+      .count();
+    const themeCardButtons = await items(page).locator("button").count();
+    expect(panelButtons - themeCardButtons).toBe(0);
 
     // "New search" rides the theme's own input: editing it and submitting
     // replaces the view's results in place.
@@ -894,6 +912,18 @@ test.describe("full-page mirror — the theme's own search page (YOY-100)", () =
     const hostile = page.getByTestId("theme-hostile-link");
     await expect(hostile).toHaveCount(1);
     await expect(hostile).not.toHaveAttribute("href", /.*/);
+    // `formaction` and SVG `xlink:href` too (YOY-96 AC-21): present in the
+    // fixture, stripped from the attached shell, elements kept.
+    expect(raw).toContain('formaction="javascript:void(0)"');
+    expect(raw).toContain('xlink:href=" JavaScript:void(0)"');
+    const hostileButton = page.getByTestId("theme-hostile-formaction");
+    await expect(hostileButton).toHaveCount(1);
+    await expect(hostileButton).not.toHaveAttribute("formaction", /.*/);
+    const hostileXlink = page.getByTestId("theme-hostile-xlink");
+    await expect(hostileXlink).toHaveCount(1);
+    expect(
+      await hostileXlink.evaluate((element) => element.getAttribute("xlink:href")),
+    ).toBeNull();
     // The mirror's own furniture is intact: the template input carries the
     // query and the count line reads as before.
     await expect(page.locator("#Search-In-Template")).toHaveValue("runner");
@@ -1248,6 +1278,55 @@ test.describe("the full match set, paged by the theme (YOY-107)", () => {
     // is rather than rendering an empty grid.
     await expect(page.getByTestId("theme-pagination")).toBeHidden();
     expect(new URL(page.url()).searchParams.has("page")).toBe(false);
+  });
+
+  test("the mirror's pushed history entry carries the page it enters on (YOY-96 AC-10)", async ({
+    page,
+  }) => {
+    // A plain origin page, non-mirror history state. Drive the mirror
+    // directly: entering on page 2 must push a URL that names page 2 — the
+    // same URL `enter` computes for its own replace path.
+    await page.goto("/theme-native.html?debounce=30000");
+    expect(await mirrorState(page)).toBeNull();
+    const result = await page.evaluate(async () => {
+      const pagePath = "/src/native-page.ts";
+      const configPath = "/src/native-render.config.ts";
+      const [nativePage, nativeConfig] = await Promise.all([
+        import(/* @vite-ignore */ pagePath),
+        import(/* @vite-ignore */ configPath),
+      ]);
+      const mirror = nativePage.createPageMirror({
+        config: nativeConfig.resolveNativeRenderConfig({ variant: "A" }),
+        section: document.createElement("section"),
+        onListClass: () => {},
+        onLeave: () => {},
+      });
+      mirror.enter("dress", 2);
+      return { search: window.location.search, state: window.history.state };
+    });
+    const params = new URLSearchParams(result.search);
+    expect(params.get("q")).toBe("dress");
+    expect(params.get("page")).toBe("2");
+    expect(result.state).toEqual({ unfilteredNativeMirror: true });
+    // And page 1 stays implicit, exactly as `resultsViewUrl` renders it.
+    const first = await page.evaluate(async () => {
+      const pagePath = "/src/native-page.ts";
+      const configPath = "/src/native-render.config.ts";
+      const [nativePage, nativeConfig] = await Promise.all([
+        import(/* @vite-ignore */ pagePath),
+        import(/* @vite-ignore */ configPath),
+      ]);
+      window.history.replaceState(null, "", "/theme-native.html");
+      const mirror = nativePage.createPageMirror({
+        config: nativeConfig.resolveNativeRenderConfig({ variant: "A" }),
+        section: document.createElement("section"),
+        onListClass: () => {},
+        onLeave: () => {},
+      });
+      mirror.enter("dress");
+      return window.location.search;
+    });
+    expect(new URLSearchParams(first).has("page")).toBe(false);
   });
 
   test("a shell without usable pagination markup still serves the full set, on one page", async ({
