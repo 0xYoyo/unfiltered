@@ -166,6 +166,48 @@ test.describe("Variant A — alternate-template fetch (AC-1)", () => {
     await expect(overlay(page)).toBeHidden();
   });
 
+  test("the injected card is sanitized: on* handlers and javascript: URLs are stripped, the card is otherwise intact (YOY-96 AC-1)", async ({
+    page,
+  }) => {
+    await page.goto("/theme-native.html?native=A&debounce=30000");
+    await submitQuery(page, "runner");
+    await expect(items(page)).toHaveCount(3);
+
+    // The fixture really carries the vectors — the stripping below is the
+    // widget's doing, not a quiet harness.
+    const raw = await page.evaluate(() =>
+      fetch("/products/nike-air-90?view=unfiltered-card").then((r) => r.text()),
+    );
+    expect(raw).toContain('onclick="window.__hostileAltClicked = true"');
+    expect(raw).toContain('onerror="window.__hostileAltImageError = true"');
+    expect(raw).toContain('href=" javascript:void(0)"');
+
+    const card = items(page).nth(0).locator(".card-wrapper[data-alt-template]");
+    await expect(card).toHaveCount(1);
+    await expect(card).not.toHaveAttribute("onclick", /.*/);
+    await expect(card.locator("img")).not.toHaveAttribute("onerror", /.*/);
+    const hostile = card.locator("[data-hostile-link]");
+    await expect(hostile).toHaveCount(1);
+    await expect(hostile).not.toHaveAttribute("href", /.*/);
+    // Nothing else moved: title, price, link, badge as before.
+    await expect(card.locator(".card__heading a")).toHaveText("Nike Air 90");
+    await expect(card.locator(".card__heading a")).toHaveAttribute(
+      "href",
+      "/products/nike-air-90",
+    );
+    await expect(card.locator(".price-item--regular")).toHaveText("₪ 100");
+    await expect(items(page).nth(2).locator(".card__badge .badge")).toHaveText(
+      "Sold out",
+    );
+    // And the handler really is inert: clicking the card sets no global.
+    await card.locator(".card__heading").click({ modifiers: ["Shift"] });
+    expect(
+      await page.evaluate(
+        () => (window as unknown as { __hostileAltClicked?: boolean }).__hostileAltClicked,
+      ),
+    ).toBeUndefined();
+  });
+
   test("the fetched card's stylesheet is hoisted into <head> once and its scripts never run", async ({
     page,
   }) => {
@@ -346,6 +388,71 @@ test.describe("Variant B — harvest-clone (AC-2)", () => {
       /grid--3-col-desktop/,
     );
     await expect(panel(page)).toHaveAttribute("data-native-count", "3");
+  });
+
+  test("every clone is sanitized while the harvested origin card keeps its attributes (YOY-96 AC-1)", async ({
+    page,
+  }) => {
+    await page.goto("/theme-native.html?native=B&debounce=30000");
+    // The origin card — the clone template — carries the vectors.
+    const origin = page
+      .getByTestId("theme-grid")
+      .locator(".card-wrapper")
+      .first();
+    await expect(origin).toHaveAttribute("onclick", /__hostileHarvestClicked/);
+    await expect(origin.locator("img")).toHaveAttribute(
+      "onerror",
+      /__hostileHarvestImageError/,
+    );
+    await expect(origin.locator("[data-hostile-link]")).toHaveAttribute(
+      "href",
+      /javascript:/i,
+    );
+
+    await submitQuery(page, "runner");
+    await expect(items(page)).toHaveCount(3);
+
+    // Every clone, every element under it: no on* attribute and no
+    // javascript: URL survives (the no-image clone has no <img> at all, so
+    // this scans the subtree instead of naming elements).
+    for (const index of [0, 1, 2]) {
+      const clone = items(page).nth(index).locator(".card-wrapper");
+      await expect(clone).toHaveCount(1);
+      await expect(clone).not.toHaveAttribute("onclick", /.*/);
+      expect(
+        await clone.evaluate((element) =>
+          [element, ...element.querySelectorAll("*")].flatMap((node) =>
+            Array.from(node.attributes)
+              .filter(
+                (attribute) =>
+                  attribute.name.toLowerCase().startsWith("on") ||
+                  /^\s*javascript:/i.test(attribute.value),
+              )
+              .map((attribute) => `${node.tagName}@${attribute.name}`),
+          ),
+        ),
+      ).toEqual([]);
+    }
+    // The hostile link itself survives as an element, just disarmed.
+    await expect(
+      items(page).nth(0).locator("[data-hostile-link]"),
+    ).toHaveCount(1);
+    await expect(
+      items(page).nth(0).locator("[data-hostile-link]"),
+    ).not.toHaveAttribute("href", /.*/);
+    // Otherwise the clone is exactly what the Variant B contract says.
+    const first = items(page).nth(0);
+    await expect(first.locator(".card__heading a")).toHaveText("Nike Air 90");
+    await expect(first.locator(".card__heading a")).toHaveAttribute(
+      "href",
+      "/products/nike-air-90",
+    );
+    await expect(
+      first.locator(".price__regular .price-item--regular"),
+    ).toHaveText("100 ILS");
+    // The origin page itself is untouched by the sanitizer: it still
+    // carries its own attributes (it is the theme's page, not ours).
+    await expect(origin).toHaveAttribute("onclick", /__hostileHarvestClicked/);
   });
 
   test("harvested ids are made unique across clones and the harvested page (no duplicate ids)", async ({
@@ -765,6 +872,41 @@ test.describe("full-page mirror — the theme's own search page (YOY-100)", () =
     expect(url.pathname).toBe("/search");
     expect(url.searchParams.get("q")).toBe("blue dress under 400");
     expect(await mirrorState(page)).toEqual({ unfilteredNativeMirror: true });
+  });
+
+  test("the attached shell is sanitized: the heading's onclick and the javascript: link are stripped, the heading text unchanged (YOY-96 AC-4)", async ({
+    page,
+  }) => {
+    await page.goto("/theme-native.html?native=A&debounce=30000");
+    // The stubbed search page carries the vectors the real one might.
+    const raw = await page.evaluate(() =>
+      fetch("/search?q=*&type=product").then((r) => r.text()),
+    );
+    expect(raw).toContain('onclick="window.__hostileShellHeadingClicked = true"');
+    expect(raw).toContain('href="JavaScript:void(0)"');
+
+    await submitQuery(page, "runner");
+    await expect(items(page)).toHaveCount(3);
+
+    const heading = page.getByTestId("theme-search-heading");
+    await expect(heading).toHaveText("Search results");
+    await expect(heading).not.toHaveAttribute("onclick", /.*/);
+    const hostile = page.getByTestId("theme-hostile-link");
+    await expect(hostile).toHaveCount(1);
+    await expect(hostile).not.toHaveAttribute("href", /.*/);
+    // The mirror's own furniture is intact: the template input carries the
+    // query and the count line reads as before.
+    await expect(page.locator("#Search-In-Template")).toHaveValue("runner");
+    await expect(themeCount(page)).toHaveText("3 results found for “runner”");
+    // Inert for real: clicking the heading sets no global.
+    await heading.click();
+    expect(
+      await page.evaluate(
+        () =>
+          (window as unknown as { __hostileShellHeadingClicked?: boolean })
+            .__hostileShellHeadingClicked,
+      ),
+    ).toBeUndefined();
   });
 
   test("a refinement and a second query update the same view in place: count line follows, one history entry, one shell fetch (AC-2, AC-3, AC-4)", async ({
