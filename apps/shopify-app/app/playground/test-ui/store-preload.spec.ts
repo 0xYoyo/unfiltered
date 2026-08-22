@@ -41,6 +41,10 @@ test.describe("the store's page (AC-1, AC-2, verify 1)", () => {
     await expect(storeLine(page)).toContainText(
       strings("en").storeProducts.replace("{count}", "120"),
     );
+    // One phrase to assistive tech, the literal separator included — not
+    // "Demo Store120 products" with the gap coming from CSS alone (YOY-96
+    // AC-16). Exact, whitespace-normalised.
+    await expect(storeLine(page)).toHaveText("Demo Store · 120 products");
     await expect(page).toHaveTitle("Demo Store — Unfiltered");
     await expect(page.locator('meta[name="robots"]')).toHaveAttribute(
       "content",
@@ -204,6 +208,10 @@ test.describe("lang and details work as on / (AC-3, verify 4)", () => {
     await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
     await expect(storeLine(page)).toContainText(
       strings("he").storeProducts.replace("{count}", "120"),
+    );
+    // The mirrored equivalent of the EN phrase, separator included (AC-16).
+    await expect(storeLine(page)).toHaveText(
+      `Demo Store · ${strings("he").storeProducts.replace("{count}", "120")}`,
     );
 
     const href = await page

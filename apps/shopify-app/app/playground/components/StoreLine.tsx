@@ -8,6 +8,13 @@ import type { PlaygroundStrings } from "../strings";
  * product count muted beside it. No logo, no colour, no per-store copy —
  * P-7 makes the page visibly the store's by naming it, not by dressing up
  * as it, and the rest of the chrome stays identical to `/`.
+ *
+ * The separator between name and count is a literal glyph with spaces
+ * around it, not CSS gap alone, so the element's text reads as one phrase —
+ * `Demo Store · 120 products` — to assistive tech and to anything else that
+ * reads `textContent` (YOY-96 AC-16). It is `aria-hidden`: the surrounding
+ * spaces already separate the words in the accessible name, and a screen
+ * reader should not announce "middle dot".
  */
 export function StoreLine({
   name,
@@ -20,7 +27,10 @@ export function StoreLine({
 }) {
   return (
     <p className="storeLine" data-store-line data-testid="playground-store-line">
-      <span className="storeName">{name}</span>
+      <span className="storeName">{name}</span>{" "}
+      <span className="storeSeparator" aria-hidden="true">
+        ·
+      </span>{" "}
       <span className="storeCount">
         {strings.storeProducts.replace("{count}", String(productCount))}
       </span>
