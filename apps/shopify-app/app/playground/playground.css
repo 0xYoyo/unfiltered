@@ -193,6 +193,12 @@ html:has(.playground) {
   font-weight: var(--weight-ui);
 }
 
+/* The literal separator (YOY-96 AC-16): as quiet as the count it precedes. */
+.storeSeparator {
+  color: var(--text-muted);
+  font-size: var(--type-13);
+}
+
 .storeCount {
   color: var(--text-muted);
   font-size: var(--type-13);

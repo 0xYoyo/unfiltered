@@ -154,6 +154,7 @@ apps/
         test-ui/
           ai-states.spec.ts
           evidence-ai.spec.ts
+          evidence-hardening.spec.ts
           evidence-store.spec.ts
           evidence.spec.ts
           playground.spec.ts
@@ -540,6 +541,19 @@ docs/
       mobile-he-1-store-initial.png
       mobile-he-2-store-results.png
       mobile-he-3-unknown-slug.png
+    YOY-96/
+      desktop-en-1-store-line.png
+      desktop-en-2-preview-cards.png
+      desktop-en-3-submitted-cards.png
+      desktop-he-1-store-line.png
+      desktop-he-2-preview-cards.png
+      desktop-he-3-submitted-cards.png
+      mobile-en-1-store-line.png
+      mobile-en-2-preview-cards.png
+      mobile-en-3-submitted-cards.png
+      mobile-he-1-store-line.png
+      mobile-he-2-preview-cards.png
+      mobile-he-3-submitted-cards.png
     YOY-99/
       1-modal-open-desktop.png
       1-modal-open-mobile.png

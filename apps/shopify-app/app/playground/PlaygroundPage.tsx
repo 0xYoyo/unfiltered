@@ -61,6 +61,15 @@ export function PlaygroundPage({
     null,
   );
   const [failed, setFailed] = useState(false);
+  // The searchId a click beacon may carry: the last SUBMITTED response's,
+  // or null while the cards on screen belong to a keystroke preview. A
+  // preview writes no SearchEvent row (YOY-68 AC-3), so its searchId is not
+  // attributable and a beacon against it is a write nothing can join — the
+  // widget nulls its own id on every preview for the same reason (YOY-96
+  // AC-14, P-5 parity).
+  const [attributableSearchId, setAttributableSearchId] = useState<
+    string | null
+  >(null);
 
   // The held intent: the last AI response's echoed intent, in memory only.
   const [heldIntent, setHeldIntent] = useState<ProxyIntent | null>(null);
@@ -121,6 +130,9 @@ export function PlaygroundPage({
           return;
         }
         setResponse(next);
+        // The cards on screen are now this response's: attributable only
+        // when it was submitted (AC-14).
+        setAttributableSearchId(preview ? null : next.searchId);
         // Only a SUBMITTED response replaces the held intent (AC-2). A
         // preview echoes `intent: null` because it is classic-only, so
         // replacing on every response would erase the refinement memory
@@ -201,6 +213,7 @@ export function PlaygroundPage({
     submittedQueryRef.current = null;
     setHeldIntent(null);
     setResponse(null);
+    setAttributableSearchId(null);
     setFailed(false);
     setPhase("initial");
     inputRef.current?.focus();
@@ -216,17 +229,19 @@ export function PlaygroundPage({
 
   const openCard = useCallback(
     (card: PlaygroundCard, position: number) => {
-      if (response === null) {
+      // Preview cards open their link and send nothing: there is no
+      // SearchEvent for a click on them to join (AC-14).
+      if (attributableSearchId === null) {
         return;
       }
       sendPlaygroundClick({
-        searchId: response.searchId,
+        searchId: attributableSearchId,
         productId: card.productId,
         position,
         ...(catalog === undefined ? {} : { catalog }),
       });
     },
-    [catalog, response],
+    [attributableSearchId, catalog],
   );
 
   // Chips belong to AI-routed responses only: never on a preview, never on

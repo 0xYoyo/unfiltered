@@ -255,6 +255,60 @@ test.describe("preview and submit (AC-5, verify 3)", () => {
   });
 });
 
+test.describe("preview cards are not attributable (YOY-96 AC-14)", () => {
+  test("a click on a preview card sends no beacon; the same click after Enter sends exactly one with the submitted searchId", async ({
+    page,
+  }) => {
+    // Count the real requests on the wire, and read each beacon's body
+    // through a recording wrapper: Playwright exposes no postData for a
+    // sendBeacon Blob, so the wrapper keeps the payload (and still sends).
+    const beacons: string[] = [];
+    page.on("request", (request) => {
+      if (request.url().includes("/api/playground/click")) {
+        beacons.push(request.url());
+      }
+    });
+    await page.addInitScript(() => {
+      const recorded: string[] = [];
+      (window as unknown as { __beaconBodies: string[] }).__beaconBodies =
+        recorded;
+      const original = navigator.sendBeacon.bind(navigator);
+      navigator.sendBeacon = (url, data) => {
+        if (data instanceof Blob) {
+          void data.text().then((text) => recorded.push(text));
+        } else if (typeof data === "string") {
+          recorded.push(data);
+        }
+        return original(url, data);
+      };
+    });
+    await page.goto("/");
+
+    // Typing with NO Enter: the debounced preview answers with its own
+    // fixture, whose searchId has no SearchEvent behind it.
+    await input(page).fill("dress");
+    await expect(cards(page)).toHaveCount(2);
+    await cards(page).nth(0).locator("a").click({ modifiers: ["Shift"] });
+    // Give a beacon that would have fired time to show up, then insist it
+    // did not: the link opened, nothing was sent.
+    await page.waitForTimeout(400);
+    expect(beacons).toHaveLength(0);
+
+    // The SAME click after an explicit submit beacons once, carrying the
+    // submitted response's searchId — never the preview's.
+    await input(page).press("Enter");
+    await expect(cards(page)).toHaveCount(4);
+    await cards(page).nth(0).locator("a").click({ modifiers: ["Shift"] });
+    await expect.poll(() => beacons.length).toBe(1);
+    const bodies = await page.evaluate(
+      () => (window as unknown as { __beaconBodies: string[] }).__beaconBodies,
+    );
+    expect(bodies).toHaveLength(1);
+    expect(JSON.parse(bodies[0])).toMatchObject({ searchId: "fixture-results" });
+    expect(bodies[0]).not.toContain("fixture-preview");
+  });
+});
+
 test.describe("result cards (AC-6, verify 4)", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/");
