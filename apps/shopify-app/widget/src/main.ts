@@ -170,6 +170,66 @@ export function resetThemeSearchUi(input: HTMLInputElement): void {
 }
 
 /**
+ * Close the theme's INLINE predictive dropdown after a takeover submit in
+ * native mode (YOY-96 AC-6). A native submit navigates, so the theme's
+ * keystroke dropdown disappears with the page; a takeover submit stays on
+ * the page, and a predictive panel that is not inside a modal — an inline
+ * header search, Shopify's `/search` template input — keeps its
+ * `[hidden]`-toggled results panel open over the mirrored results view
+ * until focus leaves the input. Bounded by structure: the ancestors from
+ * the input up to its nearest custom-element host (Dawn's
+ * `<predictive-search>`), or up to its `<form>` when no custom element
+ * wraps it, are searched for a `[role="listbox"]`,
+ * `.predictive-search__results`, or `[data-predictive-search-results]`
+ * panel, which is hidden; a custom-element host with a `close()` method is
+ * closed the theme's way as well. Called ONLY on submit — typing must keep
+ * showing the theme's dropdown (YOY-101 AC-1). Never throws.
+ */
+export function closeThemePredictive(input: HTMLInputElement): void {
+  const PANEL_SELECTOR =
+    '[role="listbox"], .predictive-search__results, [data-predictive-search-results]';
+  // The search bound: the nearest custom-element host above the input,
+  // else its form. Every ancestor up to and including that bound is
+  // searched, so a panel rendered beside the form inside the host (the
+  // harness fixture) and one rendered inside the form (Dawn) are both found.
+  let host: Element | null = null;
+  for (
+    let node = input.parentElement;
+    node !== null && node !== document.body;
+    node = node.parentElement
+  ) {
+    if (node.tagName.includes("-")) {
+      host = node;
+      break;
+    }
+  }
+  const bound: Element | null = host ?? input.form ?? input.closest("form");
+  if (bound === null) {
+    return; // Neither host nor form: nothing to bound the search by.
+  }
+  for (
+    let node = input.parentElement;
+    node !== null && node !== document.body;
+    node = node.parentElement
+  ) {
+    for (const panel of node.querySelectorAll<HTMLElement>(PANEL_SELECTOR)) {
+      panel.hidden = true;
+    }
+    if (node === bound) {
+      break;
+    }
+  }
+  const closer = host as (Element & { close?: unknown }) | null;
+  if (closer !== null && typeof closer.close === "function") {
+    try {
+      (closer.close as () => void).call(closer);
+    } catch {
+      // The theme's own close refused: the panel is hidden regardless.
+    }
+  }
+}
+
+/**
  * Mount the widget onto the host page. Idempotent: a second call finds the
  * existing root and does nothing. Never throws into the host page. With no
  * recognizable theme search input the widget mounts nothing at all (AC-2).
@@ -634,6 +694,7 @@ export function init(config: WidgetConfig): void {
       // modal, and the input the shopper is typing in lives inside it.
       if (nativeConfig !== null) {
         resetThemeSearchUi(input);
+        closeThemePredictive(input);
       }
     };
 

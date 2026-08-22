@@ -23,7 +23,10 @@
          theme's `ul.product-grid` holding the theme's OWN hits, which must
          never survive into the results view). `?shell=missing` makes that
          fetch 404 (the bare fallback); `?locale=he` serves the Hebrew
-         wording so the count rewrite is proven mid-sentence. -->
+         wording so the count rewrite is proven mid-sentence. The shell's
+         page-1 pagination item is Dawn's REAL current-page markup (YOY-96
+         AC-8): a disabled, href-less, non-`link` anchor; only the other
+         pages carry `link` and an href. -->
     <!-- Multi-input storefront (YOY-99): `?multi=1` adds a Dawn-shaped
          header search modal — `<details-modal><details>` with a page-dim
          overlay and a body scroll lock while open — beside the in-page
@@ -301,9 +304,9 @@
           <div class="pagination-wrapper" data-testid="theme-pagination">
             <nav class="pagination" role="navigation" aria-label="Pagination">
               <ul class="pagination__list list-unstyled" role="list">
-                <li><a href="/search?q=${term}" class="pagination__item pagination__item--current link" aria-current="page">1</a></li>
-                <li><a href="/search?q=${term}&amp;page=2" class="pagination__item link">2</a></li>
-                <li><a href="/search?q=${term}&amp;page=3" class="pagination__item link">3</a></li>
+                <li><a role="link" aria-disabled="true" aria-current="page" class="pagination__item pagination__item--current">1</a></li>
+                <li><a href="/search?q=${term}&amp;page=2" class="pagination__item link" aria-label="Page 2">2</a></li>
+                <li><a href="/search?q=${term}&amp;page=3" class="pagination__item link" aria-label="Page 3">3</a></li>
               </ul>
             </nav>
           </div>

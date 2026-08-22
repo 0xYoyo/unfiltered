@@ -60,6 +60,39 @@ test.describe("@evidence", () => {
         await shot(page, `widget-${device}-${locale}-loading-new-query`);
       });
 
+      test(`widget predictive close + pagination ${device} ${locale}`, async ({
+        page,
+      }) => {
+        await page.setViewportSize(viewport);
+        // AC-6: the theme's inline predictive dropdown is open while typing
+        // and closed once our submit takes over the native view.
+        await page.goto(`/native-predictive.html?native=A${suffix}`);
+        await themeInput(page).pressSequentially("nike");
+        await page.locator("#PredictiveResults").waitFor();
+        await shot(page, `widget-${device}-${locale}-predictive-open-typing`);
+        await themeInput(page).press("Enter");
+        await items(page).first().waitFor();
+        await shot(page, `widget-${device}-${locale}-predictive-closed-submit`);
+
+        // AC-8: the mirrored pagination — non-current pages are real links,
+        // only the current one carries Dawn's disabled current-item state.
+        await page.goto(
+          `/theme-native.html?native=A&fixture=full-set&results=30&pageSize=12&debounce=30000${suffix}`,
+        );
+        await themeInput(page).fill("dress");
+        await themeInput(page).press("Enter");
+        await items(page).nth(2).waitFor();
+        await page
+          .getByTestId("unfiltered-native-chip")
+          .filter({ hasText: locale === "he" ? "כחול" : "blue" })
+          .first()
+          .click();
+        await page
+          .locator('[data-testid="theme-pagination"] a[aria-current="page"]')
+          .waitFor();
+        await shot(page, `widget-${device}-${locale}-pagination-links`);
+      });
+
       for (const variant of ["A", "B"] as const) {
         test(`widget hardening ${variant} ${device} ${locale}`, async ({
           page,

@@ -1277,6 +1277,53 @@ test.describe("the full match set, paged by the theme (YOY-107)", () => {
     expect(new URL(page.url()).searchParams.has("page")).toBe(false);
   });
 
+  test("mirrored page links never inherit Dawn's current-page disabled state; only the current one carries it (YOY-96 AC-8)", async ({
+    page,
+  }) => {
+    // The shell stub's page-1 item is Dawn's real current-page markup —
+    // `role="link" aria-disabled="true"`, no href, no `link` class — so a
+    // clone template taken from the FIRST item would announce every page
+    // as disabled and lose the theme's link styling.
+    await page.goto(FULL_SET);
+    await submitQuery(page, "dress");
+    await nativeChips(page).filter({ hasText: "blue" }).click();
+    await expect(items(page)).toHaveCount(12);
+    await expect(themePages(page)).toHaveCount(3);
+
+    for (const index of [1, 2]) {
+      const link = themePages(page).nth(index);
+      await expect(link).toHaveClass(/\blink\b/);
+      await expect(link).not.toHaveAttribute("aria-disabled");
+      await expect(link).not.toHaveAttribute("aria-current");
+      await expect(link).toHaveAttribute(
+        "href",
+        `/search?q=dress&page=${index + 1}`,
+      );
+      // Dawn's `aria-label="Page N"` on the template is rewritten per page,
+      // never cloned verbatim.
+      await expect(link).toHaveAttribute("aria-label", `Page ${index + 1}`);
+    }
+    const current = currentPage(page);
+    await expect(current).toHaveText("1");
+    await expect(current).toHaveClass(/pagination__item--current/);
+    // The theme's own current-item attributes, copied from the shell — and
+    // Dawn's current item carries no label, so neither does ours.
+    await expect(current).toHaveAttribute("role", "link");
+    await expect(current).toHaveAttribute("aria-disabled", "true");
+    await expect(current).not.toHaveAttribute("aria-label");
+
+    // Paging moves the current-item state with the current page.
+    await themePages(page).nth(1).click();
+    await expect(currentPage(page)).toHaveText("2");
+    await expect(currentPage(page)).toHaveAttribute("aria-disabled", "true");
+    await expect(currentPage(page)).not.toHaveAttribute("aria-label");
+    const first = themePages(page).first();
+    await expect(first).not.toHaveAttribute("aria-disabled");
+    await expect(first).not.toHaveAttribute("role");
+    await expect(first).toHaveClass(/\blink\b/);
+    await expect(first).toHaveAttribute("aria-label", "Page 1");
+  });
+
   test("card fetches happen per rendered page, never for the whole set (AC-4)", async ({
     page,
   }) => {
@@ -1319,9 +1366,13 @@ test.describe("the full match set, paged by the theme (YOY-107)", () => {
 
     // Every product from the narrower set is still in the widened one —
     // somewhere across its pages, which is what the cap used to prevent.
+    // Page 1 is already current — and, as Dawn's own current item, disabled
+    // (YOY-96 AC-8) — so it is read in place and only pages 2 and 3 clicked.
     const after: string[] = [];
     for (const index of [0, 1, 2]) {
-      await themePages(page).nth(index).click();
+      if (index > 0) {
+        await themePages(page).nth(index).click();
+      }
       await expect(currentPage(page)).toHaveText(String(index + 1));
       after.push(...(await titles(page).allTextContents()));
     }

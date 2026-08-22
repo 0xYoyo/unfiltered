@@ -241,6 +241,14 @@ interface Shell {
     wrapper: HTMLElement;
     list: HTMLElement;
     item: HTMLElement;
+    /**
+     * The `role` / `aria-disabled` / `aria-label` values the theme's OWN
+     * current-page link carried in the shell (YOY-96 AC-8; Dawn: `role="link"
+     * aria-disabled="true"`, no label), re-applied to the current page's
+     * clone only. Empty when the shell had no current item or it carried
+     * none of them.
+     */
+    currentAttributes: Array<[name: string, value: string]>;
   } | null;
 }
 
@@ -408,15 +416,45 @@ export function createPageMirror(options: PageMirrorOptions): PageMirror {
       const paginationList = wrapper?.querySelector<HTMLElement>(
         page.pagination.listSelector,
       );
-      const paginationItem = paginationList?.querySelector<HTMLElement>(
-        page.pagination.itemSelector,
-      );
+      // The per-page clone template is the first item whose link is NOT the
+      // current page (YOY-96 AC-8): the shell is fetched for page 1, where
+      // Dawn's first item is the current one — `role="link"
+      // aria-disabled="true"`, no `href`, no `link` class — and cloning it
+      // would announce every page as disabled and drop the theme's link
+      // styling. The current item's own `role`/`aria-disabled` are kept
+      // aside to re-apply to whichever clone is current.
+      const paginationItems = [
+        ...(paginationList?.querySelectorAll<HTMLElement>(
+          page.pagination.itemSelector,
+        ) ?? []),
+      ];
+      const { currentClass, linkSelector } = page.pagination;
+      const linkOf = (item: HTMLElement): HTMLElement | null =>
+        item.matches(linkSelector)
+          ? item
+          : item.querySelector<HTMLElement>(linkSelector);
+      const isCurrentItem = (item: HTMLElement): boolean =>
+        currentClass !== "" &&
+        (linkOf(item)?.classList.contains(currentClass) ?? false);
+      const paginationItem =
+        paginationItems.find((item) => !isCurrentItem(item)) ??
+        paginationItems[0];
+      const currentLink = paginationItems
+        .filter(isCurrentItem)
+        .map(linkOf)
+        .find((link): link is HTMLElement => link !== null);
+      const currentAttributes: Array<[string, string]> = [];
+      for (const name of ["role", "aria-disabled", "aria-label"]) {
+        const value = currentLink?.getAttribute(name);
+        if (value !== null && value !== undefined) {
+          currentAttributes.push([name, value]);
+        }
+      }
       if (
         wrapper !== null &&
         wrapper !== undefined &&
         paginationList !== null &&
         paginationList !== undefined &&
-        paginationItem !== null &&
         paginationItem !== undefined
       ) {
         wrapper.hidden = true;
@@ -424,6 +462,7 @@ export function createPageMirror(options: PageMirrorOptions): PageMirror {
           wrapper,
           list: paginationList,
           item: paginationItem.cloneNode(true) as HTMLElement,
+          currentAttributes,
         };
       } else if (wrapper !== null && wrapper !== undefined) {
         // A wrapper with no recognizable item template is furniture we
@@ -683,6 +722,33 @@ export function createPageMirror(options: PageMirrorOptions): PageMirror {
         return;
       }
       const { currentClass, linkSelector } = config.page.pagination;
+      // The template is a non-current item, which on Dawn carries
+      // `aria-label="Page N"` for ITS page: each clone's label is rewritten
+      // to its own page the same way the text is, by replacing the
+      // template's number; a label that does not name the template's number
+      // cannot be rewritten and is dropped rather than announced wrong.
+      const templateLink = pagination.item.matches(linkSelector)
+        ? pagination.item
+        : pagination.item.querySelector<HTMLElement>(linkSelector);
+      const templateNumber = templateLink?.textContent?.trim() ?? "";
+      const templateLabel = templateLink?.getAttribute("aria-label") ?? null;
+      const labelFor = (number: number): string | null => {
+        if (templateLabel === null) {
+          return null;
+        }
+        const at =
+          templateNumber === ""
+            ? -1
+            : templateLabel.lastIndexOf(templateNumber);
+        if (at === -1) {
+          return null;
+        }
+        return (
+          templateLabel.slice(0, at) +
+          String(number) +
+          templateLabel.slice(at + templateNumber.length)
+        );
+      };
       const items: HTMLElement[] = [];
       for (let number = 1; number <= pageCount; number += 1) {
         const item = pagination.item.cloneNode(true) as HTMLElement;
@@ -701,10 +767,24 @@ export function createPageMirror(options: PageMirrorOptions): PageMirror {
         if (currentClass !== "") {
           link.classList.toggle(currentClass, number === current);
         }
+        // The template is a non-current item; only the current page's
+        // clone carries the theme's current-item `role`/`aria-disabled`
+        // (YOY-96 AC-8) — never a non-current page, which must stay a
+        // plain link to assistive tech.
+        link.removeAttribute("role");
+        link.removeAttribute("aria-disabled");
+        link.removeAttribute("aria-label");
         if (number === current) {
           link.setAttribute("aria-current", "page");
+          for (const [name, value] of pagination.currentAttributes) {
+            link.setAttribute(name, value);
+          }
         } else {
           link.removeAttribute("aria-current");
+          const label = labelFor(number);
+          if (label !== null) {
+            link.setAttribute("aria-label", label);
+          }
         }
         link.addEventListener("click", (event) => {
           // In-place paging: the results are already in memory, so this is
