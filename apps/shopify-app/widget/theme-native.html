@@ -265,6 +265,8 @@
           shellLocale === "he" ? "תוצאות חיפוש" : "Search results"
         }</h1>
         <a href="JavaScript:void(0)" data-testid="theme-hostile-link" hidden>Hostile</a>
+        <button type="button" formaction="javascript:void(0)" data-testid="theme-hostile-formaction" hidden>Hostile</button>
+        <svg style="display:none" data-testid="theme-hostile-svg"><a xlink:href=" JavaScript:void(0)" data-testid="theme-hostile-xlink"><text>Hostile</text></a></svg>
         <div class="template-search__search">
           <form action="/search" method="get" role="search" class="search">
             <input class="search__input" id="Search-In-Template" type="search" name="q" value="${term}" placeholder="Search">
@@ -496,6 +498,8 @@
     </div>
   </div>
   <a href=" javascript:void(0)" data-hostile-link hidden>Hostile</a>
+  <button type="button" formaction="javascript:void(0)" data-hostile-formaction hidden>Hostile</button>
+  <svg style="display:none" data-hostile-svg><a xlink:href=" JavaScript:void(0)" data-hostile-xlink><text>Hostile</text></a></svg>
 </div>
 <script>window.__altTemplateScriptRan = true;<\/script>
 `;
