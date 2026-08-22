@@ -103,6 +103,15 @@ const asString = (value: unknown): string | null => {
   return null;
 };
 
+/** Resolve `value` against `base`; null when the pair is not a valid URL. */
+const resolveUrl = (value: string, base: string): string | null => {
+  try {
+    return new URL(value, base).toString();
+  } catch {
+    return null;
+  }
+};
+
 const asNumber = (value: unknown): number | null => {
   if (typeof value === "number") {
     return Number.isFinite(value) ? value : null;
@@ -277,10 +286,10 @@ export function mapProductNode(
   }
 
   const title = asString(node["name"]) ?? "";
-  const url =
-    asString(node["url"]) !== null
-      ? new URL(asString(node["url"]) as string, pageUrl).toString()
-      : (canonicalUrl ?? pageUrl);
+  // An unparseable JSON-LD `url` falls back to the page's canonical/fetched
+  // URL instead of throwing out of the whole crawl (YOY-96 AC-7).
+  const jsonLdUrl = asString(node["url"]);
+  const url = (jsonLdUrl !== null ? resolveUrl(jsonLdUrl, pageUrl) : null) ?? canonicalUrl ?? pageUrl;
   // Deterministic per page: the product's own identifier when it has one,
   // else the page (canonical) URL — the same page always maps to the same id.
   const sourceId =
@@ -309,7 +318,8 @@ export function mapProductNode(
     currencyCode: facts.currency,
     available: facts.available,
     imageAltTexts: [],
-    imageUrl: image !== null ? new URL(image, pageUrl).toString() : null,
+    // Likewise an unparseable image URL yields no image, not a failed page.
+    imageUrl: image !== null ? resolveUrl(image, pageUrl) : null,
     url,
     sourceUpdatedAt: null,
   };

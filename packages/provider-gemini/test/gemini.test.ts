@@ -371,6 +371,37 @@ describe("structured completion", () => {
     ]);
   });
 
+  it("meters Gemini thought tokens as output tokens; no thoughtsTokenCount → candidates only (YOY-96 AC-19)", async () => {
+    const { recorded, recorder } = recorderSpy();
+    const thinking = fetchStub(200, {
+      candidates: [{ content: { parts: [{ text: '{"color":"black"}' }] } }],
+      usageMetadata: {
+        promptTokenCount: 120,
+        candidatesTokenCount: 40,
+        thoughtsTokenCount: 600,
+      },
+    });
+    await llmClient(thinking.impl, recorder).completeStructured({
+      prompt: "Extract intent",
+      schema: SCHEMA,
+      operation: "intent",
+    });
+    // Thinking is billed at the output rate: 40 answer + 600 thought tokens.
+    expect(recorded[0]).toMatchObject({ inputTokens: 120, outputTokens: 640 });
+
+    const plain = fetchStub(200, {
+      candidates: [{ content: { parts: [{ text: '{"color":"black"}' }] } }],
+      usageMetadata: { promptTokenCount: 120, candidatesTokenCount: 40 },
+    });
+    await llmClient(plain.impl, recorder).completeStructured({
+      prompt: "Extract intent",
+      schema: SCHEMA,
+      operation: "intent",
+    });
+    expect(recorded[1]).toMatchObject({ inputTokens: 120, outputTokens: 40 });
+    expect(recorded).toHaveLength(2);
+  });
+
   it("still meters a schema-violating (non-JSON) answer before throwing", async () => {
     const { recorded, recorder } = recorderSpy();
     const { impl } = fetchStub(200, {

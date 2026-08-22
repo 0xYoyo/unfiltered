@@ -1,6 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import type { EmbeddingClient, LlmClient } from "@unfiltered/engine";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { FakeRoute } from "../testing/fake-store.server";
 import { createFakeStore } from "../testing/fake-store.server";
@@ -34,6 +34,13 @@ import {
   readSitemapBody,
   sitemapsFromRobots,
 } from "./sitemap.server";
+
+// The extractor is a pass-through spy so one test can make a single page's
+// extraction throw (YOY-96 AC-7); every other call runs the real function.
+vi.mock("./jsonld.server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./jsonld.server")>();
+  return { ...actual, extractProductsFromPage: vi.fn(actual.extractProductsFromPage) };
+});
 
 // Sitemap → JSON-LD crawler (YOY-89): every test runs against the in-memory
 // crawl fixture store — robots with a Sitemap: line, an index, two child
@@ -202,6 +209,32 @@ describe("JSON-LD extraction (AC-3, AC-4)", () => {
     expect(d.skippedNoPrice).toBe(0);
   });
 
+  it("an unparseable JSON-LD url falls back to the canonical and an unparseable image yields null — no throw (YOY-96 AC-7)", () => {
+    const bad = simpleProductHtml({ canonicalPath: "/item/bad-urls", sku: "BAD-1", name: "Bad Urls", price: 20 })
+      .replace(`"url":"${CRAWL_ORIGIN}/item/bad-urls"`, '"url":"http://[bad"')
+      .replace(`"image":"${CRAWL_ORIGIN}/img/bad-1.jpg"`, '"image":"http://[bad-img"');
+    // The fixture really carries the malformed values (both throw in `new URL`).
+    expect(bad).toContain('"url":"http://[bad"');
+    expect(bad).toContain('"image":"http://[bad-img"');
+    expect(() => new URL("http://[bad", `${CRAWL_ORIGIN}/item/bad-urls`)).toThrow();
+
+    const page = extractProductsFromPage(bad, `${CRAWL_ORIGIN}/item/bad-urls?ref=1`);
+    expect(page.skippedNoPrice).toBe(0);
+    expect(page.products).toHaveLength(1);
+    expect(page.products[0]).toMatchObject({
+      sourceId: "BAD-1",
+      title: "Bad Urls",
+      url: `${CRAWL_ORIGIN}/item/bad-urls`,
+      imageUrl: null,
+      priceMin: 20,
+    });
+    // Without a canonical the fetched URL is the fallback.
+    const noCanonical = bad.replace(/<link rel="canonical"[^>]*>/, "");
+    expect(extractProductsFromPage(noCanonical, `${CRAWL_ORIGIN}/item/bad-urls?ref=1`).products[0].url).toBe(
+      `${CRAWL_ORIGIN}/item/bad-urls?ref=1`,
+    );
+  });
+
   it("a page without a Product node contributes nothing (AC-3)", async () => {
     const about = crawlStoreRoutes()["/about"] as Response;
     expect(extractProductsFromPage(await about.text(), `${CRAWL_ORIGIN}/about`)).toEqual({
@@ -272,6 +305,7 @@ describe("the crawl source (AC-1, AC-2, AC-4)", () => {
       skippedNonHtml: 1,
       skippedRobots: 0,
       fetchErrors: 0,
+      extractErrors: 0,
       budgetExhausted: false,
     });
     // Product-ish URLs were requested before /about and /catalog.pdf.
@@ -335,6 +369,41 @@ describe("the crawl source (AC-1, AC-2, AC-4)", () => {
     const source = createJsonLdCrawlSource({ storeUrl: "https://a.example", fetch: flaky.fetch });
     expect((await source.fetchProducts({ maxProducts: 10 })).map((product) => product.sourceId)).toEqual(["OK"]);
     expect(source.stats.fetchErrors).toBe(1);
+  });
+
+  it("a page whose extraction throws is counted in extractErrors; every other page's products are still returned (YOY-96 AC-7)", async () => {
+    const actual = await vi.importActual<typeof import("./jsonld.server")>("./jsonld.server");
+    const spy = vi.mocked(extractProductsFromPage);
+    spy.mockImplementation((pageHtml, pageUrl) => {
+      if (pageUrl === `${CRAWL_ORIGIN}/product/woo-dress`) {
+        throw new Error("fixture: extraction exploded on this page");
+      }
+      return actual.extractProductsFromPage(pageHtml, pageUrl);
+    });
+    try {
+      const { fetch } = polite(crawlStoreRoutes());
+      const source = createJsonLdCrawlSource({ storeUrl: CRAWL_ORIGIN, fetch });
+      const stages: string[] = [];
+      const products = await source.fetchProducts({
+        maxProducts: 2000,
+        onProgress: ({ stage }) => stages.push(stage),
+      });
+      // The run completes: only the exploding page's product is missing.
+      expect(products.map((product) => product.sourceId).sort()).toEqual(
+        CRAWL_EXPECTED_SKUS.filter((sku) => sku !== "WOO-DRESS-1").sort(),
+      );
+      expect(source.stats).toMatchObject({
+        pagesFetched: 12,
+        productsFound: 8,
+        fetchErrors: 0,
+        extractErrors: 1,
+        budgetExhausted: false,
+      });
+      // The progress line's skipped total includes it.
+      expect(stages.at(-1)).toMatch(/^pages 12 fetched \/ products 8 found \/ skipped 3$/);
+    } finally {
+      spy.mockImplementation(actual.extractProductsFromPage);
+    }
   });
 
   it("keeps at most 4 page requests in flight per host through the polite helper (AC-1)", async () => {
@@ -428,7 +497,9 @@ describe("pipeline + CLI integration on the hermetic DB (AC-5)", () => {
       expect.arrayContaining([
         `source: jsonld-crawl at ${CRAWL_ORIGIN}`,
         "name: shop.example",
-        expect.stringMatching(/^crawl: sitemaps 3, urls 12, pages fetched 5 \(budget 5\), products found \d, .* — page budget exhausted, more pages remain$/),
+        expect.stringMatching(
+          /^crawl: sitemaps 3, urls 12, pages fetched 5 \(budget 5\), products found \d, .*, fetch errors 0, extract errors 0 — page budget exhausted, more pages remain$/,
+        ),
       ]),
     );
     expect((await db.playgroundCatalog.findUniqueOrThrow({ where: { slug: "crawl-cli" } })).sourceKind).toBe("jsonld-crawl");

@@ -278,6 +278,8 @@ interface GenerateContentResponse {
   usageMetadata?: {
     promptTokenCount?: number;
     candidatesTokenCount?: number;
+    /** Thinking tokens — billed at the output rate, absent when zero. */
+    thoughtsTokenCount?: number;
   };
 }
 
@@ -324,7 +326,13 @@ export function createGeminiLlmClient(options: GeminiClientOptions): LlmClient {
         modelId: resolved.modelId,
         operation: request.operation,
         inputTokens: usage.promptTokenCount,
-        outputTokens: usage.candidatesTokenCount ?? 0,
+        // Gemini bills thinking at the output rate, so thought tokens join
+        // the output count (YOY-96 AC-19): the ledger's existing output
+        // price applies, no new column. At the model default an intent call
+        // spends 350–1010 thought tokens against ~40 of answer — left out,
+        // the ledger under-reports intent spend by 2–4× per call.
+        outputTokens:
+          (usage.candidatesTokenCount ?? 0) + (usage.thoughtsTokenCount ?? 0),
         storeId: request.storeId,
         searchId: request.searchId,
       });

@@ -36,6 +36,11 @@ export interface CrawlStats {
   skippedRobots: number;
   /** Fetch failures (network, timeout, non-2xx) — skipped and counted. */
   fetchErrors: number;
+  /**
+   * Pages whose JSON-LD extraction threw — skipped and counted, never fatal
+   * to the crawl (YOY-96 AC-7).
+   */
+  extractErrors: number;
   /** The page budget ran out with sitemap URLs still unread. */
   budgetExhausted: boolean;
 }
@@ -62,6 +67,7 @@ const emptyStats = (): CrawlStats => ({
   skippedNonHtml: 0,
   skippedRobots: 0,
   fetchErrors: 0,
+  extractErrors: 0,
   budgetExhausted: false,
 });
 
@@ -117,7 +123,11 @@ export function createJsonLdCrawlSource({
         onProgress?.({
           fetched: products.length,
           stage: `pages ${stats.pagesFetched} fetched / products ${products.length} found / skipped ${
-            stats.skippedNoPrice + stats.skippedNonHtml + stats.skippedRobots + stats.fetchErrors
+            stats.skippedNoPrice +
+            stats.skippedNonHtml +
+            stats.skippedRobots +
+            stats.fetchErrors +
+            stats.extractErrors
           }`,
         });
       };
@@ -159,8 +169,24 @@ export function createJsonLdCrawlSource({
           stats.skippedNonHtml += 1;
           return;
         }
-        const html = await response.text();
-        const extracted = extractProductsFromPage(html, url);
+        let html: string;
+        try {
+          html = await response.text();
+        } catch {
+          // A body that cannot be read is a fetch failure, not a crawl failure.
+          stats.fetchErrors += 1;
+          return;
+        }
+        let extracted: ReturnType<typeof extractProductsFromPage>;
+        try {
+          extracted = extractProductsFromPage(html, url);
+        } catch {
+          // One page's bad markup never aborts the run: count it and move on
+          // (YOY-96 AC-7). The worker's Promise.all would otherwise reject
+          // after possibly thousands of fetched pages.
+          stats.extractErrors += 1;
+          return;
+        }
         stats.skippedNoPrice += extracted.skippedNoPrice;
         for (const product of extracted.products) {
           if (seenIds.has(product.sourceId)) {
