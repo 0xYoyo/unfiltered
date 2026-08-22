@@ -11,6 +11,7 @@ import { PLAYGROUND_STRING_CATALOG, type PlaygroundLocale } from "../strings";
  */
 
 const DESKTOP = { width: 1280, height: 800 };
+const MOBILE = { width: 360, height: 640 };
 
 const input = (page: Page) => page.getByTestId("playground-input");
 const chips = (page: Page) => page.getByTestId("playground-chip");
@@ -465,6 +466,31 @@ test.describe("example queries (AC-6, verify 6)", () => {
     await expect(chips(page)).toHaveCount(3);
     await expect(examples).toHaveAttribute("data-collapsed", "true");
     await expect(examples).toContainText(strings("en").examplesLead);
+  });
+
+  test("the collapsed Try: row stays one row on a narrow viewport and the chips stay above the fold (YOY-96 AC-15)", async ({
+    page,
+  }) => {
+    await page.setViewportSize(MOBILE);
+    await page.goto("/");
+    const examples = page.getByTestId("playground-examples");
+    await submit(page, "ai elegant dress");
+    await expect(chips(page)).toHaveCount(3);
+    await expect(examples).toHaveAttribute("data-collapsed", "true");
+
+    // One row: the six 44px controls no longer wrap into a ~260px stack.
+    const box = await examples.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.height).toBeLessThanOrEqual(56);
+    // Every example keeps its hit target (F-3) inside the scrolling row.
+    for (const example of await page.getByTestId("playground-example").all()) {
+      const target = await example.boundingBox();
+      expect(target!.height).toBeGreaterThanOrEqual(44);
+    }
+    // The answer is above the fold: the chip row starts inside the viewport.
+    const chipRow = await page.getByTestId("playground-chips").boundingBox();
+    expect(chipRow).not.toBeNull();
+    expect(chipRow!.y).toBeLessThan(640);
   });
 
   test("they are links, never pills (P-2)", async ({ page }) => {

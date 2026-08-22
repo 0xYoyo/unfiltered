@@ -535,6 +535,35 @@ html:has(.playground) {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--space-12);
   }
+
+  /* The collapsed "Try:" row stays ONE quiet row on a narrow viewport
+     (YOY-96 AC-15): six 44px controls wrapping onto their own lines made a
+     ~260px block that pushed the answer below the fold. It scrolls inline
+     instead, snapping near each example; every control keeps its 44px hit
+     target (F-3) and the initial (non-collapsed) list is untouched. The
+     row is thumbed or trackpad-scrolled — an always-on scrollbar under a
+     single line of text links is the very weight the collapse removes, so
+     the track is not drawn (no custom scrollbar styling, just none). */
+  .examplesCollapsed {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x proximity;
+    scroll-padding-inline: var(--space-8);
+    overscroll-behavior-inline: contain;
+    scrollbar-width: none;
+  }
+
+  .examplesCollapsed::-webkit-scrollbar {
+    display: none;
+  }
+
+  .examplesCollapsed .examplesLead,
+  .examplesCollapsed .exampleQuery {
+    flex-shrink: 0;
+    white-space: nowrap;
+    scroll-snap-align: start;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
