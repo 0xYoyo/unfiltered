@@ -242,10 +242,11 @@ interface Shell {
     list: HTMLElement;
     item: HTMLElement;
     /**
-     * The `role` / `aria-disabled` values the theme's OWN current-page link
-     * carried in the shell (YOY-96 AC-8; Dawn: `role="link"
-     * aria-disabled="true"`), re-applied to the current page's clone only.
-     * Empty when the shell had no current item or it carried neither.
+     * The `role` / `aria-disabled` / `aria-label` values the theme's OWN
+     * current-page link carried in the shell (YOY-96 AC-8; Dawn: `role="link"
+     * aria-disabled="true"`, no label), re-applied to the current page's
+     * clone only. Empty when the shell had no current item or it carried
+     * none of them.
      */
     currentAttributes: Array<[name: string, value: string]>;
   } | null;
@@ -443,7 +444,7 @@ export function createPageMirror(options: PageMirrorOptions): PageMirror {
         .map(linkOf)
         .find((link): link is HTMLElement => link !== null);
       const currentAttributes: Array<[string, string]> = [];
-      for (const name of ["role", "aria-disabled"]) {
+      for (const name of ["role", "aria-disabled", "aria-label"]) {
         const value = currentLink?.getAttribute(name);
         if (value !== null && value !== undefined) {
           currentAttributes.push([name, value]);
@@ -721,6 +722,33 @@ export function createPageMirror(options: PageMirrorOptions): PageMirror {
         return;
       }
       const { currentClass, linkSelector } = config.page.pagination;
+      // The template is a non-current item, which on Dawn carries
+      // `aria-label="Page N"` for ITS page: each clone's label is rewritten
+      // to its own page the same way the text is, by replacing the
+      // template's number; a label that does not name the template's number
+      // cannot be rewritten and is dropped rather than announced wrong.
+      const templateLink = pagination.item.matches(linkSelector)
+        ? pagination.item
+        : pagination.item.querySelector<HTMLElement>(linkSelector);
+      const templateNumber = templateLink?.textContent?.trim() ?? "";
+      const templateLabel = templateLink?.getAttribute("aria-label") ?? null;
+      const labelFor = (number: number): string | null => {
+        if (templateLabel === null) {
+          return null;
+        }
+        const at =
+          templateNumber === ""
+            ? -1
+            : templateLabel.lastIndexOf(templateNumber);
+        if (at === -1) {
+          return null;
+        }
+        return (
+          templateLabel.slice(0, at) +
+          String(number) +
+          templateLabel.slice(at + templateNumber.length)
+        );
+      };
       const items: HTMLElement[] = [];
       for (let number = 1; number <= pageCount; number += 1) {
         const item = pagination.item.cloneNode(true) as HTMLElement;
@@ -745,6 +773,7 @@ export function createPageMirror(options: PageMirrorOptions): PageMirror {
         // plain link to assistive tech.
         link.removeAttribute("role");
         link.removeAttribute("aria-disabled");
+        link.removeAttribute("aria-label");
         if (number === current) {
           link.setAttribute("aria-current", "page");
           for (const [name, value] of pagination.currentAttributes) {
@@ -752,6 +781,10 @@ export function createPageMirror(options: PageMirrorOptions): PageMirror {
           }
         } else {
           link.removeAttribute("aria-current");
+          const label = labelFor(number);
+          if (label !== null) {
+            link.setAttribute("aria-label", label);
+          }
         }
         link.addEventListener("click", (event) => {
           // In-place paging: the results are already in memory, so this is

@@ -1299,22 +1299,29 @@ test.describe("the full match set, paged by the theme (YOY-107)", () => {
         "href",
         `/search?q=dress&page=${index + 1}`,
       );
+      // Dawn's `aria-label="Page N"` on the template is rewritten per page,
+      // never cloned verbatim.
+      await expect(link).toHaveAttribute("aria-label", `Page ${index + 1}`);
     }
     const current = currentPage(page);
     await expect(current).toHaveText("1");
     await expect(current).toHaveClass(/pagination__item--current/);
-    // The theme's own current-item attributes, copied from the shell.
+    // The theme's own current-item attributes, copied from the shell — and
+    // Dawn's current item carries no label, so neither does ours.
     await expect(current).toHaveAttribute("role", "link");
     await expect(current).toHaveAttribute("aria-disabled", "true");
+    await expect(current).not.toHaveAttribute("aria-label");
 
     // Paging moves the current-item state with the current page.
     await themePages(page).nth(1).click();
     await expect(currentPage(page)).toHaveText("2");
     await expect(currentPage(page)).toHaveAttribute("aria-disabled", "true");
+    await expect(currentPage(page)).not.toHaveAttribute("aria-label");
     const first = themePages(page).first();
     await expect(first).not.toHaveAttribute("aria-disabled");
     await expect(first).not.toHaveAttribute("role");
     await expect(first).toHaveClass(/\blink\b/);
+    await expect(first).toHaveAttribute("aria-label", "Page 1");
   });
 
   test("card fetches happen per rendered page, never for the whole set (AC-4)", async ({

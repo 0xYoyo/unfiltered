@@ -557,18 +557,30 @@ docs/
       mobile-he-3-submitted-cards.png
       widget-desktop-en-count-range-hidden.png
       widget-desktop-en-loading-new-query.png
+      widget-desktop-en-pagination-links.png
+      widget-desktop-en-predictive-closed-submit.png
+      widget-desktop-en-predictive-open-typing.png
       widget-desktop-en-variant-A-sanitized-results.png
       widget-desktop-en-variant-B-sanitized-results.png
       widget-desktop-he-count-range-hidden.png
       widget-desktop-he-loading-new-query.png
+      widget-desktop-he-pagination-links.png
+      widget-desktop-he-predictive-closed-submit.png
+      widget-desktop-he-predictive-open-typing.png
       widget-desktop-he-variant-A-sanitized-results.png
       widget-desktop-he-variant-B-sanitized-results.png
       widget-mobile-en-count-range-hidden.png
       widget-mobile-en-loading-new-query.png
+      widget-mobile-en-pagination-links.png
+      widget-mobile-en-predictive-closed-submit.png
+      widget-mobile-en-predictive-open-typing.png
       widget-mobile-en-variant-A-sanitized-results.png
       widget-mobile-en-variant-B-sanitized-results.png
       widget-mobile-he-count-range-hidden.png
       widget-mobile-he-loading-new-query.png
+      widget-mobile-he-pagination-links.png
+      widget-mobile-he-predictive-closed-submit.png
+      widget-mobile-he-predictive-open-typing.png
       widget-mobile-he-variant-A-sanitized-results.png
       widget-mobile-he-variant-B-sanitized-results.png
     YOY-99/
