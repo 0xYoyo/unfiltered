@@ -167,6 +167,31 @@ test.describe("native mode: keystroke previews ride the theme's predictive searc
     expect(await themeEvents(page)).not.toContain("keydown:Enter");
   });
 
+  test("our submit closes the theme's inline predictive dropdown; typing again re-shows it (YOY-96 AC-6)", async ({
+    page,
+  }) => {
+    await page.goto("/native-predictive.html?native=A");
+    const dropdown = page.locator("#PredictiveResults");
+
+    await themeInput(page).pressSequentially("nike");
+    await expect(dropdown).toBeVisible();
+    await expect(dropdown).toContainText("SUGGESTIONS: nike");
+
+    // The fixture's predictive panel is inline — no modal wraps it — so a
+    // takeover submit must hide it explicitly, or it overlaps the mirrored
+    // results view until focus leaves the input.
+    await themeInput(page).press("Enter");
+    await expect(nativeItems(page)).toHaveCount(1);
+    await expect(dropdown).toBeHidden();
+    await expect(dropdown).toHaveAttribute("hidden", "");
+
+    // Typing still reaches the theme untouched (YOY-101 AC-1): the theme's
+    // own input listener re-renders and re-shows its dropdown.
+    await themeInput(page).pressSequentially("s");
+    await expect(dropdown).toBeVisible();
+    await expect(dropdown).toContainText("SUGGESTIONS: nikes");
+  });
+
   test("the magnifier submit button runs our pipeline instead of navigating (AC-2)", async ({
     page,
   }) => {
