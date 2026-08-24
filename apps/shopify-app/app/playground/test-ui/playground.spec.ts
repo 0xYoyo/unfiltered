@@ -579,3 +579,67 @@ test.describe("keyboard and focus (AC-7, verify 7)", () => {
     }
   });
 });
+
+/**
+ * One self-hosted family for both scripts (YOY-96 AC-13). Heebo is declared
+ * by playground/fonts.css from the app's own static assets; the page must
+ * actually load it — for Latin on `/` and for Hebrew on `/?lang=he` — and
+ * must fetch no font from a third-party host.
+ */
+test.describe("the playground font (YOY-96 AC-13)", () => {
+  const FAMILY = "Heebo";
+
+  for (const [locale, path, sample] of [
+    ["en", "/", "Dress"],
+    ["he", "/?lang=he", "שמלה"],
+  ] as const) {
+    test(`${locale}: ${FAMILY} is loaded and is the family the input and card titles render in`, async ({
+      page,
+    }) => {
+      // Anything font-shaped that leaves the app's own host is a CDN leak.
+      const thirdPartyFonts: string[] = [];
+      page.on("request", (request) => {
+        const url = new URL(request.url());
+        if (
+          url.hostname !== "127.0.0.1" &&
+          /font|\.woff2?$|fonts\.g(static|oogleapis)|cdn\.shopify/i.test(
+            request.url(),
+          )
+        ) {
+          thirdPartyFonts.push(request.url());
+        }
+      });
+
+      await page.goto(path);
+      await submitQuery(page, "dress");
+      await expect(cards(page)).toHaveCount(4);
+      await page.evaluate(() => document.fonts.ready);
+
+      const loaded = await page.evaluate(
+        ({ family, text }) => ({
+          any: document.fonts.check(`16px ${family}`),
+          sample: document.fonts.check(`16px ${family}`, text),
+          faces: [...document.fonts]
+            .filter((face) => face.family.replace(/"/g, "") === family)
+            .map((face) => face.status),
+        }),
+        { family: FAMILY, text: sample },
+      );
+      expect(loaded.any).toBe(true);
+      expect(loaded.sample).toBe(true);
+      expect(loaded.faces).toContain("loaded");
+
+      for (const selector of [".searchInput", ".cardTitle"]) {
+        const family = await page
+          .locator(selector)
+          .first()
+          .evaluate((element) => getComputedStyle(element).fontFamily);
+        expect(family.replace(/^"/, ""), selector).toMatch(
+          new RegExp(`^${FAMILY}\\b`),
+        );
+      }
+
+      expect(thirdPartyFonts).toEqual([]);
+    });
+  }
+});

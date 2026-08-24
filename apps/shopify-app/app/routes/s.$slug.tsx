@@ -21,6 +21,7 @@ import {
   type PlaygroundLocale,
 } from "../playground/strings";
 
+import "../playground/fonts.css";
 import "../playground/tokens.css";
 import "../playground/playground.css";
 
