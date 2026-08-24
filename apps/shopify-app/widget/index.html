@@ -334,7 +334,9 @@
             fixture === "timeout-rescue" ||
             fixture === "timeout-rescue-error"
           ) {
-            if (request.mode !== "preview") {
+            // The rescue rides `mode=classic` (YOY-96 AC-9); the submitted
+            // request (no mode) is the one that stalls.
+            if (request.mode !== "classic") {
               return stall();
             }
             if (fixture === "timeout-rescue-error") {
@@ -343,10 +345,11 @@
             return Promise.resolve(jsonResponse(RESULTS_RESPONSE));
           }
           let body;
-          if (request.mode === "preview") {
+          if (request.mode === "preview" || request.mode === "classic") {
             // Keystroke previews are classic-only server-side (YOY-68 AC-1),
             // whatever fixture the SUBMIT would hit: `empty` previews stay
             // empty; every other fixture previews the plain classic set.
+            // The classic rescue (YOY-96 AC-9) is the same keyword answer.
             body =
               fixture === "empty"
                 ? { ...RESULTS_RESPONSE, results: [] }

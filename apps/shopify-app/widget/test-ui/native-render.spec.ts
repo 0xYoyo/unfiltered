@@ -686,7 +686,8 @@ test.describe("a timed-out search falls back to classic results (YOY-108)", () =
     );
     expect(requests).toHaveLength(2);
     expect(requests[0].mode).toBeUndefined();
-    expect(requests[1].mode).toBe("preview");
+    // The rescue is a SUBMITTED classic-only search (YOY-96 AC-9).
+    expect(requests[1].mode).toBe("classic");
   });
 
   test("a rescue that fails in turn resolves to the quiet no-results state (AC-2)", async ({

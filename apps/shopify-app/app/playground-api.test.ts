@@ -30,7 +30,11 @@ vi.mock("./search/proxy.server", async (importOriginal) => {
         return Promise.resolve({
           searchId: `search-${orchestratorSeam.requests.length}`,
           route: forced || preview ? "classic" : "ai",
-          routeReason: forced ? "throttled" : preview ? "preview" : "model",
+          routeReason: forced
+            ? ((request.forceClassicReason as string | undefined) ?? "throttled")
+            : preview
+              ? "preview"
+              : "model",
           intent: null,
           hits: [
             {
@@ -329,6 +333,33 @@ describe("preview, refinement, and chip removal pass through (AC-3)", () => {
     expect(orchestratorSeam.requests[0]).toMatchObject({ preview: true });
     expect(orchestratorSeam.requests[0].forceClassic).toBeUndefined();
     expect(await db.searchEvent.count()).toBe(0);
+  });
+
+  it("a classic rescue runs forced-classic with the rescue reason and writes one SearchEvent carrying it (YOY-96 AC-9)", async () => {
+    const response = await searchLoader(
+      loaderArgs(searchRequest({ mode: "classic" })),
+    );
+
+    expect(response.status).toBe(200);
+    expect(orchestratorSeam.requests[0]).toMatchObject({
+      forceClassic: true,
+      forceClassicReason: "client-timeout-rescue",
+    });
+    expect(orchestratorSeam.requests[0].preview).toBeUndefined();
+    const events = await db.searchEvent.findMany();
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      route: "classic",
+      routeReason: "client-timeout-rescue",
+      degraded: true,
+    });
+  });
+
+  it("every submitted search keeps its routeReason in the ledger (YOY-96 AC-9)", async () => {
+    await searchLoader(loaderArgs(searchRequest({})));
+    const events = await db.searchEvent.findMany();
+    expect(events).toHaveLength(1);
+    expect(events[0]!.routeReason).toBe("model");
   });
 
   it("a refinement forwards previousIntent verbatim", async () => {

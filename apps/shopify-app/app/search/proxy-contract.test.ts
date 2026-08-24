@@ -129,6 +129,21 @@ describe("search request: widget serialization → route parsing", () => {
     expect(parsed).toEqual({ query: "snowboard", sessionId: "session-2" });
   });
 
+  it("round-trips the classic rescue as mode=classic (YOY-96 AC-9)", async () => {
+    const captured: CapturedRequest[] = [];
+    captureFetch(captured);
+
+    await createSearchClient().searchClassic("snowboard", "session-6");
+
+    const rescueUrl = new URL(captured[0]!.url, "https://shop.example");
+    expect(rescueUrl.searchParams.get("mode")).toBe("classic");
+    expect(parseProxySearchParams(rescueUrl.searchParams)).toEqual({
+      query: "snowboard",
+      sessionId: "session-6",
+      mode: "classic",
+    });
+  });
+
   it("round-trips a keystroke preview and omits mode on submitted searches (YOY-68)", async () => {
     const captured: CapturedRequest[] = [];
     captureFetch(captured);

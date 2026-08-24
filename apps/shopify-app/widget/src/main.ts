@@ -447,11 +447,10 @@ export function init(config: WidgetConfig): void {
      * failed in turn and the caller should fall through to the failure
      * state (AC-2).
      *
-     * The rescued response is NOT attributable: it rides the wire's
-     * existing classic-only mode, which writes no SearchEvent row
-     * server-side (YOY-68 AC-3), so `currentSearchId` stays null and a
-     * click on a rescued card fires no beacon. That is the cost of adding
-     * no server parameter (YOY-108 NG-2) and is called out on the PR.
+     * The rescued response IS attributable (YOY-96 AC-9): it rides
+     * `mode=classic`, a submitted classic-only search the server logs as a
+     * real SearchEvent, so `currentSearchId` takes its searchId and a click
+     * on a rescued card beacons exactly like any other submitted result.
      */
     const rescueWithClassic = async (
       query: string,
@@ -470,7 +469,7 @@ export function init(config: WidgetConfig): void {
       // AC-3: the shopper got results, so this search is a rescue, not a
       // failure — the self-removal counter must never fire on AI slowness.
       consecutiveFailures = 0;
-      currentSearchId = null;
+      currentSearchId = response.searchId;
       lastQuery = query;
       // A classic response carries no intent, exactly as a server-degraded
       // one does; refinement has nothing to hold either way.
