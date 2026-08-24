@@ -7,7 +7,7 @@ export default defineConfig({
     // Single source of truth for the workspace packages in every test run
     // (YOY-52 run-5 directive). Each package's `exports` points at its
     // compiled dist/, which is gitignored and rebuilt only by npm install's
-    // prepare hook — so an eval or live-regeneration run on a tree whose
+    // root postinstall — so an eval or live-regeneration run on a tree whose
     // dist predates the current source silently scores stale logic while
     // every source-level reading looks correct (run 5's
     // "enforceComparativeBounds not in the scored path" was exactly this).

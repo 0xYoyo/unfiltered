@@ -18,8 +18,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "lint": "eslint --cache --cache-location ./node_modules/.cache/eslint .",
-    "prepare": "npm run build"
+    "lint": "eslint --cache --cache-location ./node_modules/.cache/eslint ."
   },
   "dependencies": {
     "@unfiltered/engine": "*"

@@ -18,7 +18,19 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm ci
+      # Deterministic-install guard (YOY-96 AC-12): a plain `npm ci` on a
+      # clean tree must succeed every time. The packages' `prepare` hooks used
+      # to race (provider-gemini's tsc typed against an engine dist/ that only
+      # engine's hook produced, and npm ran both concurrently), and this job
+      # had merely been winning that race. Installing twice from a scrubbed
+      # tree — node_modules and the compiled dist/ removed between runs — is
+      # the check; the second run leaves the tree the later steps use.
+      - name: npm ci twice on a clean tree
+        run: |
+          for run in 1 2; do
+            rm -rf node_modules apps/*/node_modules packages/*/node_modules packages/*/dist
+            npm ci
+          done
       # Repo-map drift guard (YOY-75 AC-2): docs/REPO-MAP.md is generated;
       # fails on a stale map, naming the fix command.
       - run: node scripts/repo-map.mjs --check

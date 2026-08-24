@@ -20,11 +20,13 @@ Prisma client, builds `apps/shopify-app` with React Router, then prunes dev
 dependencies into the runtime stage. `docker-entrypoint.sh` runs
 `prisma migrate deploy` and only then starts `react-router-serve` on `$PORT`.
 
-The install runs in two phases, and the order is load-bearing: npm runs the
-workspaces' `prepare` hooks concurrently, `provider-gemini` types against
-`engine`'s `dist/`, and losing that race fails the install. Phase one installs
-the root plus `engine` alone so its `dist/` always exists before phase two
-installs everything else.
+The install is a single `npm ci`. The workspace packages carry no `prepare`
+hooks (YOY-96 AC-12): the root `postinstall` runs `npm run build:packages`,
+which compiles `engine` and then `provider-gemini` in that order, so
+`provider-gemini`'s `tsc` always finds the `engine` `dist/` it types against.
+(Before that, npm ran the two `prepare` hooks concurrently and the install
+failed whenever `provider-gemini` lost the race; the Dockerfile worked around
+it with a two-phase install.)
 
 A container with no `DATABASE_URL` exits non-zero at startup with a stated
 reason. That is deliberate: `/healthz` never touches the database, so a
