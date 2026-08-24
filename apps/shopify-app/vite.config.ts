@@ -39,9 +39,10 @@ if (host === "localhost") {
 
 // Workspace packages resolve to their TypeScript source, never to compiled
 // dist/ (YOY-104, Option A). Each package's package.json `exports` points at
-// dist/, which is gitignored and rebuilt only by npm install's prepare hook —
-// so the running app used to execute whatever dist happened to be on disk,
-// while every test ran the source through the root vitest.config.ts alias.
+// dist/, which is gitignored and rebuilt only by npm install's root
+// postinstall — so the running app used to execute whatever dist happened to
+// be on disk, while every test ran the source through the root
+// vitest.config.ts alias.
 // PR #74's port rename (shopDomain → storeId) landed in src and in the app
 // but not in a dev tree's Aug-9 dist: every AI-routed search returned zero
 // rows and every AiCall lost its tenant, and nothing went red because no

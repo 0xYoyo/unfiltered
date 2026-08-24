@@ -12,8 +12,10 @@
     "lint": "npm run lint --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "build": "npm run build --workspaces --if-present",
+    "build:packages": "npm run build --workspace @unfiltered/engine && npm run build --workspace @unfiltered/provider-gemini",
     "build:widget": "npm run build:widget --workspace app",
-    "test:ui": "playwright test"
+    "test:ui": "playwright test",
+    "postinstall": "npm run build:packages"
   },
   "devDependencies": {
     "@playwright/test": "^1.56.1",

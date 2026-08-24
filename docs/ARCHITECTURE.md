@@ -50,7 +50,9 @@ The app, the tests, and the eval runs all execute the workspace packages'
   resolution.
 
 Each package's `package.json` still `exports` `dist/` (gitignored, rebuilt
-only by `npm install`'s `prepare` hook) for future package publishing, and
+only by the root `postinstall` — `npm run build:packages`, which compiles
+`engine` then `provider-gemini` in that order; YOY-96 AC-12) for future
+package publishing, and
 `tsc --noEmit` in the app reads types from `dist/index.d.ts` — but `dist/`
 is on no execution path in this repository. Why this matters: PR #74 renamed
 the engine port key `shopDomain → storeId` in `src` and in the app; a dev
