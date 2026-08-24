@@ -279,6 +279,8 @@ apps/
           migration.sql
         20260817130000_playground_catalog/
           migration.sql
+        20260824190000_search_event_route_reason/
+          migration.sql
         migration_lock.toml
       schema.prisma
     public/
@@ -574,6 +576,7 @@ docs/
       widget-desktop-en-pagination-links.png
       widget-desktop-en-predictive-closed-submit.png
       widget-desktop-en-predictive-open-typing.png
+      widget-desktop-en-rescued-results.png
       widget-desktop-en-variant-A-sanitized-results.png
       widget-desktop-en-variant-B-sanitized-results.png
       widget-desktop-he-count-range-hidden.png
@@ -581,6 +584,7 @@ docs/
       widget-desktop-he-pagination-links.png
       widget-desktop-he-predictive-closed-submit.png
       widget-desktop-he-predictive-open-typing.png
+      widget-desktop-he-rescued-results.png
       widget-desktop-he-variant-A-sanitized-results.png
       widget-desktop-he-variant-B-sanitized-results.png
       widget-mobile-en-count-range-hidden.png
@@ -588,6 +592,7 @@ docs/
       widget-mobile-en-pagination-links.png
       widget-mobile-en-predictive-closed-submit.png
       widget-mobile-en-predictive-open-typing.png
+      widget-mobile-en-rescued-results.png
       widget-mobile-en-variant-A-sanitized-results.png
       widget-mobile-en-variant-B-sanitized-results.png
       widget-mobile-he-count-range-hidden.png
@@ -595,6 +600,7 @@ docs/
       widget-mobile-he-pagination-links.png
       widget-mobile-he-predictive-closed-submit.png
       widget-mobile-he-predictive-open-typing.png
+      widget-mobile-he-rescued-results.png
       widget-mobile-he-variant-A-sanitized-results.png
       widget-mobile-he-variant-B-sanitized-results.png
     YOY-99/
@@ -653,7 +659,7 @@ vitest.setup.ts
 - **Entrypoints**: apps/shopify-app/app/routes/app.tsx, apps/shopify-app/widget/src/main.ts, packages/engine/src/index.ts, packages/provider-gemini/src/index.ts
 - **Scripts**: scripts/repo-map.mjs
 - **Fixtures**: apps/shopify-app/app/eval/fixtures/catalog.json, apps/shopify-app/app/eval/fixtures/goldens.json, apps/shopify-app/app/eval/fixtures/recorded/classification-synthesized.json, apps/shopify-app/app/eval/fixtures/recorded/classification.json, apps/shopify-app/app/eval/fixtures/recorded/embeddings.json, apps/shopify-app/app/eval/fixtures/recorded/enrichment.json, apps/shopify-app/app/eval/fixtures/recorded/intent-refinement.json, apps/shopify-app/app/eval/fixtures/recorded/intent.json, apps/shopify-app/app/eval/fixtures/refinement-goldens.json, apps/shopify-app/app/playground/fixtures/ai-chip-removed.json, apps/shopify-app/app/playground/fixtures/ai-zero-hit.json, apps/shopify-app/app/playground/fixtures/ai.json, apps/shopify-app/app/playground/fixtures/color-unknown.json, apps/shopify-app/app/playground/fixtures/crawl/about.html, apps/shopify-app/app/playground/fixtures/crawl/crawl-store.ts, apps/shopify-app/app/playground/fixtures/crawl/dupe-page.html, apps/shopify-app/app/playground/fixtures/crawl/group-sneaker.html, apps/shopify-app/app/playground/fixtures/crawl/magento-shirt.html, apps/shopify-app/app/playground/fixtures/crawl/priceless-scarf.html, apps/shopify-app/app/playground/fixtures/crawl/sitemap-index.xml, apps/shopify-app/app/playground/fixtures/crawl/sitemap-pages.xml, apps/shopify-app/app/playground/fixtures/crawl/sitemap-products.xml, apps/shopify-app/app/playground/fixtures/crawl/woo-dress.html, apps/shopify-app/app/playground/fixtures/degraded.json, apps/shopify-app/app/playground/fixtures/empty.json, apps/shopify-app/app/playground/fixtures/preview.json, apps/shopify-app/app/playground/fixtures/results.json, apps/shopify-app/app/playground/fixtures/shopify-public-products.ts
-- **Migrations**: apps/shopify-app/prisma/migrations/20260803000000_init_postgres/migration.sql, apps/shopify-app/prisma/migrations/20260803134500_ai_call_ledger/migration.sql, apps/shopify-app/prisma/migrations/20260803150800_catalog_product/migration.sql, apps/shopify-app/prisma/migrations/20260804152800_product_enrichment/migration.sql, apps/shopify-app/prisma/migrations/20260805131800_product_embedding/migration.sql, apps/shopify-app/prisma/migrations/20260808160000_pg_trgm_classic_search/migration.sql, apps/shopify-app/prisma/migrations/20260808170000_product_display_snapshot/migration.sql, apps/shopify-app/prisma/migrations/20260808190000_search_click_events/migration.sql, apps/shopify-app/prisma/migrations/20260809190000_catalog_product_status/migration.sql, apps/shopify-app/prisma/migrations/20260810210000_catalog_product_published_at/migration.sql, apps/shopify-app/prisma/migrations/20260816200000_catalog_product_url/migration.sql, apps/shopify-app/prisma/migrations/20260817130000_playground_catalog/migration.sql, apps/shopify-app/prisma/migrations/migration_lock.toml
+- **Migrations**: apps/shopify-app/prisma/migrations/20260803000000_init_postgres/migration.sql, apps/shopify-app/prisma/migrations/20260803134500_ai_call_ledger/migration.sql, apps/shopify-app/prisma/migrations/20260803150800_catalog_product/migration.sql, apps/shopify-app/prisma/migrations/20260804152800_product_enrichment/migration.sql, apps/shopify-app/prisma/migrations/20260805131800_product_embedding/migration.sql, apps/shopify-app/prisma/migrations/20260808160000_pg_trgm_classic_search/migration.sql, apps/shopify-app/prisma/migrations/20260808170000_product_display_snapshot/migration.sql, apps/shopify-app/prisma/migrations/20260808190000_search_click_events/migration.sql, apps/shopify-app/prisma/migrations/20260809190000_catalog_product_status/migration.sql, apps/shopify-app/prisma/migrations/20260810210000_catalog_product_published_at/migration.sql, apps/shopify-app/prisma/migrations/20260816200000_catalog_product_url/migration.sql, apps/shopify-app/prisma/migrations/20260817130000_playground_catalog/migration.sql, apps/shopify-app/prisma/migrations/20260824190000_search_event_route_reason/migration.sql, apps/shopify-app/prisma/migrations/migration_lock.toml
 
 ## Module dependency map
 

@@ -92,6 +92,7 @@ import db from "./db.server";
 import { createPrismaCostRecorder } from "./ai/cost-recorder.server";
 import { action } from "./routes/apps.unfiltered.search";
 import { createPgTrgmClassicStore } from "./search/classic-store.server";
+import { writeClickEvent } from "./search/events.server";
 import { createSearchOrchestrator } from "./search/orchestrator.server";
 import { resetProxySearchOrchestrator } from "./search/proxy.server";
 import { createPgVectorRetrievalStore } from "./search/retrieval-store.server";
@@ -467,10 +468,23 @@ describe("request validation", () => {
     expect(response.status).toBe(400);
   });
 
-  it("rejects an unknown mode and any preview carrying refinement context (YOY-68)", async () => {
+  it("rejects an unknown mode and any preview or classic rescue carrying refinement context (YOY-68, YOY-96 AC-9)", async () => {
     installOrchestrator({ llm: fakeLlm({}) });
     for (const payload of [
       { query: "shoes", sessionId: "s1", mode: "instant" },
+      {
+        query: "shoes",
+        sessionId: "s1",
+        mode: "classic",
+        previousIntent: DRESS_INTENT,
+      },
+      {
+        query: "shoes",
+        sessionId: "s1",
+        mode: "classic",
+        previousIntent: DRESS_INTENT,
+        removeChip: { field: "occasion", value: "wedding" },
+      },
       {
         query: "shoes",
         sessionId: "s1",
@@ -774,6 +788,8 @@ describe("search event logging (YOY-47 AC-2)", () => {
       resultCount: 1,
     });
     expect(events[0]!.latencyMs).toBeGreaterThanOrEqual(0);
+    // Every submitted search keeps its routeReason (YOY-96 AC-9).
+    expect(events[0]!.routeReason).toEqual(expect.any(String));
 
     // Degraded search (intent extraction fails).
     installOrchestrator({
@@ -1120,6 +1136,130 @@ describe("per-session AI throttle (YOY-47 AC-4, AC-5)", () => {
     expect(removalBody.route).toBe("ai");
     expect(removalBody.degraded).toBe(false);
     expect(counting.invocations()).toBe(callsBefore);
+  });
+});
+
+describe("classic rescue mode (YOY-96 AC-9)", () => {
+  it("serves classic-only results with zero LLM calls and no budget spent, logged as a real SearchEvent the click beacon can attribute to", async () => {
+    await seed([
+      { productId: "sneaker-90", title: "nike 90" },
+      {
+        productId: "silk-gown",
+        title: "silk gown",
+        vector: [0.9, 0.1, 0],
+        category: "dress",
+        occasions: ["wedding"],
+      },
+    ]);
+    throttleSeam.instance = createSessionThrottle({ limit: 1, now: () => 0 });
+    let calls = 0;
+    installOrchestrator({
+      llm: fakeLlm({
+        classification: () => {
+          calls += 1;
+          return { route: "ai" };
+        },
+        intent: () => {
+          calls += 1;
+          return DRESS_INTENT;
+        },
+      }),
+    });
+
+    // An AI-shaped query as a classic rescue: keyword results on contract,
+    // zero LLM calls, degraded like every forced-classic response.
+    const rescue = await action(
+      actionArgs(
+        proxyRequest({
+          payload: { query: "nike 90", sessionId: "c1", mode: "classic" },
+        }),
+      ),
+    );
+    expect(rescue.status).toBe(200);
+    const body = await rescue.json();
+    expect(Object.keys(body).sort()).toEqual(CONTRACT_KEYS);
+    expect(body.route).toBe("classic");
+    expect(body.degraded).toBe(true);
+    expect(body.chips).toEqual([]);
+    expect(
+      body.results.map((r: { productId: string }) => r.productId),
+    ).toEqual(["sneaker-90"]);
+    expect(calls).toBe(0);
+
+    // Unlike a preview, the rescue is a submitted search: exactly one
+    // SearchEvent, carrying the rescue reason, under the returned searchId.
+    const events = await db.searchEvent.findMany({
+      where: { sessionId: "c1" },
+    });
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      searchId: body.searchId,
+      shopDomain: SHOP,
+      query: "nike 90",
+      route: "classic",
+      routeReason: "client-timeout-rescue",
+      degraded: true,
+      resultCount: 1,
+    });
+
+    // …so a click on a rescued card attributes: the beacon's searchId
+    // validation finds the row.
+    expect(
+      await writeClickEvent(db, {
+        searchId: body.searchId,
+        shopDomain: SHOP,
+        sessionId: "c1",
+        productId: "sneaker-90",
+        position: 0,
+      }),
+    ).toBe(true);
+
+    // The rescue consumed no AI budget: the full budget of 1 still serves
+    // a genuine submitted AI search afterwards, which logs "model".
+    const submitted = await action(
+      actionArgs(proxyRequest({ payload: { query: AI_QUERY, sessionId: "c1" } })),
+    );
+    const submittedBody = await submitted.json();
+    expect(submittedBody.route).toBe("ai");
+    const after = await db.searchEvent.findMany({
+      where: { sessionId: "c1" },
+      orderBy: { createdAt: "asc" },
+    });
+    expect(after.map((event) => event.routeReason)).toEqual([
+      "client-timeout-rescue",
+      "model",
+    ]);
+  });
+
+  it("a throttled session's rescue still answers, LLM-free, and is logged as a rescue rather than as throttled", async () => {
+    await seed([{ productId: "sneaker-90", title: "nike 90" }]);
+    throttleSeam.instance = createSessionThrottle({ limit: 0, now: () => 0 });
+    let calls = 0;
+    installOrchestrator({
+      llm: fakeLlm({
+        classification: () => {
+          calls += 1;
+          return { route: "ai" };
+        },
+      }),
+    });
+
+    const rescue = await action(
+      actionArgs(
+        proxyRequest({
+          payload: { query: "nike 90", sessionId: "c2", mode: "classic" },
+        }),
+      ),
+    );
+    expect(rescue.status).toBe(200);
+    expect((await rescue.json()).route).toBe("classic");
+    expect(calls).toBe(0);
+    const events = await db.searchEvent.findMany({
+      where: { sessionId: "c2" },
+    });
+    expect(events.map((event) => event.routeReason)).toEqual([
+      "client-timeout-rescue",
+    ]);
   });
 });
 

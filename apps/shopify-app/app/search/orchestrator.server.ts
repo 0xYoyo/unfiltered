@@ -115,15 +115,28 @@ function warnIntentFailure(
  * removal, YOY-46) and no classification ran, "throttled" when the
  * caller forced the classic path (YOY-47) and no classification ran, or
  * "classic-zero-hit" when a genuine classic route found nothing and
- * escalated once into the AI path (YOY-67 AC-3), or "preview" when the
- * caller asked for a keystroke preview (YOY-68) and no classification ran.
+ * escalated once into the AI path (YOY-67 AC-3), "preview" when the
+ * caller asked for a keystroke preview (YOY-68) and no classification ran,
+ * or "client-timeout-rescue" when the widget's submitted search ran out its
+ * own budget and re-asked down the classic path (YOY-108 / YOY-96 AC-9) —
+ * again with no classification run.
  */
 export type SearchRouteReason =
   | ClassificationReason
   | "resolved-intent"
-  | "throttled"
+  | ForceClassicReason
   | "classic-zero-hit"
   | "preview";
+
+/**
+ * Why a caller forced the classic path (`forceClassic`): the session spent
+ * its AI budget ("throttled", YOY-47), or the shopper's submitted search
+ * timed out client-side and the widget is rescuing it with the same query
+ * down the zero-LLM path ("client-timeout-rescue", YOY-96 AC-9). Both are
+ * served identically; the reason is what the SearchEvent ledger keeps so
+ * the two stay distinguishable in analytics.
+ */
+export type ForceClassicReason = "throttled" | "client-timeout-rescue";
 
 /** One orchestrated search request. */
 export interface SearchRequest {
@@ -147,9 +160,16 @@ export interface SearchRequest {
   /**
    * Force the classic path without consulting the classifier — zero LLM
    * calls (YOY-47 throttle). The response is served `degraded: true` with
-   * reason "throttled". Takes precedence over `resolvedIntent`.
+   * reason `forceClassicReason`, "throttled" when absent. Takes precedence
+   * over `resolvedIntent`.
    */
   forceClassic?: boolean;
+  /**
+   * The reason a forced-classic response carries (YOY-96 AC-9): "throttled"
+   * by default; "client-timeout-rescue" when the widget re-asks a submitted
+   * search that timed out on its side. Ignored unless `forceClassic` is set.
+   */
+  forceClassicReason?: ForceClassicReason;
   /**
    * Keystroke preview (YOY-68 AC-1): classic-only results with zero LLM
    * calls of any kind — no classification, no zero-hit escalation. Unlike
@@ -479,10 +499,13 @@ export function createSearchOrchestrator(
       }
 
       if (request.forceClassic === true) {
-        // Throttled (YOY-47): the caller has decided this session spent its
-        // AI budget — classic keyword results, zero LLM calls, degraded so
-        // the response is honest about not being the AI path.
-        return classicResponse("throttled", true);
+        // Forced classic: the caller has decided this search must not reach
+        // the AI path — the session spent its budget (YOY-47, "throttled")
+        // or the widget is rescuing a submitted search that timed out on
+        // its side (YOY-96 AC-9, "client-timeout-rescue"). Classic keyword
+        // results, zero LLM calls, degraded so the response is honest about
+        // not being the AI path; the reason is what the ledger keeps.
+        return classicResponse(request.forceClassicReason ?? "throttled", true);
       }
 
       if (request.resolvedIntent !== undefined) {

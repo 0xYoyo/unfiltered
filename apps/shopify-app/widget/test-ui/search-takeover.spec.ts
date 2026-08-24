@@ -136,12 +136,38 @@ test.describe("a timed-out search falls back to classic results (YOY-108)", () =
     await expect(noResults(page)).toBeHidden();
     await expect(overlay(page)).toBeVisible();
 
-    // Two requests: the submitted one that timed out, then the rescue on
-    // the wire's classic-only mode.
+    // Two requests: the submitted one that timed out, then the rescue as a
+    // SUBMITTED classic-only search — `mode=classic`, not the keystroke
+    // preview mode (YOY-96 AC-9).
     const requests = await searchRequests(page);
     expect(requests).toHaveLength(2);
     expect(requests[0].mode).toBeUndefined();
-    expect(requests[1].mode).toBe("preview");
+    expect(requests[1].mode).toBe("classic");
+  });
+
+  test("a rescued search is attributable: a click on a rescued card beacons with the rescue's searchId (YOY-96 AC-9)", async ({
+    page,
+  }) => {
+    await page.goto("/?fixture=timeout-rescue&debounce=30000");
+
+    await themeInput(page).fill("nike");
+    await themeInput(page).press("Enter");
+    await expect(cards(page).first()).toBeVisible({ timeout: 5000 });
+
+    await cards(page).first().click();
+    await page.waitForURL(/\/products\/nike-air-90/);
+
+    // The beacon log survives navigation in sessionStorage; the searchId is
+    // the one the rescue's own response carried.
+    const beacons = await page.evaluate(() =>
+      JSON.parse(sessionStorage.getItem("harness:clickBeacons") ?? "[]"),
+    );
+    expect(beacons).toHaveLength(1);
+    expect(beacons[0]).toMatchObject({
+      searchId: "harness-search-1",
+      productId: "gid://shopify/Product/1",
+      position: 0,
+    });
   });
 
   test("the failure state returns only when the rescue fails too (AC-2)", async ({

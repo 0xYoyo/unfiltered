@@ -445,12 +445,27 @@ The serializer re-maps every field explicitly (`serializeProxySearchResponse`),
 so orchestrator-internal diagnostics like `routeReason` — and anything the
 orchestrator response grows later — cannot leak to a shopper.
 
-**Search logging (YOY-47).** Every search request — degraded, zero-hit, and
-throttled included — writes exactly one `SearchEvent` row (searchId, shop,
-sessionId, query, resolved route, degraded flag, latency, result count)
-through `app/search/events.server.ts`. The write is an observer: a logging
-failure is swallowed and logged server-side, never failing the shopper's
-response.
+**Search logging (YOY-47).** Every submitted search request — degraded,
+zero-hit, throttled, and classic-rescued included — writes exactly one
+`SearchEvent` row (searchId, shop, sessionId, query, resolved route, the
+orchestrator's `routeReason`, degraded flag, latency, result count) through
+`app/search/events.server.ts`. The write is an observer: a logging failure
+is swallowed and logged server-side, never failing the shopper's response.
+`routeReason` (YOY-96 AC-9; nullable, rows from before the column are null)
+is what tells a classic row's cause apart in the ledger — a heuristic or
+model decision, a `throttled` session, or the widget's
+`client-timeout-rescue` — so rescue frequency and AI-value searches can be
+measured rather than inferred.
+
+**The classic rescue (YOY-108, YOY-96 AC-9).** When the widget's SUBMITTED
+search runs out its own client-side budget it re-asks the same query with
+`mode=classic`: the proxy routes it through the orchestrator's
+`forceClassic` path with reason `client-timeout-rescue` — zero LLM calls,
+no throttle budget consumed, `degraded: true` — and, unlike a
+`mode=preview` keystroke fetch, logs it as a real `SearchEvent` and returns
+an attributable `searchId`, so the widget keeps it as `currentSearchId` and
+a click on a rescued card beacons like any other. Like `preview`, `classic`
+is a bare classic fetch and rejects `previousIntent`/`removeChip` (400).
 
 **Click beacon (YOY-47).** `POST /apps/unfiltered/click`
 (`app/routes/apps.unfiltered.click.tsx`), signature-verified exactly like
@@ -812,7 +827,9 @@ by visiting.
 
 **The interaction model is the widget's** (YOY-68): typing issues debounced
 `mode=preview` requests that are classic-only, spend no AI budget, and write
-no `SearchEvent`; Enter or the magnifier submits the full pipeline. One
+no `SearchEvent`; Enter or the magnifier submits the full pipeline (and a
+`mode=classic` rescue, logged with `routeReason: client-timeout-rescue`, is
+accepted exactly as on the proxy — YOY-96 AC-9). One
 in-flight request at a time, so a slower earlier response can never overwrite
 a newer one.
 

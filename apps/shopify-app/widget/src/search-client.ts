@@ -77,6 +77,14 @@ export interface SearchRequestContext {
    * Mutually exclusive with `previousIntent`/`removeChip` by contract.
    */
   preview?: boolean;
+  /**
+   * The classic rescue of a SUBMITTED search (YOY-96 AC-9): the request
+   * rides `mode=classic` and the server serves the same zero-LLM keyword
+   * results as a preview, but logs it as a real SearchEvent (routeReason
+   * "client-timeout-rescue") and returns an attributable searchId. Mutually
+   * exclusive with `preview`, `previousIntent`, and `removeChip`.
+   */
+  classic?: boolean;
 }
 
 export interface SearchClientOptions {
@@ -144,10 +152,13 @@ export function buildSearchParams(
   if (context?.removeChip !== undefined) {
     params.set("removeChip", JSON.stringify(context.removeChip));
   }
-  // `mode` is OMITTED on submitted searches — its absence is what makes the
-  // full pipeline run (YOY-68 AC-2).
+  // `mode` is OMITTED on ordinary submitted searches — its absence is what
+  // makes the full pipeline run (YOY-68 AC-2). `classic` is the submitted
+  // rescue (YOY-96 AC-9), the only other mode a submit ever carries.
   if (context?.preview === true) {
     params.set("mode", "preview");
+  } else if (context?.classic === true) {
+    params.set("mode", "classic");
   }
   return params;
 }
@@ -180,9 +191,10 @@ export interface SearchClient {
   ): Promise<ProxySearchResponse>;
   /**
    * The classic rescue (YOY-108 AC-1): the same query down the zero-LLM
-   * keyword path, on the short fallback budget. Rides the existing
-   * classic-only wire mode — the server needs no new parameter — and
-   * rejects exactly like `search` when it fails in turn (AC-2).
+   * keyword path, on the short fallback budget. Rides `mode=classic`
+   * (YOY-96 AC-9) — a SUBMITTED classic-only search the server logs with an
+   * attributable searchId — and rejects exactly like `search` when it fails
+   * in turn (AC-2).
    */
   searchClassic(
     query: string,
@@ -260,11 +272,11 @@ export function createSearchClient(
     },
 
     async searchClassic(query, sessionId) {
-      // `mode=preview` is the wire's existing classic-only fast path
-      // (YOY-68 AC-1): keyword results, zero LLM calls, no throttle budget.
-      // The widget renders this response as the submitted answer it is;
-      // see main.ts for what that costs in attribution.
-      return request(query, sessionId, { preview: true }, fallbackTimeoutMs);
+      // `mode=classic` (YOY-96 AC-9): keyword results, zero LLM calls, no
+      // throttle budget — like a preview — but a submitted search the
+      // server writes a SearchEvent for, so the response's searchId is one
+      // the click beacon can attribute to.
+      return request(query, sessionId, { classic: true }, fallbackTimeoutMs);
     },
 
     sendClickBeacon(beacon) {

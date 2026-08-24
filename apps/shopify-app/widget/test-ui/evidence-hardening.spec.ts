@@ -5,7 +5,8 @@ import { mkdirSync } from "node:fs";
  * Design evidence for the M4 hardening tail's widget items (YOY-96): the
  * native results view with the sanitized alternate-template cards (AC-1),
  * the sanitized harvested clones (AC-1), and the sanitized full-page shell
- * (AC-4), desktop + mobile, EN + HE (RTL). Skipped on the default lane —
+ * (AC-4), and the overlay's rescued results after a timed-out submit (AC-9),
+ * desktop + mobile, EN + HE (RTL). Skipped on the default lane —
  * the widget project has no @evidence filter — and captured with
  * `WIDGET_EVIDENCE=1 npx playwright test --project=widget -g hardening`.
  */
@@ -35,6 +36,21 @@ test.describe("@evidence", () => {
       ["en", ""],
       ["he", "&locale=he"],
     ] as const) {
+      test(`widget rescued results ${device} ${locale}`, async ({ page }) => {
+        await page.setViewportSize(viewport);
+        // AC-9: a submitted search that timed out is rescued down the
+        // classic path (`mode=classic`) and rendered as the submitted
+        // answer it is — now with an attributable searchId behind it.
+        await page.goto(`/?fixture=timeout-rescue&debounce=30000${suffix}`);
+        await themeInput(page).fill("nike");
+        await themeInput(page).press("Enter");
+        await page
+          .getByTestId("unfiltered-widget-card")
+          .first()
+          .waitFor({ timeout: 5000 });
+        await shot(page, `widget-${device}-${locale}-rescued-results`);
+      });
+
       test(`widget count line ${device} ${locale}`, async ({ page }) => {
         await page.setViewportSize(viewport);
         // AC-3: a multi-number count line is hidden, not rewritten.

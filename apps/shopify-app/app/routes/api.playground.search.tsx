@@ -76,7 +76,7 @@ export const loader = async ({
     const outcome = fixtureOutcome(
       body.removeChip !== undefined
         ? selectFixtureForRemoval(body.removeChip)
-        : selectFixture(body.query, body.mode === "preview"),
+        : selectFixture(body.query, body.mode !== undefined),
     );
     await sleep(outcome.delayMs);
     return outcome.body === null
@@ -96,11 +96,14 @@ export const loader = async ({
       ? removeChipFromIntent(body.previousIntent, body.removeChip)
       : undefined;
   const preview = body.mode === "preview";
+  // The classic rescue (YOY-96 AC-9): a submitted search re-asked down the
+  // classic path after timing out client-side — logged, unlike a preview.
+  const classic = body.mode === "classic";
 
-  // Guards apply only where AI spend is possible. A preview is classic-only
-  // by contract and chip removal makes no LLM call at all, so neither can
-  // burn budget and neither is counted or limited (AC-3).
-  const guarded = !preview && resolvedIntent === undefined;
+  // Guards apply only where AI spend is possible. A preview and a classic
+  // rescue are classic-only by contract and chip removal makes no LLM call
+  // at all, so none can burn budget and none is counted or limited (AC-3).
+  const guarded = !preview && !classic && resolvedIntent === undefined;
   const throttle = getPlaygroundIpThrottle();
   // Keyed by the last trusted X-Forwarded-For hop; the connection address is
   // only available to a custom server's load context (YOY-96 AC-11).
@@ -123,7 +126,9 @@ export const loader = async ({
       limit: PLAYGROUND_RESULT_LIMIT,
       ...(preview
         ? { preview: true }
-        : limited !== null
+        : classic
+          ? { forceClassic: true, forceClassicReason: "client-timeout-rescue" }
+          : limited !== null
           ? { forceClassic: true }
           : resolvedIntent !== undefined
             ? { resolvedIntent }
@@ -155,6 +160,7 @@ export const loader = async ({
         sessionId: body.sessionId,
         query: body.query,
         route: response.route,
+        routeReason: response.routeReason,
         degraded: response.degraded,
         latencyMs,
         resultCount: response.hits.length,

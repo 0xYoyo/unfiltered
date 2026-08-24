@@ -607,7 +607,9 @@
             fixture === "timeout-rescue" ||
             fixture === "timeout-rescue-error"
           ) {
-            if (request.mode !== "preview") {
+            // The rescue rides `mode=classic` (YOY-96 AC-9); the submitted
+            // request (no mode) is the one that stalls.
+            if (request.mode !== "classic") {
               // Never answers, but honors the abort signal the way real
               // fetch does — the widget's timeout depends on it.
               return new Promise((resolve, reject) => {
@@ -638,7 +640,7 @@
                 : AI_CHIPS,
               intent: AI_INTENT,
             };
-          } else if (request.mode === "preview") {
+          } else if (request.mode === "preview" || request.mode === "classic") {
             body = RESULTS_RESPONSE;
           } else if (request.removeChip !== undefined) {
             body = chipRemovalResponse(request);

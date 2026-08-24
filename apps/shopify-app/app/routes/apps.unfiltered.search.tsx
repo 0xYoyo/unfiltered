@@ -94,14 +94,21 @@ async function handleSearch(
   // throttle and outside the SearchEvent log — the submitted search is the
   // shopper's actual query; previews are typing noise.
   const preview = body.mode === "preview";
+  // The classic rescue (YOY-96 AC-9): the widget's SUBMITTED search timed
+  // out on its side and it re-asks the same query down the classic path —
+  // the same zero-LLM keyword results as a preview, but a real search the
+  // shopper made, so it is logged and attributable like any other submit.
+  const classic = body.mode === "classic";
 
   // Per-session AI throttle (YOY-47): a session past its sliding-window
   // budget is forced onto the classic path with zero LLM calls. Chip
   // removal is exempt — it makes no classification or intent call anyway —
-  // and previews never reach the AI path, so the throttle ignores them too.
+  // and previews and classic rescues never reach the AI path, so the
+  // throttle ignores them too.
   const throttle = getSessionThrottle();
   const throttled =
     !preview &&
+    !classic &&
     resolvedIntent === undefined &&
     throttle.shouldThrottle(body.sessionId);
 
@@ -118,6 +125,13 @@ async function handleSearch(
     const response = await orchestrator.runSearch(
       preview
         ? { query: body.query, shopDomain: shop, preview: true }
+        : classic
+          ? {
+              query: body.query,
+              shopDomain: shop,
+              forceClassic: true,
+              forceClassicReason: "client-timeout-rescue",
+            }
         : throttled
         ? { query: body.query, shopDomain: shop, forceClassic: true }
         : resolvedIntent !== undefined
@@ -151,11 +165,14 @@ async function handleSearch(
       throttle.recordAiSearch(body.sessionId);
     }
 
-    // Exactly one SearchEvent per SUBMITTED search — degraded, zero-hit, and
-    // throttled included; a write failure never fails the response (YOY-47
-    // AC-2/AC-5). Keystroke previews are never logged (YOY-68 AC-3): they
-    // would flood analytics with per-keystroke noise, and the click beacon
-    // has nothing to attribute to a search the shopper never submitted.
+    // Exactly one SearchEvent per SUBMITTED search — degraded, zero-hit,
+    // throttled, and classic-rescued included; a write failure never fails
+    // the response (YOY-47 AC-2/AC-5). Keystroke previews are never logged
+    // (YOY-68 AC-3): they would flood analytics with per-keystroke noise,
+    // and the click beacon has nothing to attribute to a search the shopper
+    // never submitted. The row keeps the orchestrator's routeReason (YOY-96
+    // AC-9) so a rescue is distinguishable from a throttled or heuristic
+    // classic in the ledger.
     if (!preview) {
       await writeSearchEvent(db, {
         searchId: response.searchId,
@@ -163,6 +180,7 @@ async function handleSearch(
         sessionId: body.sessionId,
         query: body.query,
         route: response.route,
+        routeReason: response.routeReason,
         degraded: response.degraded,
         latencyMs,
         resultCount: response.hits.length,

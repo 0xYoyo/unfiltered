@@ -12,6 +12,14 @@ export interface SearchEventInput {
   sessionId: string;
   query: string;
   route: string;
+  /**
+   * Why the search took its route — the orchestrator's `routeReason`,
+   * written for every submitted search (YOY-96 AC-9) so a classic row can
+   * be told apart by cause: a heuristic or model decision, a throttled
+   * session, or the widget's "client-timeout-rescue" of a search that
+   * timed out on its side. Rows from before the column are null.
+   */
+  routeReason: string;
   degraded: boolean;
   latencyMs: number;
   resultCount: number;

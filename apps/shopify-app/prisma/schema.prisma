@@ -135,6 +135,10 @@ model SearchEvent {
   sessionId   String
   query       String
   route       String
+  // Why the search took its route (YOY-96 AC-9): the orchestrator's
+  // routeReason — "throttled", "client-timeout-rescue", a classifier reason.
+  // Nullable: rows written before the column carry no reason.
+  routeReason String?
   degraded    Boolean
   latencyMs   Int
   resultCount Int

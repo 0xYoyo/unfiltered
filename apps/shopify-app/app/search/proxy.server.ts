@@ -49,12 +49,22 @@ export interface ProxySearchBody {
   removeChip?: ProxyChip;
   /**
    * "preview" marks a keystroke preview (YOY-68): classic-only results,
-   * zero LLM calls, no throttle budget, no SearchEvent. Absent on submitted
-   * searches, which run the full pipeline. A preview is a bare classic
-   * fetch, so it combines with neither `previousIntent` nor `removeChip`.
+   * zero LLM calls, no throttle budget, no SearchEvent. "classic" marks a
+   * SUBMITTED classic-only search (YOY-96 AC-9) — the widget's rescue of a
+   * search that timed out on its side: the same zero-LLM keyword path, no
+   * throttle budget, but logged as a real SearchEvent (route "classic",
+   * routeReason "client-timeout-rescue") with an attributable searchId.
+   * Absent on ordinary submitted searches, which run the full pipeline.
+   * Both modes are bare classic fetches, so neither combines with
+   * `previousIntent` or `removeChip`.
    */
-  mode?: "preview";
+  mode?: ProxySearchMode;
 }
+
+/** The classic-only wire modes; see `ProxySearchBody.mode`. */
+export type ProxySearchMode = "preview" | "classic";
+
+const SEARCH_MODES: ReadonlySet<string> = new Set(["preview", "classic"]);
 
 const CHIP_FIELDS: ReadonlySet<string> = new Set([
   "category",
@@ -88,16 +98,17 @@ export function parseProxySearchBody(value: unknown): ProxySearchBody | null {
   const body: ProxySearchBody = { query, sessionId };
 
   if (record.mode !== undefined && record.mode !== null) {
-    if (record.mode !== "preview") {
+    if (typeof record.mode !== "string" || !SEARCH_MODES.has(record.mode)) {
       return null;
     }
-    // A preview is a bare classic fetch (YOY-68 AC-1): refinement context
-    // belongs to the submitted pipeline, so combining them is a contract
-    // violation, not a request to guess about.
+    // A preview — and the classic rescue (YOY-96 AC-9) — is a bare classic
+    // fetch (YOY-68 AC-1): refinement context belongs to the full submitted
+    // pipeline, so combining them is a contract violation, not a request to
+    // guess about.
     if (record.previousIntent != null || record.removeChip != null) {
       return null;
     }
-    body.mode = "preview";
+    body.mode = record.mode as ProxySearchMode;
   }
 
   if (record.previousIntent !== undefined && record.previousIntent !== null) {
