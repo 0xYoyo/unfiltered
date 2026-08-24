@@ -13,6 +13,7 @@ sensitive_paths:
   - package.json
   - Makefile
   - shopify.app.toml
+  - render.yaml
   - "**/billing/**"
   - "**/auth/**"
   - "**/webhooks/**"
