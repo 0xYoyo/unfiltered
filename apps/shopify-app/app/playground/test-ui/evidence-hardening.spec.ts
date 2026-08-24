@@ -3,8 +3,10 @@ import { mkdirSync } from "node:fs";
 
 /**
  * Design evidence for the M4 hardening tail's playground items (YOY-96):
- * the store line with its literal separator (AC-16) and the preview-cards
- * vs submitted-cards states behind the click-beacon rule (AC-14). Tagged
+ * the store line with its literal separator (AC-16), the preview-cards
+ * vs submitted-cards states behind the click-beacon rule (AC-14), and the
+ * self-hosted Latin + Hebrew family in its initial and results states
+ * (AC-13). Tagged
  * @evidence — off the default lane, captured with
  * `PLAYGROUND_EVIDENCE=1 npx playwright test --project=playground -g @evidence`.
  */
@@ -57,6 +59,20 @@ test.describe("@evidence", () => {
         await shot(page, `${device}-${locale}-3-submitted-cards`, {
           fullPage: true,
         });
+      });
+
+      test(`font ${device} ${locale}`, async ({ page }) => {
+        await page.setViewportSize(viewport);
+
+        // AC-13: the same self-hosted family renders both scripts — the
+        // initial page (input placeholder, examples) and a results page
+        // (card titles, prices) with Heebo loaded.
+        await page.goto(`/${suffix}`);
+        await shot(page, `${device}-${locale}-4-font-initial`);
+        await input(page).fill("dress");
+        await input(page).press("Enter");
+        await cards(page).nth(3).waitFor();
+        await shot(page, `${device}-${locale}-5-font-results`);
       });
     }
   }

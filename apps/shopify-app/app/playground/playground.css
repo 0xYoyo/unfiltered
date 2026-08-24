@@ -32,8 +32,10 @@ html:has(.playground) {
   flex-direction: column;
   background: var(--bg);
   color: var(--text);
+  /* Heebo is self-hosted by fonts.css (YOY-96 AC-13) and covers both
+     scripts; the rest is a neutral system fallback for the swap window. */
   font-family:
-    Inter,
+    Heebo,
     system-ui,
     -apple-system,
     "Segoe UI",
