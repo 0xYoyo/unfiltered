@@ -61,6 +61,10 @@ npx tsx scripts/render-migrate.mts preflight                    # RENDER_API_KEY
 npx tsx scripts/render-migrate.mts inspect <serviceId>          # settings + env var key names
 npx tsx scripts/render-migrate.mts create-group <serviceId> <group>   # copy a service's env into a new group
 npx tsx scripts/render-migrate.mts link-group <group> <serviceId>     # attach a group to a service
+npx tsx scripts/render-migrate.mts create-service <oldServiceId> <name> <region>  # re-create a service elsewhere
+npx tsx scripts/render-migrate.mts trigger-deploy <serviceId>         # start a build-and-deploy
+npx tsx scripts/render-migrate.mts wait-deploy <serviceId> [deployId] # poll until live / failed (15 min)
+npx tsx scripts/render-migrate.mts set-group-var <group> <key> <value> # set one non-secret group value
 ```
 
 Optional variables (`GEMINI_*`, `PLAYGROUND_TRUSTED_PROXY_HOPS`) are added to
@@ -80,7 +84,9 @@ re-creation silently loses it.
    auto-deploy from `main`, with the `unfiltered-prod` group attached. It
    should prompt for **nothing**. If it asks for a value, stop and cancel:
    the group is not being matched (wrong workspace, or the name differs) —
-   fix that rather than retyping secrets.
+   fix that rather than retyping secrets. In practice the dialog did not
+   link the existing group (see the re-creation runbook), so prefer
+   `create-service` + `link-group` over the blueprint for a real re-creation.
 3. Apply. The first build takes several minutes (a cold image build with no
    layer cache). Watch **Logs**: `prisma migrate deploy` output appears, then
    `[react-router-serve] http://localhost:3000`.
@@ -89,8 +95,9 @@ re-creation silently loses it.
    `curl "https://<service>.onrender.com/api/playground/search?query=dress&sessionId=s1"`
    → `200` with the playground contract.
 5. If the Shopify app's own configuration should carry this origin, set
-   `SHOPIFY_APP_URL` in the `unfiltered-prod` group to it (the group
-   redeploys the service).
+   `SHOPIFY_APP_URL` in the `unfiltered-prod` group to it
+   (`render-migrate.mts set-group-var`), then `trigger-deploy` — a group
+   change did not start a deploy by itself on 2026-08-25.
 
 ## Environment variables and where they come from
 
@@ -120,8 +127,14 @@ All of these live in the `unfiltered-prod` group (see above).
 
 Render cannot change a service's region in place: moving Oregon → Frankfurt
 means a new service, a new `https://<name>-<hash>.onrender.com` URL, and
-deleting the old one. With the environment in a group, the agent does the
-data work over the API and the founder does exactly three dashboard actions.
+deleting the old one. With the environment in a group, the agent creates
+the service and does the data work over the API; the founder does two
+dashboard actions (monitor re-point, old-service delete).
+
+Current service (created 2026-08-25 under YOY-115): **`unfiltered-eu`**,
+id `srv-da6uhoh5efls73cvfis0`, region `frankfurt`, origin
+`https://unfiltered-eu.onrender.com`. The name `unfiltered` was rejected by
+Render as already in use at creation time, hence the `-eu` suffix.
 
 **Agent (before the founder starts):**
 
@@ -132,45 +145,47 @@ data work over the API and the founder does exactly three dashboard actions.
    — copies every env var into the group and confirms the key set (and
    values) match. The script refuses if the group already exists.
 3. Land `render.yaml` with `region: frankfurt` and the group attachment (this
-   is the state on `main` now).
+   is the state on `main` now; it documents the intended shape — the
+   service itself is created in step (a) over the API).
+4. **(a)** `npx tsx scripts/render-migrate.mts create-service <oldServiceId> unfiltered frankfurt`
+   — creates the web service with the old service's repo, branch,
+   autoDeploy, Docker settings, health check and plan in the new region
+   and prints the new service id, URL and initial deploy id. If Render
+   answers `name: (unfiltered) already in use`, re-run with
+   `unfiltered-eu`. This replaces the dashboard's **New Blueprint
+   Instance** because that dialog creates a suffixed, empty copy of the
+   environment group instead of linking the existing `unfiltered-prod`.
+5. `npx tsx scripts/render-migrate.mts link-group unfiltered-prod <newServiceId>`,
+   then `inspect <newServiceId>` — the linked group must list the 12 keys.
+6. `npx tsx scripts/render-migrate.mts wait-deploy <newServiceId>` (use
+   `trigger-deploy` first if no deploy started), then verify `/healthz` →
+   200 and an AI-routed playground search on the new URL.
+7. `npx tsx scripts/render-migrate.mts set-group-var unfiltered-prod SHOPIFY_APP_URL https://<new URL>`
+   — the group change alone did not start a deploy on 2026-08-25, so run
+   `trigger-deploy <newServiceId>`, `wait-deploy <newServiceId>`, and
+   re-check `/healthz`.
+8. Update every place that references the origin (the list below) with the
+   new URL and open a PR.
 
 **Founder:**
 
-- **(a)** Dashboard → **Blueprints** → **New Blueprint Instance** → this
-  repo → Apply. Wait for the first deploy to go Live and note the new
-  service's URL. (If Render rejects the blueprint because a service named
-  `unfiltered` already exists, rename the old one to `unfiltered-oregon`
-  from its Settings page and apply again; both then exist side by side
-  during the cutover.)
 - **(b)** UptimeRobot → the `/healthz` monitor → edit the URL to the new
   service's `https://<new URL>/healthz`.
 - **(c)** Once the new service answers `/healthz` and a playground search
   correctly, delete the old service: old service → **Settings** → **Delete
   Web Service**. Env values are untouched — they live in the group.
 
-**Agent (after the founder's step (a)):**
-
-4. `npx tsx scripts/render-migrate.mts inspect <newServiceId>` — confirm the
-   settings match step 1 (region now `frankfurt`) and the 12 keys are
-   present. If the blueprint did not attach the group, attach it with
-   `npx tsx scripts/render-migrate.mts link-group unfiltered-prod <newServiceId>`.
-5. Update `SHOPIFY_APP_URL` in the `unfiltered-prod` group to the new
-   origin (dashboard → Environment Groups; the group redeploys the service).
-6. Replace every `TODO(frankfurt-url)` placeholder in the repo with the new
-   URL (see the list below) and open a PR.
-
 ### The onrender.com URL changes — every place it is referenced
 
 The old origin is `https://unfiltered-3khq.onrender.com`; the new one is
-`https://<new URL>` <!-- TODO(frankfurt-url) --> once the Frankfurt service
-exists. Places that reference it:
+`https://unfiltered-eu.onrender.com`. Places that reference it:
 
 | Where | What to do |
 | --- | --- |
-| `SHOPIFY_APP_URL` in the `unfiltered-prod` environment group | Set to the new origin (runbook step 5). |
+| `SHOPIFY_APP_URL` in the `unfiltered-prod` environment group | Set to the new origin (runbook step 7; done 2026-08-25). |
 | UptimeRobot `/healthz` monitor | Re-point (founder step (b)). |
 | `docs/M4-LIVE-RUN.md` | Historical record of the M4 run; keeps the old URL, with a note at the top that the service moved. |
-| `docs/DEPLOY.md` (this section) | Replace the `TODO(frankfurt-url)` placeholder. |
+| `docs/DEPLOY.md` (this section) | Records the current origin. |
 | Shared `/s/<slug>` playground links and any pasted URLs in Linear (YOY-91, YOY-95, YOY-115) or Slack | Old links 404 after step (c); re-share from the new origin. No redirect is configured. |
 | Shopify app record (`shopify.app.toml`, Partner dashboard) | **Not referenced** — the app record was never re-pointed at Render (NG-1); nothing to change. |
 | Code, widget, CI | **Not referenced** — nothing in the repo assumes the hostname (`grep -r onrender.com` finds only the docs above). |

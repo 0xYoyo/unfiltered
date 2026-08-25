@@ -25,6 +25,22 @@
  *     → attaches an existing group to a (new) service — the step that runs
  *       after the Frankfurt service exists. Blueprint-created services get
  *       the link from render.yaml's `fromGroup`; this is the manual fallback.
+ *   npx tsx scripts/render-migrate.mts create-service <oldServiceId> <name> <region>
+ *     → creates a new Docker web service with the old service's repo,
+ *       branch, autoDeploy, dockerfilePath, dockerContext, healthCheckPath
+ *       and plan, in <region>. Prints the new service's settings and the
+ *       id of the deploy Render started for it (if any). Env vars are NOT
+ *       copied — link the group with link-group afterwards.
+ *   npx tsx scripts/render-migrate.mts deploys <serviceId>
+ *     → the ten most recent deploys with status, trigger and timestamps.
+ *   npx tsx scripts/render-migrate.mts trigger-deploy <serviceId>
+ *     → starts a build-and-deploy and prints its id.
+ *   npx tsx scripts/render-migrate.mts wait-deploy <serviceId> [deployId] [timeoutMinutes]
+ *     → polls the deploy (latest one when no id is given) until it is live
+ *       or failed; exits non-zero on failure or after the timeout (15 min).
+ *   npx tsx scripts/render-migrate.mts set-group-var <groupName> <key> <value>
+ *     → sets one variable in an environment group (for non-secret values
+ *       such as SHOPIFY_APP_URL). Prints the key name only, never the value.
  *
  * Stops (non-zero exit, no partial writes) on any 401/403/5xx from Render.
  */
@@ -83,14 +99,15 @@ class RenderApiError extends Error {
     readonly status: number,
     readonly method: string,
     readonly path: string,
+    detail?: string,
   ) {
-    super(`Render API ${method} ${path} → HTTP ${status}`);
+    super(`Render API ${method} ${path} → HTTP ${status}${detail ? ` (${detail})` : ""}`);
   }
 }
 
 async function render<T>(
   apiKey: string,
-  method: "GET" | "POST",
+  method: "GET" | "POST" | "PUT",
   path: string,
   body?: unknown,
 ): Promise<T> {
@@ -104,10 +121,17 @@ async function render<T>(
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   if (!response.ok) {
-    // STOP conditions: auth failures and server errors abort the run. The
-    // body is deliberately not echoed — Render error bodies can quote the
-    // request payload.
-    throw new RenderApiError(response.status, method, path);
+    // STOP conditions: auth failures and server errors abort the run. Only
+    // Render's short `message` field is surfaced — the full body is never
+    // echoed because it can quote the request payload.
+    let detail: string | undefined;
+    try {
+      const body = (await response.json()) as { message?: unknown };
+      if (typeof body.message === "string") detail = body.message;
+    } catch {
+      /* no JSON body */
+    }
+    throw new RenderApiError(response.status, method, path, detail);
   }
   return (await response.json()) as T;
 }
@@ -178,7 +202,32 @@ function readServiceEnvVars(apiKey: string, serviceId: string): Promise<EnvVar[]
   return listAll<"envVar", EnvVar>(apiKey, `/services/${serviceId}/env-vars`, "envVar");
 }
 
-type EnvGroup = { id: string; name: string; envVars?: EnvVar[] };
+type EnvGroup = {
+  id: string;
+  name: string;
+  envVars?: EnvVar[];
+  serviceLinks?: Array<{ id: string; name?: string }>;
+};
+
+/** Env groups attached to a service, with their variables (list rows omit
+ *  envVars, so each linked group is re-read individually). */
+async function linkedEnvGroups(
+  apiKey: string,
+  ownerId: string,
+  serviceId: string,
+): Promise<EnvGroup[]> {
+  const groups = await listAll<"envGroup", EnvGroup>(
+    apiKey,
+    `/env-groups?ownerId=${encodeURIComponent(ownerId)}`,
+    "envGroup",
+  );
+  const linked: EnvGroup[] = [];
+  for (const group of groups) {
+    const full = await render<EnvGroup>(apiKey, "GET", `/env-groups/${group.id}`);
+    if ((full.serviceLinks ?? []).some((link) => link.id === serviceId)) linked.push(full);
+  }
+  return linked;
+}
 
 async function findEnvGroup(
   apiKey: string,
@@ -192,6 +241,38 @@ async function findEnvGroup(
   );
   return groups.find((group) => group.name === name);
 }
+
+type Deploy = {
+  id: string;
+  status: string;
+  trigger?: string;
+  createdAt?: string;
+  startedAt?: string;
+  finishedAt?: string;
+};
+
+const DEPLOY_FAILED = new Set([
+  "build_failed",
+  "update_failed",
+  "pre_deploy_failed",
+  "canceled",
+  "deactivated",
+]);
+
+async function latestDeploy(apiKey: string, serviceId: string): Promise<Deploy | undefined> {
+  const page = await render<Cursored<"deploy", Deploy>>(
+    apiKey,
+    "GET",
+    `/services/${serviceId}/deploys?limit=1`,
+  );
+  return page[0]?.deploy;
+}
+
+function readDeploy(apiKey: string, serviceId: string, deployId: string): Promise<Deploy> {
+  return render<Deploy>(apiKey, "GET", `/services/${serviceId}/deploys/${deployId}`);
+}
+
+const sleep = (ms: number) => new Promise<void>((done) => setTimeout(done, ms));
 
 // --- output (names only, never values) ------------------------------------
 
@@ -218,7 +299,13 @@ async function inspect(apiKey: string, serviceId: string): Promise<void> {
   const settings = await readService(apiKey, serviceId);
   const envVars = await readServiceEnvVars(apiKey, serviceId);
   printSettings(settings);
-  printKeys("Env var keys", envVars.map((entry) => entry.key));
+  printKeys("Service-level env var keys", envVars.map((entry) => entry.key));
+  for (const group of await linkedEnvGroups(apiKey, settings.ownerId, settings.id)) {
+    printKeys(
+      `Linked group "${group.name}" (${group.id}) keys`,
+      (group.envVars ?? []).map((entry) => entry.key),
+    );
+  }
 }
 
 async function createGroup(
@@ -271,11 +358,139 @@ async function linkGroup(
   console.log(`Linked group "${groupName}" (${group.id}) → service ${settings.name} (${serviceId}).`);
 }
 
+async function createService(
+  apiKey: string,
+  oldServiceId: string,
+  name: string,
+  region: string,
+): Promise<void> {
+  const source = await readService(apiKey, oldServiceId);
+  // Payload per https://api-docs.render.com/reference/create-service —
+  // Docker web service; no envVars (the group is linked afterwards).
+  const created = await render<{ service: RawService; deployId?: string }>(
+    apiKey,
+    "POST",
+    "/services",
+    {
+      type: "web_service",
+      name,
+      ownerId: source.ownerId,
+      repo: source.repo,
+      branch: source.branch,
+      autoDeploy: source.autoDeploy || "yes",
+      serviceDetails: {
+        runtime: "docker",
+        region,
+        plan: source.plan || "free",
+        healthCheckPath: source.healthCheckPath,
+        envSpecificDetails: {
+          dockerfilePath: source.dockerfilePath || "./Dockerfile",
+          dockerContext: source.dockerContext || ".",
+        },
+      },
+    },
+  );
+  const settings = await readService(apiKey, created.service.id);
+  printSettings(settings);
+  console.log(`Initial deploy: ${created.deployId ?? "(none started)"}`);
+}
+
+async function listDeploys(apiKey: string, serviceId: string): Promise<void> {
+  const page = await render<Cursored<"deploy", Deploy>>(
+    apiKey,
+    "GET",
+    `/services/${serviceId}/deploys?limit=10`,
+  );
+  console.log(`Deploys for ${serviceId} (newest first):`);
+  for (const { deploy } of page) {
+    console.log(
+      `  ${deploy.id}  ${deploy.status.padEnd(20)} trigger=${deploy.trigger ?? "?"}  created=${deploy.createdAt ?? "?"}  finished=${deploy.finishedAt ?? "-"}`,
+    );
+  }
+}
+
+async function triggerDeploy(apiKey: string, serviceId: string): Promise<void> {
+  const deploy = await render<Deploy>(apiKey, "POST", `/services/${serviceId}/deploys`, {
+    clearCache: "do_not_clear",
+  });
+  console.log(`Deploy ${deploy.id} started (${deploy.status}) at ${deploy.createdAt ?? "?"}`);
+}
+
+async function waitDeploy(
+  apiKey: string,
+  serviceId: string,
+  deployId: string | undefined,
+  timeoutMinutes: number,
+): Promise<void> {
+  let id = deployId;
+  if (!id) {
+    const latest = await latestDeploy(apiKey, serviceId);
+    if (!latest) {
+      console.error(`STOP: service ${serviceId} has no deploys.`);
+      process.exit(2);
+    }
+    id = latest.id;
+  }
+  const deadline = Date.now() + timeoutMinutes * 60_000;
+  let last = "";
+  for (;;) {
+    const deploy = await readDeploy(apiKey, serviceId, id);
+    if (deploy.status !== last) {
+      last = deploy.status;
+      console.log(`${new Date().toISOString()} deploy ${id}: ${deploy.status}`);
+    }
+    if (deploy.status === "live") {
+      console.log(
+        `Deploy live. created=${deploy.createdAt ?? "?"} started=${deploy.startedAt ?? "?"} finished=${deploy.finishedAt ?? "?"}`,
+      );
+      return;
+    }
+    if (DEPLOY_FAILED.has(deploy.status)) {
+      console.error(`STOP: deploy ${id} ended in state ${deploy.status}.`);
+      process.exit(3);
+    }
+    if (Date.now() > deadline) {
+      console.error(`STOP: deploy ${id} still ${deploy.status} after ${timeoutMinutes} minutes.`);
+      process.exit(4);
+    }
+    await sleep(15_000);
+  }
+}
+
+async function setGroupVar(
+  apiKey: string,
+  groupName: string,
+  key: string,
+  value: string,
+): Promise<void> {
+  const owner = await render<Array<{ owner: { id: string } }>>(apiKey, "GET", "/owners?limit=100");
+  let group: EnvGroup | undefined;
+  for (const row of owner) {
+    group = await findEnvGroup(apiKey, row.owner.id, groupName);
+    if (group) break;
+  }
+  if (!group) {
+    console.error(`STOP: environment group "${groupName}" not found.`);
+    process.exit(2);
+  }
+  const updated = await render<EnvGroup>(
+    apiKey,
+    "PUT",
+    `/env-groups/${group.id}/env-vars/${encodeURIComponent(key)}`,
+    { value },
+  );
+  const present = (updated.envVars ?? []).some(
+    (entry) => entry.key === key && entry.value === value,
+  );
+  console.log(`Group "${groupName}" (${group.id}): ${key} ${present ? "updated" : "NOT updated"}.`);
+  if (!present) process.exit(3);
+}
+
 // --- main -----------------------------------------------------------------
 
 const [command, ...rest] = process.argv.slice(2);
 const usage =
-  "usage: render-migrate.mts preflight | inspect <serviceId> | create-group <serviceId> <groupName> | link-group <groupName> <serviceId>";
+  "usage: render-migrate.mts preflight | inspect <serviceId> | create-group <serviceId> <groupName> | link-group <groupName> <serviceId> | create-service <oldServiceId> <name> <region> | deploys <serviceId> | trigger-deploy <serviceId> | wait-deploy <serviceId> [deployId] [timeoutMinutes] | set-group-var <groupName> <key> <value>";
 
 loadEnvInProcess();
 
@@ -301,6 +516,36 @@ try {
       const [groupName, serviceId] = rest;
       if (!groupName || !serviceId) throw new Error(usage);
       await linkGroup(requireApiKey(), groupName, serviceId);
+      break;
+    }
+    case "create-service": {
+      const [oldServiceId, name, region] = rest;
+      if (!oldServiceId || !name || !region) throw new Error(usage);
+      await createService(requireApiKey(), oldServiceId, name, region);
+      break;
+    }
+    case "deploys": {
+      const [serviceId] = rest;
+      if (!serviceId) throw new Error(usage);
+      await listDeploys(requireApiKey(), serviceId);
+      break;
+    }
+    case "trigger-deploy": {
+      const [serviceId] = rest;
+      if (!serviceId) throw new Error(usage);
+      await triggerDeploy(requireApiKey(), serviceId);
+      break;
+    }
+    case "wait-deploy": {
+      const [serviceId, deployId, timeout] = rest;
+      if (!serviceId) throw new Error(usage);
+      await waitDeploy(requireApiKey(), serviceId, deployId, timeout ? Number(timeout) : 15);
+      break;
+    }
+    case "set-group-var": {
+      const [groupName, key, value] = rest;
+      if (!groupName || !key || value === undefined) throw new Error(usage);
+      await setGroupVar(requireApiKey(), groupName, key, value);
       break;
     }
     default:
