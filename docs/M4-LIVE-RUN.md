@@ -1,5 +1,7 @@
 # M4 live-run runbook — the deployed playground
 
+> Historical record. The service described here (Oregon, `https://unfiltered-3khq.onrender.com`) was re-created in Frankfurt under YOY-115; the URLs below are the ones in force on 2026-08-22 and are kept as-is. See [DEPLOY.md](DEPLOY.md) for the current deployment.
+
 - **Date:** 2026-08-22
 - **Executed by:** founder (Phases A and D) + agents (Phases B and C)
 - **Deployment URL:** `https://unfiltered-3khq.onrender.com`

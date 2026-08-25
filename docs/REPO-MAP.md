@@ -295,6 +295,7 @@ apps/
       ingest-public.mts
       ingest.mts
       native-render-template.mts
+      render-migrate.mts
     shopify.app.toml
     shopify.web.toml
     tsconfig.json

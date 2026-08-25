@@ -1,10 +1,12 @@
 # Deployment (Render)
 
-The playground runs as a single Docker web service on Render, built from the
+The playground runs as a single Docker web service on Render in the
+**Frankfurt** region (moved from Oregon under YOY-115), built from the
 repo-root `Dockerfile` and described by the repo-root `render.yaml`
 blueprint. This document is the operational record: how to bring the service
-up, where each environment value comes from, how the free plan behaves, and
-how to attach a custom domain later.
+up, where each environment value comes from and how it reaches the service
+(the environment group), how to re-create the service in a new region, how
+the free plan behaves, and how to attach a custom domain later.
 
 **The Shopify app record is NOT re-pointed at this deployment.** The embedded
 app and its storefront proxy keep pointing at whatever `shopify app dev`
@@ -33,14 +35,52 @@ reason. That is deliberate: `/healthz` never touches the database, so a
 misconfigured service would otherwise pass its health check while every
 search 500s.
 
+## Environment: the `unfiltered-prod` group
+
+Every environment value the service needs lives in one Render
+**environment group** named `unfiltered-prod`, attached to the service by
+`render.yaml` (`envVars: - fromGroup: unfiltered-prod`). The service declares
+no per-key values of its own, so:
+
+- A service is created with its full environment in one step, with no one
+  typing a secret into a form. Re-creating the service (region move, plan
+  change that needs a fresh service, accidental deletion) is a link, not a
+  re-entry.
+- Values are edited in one place — dashboard → **Environment Groups** →
+  `unfiltered-prod` — and every service linked to the group redeploys.
+- The group is filled and verified by
+  `apps/shopify-app/scripts/render-migrate.mts` over the Render REST API.
+  The script holds values in memory only and prints key names, never values;
+  its output is safe to paste anywhere. `RENDER_API_KEY` (a Render personal
+  API key, dashboard → Account Settings → API Keys) is loaded in-process from
+  `apps/shopify-app/.env` or the repo-root `.env`; never `cat` or `source` it.
+
+```bash
+cd apps/shopify-app
+npx tsx scripts/render-migrate.mts preflight                    # RENDER_API_KEY: present
+npx tsx scripts/render-migrate.mts inspect <serviceId>          # settings + env var key names
+npx tsx scripts/render-migrate.mts create-group <serviceId> <group>   # copy a service's env into a new group
+npx tsx scripts/render-migrate.mts link-group <group> <serviceId>     # attach a group to a service
+```
+
+Optional variables (`GEMINI_*`, `PLAYGROUND_TRUSTED_PROXY_HOPS`) are added to
+the same group from the dashboard when needed. Do not add env vars to the
+service directly: a service-level value shadows the group's and the next
+re-creation silently loses it.
+
 ## First-time setup
 
-1. Render dashboard → **Blueprints** → **New Blueprint Instance** → pick this
+1. Make sure the `unfiltered-prod` environment group exists with every
+   variable in the table below (dashboard → **Environment Groups**). It does
+   — it was created from the Oregon service under YOY-115 — so this is a
+   check, not a task, unless you are standing up a second copy.
+2. Render dashboard → **Blueprints** → **New Blueprint Instance** → pick this
    repository. Render reads `render.yaml` and proposes one web service named
-   `unfiltered` on the free plan, health check `/healthz`, auto-deploy from
-   `main`.
-2. Render prompts for every `sync: false` variable (see the table below).
-   Fill them in; they are stored in Render, never in the repo.
+   `unfiltered` on the free plan in Frankfurt, health check `/healthz`,
+   auto-deploy from `main`, with the `unfiltered-prod` group attached. It
+   should prompt for **nothing**. If it asks for a value, stop and cancel:
+   the group is not being matched (wrong workspace, or the name differs) —
+   fix that rather than retyping secrets.
 3. Apply. The first build takes several minutes (a cold image build with no
    layer cache). Watch **Logs**: `prisma migrate deploy` output appears, then
    `[react-router-serve] http://localhost:3000`.
@@ -48,8 +88,13 @@ search 500s.
    engine version, and
    `curl "https://<service>.onrender.com/api/playground/search?query=dress&sessionId=s1"`
    → `200` with the playground contract.
+5. If the Shopify app's own configuration should carry this origin, set
+   `SHOPIFY_APP_URL` in the `unfiltered-prod` group to it (the group
+   redeploys the service).
 
 ## Environment variables and where they come from
+
+All of these live in the `unfiltered-prod` group (see above).
 
 | Variable | Source | Notes |
 | --- | --- | --- |
@@ -70,6 +115,65 @@ search 500s.
 | `GEMINI_INTENT_THINKING_LEVEL` | optional | Thinking level of the intent-extraction call; default `low` (YOY-109). `model-default` sends no thinking config and restores the model's own default. |
 
 `PORT` is supplied by Render and honoured by the entrypoint; do not set it.
+
+## Re-creating the service (region move, YOY-115)
+
+Render cannot change a service's region in place: moving Oregon → Frankfurt
+means a new service, a new `https://<name>-<hash>.onrender.com` URL, and
+deleting the old one. With the environment in a group, the agent does the
+data work over the API and the founder does exactly three dashboard actions.
+
+**Agent (before the founder starts):**
+
+1. `npx tsx scripts/render-migrate.mts inspect <oldServiceId>` — record the
+   settings (repo, branch, dockerfile path, health check path, plan,
+   autoDeploy, region, URL) and the key names.
+2. `npx tsx scripts/render-migrate.mts create-group <oldServiceId> unfiltered-prod`
+   — copies every env var into the group and confirms the key set (and
+   values) match. The script refuses if the group already exists.
+3. Land `render.yaml` with `region: frankfurt` and the group attachment (this
+   is the state on `main` now).
+
+**Founder:**
+
+- **(a)** Dashboard → **Blueprints** → **New Blueprint Instance** → this
+  repo → Apply. Wait for the first deploy to go Live and note the new
+  service's URL. (If Render rejects the blueprint because a service named
+  `unfiltered` already exists, rename the old one to `unfiltered-oregon`
+  from its Settings page and apply again; both then exist side by side
+  during the cutover.)
+- **(b)** UptimeRobot → the `/healthz` monitor → edit the URL to the new
+  service's `https://<new URL>/healthz`.
+- **(c)** Once the new service answers `/healthz` and a playground search
+  correctly, delete the old service: old service → **Settings** → **Delete
+  Web Service**. Env values are untouched — they live in the group.
+
+**Agent (after the founder's step (a)):**
+
+4. `npx tsx scripts/render-migrate.mts inspect <newServiceId>` — confirm the
+   settings match step 1 (region now `frankfurt`) and the 12 keys are
+   present. If the blueprint did not attach the group, attach it with
+   `npx tsx scripts/render-migrate.mts link-group unfiltered-prod <newServiceId>`.
+5. Update `SHOPIFY_APP_URL` in the `unfiltered-prod` group to the new
+   origin (dashboard → Environment Groups; the group redeploys the service).
+6. Replace every `TODO(frankfurt-url)` placeholder in the repo with the new
+   URL (see the list below) and open a PR.
+
+### The onrender.com URL changes — every place it is referenced
+
+The old origin is `https://unfiltered-3khq.onrender.com`; the new one is
+`https://<new URL>` <!-- TODO(frankfurt-url) --> once the Frankfurt service
+exists. Places that reference it:
+
+| Where | What to do |
+| --- | --- |
+| `SHOPIFY_APP_URL` in the `unfiltered-prod` environment group | Set to the new origin (runbook step 5). |
+| UptimeRobot `/healthz` monitor | Re-point (founder step (b)). |
+| `docs/M4-LIVE-RUN.md` | Historical record of the M4 run; keeps the old URL, with a note at the top that the service moved. |
+| `docs/DEPLOY.md` (this section) | Replace the `TODO(frankfurt-url)` placeholder. |
+| Shared `/s/<slug>` playground links and any pasted URLs in Linear (YOY-91, YOY-95, YOY-115) or Slack | Old links 404 after step (c); re-share from the new origin. No redirect is configured. |
+| Shopify app record (`shopify.app.toml`, Partner dashboard) | **Not referenced** — the app record was never re-pointed at Render (NG-1); nothing to change. |
+| Code, widget, CI | **Not referenced** — nothing in the repo assumes the hostname (`grep -r onrender.com` finds only the docs above). |
 
 ## Free plan behavior
 
