@@ -173,6 +173,7 @@ export const loader = async ({
         latencyMs,
         limited,
         stages: response.stages,
+        intentTier: response.intentTier,
       }),
       { headers: PLAYGROUND_RESPONSE_HEADERS },
     );

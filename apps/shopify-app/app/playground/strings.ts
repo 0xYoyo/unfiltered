@@ -66,6 +66,8 @@ export interface PlaygroundStrings {
   /** Field labels inside the engine-details panel. */
   detailsRoute: string;
   detailsRouteReason: string;
+  /** Which model tier extracted the intent (YOY-116). */
+  detailsIntentTier: string;
   detailsLatency: string;
   detailsDegraded: string;
   detailsLimited: string;
@@ -124,6 +126,7 @@ export const PLAYGROUND_STRING_CATALOG: Record<
     engineDetailsToggle: "How it understood you",
     detailsRoute: "Route",
     detailsRouteReason: "Reason",
+    detailsIntentTier: "Intent tier",
     detailsLatency: "Latency",
     detailsDegraded: "Degraded",
     detailsLimited: "Limited",
@@ -167,6 +170,7 @@ export const PLAYGROUND_STRING_CATALOG: Record<
     engineDetailsToggle: "איך זה הבין אתכם",
     detailsRoute: "מסלול",
     detailsRouteReason: "סיבה",
+    detailsIntentTier: "רמת חילוץ",
     detailsLatency: "זמן תגובה",
     detailsDegraded: "מצומצם",
     detailsLimited: "הוגבל",

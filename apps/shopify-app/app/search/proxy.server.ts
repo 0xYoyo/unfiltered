@@ -1,6 +1,8 @@
 import type { PrismaClient } from "@prisma/client";
 import {
+  createEscalatingIntentExtractor,
   createIntentExtractor,
+  DEFAULT_INTENT_ESCALATION_THRESHOLD,
   createQueryClassifier,
   createRetriever,
   parseIntent,
@@ -404,6 +406,32 @@ export function serializeProxySearchResponse(
   return body;
 }
 
+/** Env var naming the lite-tier confidence floor (YOY-116 AC-2). */
+export const INTENT_ESCALATION_THRESHOLD_ENV = "INTENT_ESCALATION_THRESHOLD";
+
+/**
+ * The confidence below which a lite intent answer escalates to the accuracy
+ * tier: `INTENT_ESCALATION_THRESHOLD`, a number in [0, 1]; unset means the
+ * engine's committed default. A malformed value is a misconfiguration and
+ * fails here, at construction, rather than silently routing everything to
+ * one tier.
+ */
+export function intentEscalationThresholdFromEnv(
+  env: Record<string, string | undefined> = process.env,
+): number {
+  const raw = env[INTENT_ESCALATION_THRESHOLD_ENV];
+  if (raw === undefined) {
+    return DEFAULT_INTENT_ESCALATION_THRESHOLD;
+  }
+  const threshold = Number(raw);
+  if (raw.trim() === "" || !Number.isFinite(threshold) || threshold < 0 || threshold > 1) {
+    throw new Error(
+      `${INTENT_ESCALATION_THRESHOLD_ENV} must be a number within [0, 1], got ${JSON.stringify(raw)}`,
+    );
+  }
+  return threshold;
+}
+
 /**
  * The orchestrator wired for production storefront traffic: configured
  * Gemini models metered through the Prisma cost ledger, over the pgvector
@@ -423,15 +451,34 @@ export function createProxySearchOrchestrator(
         costRecorder,
       }),
     }),
-    extractor: createIntentExtractor({
-      llm: createGeminiLlmClient({
-        modelId: models.intentModel,
-        costRecorder,
-        // Low thinking on the intent call (YOY-109): the model default's
-        // queue tail and hangs were the live degraded-with-intent-null
-        // failures.
-        thinkingLevel: models.intentThinkingLevel,
+    // Lite-first intent extraction (YOY-116): the lite tier answers first
+    // and the accuracy tier takes over on low confidence or a known-weak
+    // query class. Two metered clients, one searchId, each its own model id
+    // in the ledger.
+    extractor: createEscalatingIntentExtractor({
+      lite: createIntentExtractor({
+        llm: createGeminiLlmClient({
+          modelId: models.intentLiteModel,
+          costRecorder,
+          // Explicit thinking on the lite call too (YOY-109 lesson): never
+          // the model default.
+          thinkingLevel: models.intentLiteThinkingLevel,
+          // A hung lite call escalates to the accuracy tier; it must give
+          // up fast (gemini-3.5-flash-lite hangs on some refinement prompts).
+          requestTimeoutMs: models.intentLiteTimeoutMs,
+        }),
       }),
+      accuracy: createIntentExtractor({
+        llm: createGeminiLlmClient({
+          modelId: models.intentModel,
+          costRecorder,
+          // Low thinking on the intent call (YOY-109): the model default's
+          // queue tail and hangs were the live degraded-with-intent-null
+          // failures.
+          thinkingLevel: models.intentThinkingLevel,
+        }),
+      }),
+      threshold: intentEscalationThresholdFromEnv(),
     }),
     retriever: createRetriever({
       embeddings: createGeminiEmbeddingClient({

@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import {
+  createEscalatingIntentExtractor,
   createIntentExtractor,
   createQueryClassifier,
   createRetriever,
@@ -1327,5 +1328,145 @@ describe("per-stage timing (YOY-114 AC-1)", () => {
     });
     expect(response.routeReason).toBe("resolved-intent");
     expect(Object.keys(response.stages)).toEqual(["embed", "retrieve", "hydrate"]);
+  });
+});
+
+describe("intent tier and per-tier ledger rows (YOY-116 AC-2, AC-3)", () => {
+  let db: PrismaClient;
+  /** Too long for the heuristics, and free of every escalation-class phrase. */
+  const PLAIN_AI_QUERY = "flowing silk gown with long sleeves and a high neckline";
+
+  /**
+   * A metered fake intent port for one tier: records its own model id —
+   * one the price table knows, because the Prisma recorder refuses unknown
+   * ids (YOY-27) and an intent port that throws degrades the search.
+   */
+  const LITE_MODEL = "gemini-3.5-flash-lite";
+  const ACCURACY_MODEL = "gemini-3.6-flash";
+  function tierLlm(
+    modelId: string,
+    answer: (request: StructuredCompletionRequest) => unknown,
+    costRecorder: CostRecorder,
+  ): LlmClient {
+    return {
+      async completeStructured(request) {
+        await costRecorder.record({
+          provider: "google",
+          modelId,
+          operation: request.operation,
+          inputTokens: 10,
+          outputTokens: 5,
+          storeId: request.storeId,
+          searchId: request.searchId,
+        });
+        return answer(request);
+      },
+    };
+  }
+
+  function tieredOrchestrator(liteConfidence: number) {
+    const costRecorder = createPrismaCostRecorder(db);
+    const liteIntent = { ...DRESS_INTENT, occasion: null, confidence: liteConfidence };
+    const accuracyIntent = { ...DRESS_INTENT, confidence: 0.95 };
+    return createSearchOrchestrator({
+      db,
+      classifier: createQueryClassifier({
+        llm: fakeLlm({ classification: () => ({ route: "ai" }), costRecorder }),
+        timeoutMs: 500,
+      }),
+      extractor: createEscalatingIntentExtractor({
+        lite: createIntentExtractor({ llm: tierLlm(LITE_MODEL, () => liteIntent, costRecorder) }),
+        accuracy: createIntentExtractor({ llm: tierLlm(ACCURACY_MODEL, () => accuracyIntent, costRecorder) }),
+        threshold: 0.8,
+      }),
+      retriever: createRetriever({
+        embeddings: fakeEmbeddings({ costRecorder }),
+        store: createPgVectorRetrievalStore(db),
+      }),
+      classicStore: createPgTrgmClassicStore(db),
+    });
+  }
+
+  beforeEach(async () => {
+    db = await createTestDb();
+    await seed(db, [
+      { productId: "sneaker-90", title: "nike 90" },
+      {
+        productId: "silk-gown",
+        title: "silk gown",
+        vector: [0.9, 0.1, 0],
+        enrichment: { category: "dress", occasions: ["wedding"] },
+      },
+    ]);
+  });
+
+  it("a confident lite answer: intentTier lite, exactly one intent row, on the lite model", async () => {
+    const response = await tieredOrchestrator(0.9).runSearch({
+      query: PLAIN_AI_QUERY,
+      shopDomain: SHOP,
+      searchId: "search-lite",
+    });
+    expect(response.route).toBe("ai");
+    expect(response.intentTier).toBe("lite");
+    const rows = await db.aiCall.findMany({ where: { searchId: "search-lite", operation: "intent" } });
+    expect(rows.map((row) => row.modelId)).toEqual([LITE_MODEL]);
+  });
+
+  it("a low-confidence lite answer escalates: intentTier accuracy, two intent rows sharing the searchId", async () => {
+    const response = await tieredOrchestrator(0.3).runSearch({
+      query: PLAIN_AI_QUERY,
+      shopDomain: SHOP,
+      searchId: "search-escalated",
+    });
+    expect(response.intentTier).toBe("accuracy");
+    // The accuracy answer replaced the lite one entirely.
+    expect(response.intent?.occasion).toBe("wedding");
+    const rows = await db.aiCall.findMany({
+      where: { searchId: "search-escalated", operation: "intent" },
+      orderBy: { createdAt: "asc" },
+    });
+    expect(rows.map((row) => row.modelId).sort()).toEqual([ACCURACY_MODEL, LITE_MODEL].sort());
+    expect(rows.every((row) => row.searchId === "search-escalated")).toBe(true);
+  });
+
+  it("an escalation-class query skips the lite tier: one intent row, on the accuracy model", async () => {
+    const response = await tieredOrchestrator(0.99).runSearch({
+      query: AI_QUERY, // "... for a summer wedding": the occasion class
+      shopDomain: SHOP,
+      searchId: "search-class",
+    });
+    expect(response.intentTier).toBe("accuracy");
+    const rows = await db.aiCall.findMany({ where: { searchId: "search-class", operation: "intent" } });
+    expect(rows.map((row) => row.modelId)).toEqual([ACCURACY_MODEL]);
+  });
+
+  it("classic routes, previews, and chip removal report no tier; chip removal makes zero LLM calls (AC-4)", async () => {
+    const orchestrator = tieredOrchestrator(0.9);
+    const classic = await orchestrator.runSearch({ query: "nike 90", shopDomain: SHOP, searchId: "s-classic" });
+    expect(classic.route).toBe("classic");
+    expect(classic.intentTier).toBeNull();
+    const preview = await orchestrator.runSearch({ query: "nike 90", shopDomain: SHOP, preview: true, searchId: "s-preview" });
+    expect(preview.intentTier).toBeNull();
+    const removal = await orchestrator.runSearch({
+      query: AI_QUERY,
+      shopDomain: SHOP,
+      searchId: "s-removal",
+      resolvedIntent: { category: "dress", colorsInclude: [], colorsExclude: [], availabilityRequired: false, softAttributes: ["elegant"] },
+    });
+    expect(removal.route).toBe("ai");
+    expect(removal.intentTier).toBeNull();
+    const llmRows = await db.aiCall.findMany({
+      where: { searchId: "s-removal", operation: { in: ["intent", "classification"] } },
+    });
+    expect(llmRows).toEqual([]);
+  });
+
+  it("a tier-agnostic extractor leaves intentTier null on the AI route", async () => {
+    const orchestrator = buildOrchestrator(db, {
+      llm: fakeLlm({ classification: () => ({ route: "ai" }), intent: () => DRESS_INTENT }),
+    });
+    const response = await orchestrator.runSearch({ query: AI_QUERY, shopDomain: SHOP });
+    expect(response.route).toBe("ai");
+    expect(response.intentTier).toBeNull();
   });
 });

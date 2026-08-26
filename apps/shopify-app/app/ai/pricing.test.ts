@@ -24,6 +24,20 @@ describe("AI price table", () => {
     );
   });
 
+  it("prices gemini-3.6-flash at the rate in force through 2026-12-31 (YOY-116 AC-8)", () => {
+    // $1.50 / $7.50 is the 2027 price; metering it today over-charges 2×.
+    expect(getModelPrice("gemini-3.6-flash")).toMatchObject({
+      inputUsdPerMTok: 0.75,
+      outputUsdPerMTok: 3.75,
+    });
+    expect(getModelPrice("gemini-3.5-flash-lite")).toMatchObject({
+      inputUsdPerMTok: 0.3,
+      outputUsdPerMTok: 2.5,
+    });
+    // 1000 in / 500 out on the accuracy tier: (1000*0.75 + 500*3.75) / 1e6.
+    expect(computeCostUsd("gemini-3.6-flash", 1000, 500)).toBeCloseTo(0.002625, 10);
+  });
+
   it("charges nothing for output on embedding models priced input-only", () => {
     expect(computeCostUsd("gemini-embedding-001", 1_000_000, 0)).toBeCloseTo(
       0.15,

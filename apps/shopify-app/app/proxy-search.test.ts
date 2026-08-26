@@ -94,7 +94,11 @@ import { action } from "./routes/apps.unfiltered.search";
 import { createPgTrgmClassicStore } from "./search/classic-store.server";
 import { writeClickEvent } from "./search/events.server";
 import { createSearchOrchestrator } from "./search/orchestrator.server";
-import { resetProxySearchOrchestrator } from "./search/proxy.server";
+import {
+  intentEscalationThresholdFromEnv,
+  INTENT_ESCALATION_THRESHOLD_ENV,
+  resetProxySearchOrchestrator,
+} from "./search/proxy.server";
 import { createPgVectorRetrievalStore } from "./search/retrieval-store.server";
 import { createSessionThrottle } from "./search/throttle.server";
 
@@ -562,7 +566,10 @@ describe("the response contract (AC-3, AC-5)", () => {
         "routeReason",
         "latencyMs",
         "stages",
+        "intentTier",
       ]);
+      // A classic route ran no intent call (YOY-116 AC-3).
+      expect(logged.intentTier).toBeNull();
       expect(logged.searchId).toBe(body.searchId);
       expect(logged.route).toBe("classic");
       expect(logged.routeReason).toBe("sku-pattern");
@@ -1462,5 +1469,21 @@ describe("orchestrator module singleton (YOY-67 AC-7)", () => {
     expect(firstBody.route).toBe("ai");
     expect(secondBody.route).toBe("ai");
     expect(classificationCalls).toBe(1);
+  });
+});
+
+describe("intent escalation threshold from env (YOY-116 AC-2)", () => {
+  it("defaults to the engine's committed threshold and reads a [0, 1] override", () => {
+    expect(intentEscalationThresholdFromEnv({})).toBeGreaterThan(0);
+    expect(intentEscalationThresholdFromEnv({ [INTENT_ESCALATION_THRESHOLD_ENV]: "0.5" })).toBe(0.5);
+    expect(intentEscalationThresholdFromEnv({ [INTENT_ESCALATION_THRESHOLD_ENV]: "1" })).toBe(1);
+  });
+
+  it("rejects a malformed or out-of-range value, naming the variable", () => {
+    for (const raw of ["", " ", "abc", "1.5", "-0.1"]) {
+      expect(() =>
+        intentEscalationThresholdFromEnv({ [INTENT_ESCALATION_THRESHOLD_ENV]: raw }),
+      ).toThrow(/INTENT_ESCALATION_THRESHOLD/);
+    }
   });
 });

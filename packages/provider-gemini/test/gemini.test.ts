@@ -6,6 +6,9 @@ import {
   DEFAULT_REQUEST_TIMEOUT_MS,
   DEFAULT_EMBEDDING_DIMENSION,
   DEFAULT_EMBEDDING_MODEL,
+  DEFAULT_INTENT_LITE_MODEL,
+  DEFAULT_INTENT_LITE_THINKING_LEVEL,
+  DEFAULT_INTENT_LITE_TIMEOUT_MS,
   DEFAULT_INTENT_MODEL,
   DEFAULT_INTENT_THINKING_LEVEL,
   MODEL_DEFAULT_THINKING_LEVEL,
@@ -82,11 +85,18 @@ describe("model configuration", () => {
     expect(models).toEqual({
       classificationModel: DEFAULT_CLASSIFICATION_MODEL,
       intentModel: DEFAULT_INTENT_MODEL,
+      intentLiteModel: DEFAULT_INTENT_LITE_MODEL,
       embeddingModel: DEFAULT_EMBEDDING_MODEL,
       embeddingDimension: DEFAULT_EMBEDDING_DIMENSION,
       intentThinkingLevel: DEFAULT_INTENT_THINKING_LEVEL,
+      intentLiteThinkingLevel: DEFAULT_INTENT_LITE_THINKING_LEVEL,
+      intentLiteTimeoutMs: DEFAULT_INTENT_LITE_TIMEOUT_MS,
     });
+    expect(DEFAULT_INTENT_LITE_TIMEOUT_MS).toBe(8_000);
     expect(DEFAULT_INTENT_THINKING_LEVEL).toBe("low");
+    // The lite tier (YOY-116): the cheap model, thinking set explicitly.
+    expect(DEFAULT_INTENT_LITE_MODEL).toBe("gemini-3.5-flash-lite");
+    expect(DEFAULT_INTENT_LITE_THINKING_LEVEL).toBe("low");
   });
 
   it("reads every model from env overrides", () => {
@@ -96,14 +106,43 @@ describe("model configuration", () => {
       GEMINI_EMBEDDING_MODEL: "model-c",
       GEMINI_EMBEDDING_DIMENSION: "1536",
       GEMINI_INTENT_THINKING_LEVEL: "high",
+      GEMINI_INTENT_LITE_MODEL: "model-d",
+      GEMINI_INTENT_LITE_THINKING_LEVEL: "medium",
+      GEMINI_INTENT_LITE_TIMEOUT_MS: "5000",
     });
     expect(models).toEqual({
       classificationModel: "model-a",
       intentModel: "model-b",
+      intentLiteModel: "model-d",
       embeddingModel: "model-c",
       embeddingDimension: 1536,
       intentThinkingLevel: "high",
+      intentLiteThinkingLevel: "medium",
+      intentLiteTimeoutMs: 5000,
     });
+    for (const raw of ["", "abc", "0", "-1", "1.5"]) {
+      expect(() => geminiModelsFromEnv({ GEMINI_INTENT_LITE_TIMEOUT_MS: raw })).toThrow(
+        /GEMINI_INTENT_LITE_TIMEOUT_MS/,
+      );
+    }
+  });
+
+  it("gives the lite intent call its own thinking level with the same override pattern (YOY-116)", () => {
+    expect(
+      geminiModelsFromEnv({
+        GEMINI_INTENT_LITE_THINKING_LEVEL: MODEL_DEFAULT_THINKING_LEVEL,
+      }).intentLiteThinkingLevel,
+    ).toBeUndefined();
+    // The accuracy tier's override does not leak into the lite tier.
+    expect(
+      geminiModelsFromEnv({ GEMINI_INTENT_THINKING_LEVEL: "high" })
+        .intentLiteThinkingLevel,
+    ).toBe("low");
+    for (const raw of ["", "  "]) {
+      expect(() =>
+        geminiModelsFromEnv({ GEMINI_INTENT_LITE_THINKING_LEVEL: raw }),
+      ).toThrow(/GEMINI_INTENT_LITE_THINKING_LEVEL/);
+    }
   });
 
   it("rejects a malformed GEMINI_EMBEDDING_DIMENSION naming the variable (YOY-29 AC-3)", () => {

@@ -159,6 +159,8 @@ async function handleSearch(
           routeReason: response.routeReason,
           latencyMs,
           stages: response.stages,
+          // Which intent tier answered (YOY-116 AC-3); null when none ran.
+          intentTier: response.intentTier,
         }),
       );
     }

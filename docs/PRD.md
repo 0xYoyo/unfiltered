@@ -285,6 +285,11 @@ may be revised at version bumps.
 Unit economics (stated assumptions, to be validated by measurement):
 - Cost per AI search: $0.0005–0.002 blended with routing/caching
   (~$0.5–2 per 1,000). Classic search ≈ $0.
+  *Measured (YOY-116, 2026-08-26, eval harness on the routed blend at real
+  prices — `gemini-3.6-flash` $0.75 / $3.75 per 1M tokens through
+  2026-12-31):* blended **$0.52 per 1,000 AI searches** on the eval blend (lite-first intent extraction with class/confidence escalation to the accuracy tier: escalation rate 56% of AI searches, 11% of follow-ups; refinement follow-ups $0.60 per 1,000; one-time indexing $0.013 for the 61-product fixture catalog). The M4 live figure of $0.98 per 1,000 (YOY-95 step 8) was metered at the 2027 accuracy-tier price and reads $0.49 at the price in force; both sit inside the stated $0.5–2 band. The
+  target for the intent tier is ≤ $0.60 per 1,000 AI searches, asserted by
+  the harness.
 - Typical store volumes: ~10–30% of searches classify as AI-tier.
   A store on the $99 plan using 50K AI searches costs us ~$25–100;
   routing discipline targets the low end. One-time embedding: $1–5/store.

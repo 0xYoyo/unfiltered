@@ -5,11 +5,15 @@ import { fileURLToPath } from "node:url";
 import type { PrismaClient } from "@prisma/client";
 import {
   constraintsFromIntent,
+  createEscalatingIntentExtractor,
   createIntentExtractor,
   createQueryClassifier,
   createRetriever,
+  DEFAULT_INTENT_ESCALATION_THRESHOLD,
   expandCategoryConstraint,
   type Intent,
+  type IntentEscalation,
+  type IntentTier,
 } from "@unfiltered/engine";
 
 import { createPrismaCostRecorder } from "../ai/cost-recorder.server";
@@ -120,6 +124,10 @@ export interface RefinementGolden {
 export interface RefinementScore {
   golden: RefinementGolden;
   intent: Intent | null;
+  /** Which tier answered the follow-up's intent call (YOY-116). */
+  intentTier: IntentTier | null;
+  /** Why it escalated, when it did. */
+  escalation: IntentEscalation | null;
   /** Constraint outcomes that missed the golden's expectation (empty is clean). */
   violations: string[];
   costUsd: number;
@@ -131,6 +139,8 @@ export interface QueryScore {
   route: string;
   routeReason: string;
   intent: Intent | null;
+  /** Which tier answered the intent call; null on classic routes (YOY-116). */
+  intentTier: IntentTier | null;
   hits: ProductCard[];
   /** 1-based rank of the first expected product in the top 10, or null. */
   firstExpectedRank: number | null;
@@ -165,6 +175,31 @@ export interface EvalRunResult {
   blendedAiSearchCount: number;
   /** Intent-only refinement cost projected per 1,000 follow-ups, USD. */
   refinementCostPer1000Usd: number;
+  /**
+   * Lite-first routing (YOY-116): the share of AI-routed goldens whose
+   * intent came from the accuracy tier (a class match or a low-confidence
+   * escalation), and the same for refinement follow-ups.
+   */
+  escalationRate: number;
+  refinementEscalationRate: number;
+  /** Intent-operation ledger rows per tier, by the recordings' model ids. */
+  intentCalls: { lite: number; accuracy: number };
+  /** The threshold the routed blend was scored under. */
+  escalationThreshold: number;
+}
+
+/**
+ * The per-golden zero-regression baseline (YOY-116 AC-5): which goldens hit
+ * and which refinements were clean before lite-first routing landed.
+ */
+export interface BaselineHits {
+  recordedAt: string;
+  goldens: Record<string, boolean>;
+  refinements: Record<string, boolean>;
+}
+
+export function loadBaselineHits(): BaselineHits {
+  return readJson<BaselineHits>("baseline-hits.json");
 }
 
 export function loadCatalog(): EvalProduct[] {
@@ -353,6 +388,23 @@ export async function runEval(db: PrismaClient): Promise<EvalRunResult> {
       `eval: synthesized classification recordings collide with live ones on ${classificationCollisions.join(", ")} — empty classification-synthesized.json after regenerating`,
     );
   }
+  // Lite-tier recordings (YOY-116): the same query set answered by the lite
+  // model, each answer carrying its `confidence`, so the routed blend —
+  // lite first, accuracy on a class match or low confidence — replays
+  // deterministically. Own files, same collision rule.
+  const liteRecording = readJson<LlmRecording>("recorded", "intent-lite.json");
+  const liteRefinementRecording = readJson<LlmRecording>(
+    "recorded",
+    "intent-lite-refinement.json",
+  );
+  const liteCollisions = Object.keys(liteRefinementRecording.entries).filter(
+    (key) => key in liteRecording.entries,
+  );
+  if (liteCollisions.length > 0) {
+    throw new Error(
+      `eval: lite refinement recordings collide with base lite recordings on ${liteCollisions.join(", ")}`,
+    );
+  }
   const recordings: Record<string, LlmRecording> = {
     enrichment: readJson<LlmRecording>("recorded", "enrichment.json"),
     classification: {
@@ -367,6 +419,15 @@ export async function runEval(db: PrismaClient): Promise<EvalRunResult> {
       entries: { ...intentRecording.entries, ...refinementRecording.entries },
     },
   };
+  const liteRecordings: Record<string, LlmRecording> = {
+    intent: {
+      modelId: liteRecording.modelId,
+      entries: {
+        ...liteRecording.entries,
+        ...liteRefinementRecording.entries,
+      },
+    },
+  };
   const embeddingRecording = readJson<EmbeddingRecording>(
     "recorded",
     "embeddings.json",
@@ -374,6 +435,7 @@ export async function runEval(db: PrismaClient): Promise<EvalRunResult> {
 
   const costRecorder = createPrismaCostRecorder(db);
   const llm = createReplayLlmClient({ recordings, costRecorder });
+  const liteLlm = createReplayLlmClient({ recordings: liteRecordings, costRecorder });
   const embeddings = createReplayEmbeddingClient({
     recording: embeddingRecording,
     costRecorder,
@@ -398,7 +460,15 @@ export async function runEval(db: PrismaClient): Promise<EvalRunResult> {
   await embedCatalog({ db, shopDomain, embeddings });
 
   const classifier = createQueryClassifier({ llm });
-  const extractor = createIntentExtractor({ llm });
+  // The production ladder over the two replay tiers (YOY-116 AC-5): the
+  // committed classes and threshold decide which recording answers, exactly
+  // as they decide which model is called live.
+  const escalationThreshold = DEFAULT_INTENT_ESCALATION_THRESHOLD;
+  const extractor = createEscalatingIntentExtractor({
+    lite: createIntentExtractor({ llm: liteLlm }),
+    accuracy: createIntentExtractor({ llm }),
+    threshold: escalationThreshold,
+  });
   // Goldens run through the orchestrator end to end (YOY-45 AC-8): the same
   // routing and fallback ladder production takes, over the replay ports.
   const orchestrator = createSearchOrchestrator({
@@ -454,6 +524,7 @@ export async function runEval(db: PrismaClient): Promise<EvalRunResult> {
       route: response.route,
       routeReason: response.routeReason,
       intent: response.intent,
+      intentTier: response.intentTier,
       hits,
       firstExpectedRank: rankIndex === -1 ? null : rankIndex + 1,
       violations,
@@ -466,7 +537,7 @@ export async function runEval(db: PrismaClient): Promise<EvalRunResult> {
   // follow-up is scored on the constraints it merges, not on ranking.
   const perRefinement: RefinementScore[] = [];
   for (const golden of refinementGoldens) {
-    const intent = await extractor.extract(golden.query, {
+    const { intent, tier, escalation } = await extractor.extractDetailed(golden.query, {
       storeId: shopDomain,
       searchId: golden.id,
       previousIntent: golden.previousIntent,
@@ -475,6 +546,8 @@ export async function runEval(db: PrismaClient): Promise<EvalRunResult> {
     perRefinement.push({
       golden,
       intent,
+      intentTier: tier,
+      escalation,
       violations: refinementViolations(golden, intent),
       costUsd: ledger.reduce((sum, row) => sum + row.costUsd, 0),
     });
@@ -520,6 +593,24 @@ export async function runEval(db: PrismaClient): Promise<EvalRunResult> {
       : (refinementTotal / refinementGoldens.length) * 1000;
 
   const hitCount = perQuery.filter((score) => score.firstExpectedRank !== null).length;
+  // Escalation metrics (YOY-116): over the goldens that ran an intent call.
+  const aiScores = perQuery.filter((score) => score.intentTier !== null);
+  const escalationRate =
+    aiScores.length === 0
+      ? 0
+      : aiScores.filter((score) => score.intentTier === "accuracy").length /
+        aiScores.length;
+  const refinementEscalationRate =
+    perRefinement.length === 0
+      ? 0
+      : perRefinement.filter((score) => score.intentTier === "accuracy").length /
+        perRefinement.length;
+  const intentRows = allRows.filter((row) => row.operation === "intent");
+  const intentCalls = {
+    lite: intentRows.filter((row) => row.modelId === liteRecording.modelId).length,
+    accuracy: intentRows.filter((row) => row.modelId === intentRecording.modelId)
+      .length,
+  };
   const result: EvalRunResult = {
     catalogSize: catalog.length,
     perQuery,
@@ -538,6 +629,10 @@ export async function runEval(db: PrismaClient): Promise<EvalRunResult> {
     perSearchCostPer1000Usd,
     blendedAiSearchCount,
     refinementCostPer1000Usd,
+    escalationRate,
+    refinementEscalationRate,
+    intentCalls,
+    escalationThreshold,
   };
   printScorecard(result);
   return result;
@@ -548,8 +643,8 @@ function printScorecard(result: EvalRunResult): void {
   const lines = [
     "",
     "eval scorecard — sparse catalog quality harness",
-    "query                                     | lang  | route      | rank | viol | cost USD",
-    "------------------------------------------+-------+------------+------+------+---------",
+    "query                                     | lang  | route      | tier     | rank | viol | cost USD",
+    "------------------------------------------+-------+------------+----------+------+------+---------",
   ];
   for (const score of result.perQuery) {
     const query =
@@ -561,6 +656,7 @@ function printScorecard(result: EvalRunResult): void {
         query.padEnd(41),
         score.golden.language.padEnd(5),
         `${score.route}/${score.routeReason}`.padEnd(10),
+        (score.intentTier ?? "-").padEnd(8),
         String(score.firstExpectedRank ?? "MISS").padStart(4),
         String(score.violations.length).padStart(4),
         score.costUsd.toFixed(6),
@@ -573,8 +669,8 @@ function printScorecard(result: EvalRunResult): void {
   lines.push(
     "",
     "refinement goldens — follow-up query merged into the previous intent",
-    "id  | lang  | outcome    | viol | cost USD | what it pins",
-    "----+-------+------------+------+----------+-------------",
+    "id  | lang  | outcome    | tier     | viol | cost USD | what it pins",
+    "----+-------+------------+----------+------+----------+-------------",
   );
   for (const score of result.perRefinement) {
     lines.push(
@@ -582,6 +678,7 @@ function printScorecard(result: EvalRunResult): void {
         score.golden.id.padEnd(3),
         score.golden.language.padEnd(5),
         score.golden.outcome.padEnd(10),
+        (score.intentTier ?? "-").padEnd(8),
         String(score.violations.length).padStart(4),
         score.costUsd.toFixed(6).padStart(8),
         score.golden.note,
@@ -605,8 +702,10 @@ function printScorecard(result: EvalRunResult): void {
     `refinement constraint misses: ${result.refinementViolationCount} (bar: 0)`,
     `hard-constraint violations in any top 10: ${result.violationCount} (bar: 0)`,
     `one-time indexing cost (enrichment + embedding, ${result.catalogSize} products): $${result.oneTimeCostUsd.toFixed(4)}`,
-    `blended per-search cost per 1,000 AI searches (${result.blendedAiSearchCount} full-path searches): $${result.perSearchCostPer1000Usd.toFixed(2)} (bar: ≤ $2.00)`,
+    `blended per-search cost per 1,000 AI searches (${result.blendedAiSearchCount} full-path searches): $${result.perSearchCostPer1000Usd.toFixed(2)} (bar: ≤ $0.60)`,
     `refinement-only intent cost per 1,000 follow-ups (reported separately, not blended): $${result.refinementCostPer1000Usd.toFixed(2)}`,
+    `intent escalation rate (lite → accuracy, threshold ${result.escalationThreshold}): ${(result.escalationRate * 100).toFixed(0)}% of AI searches, ${(result.refinementEscalationRate * 100).toFixed(0)}% of follow-ups`,
+    `intent calls per tier: lite ${result.intentCalls.lite}, accuracy ${result.intentCalls.accuracy}`,
     "",
   );
   console.log(lines.join("\n"));

@@ -47,6 +47,7 @@
       "classify": 44,
       "intent": 1002,
       "classic": 31
-    }
+    },
+    "intentTier": null
   }
 }

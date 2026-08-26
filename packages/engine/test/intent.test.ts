@@ -63,6 +63,7 @@ const scenarios: RecordedScenario[] = [
       size: null,
       availabilityRequired: false,
       softAttributes: ["elegant", "summer"],
+      confidence: 0.9,
     },
     expected: {
       category: "dress",
@@ -75,6 +76,7 @@ const scenarios: RecordedScenario[] = [
       size: undefined,
       availabilityRequired: false,
       softAttributes: ["elegant", "summer"],
+      confidence: 0.9,
     },
   },
   {
@@ -91,6 +93,7 @@ const scenarios: RecordedScenario[] = [
       size: null,
       availabilityRequired: false,
       softAttributes: ["אלגנטית", "קיץ"],
+      confidence: 0.9,
     },
     expected: {
       category: "dress",
@@ -103,6 +106,7 @@ const scenarios: RecordedScenario[] = [
       size: undefined,
       availabilityRequired: false,
       softAttributes: ["אלגנטית", "קיץ"],
+      confidence: 0.9,
     },
   },
   {
@@ -119,6 +123,7 @@ const scenarios: RecordedScenario[] = [
       size: "M",
       availabilityRequired: true,
       softAttributes: ["elegant", "קיץ"],
+      confidence: 0.9,
     },
     expected: {
       category: "dress",
@@ -131,6 +136,7 @@ const scenarios: RecordedScenario[] = [
       size: "M",
       availabilityRequired: true,
       softAttributes: ["elegant", "קיץ"],
+      confidence: 0.9,
     },
   },
   {
@@ -147,6 +153,7 @@ const scenarios: RecordedScenario[] = [
       size: null,
       availabilityRequired: false,
       softAttributes: ["cozy", "warm", "rainy winter evenings"],
+      confidence: 0.9,
     },
     expected: {
       category: undefined,
@@ -159,6 +166,7 @@ const scenarios: RecordedScenario[] = [
       size: undefined,
       availabilityRequired: false,
       softAttributes: ["cozy", "warm", "rainy winter evenings"],
+      confidence: 0.9,
     },
   },
 ];
@@ -918,5 +926,70 @@ describe("deterministic constraint carry-over (YOY-52 run-5 directive)", () => {
         (REFINEMENT_INTENT_SCHEMA.properties as Record<string, unknown>)[key],
       ).toBeDefined();
     }
+  });
+});
+
+describe("confidence (YOY-116 AC-1)", () => {
+  it("INTENT_SCHEMA and the refinement schema require a 0–1 confidence", () => {
+    expect(INTENT_SCHEMA.required).toContain("confidence");
+    expect(REFINEMENT_INTENT_SCHEMA.required).toContain("confidence");
+    expect((INTENT_SCHEMA.properties as Record<string, unknown>).confidence).toEqual({
+      type: "number",
+      minimum: 0,
+      maximum: 1,
+    });
+  });
+
+  it("parses a reported confidence and rejects one outside [0, 1] or of the wrong type", () => {
+    const base = {
+      colorsInclude: [],
+      colorsExclude: [],
+      availabilityRequired: false,
+      softAttributes: [],
+    };
+    expect(parseIntent({ ...base, confidence: 0.85 })?.confidence).toBe(0.85);
+    expect(parseIntent({ ...base, confidence: 0 })?.confidence).toBe(0);
+    expect(parseIntent({ ...base, confidence: 1 })?.confidence).toBe(1);
+    expect(parseIntent({ ...base, confidence: 1.2 })).toBeNull();
+    expect(parseIntent({ ...base, confidence: -0.1 })).toBeNull();
+    expect(parseIntent({ ...base, confidence: "high" })).toBeNull();
+  });
+
+  it("treats a missing or null confidence as absent, so pre-YOY-116 recordings still parse", () => {
+    const base = {
+      colorsInclude: [],
+      colorsExclude: [],
+      availabilityRequired: false,
+      softAttributes: [],
+    };
+    expect(parseIntent(base)).not.toHaveProperty("confidence");
+    expect(parseIntent({ ...base, confidence: null })).not.toHaveProperty("confidence");
+  });
+
+  it("asks the model for confidence in the prompt and keeps it out of the previous-intent block", async () => {
+    const { llm, calls } = llmStub({
+      colorsInclude: [],
+      colorsExclude: [],
+      availabilityRequired: false,
+      softAttributes: [],
+      outcome: "refinement",
+      confidence: 0.9,
+    });
+    const previousIntent: Intent = {
+      category: "dress",
+      colorsInclude: [],
+      colorsExclude: [],
+      availabilityRequired: false,
+      softAttributes: ["elegant"],
+      confidence: 0.4,
+    };
+    await createIntentExtractor({ llm }).extract("cheaper", { previousIntent });
+    const prompt = calls[0]!.prompt;
+    expect(prompt).toContain("- confidence: a number from 0 to 1");
+    // The previous intent's own confidence is not a constraint and is not
+    // echoed into the prompt.
+    const block = prompt.slice(prompt.indexOf("Previous intent:"));
+    expect(block).not.toContain("confidence");
+    expect(block).toContain('"category": "dress"');
   });
 });

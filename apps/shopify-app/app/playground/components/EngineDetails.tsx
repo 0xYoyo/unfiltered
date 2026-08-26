@@ -43,6 +43,12 @@ export function EngineDetails({
   const rows: { label: string; value: string }[] = [
     { label: strings.detailsRoute, value: response.route },
     { label: strings.detailsRouteReason, value: response.details.routeReason },
+    // Which tier answered the intent call (YOY-116): "lite", "accuracy", or
+    // none when no intent call ran — a classic route or a chip removal.
+    {
+      label: strings.detailsIntentTier,
+      value: response.details.intentTier ?? strings.detailsNone,
+    },
     { label: strings.detailsLatency, value: `${response.details.latencyMs} ms` },
     {
       label: strings.detailsDegraded,

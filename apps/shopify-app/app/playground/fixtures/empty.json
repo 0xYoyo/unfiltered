@@ -12,6 +12,7 @@
     "stages": {
       "classify": 2,
       "classic": 19
-    }
+    },
+    "intentTier": null
   }
 }

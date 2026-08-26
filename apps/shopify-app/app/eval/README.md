@@ -30,18 +30,35 @@ zero network calls, identical ledger shape to a live run.
 - `fixtures/recorded/` — recorded model outputs the harness replays:
   `enrichment.json` (keyed by product title), `classification.json` (keyed by
   normalized query), `intent.json` and `intent-refinement.json` (keyed by raw
-  query), `embeddings.json` (keyed by exact embedded text). Each recording
-  file declares its `provenance`; the two intent files are merged at replay
-  time and a key present in both is an error.
+  query; the accuracy tier), `intent-lite.json` and
+  `intent-lite-refinement.json` (the same keys answered by the lite tier,
+  each answer carrying its `confidence` — YOY-116), `embeddings.json` (keyed
+  by exact embedded text). Each recording file declares its `provenance`;
+  the intent files of one tier are merged at replay time and a key present
+  in both is an error.
+- `fixtures/baseline-hits.json` — the per-golden zero-regression baseline
+  (YOY-116 AC-5): which goldens hit and which refinements were clean on the
+  accuracy-only run before lite-first routing; `harness.test.ts` fails if
+  any of them regresses. Regenerate it only when a golden legitimately
+  changes, never to absorb a regression.
+
+The harness runs intent extraction through the production lite-first ladder
+(`createEscalatingIntentExtractor`) over the two recording sets, so the
+committed escalation classes and threshold decide which tier's recording
+answers exactly as they decide which model is called live. The scorecard
+prints a tier column per golden, the escalation rate, and the intent calls
+per tier.
 
 ## Pass bar (enforced as failing tests)
 
 - ≥80% of golden queries return at least one expected product in the top 10.
 - Zero hard-constraint violations (price cap, excluded color, category,
   availability) anywhere in any query's top 10.
-- Blended per-search cost ≤ $2.00 per 1,000 AI searches, computed from the
-  ledger over the eval run with the committed price table
-  `config/ai-prices.json`. Ledger rows carrying a `searchId` are per-search
+- Every golden and refinement that hit at the committed baseline still hits
+  (per-golden zero regression, `fixtures/baseline-hits.json`).
+- Blended per-search cost ≤ $0.60 per 1,000 AI searches (YOY-116; was
+  $2.00), computed from the ledger over the eval run with the committed
+  price table `config/ai-prices.json`. Ledger rows carrying a `searchId` are per-search
   cost (classification + intent + query embedding); rows without one are the
   one-time indexing cost (enrichment + catalog embedding), reported
   separately.
@@ -57,6 +74,12 @@ under `LIVE_LLM_TESTS=1` with a local `GEMINI_API_KEY` — never by default and
 never in CI, which holds no key (NG-2):
 
     LIVE_LLM_TESTS=1 GEMINI_API_KEY=... npm run regen:live
+    LIVE_LLM_TESTS=1 GEMINI_API_KEY=... REGEN_SCOPE=lite npm run regen:live   # lite-tier intents only
+
+`REGEN_SCOPE=lite` re-records only `intent-lite.json` and
+`intent-lite-refinement.json` and leaves every accuracy-tier recording
+untouched, so a lite-tier change never silently reshuffles the baseline the
+zero-regression bar is scored against.
 
 The root `regen:live` script pins the run to the root `vitest.config.ts`,
 whose alias resolves `@unfiltered/*` to the TypeScript source. Invoking
@@ -74,6 +97,11 @@ Provenance of what is committed today:
   live Gemini output, recorded by the regenerate flow (YOY-28).
 - `intent-refinement.json` — live Gemini output (`"provenance": "live"`)
   since the run-8 regeneration (YOY-67): the refinement rows are real model
-  evidence, not hand-written plumbing checks. The eval scorecard still prints
+  evidence, not hand-written plumbing checks.
+- `intent-lite.json`, `intent-lite-refinement.json` — live
+  `gemini-3.5-flash-lite` output at thinking level `low`, recorded on
+  YOY-116 (2026-08-26) with the confidence-bearing prompt. The accuracy
+  recordings predate the `confidence` field and carry none; the ladder
+  never reads the accuracy tier's confidence, so they stay valid evidence. The eval scorecard still prints
   a NOTE whenever any replayed intent recording is synthesized, so a future
   hand-written stopgap cannot pass silently as live evidence.
