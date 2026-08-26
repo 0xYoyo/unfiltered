@@ -71,6 +71,14 @@ so the probe measures the pipeline rather than the guard. The percentile
 math and the exit semantics are unit-tested in
 `scripts/latency-probe.test.ts`.
 
+### Classic bar — met (YOY-115)
+
+Classic p95 ≤ 500 ms was met on 2026-08-26 at **19 ms** (row 2 below:
+Frankfurt, one-statement search, unpooled) — 26× under the bar, from
+50 ms on the two-statement code and 919–978 ms on the Oregon deployment
+that motivated it. The pooled-connection row (row 3) is the deployment's
+final form and is measured in YOY-124 AC-11; it is not what meets the bar.
+
 ## Recorded measurements
 
 Every quoted row names the deployment region and the code it ran, and
@@ -78,8 +86,10 @@ links the issue comment carrying the probe's full output.
 
 | Date | Region | Code | Set | n | p50 | p95 | Notes |
 |---|---|---|---|---|---|---|---|
-| 2026-08-15 (YOY-95 step 12) | Oregon → Frankfurt DB | M4 | classic | 1 query | — | 919–978 ms | Pre-method hand-timed; the F-3 finding that motivated the bar. |
-| 2026-08-26 | Frankfurt | `main` before YOY-114 (unchanged code) | classic | 100 | 24 ms | 50 ms | The M5 baseline (YOY-114 AC-5); full probe output on the issue. Frankfurt, not Oregon: the service moved (YOY-115 gate) before the baseline ran. One 2057 ms outlier (rank 100). |
+| 2026-08-15 (YOY-95 step 12) | Oregon → Frankfurt DB | M4 | classic | 1 query | — | 919–978 ms | Pre-method hand-timed; the F-3 finding that motivated the bar. YOY-115 "Oregon before": the service moved to Frankfurt (PRs #109/#110) before any probe run, so the M5 rows below are all Frankfurt. |
+| 2026-08-26 | Frankfurt | `main` before YOY-114 (unchanged code) | classic | 100 | 24 ms | 50 ms | The M5 baseline (YOY-114 AC-5) = YOY-115 AC-6 row 1 (two statements + a hydration query, unpooled); full probe output on the issue. Frankfurt, not Oregon: the service moved (YOY-115 gate) before the baseline ran. One 2057 ms outlier (rank 100). |
 | 2026-08-26 | Frankfurt | `main` before YOY-114 | ai-en | 100 | 1830 ms | 6784 ms | 0 degraded, 0 limited. p95 misses the 3500 ms bar. |
 | 2026-08-26 | Frankfurt | `main` before YOY-114 | ai-he | 100 | 1820 ms | 7370 ms | 0 degraded, 0 limited. p95 misses the 3500 ms bar. |
 | 2026-08-26 | Frankfurt | `main` before YOY-114 | ai-combined | 200 | 1830 ms | 7370 ms | Per-stage means absent: the deployed code predates `details.stages`. |
+| 2026-08-26 12:37 UTC | Frankfurt | PR #113 one-statement classic (YOY-115 AC-1..3), unpooled `DATABASE_URL` | classic | 100 | **9 ms** | **19 ms** | YOY-115 AC-6 row 2; `--assert-classic-p95 500` exit 0; full output on YOY-115. 1 `degraded` (a cold LLM-classifier timeout on "black shirt", served classic) — the classifier's cost, not the statement's: mean per stage classify 29 ms · classic 10 ms. |
+| — | Frankfurt | one-statement classic + pooled `-pooler` host (`pgbouncer=true`) | classic | — | — | — | YOY-115 AC-6 row 3: pooled — measured in YOY-124 AC-11 after the founder-lane env-group switch (docs/DEPLOY.md "Switching to the pooled connection"). |
