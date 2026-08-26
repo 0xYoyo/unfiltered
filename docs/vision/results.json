@@ -1,0 +1,4922 @@
+{
+  "generatedAt": "2026-08-26T10:16:31.472Z",
+  "ceilingUsd": 1,
+  "imageWidth": 1024,
+  "totalCostUsd": 0.4522685500000001,
+  "prompt": "You are labelling ONE fashion e-commerce product for a search index.\nThe images are the product's own listing photos. They may show a model\nwearing OTHER garments, shoes, jewellery or accessories that are NOT for\nsale. Describe ONLY the item being sold — the one named by the title and\ntype below. Never report a colour, pattern, material or category that\nbelongs to another item in the picture, the model, or the background.\nThe product text can be sparse or wrong; when text and images disagree\nabout what you can see, trust the images.\n\n- category: exactly one of dress, top, skirt, pants, coat, jacket, shoes, boots, sneakers, bag, jewelry, accessories, swimwear, other.\n- primaryColour: the single dominant colour of the sold item, one\n  lowercase English word (black, navy, blue, grey, beige, brown, ...).\n- secondaryColours: further colours on the sold item itself, else [].\n- sleeveLength, neckline, garmentLength: use \"not-applicable\" for shoes,\n  bags, jewellery, accessories and legwear (trousers have no neckline).\n- pattern: solid when there is no print.\n- materialAppearance: what the material looks like, one word.\n- occasions: any of casual, work, evening, wedding, beach, sport, other.\nAnswer as JSON matching the schema.\n\nTitle: <title>\nType: <type>\nText: <text>",
+  "responseSchema": {
+    "type": "object",
+    "properties": {
+      "category": {
+        "type": "string",
+        "enum": [
+          "dress",
+          "top",
+          "skirt",
+          "pants",
+          "coat",
+          "jacket",
+          "shoes",
+          "boots",
+          "sneakers",
+          "bag",
+          "jewelry",
+          "accessories",
+          "swimwear",
+          "other"
+        ]
+      },
+      "primaryColour": {
+        "type": "string",
+        "description": "one lowercase English colour word for the sold item"
+      },
+      "secondaryColours": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "other colours ON THE SOLD ITEM only; [] if none"
+      },
+      "sleeveLength": {
+        "type": "string",
+        "enum": [
+          "sleeveless",
+          "short",
+          "three-quarter",
+          "long",
+          "not-applicable"
+        ]
+      },
+      "neckline": {
+        "type": "string",
+        "enum": [
+          "crew",
+          "v-neck",
+          "scoop",
+          "collar",
+          "high-neck",
+          "hooded",
+          "boat",
+          "square",
+          "asymmetric",
+          "notch",
+          "not-applicable"
+        ]
+      },
+      "garmentLength": {
+        "type": "string",
+        "enum": [
+          "cropped",
+          "hip",
+          "thigh",
+          "mini",
+          "knee",
+          "midi",
+          "maxi",
+          "ankle",
+          "full",
+          "not-applicable"
+        ]
+      },
+      "pattern": {
+        "type": "string",
+        "description": "solid, stripe, check, floral, animal, graphic, print, colour-block, herringbone, quilted, multi"
+      },
+      "materialAppearance": {
+        "type": "string",
+        "description": "what the fabric/material LOOKS like: cotton, denim, wool, knit, fleece, leather, suede, silk, jersey, synthetic, metal, ..."
+      },
+      "occasions": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "enum": [
+            "casual",
+            "work",
+            "evening",
+            "wedding",
+            "beach",
+            "sport",
+            "other"
+          ]
+        }
+      }
+    },
+    "required": [
+      "category",
+      "primaryColour",
+      "secondaryColours",
+      "sleeveLength",
+      "neckline",
+      "garmentLength",
+      "pattern",
+      "materialAppearance",
+      "occasions"
+    ]
+  },
+  "models": [
+    {
+      "model": "gemini-3.5-flash-lite",
+      "thinkingLevel": "low",
+      "runs": [
+        {
+          "productId": "seed-layered-contrast-dress-white-black",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 1947,
+          "usage": {
+            "promptTokens": 1506,
+            "outputTokens": 106,
+            "thoughtTokens": 0,
+            "imageTokens": 1092,
+            "costUsd": 0.0007168
+          },
+          "output": {
+            "category": "dress",
+            "primaryColour": "black",
+            "secondaryColours": [
+              "cream"
+            ],
+            "sleeveLength": "short",
+            "neckline": "high-neck",
+            "garmentLength": "midi",
+            "pattern": "colour-block",
+            "materialAppearance": "wool",
+            "occasions": [
+              "evening",
+              "work"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": false,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "seed-asymmetric-dress-black",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 2013,
+          "usage": {
+            "promptTokens": 1486,
+            "outputTokens": 97,
+            "thoughtTokens": 0,
+            "imageTokens": 1092,
+            "costUsd": 0.0006883
+          },
+          "output": {
+            "category": "dress",
+            "primaryColour": "black",
+            "secondaryColours": [],
+            "sleeveLength": "sleeveless",
+            "neckline": "asymmetric",
+            "garmentLength": "knee",
+            "pattern": "solid",
+            "materialAppearance": "wool",
+            "occasions": [
+              "work",
+              "evening"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "seed-s14-hac-dr-s13083891-tan",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 2071,
+          "usage": {
+            "promptTokens": 1502,
+            "outputTokens": 102,
+            "thoughtTokens": 0,
+            "imageTokens": 1092,
+            "costUsd": 0.0007055999999999999
+          },
+          "output": {
+            "category": "dress",
+            "primaryColour": "brown",
+            "secondaryColours": [],
+            "sleeveLength": "short",
+            "neckline": "scoop",
+            "garmentLength": "thigh",
+            "pattern": "solid",
+            "materialAppearance": "leather",
+            "occasions": [
+              "casual",
+              "work",
+              "evening"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "seed-a-line-pocket-shift-black",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 2500,
+          "usage": {
+            "promptTokens": 1477,
+            "outputTokens": 102,
+            "thoughtTokens": 0,
+            "imageTokens": 1092,
+            "costUsd": 0.0006980999999999999
+          },
+          "output": {
+            "category": "dress",
+            "primaryColour": "black",
+            "secondaryColours": [],
+            "sleeveLength": "long",
+            "neckline": "v-neck",
+            "garmentLength": "knee",
+            "pattern": "solid",
+            "materialAppearance": "synthetic",
+            "occasions": [
+              "casual",
+              "work",
+              "evening"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "seed-full-collar-poplin-blouse-navy",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 51677,
+          "usage": {
+            "promptTokens": 1484,
+            "outputTokens": 97,
+            "thoughtTokens": 0,
+            "imageTokens": 1092,
+            "costUsd": 0.0006877000000000001
+          },
+          "output": {
+            "category": "top",
+            "primaryColour": "navy",
+            "secondaryColours": [],
+            "sleeveLength": "long",
+            "neckline": "high-neck",
+            "garmentLength": "hip",
+            "pattern": "solid",
+            "materialAppearance": "cotton",
+            "occasions": [
+              "casual",
+              "work"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "seed-madame-l-blouse-leopard",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 1490,
+          "usage": {
+            "promptTokens": 1471,
+            "outputTokens": 112,
+            "thoughtTokens": 0,
+            "imageTokens": 1092,
+            "costUsd": 0.0007212999999999999
+          },
+          "output": {
+            "category": "top",
+            "primaryColour": "brown",
+            "secondaryColours": [
+              "black",
+              "white"
+            ],
+            "sleeveLength": "long",
+            "neckline": "collar",
+            "garmentLength": "hip",
+            "pattern": "animal",
+            "materialAppearance": "silk",
+            "occasions": [
+              "casual",
+              "work",
+              "evening"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "seed-tulle-pleat-skirt-navy",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 3728,
+          "usage": {
+            "promptTokens": 1513,
+            "outputTokens": 104,
+            "thoughtTokens": 0,
+            "imageTokens": 1092,
+            "costUsd": 0.0007139
+          },
+          "output": {
+            "category": "skirt",
+            "primaryColour": "navy",
+            "secondaryColours": [],
+            "sleeveLength": "not-applicable",
+            "neckline": "not-applicable",
+            "garmentLength": "midi",
+            "pattern": "solid",
+            "materialAppearance": "cotton",
+            "occasions": [
+              "casual",
+              "work",
+              "evening"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "seed-circle-skirt-in-navy",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 4068,
+          "usage": {
+            "promptTokens": 1518,
+            "outputTokens": 114,
+            "thoughtTokens": 0,
+            "imageTokens": 1092,
+            "costUsd": 0.0007404
+          },
+          "output": {
+            "category": "skirt",
+            "primaryColour": "navy",
+            "secondaryColours": [
+              "white"
+            ],
+            "sleeveLength": "not-applicable",
+            "neckline": "not-applicable",
+            "garmentLength": "knee",
+            "pattern": "colour-block",
+            "materialAppearance": "silk",
+            "occasions": [
+              "work",
+              "casual",
+              "evening"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "seed-marquee-coat-steel",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 8445,
+          "usage": {
+            "promptTokens": 1495,
+            "outputTokens": 91,
+            "thoughtTokens": 0,
+            "imageTokens": 1092,
+            "costUsd": 0.000676
+          },
+          "output": {
+            "category": "coat",
+            "primaryColour": "navy",
+            "secondaryColours": [],
+            "sleeveLength": "long",
+            "neckline": "high-neck",
+            "garmentLength": "hip",
+            "pattern": "solid",
+            "materialAppearance": "cotton",
+            "occasions": [
+              "casual"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "seed-deione-coat-graphite-floral",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 21842,
+          "usage": {
+            "promptTokens": 1482,
+            "outputTokens": 104,
+            "thoughtTokens": 0,
+            "imageTokens": 1092,
+            "costUsd": 0.0007045999999999999
+          },
+          "output": {
+            "category": "jacket",
+            "primaryColour": "grey",
+            "secondaryColours": [
+              "beige",
+              "blue"
+            ],
+            "sleeveLength": "long",
+            "neckline": "high-neck",
+            "garmentLength": "hip",
+            "pattern": "floral",
+            "materialAppearance": "synthetic",
+            "occasions": [
+              "casual"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": false,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "seed-girlfriend-trouser-black",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 35227,
+          "usage": {
+            "promptTokens": 1475,
+            "outputTokens": 98,
+            "thoughtTokens": 0,
+            "imageTokens": 1092,
+            "costUsd": 0.0006875
+          },
+          "output": {
+            "category": "pants",
+            "primaryColour": "black",
+            "secondaryColours": [],
+            "sleeveLength": "not-applicable",
+            "neckline": "not-applicable",
+            "garmentLength": "ankle",
+            "pattern": "solid",
+            "materialAppearance": "wool",
+            "occasions": [
+              "casual",
+              "work"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "seed-stiro-oxford-black",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 23811,
+          "usage": {
+            "promptTokens": 1480,
+            "outputTokens": 106,
+            "thoughtTokens": 0,
+            "imageTokens": 1092,
+            "costUsd": 0.000709
+          },
+          "output": {
+            "category": "shoes",
+            "primaryColour": "black",
+            "secondaryColours": [],
+            "sleeveLength": "not-applicable",
+            "neckline": "not-applicable",
+            "garmentLength": "not-applicable",
+            "pattern": "solid",
+            "materialAppearance": "leather",
+            "occasions": [
+              "casual",
+              "work",
+              "evening"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "seed-listello-short-boot-mud",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 10173,
+          "usage": {
+            "promptTokens": 1476,
+            "outputTokens": 102,
+            "thoughtTokens": 0,
+            "imageTokens": 1092,
+            "costUsd": 0.0006977999999999999
+          },
+          "output": {
+            "category": "boots",
+            "primaryColour": "brown",
+            "secondaryColours": [],
+            "sleeveLength": "not-applicable",
+            "neckline": "not-applicable",
+            "garmentLength": "not-applicable",
+            "pattern": "solid",
+            "materialAppearance": "suede",
+            "occasions": [
+              "casual",
+              "work"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "seed-lemy-blazer-grey",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 22908,
+          "usage": {
+            "promptTokens": 1504,
+            "outputTokens": 94,
+            "thoughtTokens": 0,
+            "imageTokens": 1092,
+            "costUsd": 0.0006862000000000001
+          },
+          "output": {
+            "category": "jacket",
+            "primaryColour": "grey",
+            "secondaryColours": [],
+            "sleeveLength": "long",
+            "neckline": "notch",
+            "garmentLength": "hip",
+            "pattern": "solid",
+            "materialAppearance": "cotton",
+            "occasions": [
+              "casual",
+              "work"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": false,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "seed-floral-button-up-blue",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 7105,
+          "usage": {
+            "promptTokens": 1496,
+            "outputTokens": 94,
+            "thoughtTokens": 0,
+            "imageTokens": 1092,
+            "costUsd": 0.0006837999999999999
+          },
+          "output": {
+            "category": "top",
+            "primaryColour": "blue",
+            "secondaryColours": [],
+            "sleeveLength": "long",
+            "neckline": "collar",
+            "garmentLength": "hip",
+            "pattern": "floral",
+            "materialAppearance": "cotton",
+            "occasions": [
+              "casual",
+              "work"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "seed-longsleeve-blouse-in-blue-stripe",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 15380,
+          "usage": {
+            "promptTokens": 1511,
+            "outputTokens": 107,
+            "thoughtTokens": 0,
+            "imageTokens": 1092,
+            "costUsd": 0.0007208
+          },
+          "output": {
+            "category": "top",
+            "primaryColour": "blue",
+            "secondaryColours": [
+              "yellow",
+              "white"
+            ],
+            "sleeveLength": "long",
+            "neckline": "collar",
+            "garmentLength": "hip",
+            "pattern": "multi",
+            "materialAppearance": "cotton",
+            "occasions": [
+              "casual",
+              "work"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": false,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "tentree-colville-button-up",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 5277,
+          "usage": {
+            "promptTokens": 4647,
+            "outputTokens": 95,
+            "thoughtTokens": 0,
+            "imageTokens": 4292,
+            "costUsd": 0.0016316
+          },
+          "output": {
+            "category": "jacket",
+            "primaryColour": "grey",
+            "secondaryColours": [],
+            "sleeveLength": "long",
+            "neckline": "collar",
+            "garmentLength": "hip",
+            "pattern": "quilted",
+            "materialAppearance": "cotton",
+            "occasions": [
+              "casual",
+              "work"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "tentree-valley-dress-deep-olive",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 10662,
+          "usage": {
+            "promptTokens": 3562,
+            "outputTokens": 90,
+            "thoughtTokens": 0,
+            "imageTokens": 3219,
+            "costUsd": 0.0012936
+          },
+          "output": {
+            "category": "dress",
+            "primaryColour": "green",
+            "secondaryColours": [],
+            "sleeveLength": "sleeveless",
+            "neckline": "crew",
+            "garmentLength": "midi",
+            "pattern": "solid",
+            "materialAppearance": "jersey",
+            "occasions": [
+              "casual"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "tentree-juneau-dress-clay",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 5206,
+          "usage": {
+            "promptTokens": 4646,
+            "outputTokens": 97,
+            "thoughtTokens": 0,
+            "imageTokens": 4292,
+            "costUsd": 0.0016363
+          },
+          "output": {
+            "category": "dress",
+            "primaryColour": "brown",
+            "secondaryColours": [],
+            "sleeveLength": "sleeveless",
+            "neckline": "v-neck",
+            "garmentLength": "midi",
+            "pattern": "solid",
+            "materialAppearance": "jersey",
+            "occasions": [
+              "casual",
+              "work"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "tentree-hopewell-dress-clay-railroad-stripe",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 2101,
+          "usage": {
+            "promptTokens": 3575,
+            "outputTokens": 104,
+            "thoughtTokens": 0,
+            "imageTokens": 3219,
+            "costUsd": 0.0013325
+          },
+          "output": {
+            "category": "dress",
+            "primaryColour": "beige",
+            "secondaryColours": [
+              "white"
+            ],
+            "sleeveLength": "sleeveless",
+            "neckline": "scoop",
+            "garmentLength": "midi",
+            "pattern": "stripe",
+            "materialAppearance": "cotton",
+            "occasions": [
+              "casual",
+              "beach"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "tentree-recycled-boucle-fleece-jacket-pale-oak",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 2911,
+          "usage": {
+            "promptTokens": 4637,
+            "outputTokens": 91,
+            "thoughtTokens": 0,
+            "imageTokens": 4292,
+            "costUsd": 0.0016186
+          },
+          "output": {
+            "category": "jacket",
+            "primaryColour": "beige",
+            "secondaryColours": [],
+            "sleeveLength": "long",
+            "neckline": "collar",
+            "garmentLength": "thigh",
+            "pattern": "solid",
+            "materialAppearance": "fleece",
+            "occasions": [
+              "casual"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "tentree-quilted-full-zip-meteorite-black-heather",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 2592,
+          "usage": {
+            "promptTokens": 4640,
+            "outputTokens": 102,
+            "thoughtTokens": 0,
+            "imageTokens": 4292,
+            "costUsd": 0.001647
+          },
+          "output": {
+            "category": "jacket",
+            "primaryColour": "grey",
+            "secondaryColours": [],
+            "sleeveLength": "long",
+            "neckline": "high-neck",
+            "garmentLength": "hip",
+            "pattern": "quilted",
+            "materialAppearance": "synthetic",
+            "occasions": [
+              "casual",
+              "work",
+              "sport"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": false
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "tentree-atlin-legging-meteorite-black",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 70576,
+          "usage": {
+            "promptTokens": 4648,
+            "outputTokens": 69,
+            "thoughtTokens": 0,
+            "imageTokens": 4292,
+            "costUsd": 0.0015668999999999998
+          },
+          "output": {
+            "category": "pants",
+            "primaryColour": "black",
+            "secondaryColours": [],
+            "sleeveLength": "not-applicable",
+            "neckline": "not-applicable",
+            "garmentLength": "full",
+            "pattern": "solid",
+            "materialAppearance": "synthetic",
+            "occasions": [
+              "casual",
+              "sport"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "tentree-narrows-pant-sand-stone",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 87733,
+          "usage": {
+            "promptTokens": 4670,
+            "outputTokens": 93,
+            "thoughtTokens": 0,
+            "imageTokens": 4292,
+            "costUsd": 0.0016335
+          },
+          "output": {
+            "category": "pants",
+            "primaryColour": "grey",
+            "secondaryColours": [],
+            "sleeveLength": "not-applicable",
+            "neckline": "not-applicable",
+            "garmentLength": "cropped",
+            "pattern": "stripe",
+            "materialAppearance": "cotton",
+            "occasions": [
+              "casual"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "tentree-sasquatch-t-shirt-seaport-heather-hockey",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 1795,
+          "usage": {
+            "promptTokens": 4641,
+            "outputTokens": 107,
+            "thoughtTokens": 0,
+            "imageTokens": 4292,
+            "costUsd": 0.0016598
+          },
+          "output": {
+            "category": "top",
+            "primaryColour": "blue",
+            "secondaryColours": [
+              "green",
+              "brown"
+            ],
+            "sleeveLength": "short",
+            "neckline": "crew",
+            "garmentLength": "hip",
+            "pattern": "print",
+            "materialAppearance": "cotton",
+            "occasions": [
+              "casual",
+              "sport"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": false,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "tentree-yaletown-skirt-nightfall-watercolour-floral",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 4411,
+          "usage": {
+            "promptTokens": 4636,
+            "outputTokens": 107,
+            "thoughtTokens": 0,
+            "imageTokens": 4292,
+            "costUsd": 0.0016583
+          },
+          "output": {
+            "category": "skirt",
+            "primaryColour": "blue",
+            "secondaryColours": [
+              "white"
+            ],
+            "sleeveLength": "not-applicable",
+            "neckline": "not-applicable",
+            "garmentLength": "midi",
+            "pattern": "floral",
+            "materialAppearance": "silk",
+            "occasions": [
+              "casual",
+              "beach"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "tentree-somerset-shacket-sand-stone-multi-stripe",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 1960,
+          "usage": {
+            "promptTokens": 4649,
+            "outputTokens": 107,
+            "thoughtTokens": 0,
+            "imageTokens": 4292,
+            "costUsd": 0.0016622
+          },
+          "output": {
+            "category": "jacket",
+            "primaryColour": "beige",
+            "secondaryColours": [
+              "brown",
+              "green"
+            ],
+            "sleeveLength": "long",
+            "neckline": "collar",
+            "garmentLength": "hip",
+            "pattern": "stripe",
+            "materialAppearance": "cotton",
+            "occasions": [
+              "casual",
+              "work"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": true,
+          "contaminationHits": [
+            "colour=green (green baseball cap)",
+            "colour=brown (tan clogs)"
+          ]
+        },
+        {
+          "productId": "tentree-astir-polo-nightfall-heather",
+          "ok": true,
+          "attempts": 2,
+          "latencyMs": 5674,
+          "usage": {
+            "promptTokens": 3571,
+            "outputTokens": 94,
+            "thoughtTokens": 0,
+            "imageTokens": 3219,
+            "costUsd": 0.0013063
+          },
+          "output": {
+            "category": "top",
+            "primaryColour": "blue",
+            "secondaryColours": [],
+            "sleeveLength": "short",
+            "neckline": "collar",
+            "garmentLength": "hip",
+            "pattern": "solid",
+            "materialAppearance": "cotton",
+            "occasions": [
+              "casual",
+              "work"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "whitestuff-3-pack-stag-sock",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 62315,
+          "usage": {
+            "promptTokens": 2458,
+            "outputTokens": 118,
+            "thoughtTokens": 0,
+            "imageTokens": 2128,
+            "costUsd": 0.0010324000000000002
+          },
+          "output": {
+            "category": "accessories",
+            "primaryColour": "multi",
+            "secondaryColours": [
+              "green",
+              "blue",
+              "brown",
+              "orange"
+            ],
+            "sleeveLength": "not-applicable",
+            "neckline": "not-applicable",
+            "garmentLength": "not-applicable",
+            "pattern": "print",
+            "materialAppearance": "knit",
+            "occasions": [
+              "casual"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "whitestuff-leather-stitch-belt",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 14567,
+          "usage": {
+            "promptTokens": 1389,
+            "outputTokens": 108,
+            "thoughtTokens": 0,
+            "imageTokens": 1064,
+            "costUsd": 0.0006867
+          },
+          "output": {
+            "category": "accessories",
+            "primaryColour": "green",
+            "secondaryColours": [
+              "white"
+            ],
+            "sleeveLength": "not-applicable",
+            "neckline": "not-applicable",
+            "garmentLength": "not-applicable",
+            "pattern": "solid",
+            "materialAppearance": "leather",
+            "occasions": [
+              "casual",
+              "work"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "whitestuff-herringbone-bootie",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 2328,
+          "usage": {
+            "promptTokens": 3516,
+            "outputTokens": 106,
+            "thoughtTokens": 0,
+            "imageTokens": 3192,
+            "costUsd": 0.0013197999999999999
+          },
+          "output": {
+            "category": "boots",
+            "primaryColour": "blue",
+            "secondaryColours": [
+              "white"
+            ],
+            "sleeveLength": "not-applicable",
+            "neckline": "not-applicable",
+            "garmentLength": "not-applicable",
+            "pattern": "herringbone",
+            "materialAppearance": "wool",
+            "occasions": [
+              "casual"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "whitestuff-suede-and-shearling-moccasin",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 1981,
+          "usage": {
+            "promptTokens": 3512,
+            "outputTokens": 109,
+            "thoughtTokens": 0,
+            "imageTokens": 3192,
+            "costUsd": 0.0013261
+          },
+          "output": {
+            "category": "shoes",
+            "primaryColour": "brown",
+            "secondaryColours": [
+              "pink",
+              "white"
+            ],
+            "sleeveLength": "not-applicable",
+            "neckline": "not-applicable",
+            "garmentLength": "not-applicable",
+            "pattern": "solid",
+            "materialAppearance": "suede",
+            "occasions": [
+              "casual"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "whitestuff-lace-up-thistle-brogue",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 24848,
+          "usage": {
+            "promptTokens": 3524,
+            "outputTokens": 102,
+            "thoughtTokens": 0,
+            "imageTokens": 3192,
+            "costUsd": 0.0013122000000000001
+          },
+          "output": {
+            "category": "shoes",
+            "primaryColour": "pink",
+            "secondaryColours": [],
+            "sleeveLength": "not-applicable",
+            "neckline": "not-applicable",
+            "garmentLength": "not-applicable",
+            "pattern": "solid",
+            "materialAppearance": "suede",
+            "occasions": [
+              "casual",
+              "work"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "whitestuff-issy-bag",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 1887,
+          "usage": {
+            "promptTokens": 3507,
+            "outputTokens": 100,
+            "thoughtTokens": 0,
+            "imageTokens": 3192,
+            "costUsd": 0.0013020999999999998
+          },
+          "output": {
+            "category": "bag",
+            "primaryColour": "black",
+            "secondaryColours": [],
+            "sleeveLength": "not-applicable",
+            "neckline": "not-applicable",
+            "garmentLength": "not-applicable",
+            "pattern": "solid",
+            "materialAppearance": "leather",
+            "occasions": [
+              "casual",
+              "work"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "whitestuff-mosaic-pendant-necklace",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 16758,
+          "usage": {
+            "promptTokens": 2453,
+            "outputTokens": 123,
+            "thoughtTokens": 0,
+            "imageTokens": 2128,
+            "costUsd": 0.0010434
+          },
+          "output": {
+            "category": "jewelry",
+            "primaryColour": "gold",
+            "secondaryColours": [
+              "green",
+              "red",
+              "yellow",
+              "white"
+            ],
+            "sleeveLength": "not-applicable",
+            "neckline": "not-applicable",
+            "garmentLength": "not-applicable",
+            "pattern": "multi",
+            "materialAppearance": "metal",
+            "occasions": [
+              "casual",
+              "work"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "whitestuff-oceanna-jersey-dress",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 3319,
+          "usage": {
+            "promptTokens": 3508,
+            "outputTokens": 107,
+            "thoughtTokens": 0,
+            "imageTokens": 3192,
+            "costUsd": 0.0013199
+          },
+          "output": {
+            "category": "dress",
+            "primaryColour": "blue",
+            "secondaryColours": [
+              "red",
+              "green",
+              "yellow"
+            ],
+            "sleeveLength": "long",
+            "neckline": "crew",
+            "garmentLength": "knee",
+            "pattern": "print",
+            "materialAppearance": "jersey",
+            "occasions": [
+              "casual"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "whitestuff-layla-jacket",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 1881,
+          "usage": {
+            "promptTokens": 4571,
+            "outputTokens": 91,
+            "thoughtTokens": 0,
+            "imageTokens": 4256,
+            "costUsd": 0.0015988
+          },
+          "output": {
+            "category": "jacket",
+            "primaryColour": "green",
+            "secondaryColours": [],
+            "sleeveLength": "long",
+            "neckline": "high-neck",
+            "garmentLength": "hip",
+            "pattern": "solid",
+            "materialAppearance": "cotton",
+            "occasions": [
+              "casual"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "whitestuff-harwood-straight-jean",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 2245,
+          "usage": {
+            "promptTokens": 4588,
+            "outputTokens": 99,
+            "thoughtTokens": 0,
+            "imageTokens": 4256,
+            "costUsd": 0.0016239
+          },
+          "output": {
+            "category": "pants",
+            "primaryColour": "blue",
+            "secondaryColours": [],
+            "sleeveLength": "not-applicable",
+            "neckline": "not-applicable",
+            "garmentLength": "full",
+            "pattern": "solid",
+            "materialAppearance": "denim",
+            "occasions": [
+              "casual",
+              "work"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "whitestuff-nelly-notch-tee",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 30054,
+          "usage": {
+            "promptTokens": 4571,
+            "outputTokens": 107,
+            "thoughtTokens": 0,
+            "imageTokens": 4256,
+            "costUsd": 0.0016388
+          },
+          "output": {
+            "category": "top",
+            "primaryColour": "navy",
+            "secondaryColours": [
+              "red",
+              "white"
+            ],
+            "sleeveLength": "short",
+            "neckline": "notch",
+            "garmentLength": "hip",
+            "pattern": "solid",
+            "materialAppearance": "cotton",
+            "occasions": [
+              "casual",
+              "work"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "whitestuff-wool-blend-baseball-cap",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 29366,
+          "usage": {
+            "promptTokens": 2456,
+            "outputTokens": 110,
+            "thoughtTokens": 0,
+            "imageTokens": 2128,
+            "costUsd": 0.0010118
+          },
+          "output": {
+            "category": "accessories",
+            "primaryColour": "navy",
+            "secondaryColours": [
+              "green"
+            ],
+            "sleeveLength": "not-applicable",
+            "neckline": "not-applicable",
+            "garmentLength": "not-applicable",
+            "pattern": "herringbone",
+            "materialAppearance": "wool",
+            "occasions": [
+              "casual",
+              "sport"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        }
+      ],
+      "metrics": {
+        "productsScored": 40,
+        "productsFailed": 0,
+        "accuracyPct": {
+          "category": 100,
+          "primaryColour": 100,
+          "sleeveLength": 100,
+          "neckline": 92.5,
+          "garmentLength": 100,
+          "pattern": 95,
+          "materialAppearance": 97.5
+        },
+        "meanAccuracyPct": 97.9,
+        "contaminationRatePct": 3.4,
+        "contaminationRateAllPct": 2.5,
+        "contaminatedProducts": 1,
+        "contaminationProneProducts": 29,
+        "costUsdPerImage": 0.00047473999999999997,
+        "costUsdPerProduct": 0.0011275075,
+        "costUsdTotal": 0.045100299999999996,
+        "projectedUsdPer1000ProductsAt4Images": 1.89896,
+        "medianLatencyMs": 5241.5,
+        "tokens": {
+          "prompt": 116451,
+          "output": 4066,
+          "thoughts": 0,
+          "imageTokens": 101933,
+          "imageTokensPerImage": 1073
+        },
+        "retriedWithoutThinking": 1
+      }
+    },
+    {
+      "model": "gemini-3.6-flash",
+      "thinkingLevel": "low",
+      "runs": [
+        {
+          "productId": "seed-layered-contrast-dress-white-black",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 4273,
+          "usage": {
+            "promptTokens": 1506,
+            "outputTokens": 106,
+            "thoughtTokens": 239,
+            "imageTokens": 1092,
+            "costUsd": 0.00242325
+          },
+          "output": {
+            "category": "dress",
+            "primaryColour": "black",
+            "secondaryColours": [
+              "cream"
+            ],
+            "sleeveLength": "short",
+            "neckline": "high-neck",
+            "garmentLength": "knee",
+            "pattern": "colour-block",
+            "materialAppearance": "wool",
+            "occasions": [
+              "work",
+              "evening"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": false,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "seed-asymmetric-dress-black",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 8135,
+          "usage": {
+            "promptTokens": 1486,
+            "outputTokens": 50,
+            "thoughtTokens": 111,
+            "imageTokens": 1092,
+            "costUsd": 0.00171825
+          },
+          "output": {
+            "category": "dress",
+            "primaryColour": "black",
+            "secondaryColours": [],
+            "sleeveLength": "sleeveless",
+            "neckline": "asymmetric",
+            "garmentLength": "knee",
+            "pattern": "solid",
+            "materialAppearance": "wool",
+            "occasions": [
+              "evening",
+              "work"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "seed-s14-hac-dr-s13083891-tan",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 8541,
+          "usage": {
+            "promptTokens": 1502,
+            "outputTokens": 50,
+            "thoughtTokens": 238,
+            "imageTokens": 1092,
+            "costUsd": 0.0022065
+          },
+          "output": {
+            "category": "dress",
+            "primaryColour": "brown",
+            "secondaryColours": [],
+            "sleeveLength": "short",
+            "neckline": "scoop",
+            "garmentLength": "thigh",
+            "pattern": "solid",
+            "materialAppearance": "leather",
+            "occasions": [
+              "casual",
+              "evening"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "seed-a-line-pocket-shift-black",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 5091,
+          "usage": {
+            "promptTokens": 1477,
+            "outputTokens": 102,
+            "thoughtTokens": 335,
+            "imageTokens": 1092,
+            "costUsd": 0.0027465
+          },
+          "output": {
+            "category": "dress",
+            "primaryColour": "black",
+            "secondaryColours": [],
+            "sleeveLength": "long",
+            "neckline": "v-neck",
+            "garmentLength": "thigh",
+            "pattern": "solid",
+            "materialAppearance": "synthetic",
+            "occasions": [
+              "work",
+              "casual",
+              "evening"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": false,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "seed-full-collar-poplin-blouse-navy",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 2169,
+          "usage": {
+            "promptTokens": 1484,
+            "outputTokens": 97,
+            "thoughtTokens": 0,
+            "imageTokens": 1092,
+            "costUsd": 0.00147675
+          },
+          "output": {
+            "category": "top",
+            "primaryColour": "navy",
+            "secondaryColours": [],
+            "sleeveLength": "long",
+            "neckline": "high-neck",
+            "garmentLength": "hip",
+            "pattern": "solid",
+            "materialAppearance": "cotton",
+            "occasions": [
+              "work",
+              "casual"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "seed-madame-l-blouse-leopard",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 9464,
+          "usage": {
+            "promptTokens": 1471,
+            "outputTokens": 51,
+            "thoughtTokens": 262,
+            "imageTokens": 1092,
+            "costUsd": 0.002277
+          },
+          "output": {
+            "category": "top",
+            "primaryColour": "beige",
+            "secondaryColours": [
+              "black",
+              "brown"
+            ],
+            "sleeveLength": "long",
+            "neckline": "collar",
+            "garmentLength": "hip",
+            "pattern": "animal",
+            "materialAppearance": "silk",
+            "occasions": [
+              "casual",
+              "work"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "seed-tulle-pleat-skirt-navy",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 3786,
+          "usage": {
+            "promptTokens": 1513,
+            "outputTokens": 104,
+            "thoughtTokens": 130,
+            "imageTokens": 1092,
+            "costUsd": 0.00201225
+          },
+          "output": {
+            "category": "skirt",
+            "primaryColour": "navy",
+            "secondaryColours": [],
+            "sleeveLength": "not-applicable",
+            "neckline": "not-applicable",
+            "garmentLength": "midi",
+            "pattern": "solid",
+            "materialAppearance": "synthetic",
+            "occasions": [
+              "work",
+              "casual",
+              "evening"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": false
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "seed-circle-skirt-in-navy",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 5455,
+          "usage": {
+            "promptTokens": 1518,
+            "outputTokens": 114,
+            "thoughtTokens": 137,
+            "imageTokens": 1092,
+            "costUsd": 0.00207975
+          },
+          "output": {
+            "category": "skirt",
+            "primaryColour": "navy",
+            "secondaryColours": [
+              "white"
+            ],
+            "sleeveLength": "not-applicable",
+            "neckline": "not-applicable",
+            "garmentLength": "knee",
+            "pattern": "colour-block",
+            "materialAppearance": "silk",
+            "occasions": [
+              "work",
+              "evening",
+              "casual"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "seed-marquee-coat-steel",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 3766,
+          "usage": {
+            "promptTokens": 1495,
+            "outputTokens": 91,
+            "thoughtTokens": 243,
+            "imageTokens": 1092,
+            "costUsd": 0.00237375
+          },
+          "output": {
+            "category": "jacket",
+            "primaryColour": "navy",
+            "secondaryColours": [],
+            "sleeveLength": "long",
+            "neckline": "high-neck",
+            "garmentLength": "hip",
+            "pattern": "solid",
+            "materialAppearance": "cotton",
+            "occasions": [
+              "casual"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "seed-deione-coat-graphite-floral",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 9661,
+          "usage": {
+            "promptTokens": 1482,
+            "outputTokens": 91,
+            "thoughtTokens": 323,
+            "imageTokens": 1092,
+            "costUsd": 0.002664
+          },
+          "output": {
+            "category": "jacket",
+            "primaryColour": "grey",
+            "secondaryColours": [
+              "beige",
+              "blue",
+              "black"
+            ],
+            "sleeveLength": "long",
+            "neckline": "collar",
+            "garmentLength": "hip",
+            "pattern": "floral",
+            "materialAppearance": "synthetic",
+            "occasions": [
+              "casual"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "seed-girlfriend-trouser-black",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 12353,
+          "usage": {
+            "promptTokens": 1475,
+            "outputTokens": 52,
+            "thoughtTokens": 123,
+            "imageTokens": 1092,
+            "costUsd": 0.0017625
+          },
+          "output": {
+            "category": "pants",
+            "primaryColour": "black",
+            "secondaryColours": [],
+            "sleeveLength": "not-applicable",
+            "neckline": "not-applicable",
+            "garmentLength": "ankle",
+            "pattern": "solid",
+            "materialAppearance": "wool",
+            "occasions": [
+              "casual",
+              "work"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "seed-stiro-oxford-black",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 3027,
+          "usage": {
+            "promptTokens": 1480,
+            "outputTokens": 106,
+            "thoughtTokens": 72,
+            "imageTokens": 1092,
+            "costUsd": 0.0017775
+          },
+          "output": {
+            "category": "shoes",
+            "primaryColour": "black",
+            "secondaryColours": [],
+            "sleeveLength": "not-applicable",
+            "neckline": "not-applicable",
+            "garmentLength": "not-applicable",
+            "pattern": "solid",
+            "materialAppearance": "leather",
+            "occasions": [
+              "work",
+              "casual",
+              "evening"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "seed-listello-short-boot-mud",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 8644,
+          "usage": {
+            "promptTokens": 1476,
+            "outputTokens": 55,
+            "thoughtTokens": 118,
+            "imageTokens": 1092,
+            "costUsd": 0.00175575
+          },
+          "output": {
+            "category": "boots",
+            "primaryColour": "brown",
+            "secondaryColours": [],
+            "sleeveLength": "not-applicable",
+            "neckline": "not-applicable",
+            "garmentLength": "not-applicable",
+            "pattern": "solid",
+            "materialAppearance": "suede",
+            "occasions": [
+              "casual",
+              "work"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "seed-lemy-blazer-grey",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 3501,
+          "usage": {
+            "promptTokens": 1504,
+            "outputTokens": 48,
+            "thoughtTokens": 143,
+            "imageTokens": 1092,
+            "costUsd": 0.00184425
+          },
+          "output": {
+            "category": "jacket",
+            "primaryColour": "grey",
+            "secondaryColours": [],
+            "sleeveLength": "long",
+            "neckline": "notch",
+            "garmentLength": "hip",
+            "pattern": "solid",
+            "materialAppearance": "jersey",
+            "occasions": [
+              "casual",
+              "work"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": false,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "seed-floral-button-up-blue",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 5423,
+          "usage": {
+            "promptTokens": 1496,
+            "outputTokens": 48,
+            "thoughtTokens": 80,
+            "imageTokens": 1092,
+            "costUsd": 0.001602
+          },
+          "output": {
+            "category": "top",
+            "primaryColour": "blue",
+            "secondaryColours": [],
+            "sleeveLength": "long",
+            "neckline": "collar",
+            "garmentLength": "hip",
+            "pattern": "floral",
+            "materialAppearance": "cotton",
+            "occasions": [
+              "casual",
+              "work"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "seed-longsleeve-blouse-in-blue-stripe",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 6406,
+          "usage": {
+            "promptTokens": 1511,
+            "outputTokens": 93,
+            "thoughtTokens": 124,
+            "imageTokens": 1092,
+            "costUsd": 0.001947
+          },
+          "output": {
+            "category": "top",
+            "primaryColour": "blue",
+            "secondaryColours": [
+              "yellow",
+              "white"
+            ],
+            "sleeveLength": "long",
+            "neckline": "collar",
+            "garmentLength": "hip",
+            "pattern": "colour-block",
+            "materialAppearance": "cotton",
+            "occasions": [
+              "casual",
+              "work"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "tentree-colville-button-up",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 4673,
+          "usage": {
+            "promptTokens": 4647,
+            "outputTokens": 90,
+            "thoughtTokens": 345,
+            "imageTokens": 4292,
+            "costUsd": 0.0051165
+          },
+          "output": {
+            "category": "jacket",
+            "primaryColour": "grey",
+            "secondaryColours": [],
+            "sleeveLength": "long",
+            "neckline": "collar",
+            "garmentLength": "hip",
+            "pattern": "quilted",
+            "materialAppearance": "cotton",
+            "occasions": [
+              "casual"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "tentree-valley-dress-deep-olive",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 5019,
+          "usage": {
+            "promptTokens": 3562,
+            "outputTokens": 90,
+            "thoughtTokens": 149,
+            "imageTokens": 3219,
+            "costUsd": 0.00356775
+          },
+          "output": {
+            "category": "dress",
+            "primaryColour": "green",
+            "secondaryColours": [],
+            "sleeveLength": "sleeveless",
+            "neckline": "crew",
+            "garmentLength": "midi",
+            "pattern": "solid",
+            "materialAppearance": "jersey",
+            "occasions": [
+              "casual"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "tentree-juneau-dress-clay",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 4126,
+          "usage": {
+            "promptTokens": 4646,
+            "outputTokens": 92,
+            "thoughtTokens": 141,
+            "imageTokens": 4292,
+            "costUsd": 0.00435825
+          },
+          "output": {
+            "category": "dress",
+            "primaryColour": "brown",
+            "secondaryColours": [],
+            "sleeveLength": "sleeveless",
+            "neckline": "v-neck",
+            "garmentLength": "midi",
+            "pattern": "solid",
+            "materialAppearance": "jersey",
+            "occasions": [
+              "casual"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "tentree-hopewell-dress-clay-railroad-stripe",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 4294,
+          "usage": {
+            "promptTokens": 3575,
+            "outputTokens": 104,
+            "thoughtTokens": 137,
+            "imageTokens": 3219,
+            "costUsd": 0.003585
+          },
+          "output": {
+            "category": "dress",
+            "primaryColour": "beige",
+            "secondaryColours": [
+              "white"
+            ],
+            "sleeveLength": "sleeveless",
+            "neckline": "scoop",
+            "garmentLength": "midi",
+            "pattern": "stripe",
+            "materialAppearance": "cotton",
+            "occasions": [
+              "casual",
+              "beach"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "tentree-recycled-boucle-fleece-jacket-pale-oak",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 6627,
+          "usage": {
+            "promptTokens": 4637,
+            "outputTokens": 48,
+            "thoughtTokens": 143,
+            "imageTokens": 4292,
+            "costUsd": 0.004194
+          },
+          "output": {
+            "category": "jacket",
+            "primaryColour": "beige",
+            "secondaryColours": [],
+            "sleeveLength": "long",
+            "neckline": "collar",
+            "garmentLength": "thigh",
+            "pattern": "solid",
+            "materialAppearance": "fleece",
+            "occasions": [
+              "casual"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "tentree-quilted-full-zip-meteorite-black-heather",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 6005,
+          "usage": {
+            "promptTokens": 4640,
+            "outputTokens": 92,
+            "thoughtTokens": 288,
+            "imageTokens": 4292,
+            "costUsd": 0.004905
+          },
+          "output": {
+            "category": "jacket",
+            "primaryColour": "grey",
+            "secondaryColours": [],
+            "sleeveLength": "long",
+            "neckline": "high-neck",
+            "garmentLength": "hip",
+            "pattern": "quilted",
+            "materialAppearance": "knit",
+            "occasions": [
+              "casual"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "tentree-atlin-legging-meteorite-black",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 3582,
+          "usage": {
+            "promptTokens": 4648,
+            "outputTokens": 98,
+            "thoughtTokens": 126,
+            "imageTokens": 4292,
+            "costUsd": 0.004326
+          },
+          "output": {
+            "category": "pants",
+            "primaryColour": "black",
+            "secondaryColours": [],
+            "sleeveLength": "not-applicable",
+            "neckline": "not-applicable",
+            "garmentLength": "ankle",
+            "pattern": "solid",
+            "materialAppearance": "synthetic",
+            "occasions": [
+              "casual",
+              "sport"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "tentree-narrows-pant-sand-stone",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 9128,
+          "usage": {
+            "promptTokens": 4670,
+            "outputTokens": 50,
+            "thoughtTokens": 354,
+            "imageTokens": 4292,
+            "costUsd": 0.0050175
+          },
+          "output": {
+            "category": "pants",
+            "primaryColour": "grey",
+            "secondaryColours": [],
+            "sleeveLength": "not-applicable",
+            "neckline": "not-applicable",
+            "garmentLength": "ankle",
+            "pattern": "stripe",
+            "materialAppearance": "cotton",
+            "occasions": [
+              "casual"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "tentree-sasquatch-t-shirt-seaport-heather-hockey",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 8440,
+          "usage": {
+            "promptTokens": 4641,
+            "outputTokens": 46,
+            "thoughtTokens": 103,
+            "imageTokens": 4292,
+            "costUsd": 0.0040395
+          },
+          "output": {
+            "category": "top",
+            "primaryColour": "blue",
+            "secondaryColours": [],
+            "sleeveLength": "short",
+            "neckline": "crew",
+            "garmentLength": "hip",
+            "pattern": "solid",
+            "materialAppearance": "jersey",
+            "occasions": [
+              "casual"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "tentree-yaletown-skirt-nightfall-watercolour-floral",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 8644,
+          "usage": {
+            "promptTokens": 4636,
+            "outputTokens": 102,
+            "thoughtTokens": 88,
+            "imageTokens": 4292,
+            "costUsd": 0.0041895
+          },
+          "output": {
+            "category": "skirt",
+            "primaryColour": "blue",
+            "secondaryColours": [
+              "white"
+            ],
+            "sleeveLength": "not-applicable",
+            "neckline": "not-applicable",
+            "garmentLength": "midi",
+            "pattern": "floral",
+            "materialAppearance": "synthetic",
+            "occasions": [
+              "casual"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "tentree-somerset-shacket-sand-stone-multi-stripe",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 6205,
+          "usage": {
+            "promptTokens": 4649,
+            "outputTokens": 102,
+            "thoughtTokens": 307,
+            "imageTokens": 4292,
+            "costUsd": 0.0050205
+          },
+          "output": {
+            "category": "jacket",
+            "primaryColour": "beige",
+            "secondaryColours": [
+              "brown",
+              "grey"
+            ],
+            "sleeveLength": "long",
+            "neckline": "collar",
+            "garmentLength": "hip",
+            "pattern": "stripe",
+            "materialAppearance": "cotton",
+            "occasions": [
+              "casual"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": true,
+          "contaminationHits": [
+            "colour=brown (tan clogs)"
+          ]
+        },
+        {
+          "productId": "tentree-astir-polo-nightfall-heather",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 8645,
+          "usage": {
+            "promptTokens": 3571,
+            "outputTokens": 46,
+            "thoughtTokens": 105,
+            "imageTokens": 3219,
+            "costUsd": 0.0032445
+          },
+          "output": {
+            "category": "top",
+            "primaryColour": "blue",
+            "secondaryColours": [],
+            "sleeveLength": "short",
+            "neckline": "collar",
+            "garmentLength": "hip",
+            "pattern": "solid",
+            "materialAppearance": "cotton",
+            "occasions": [
+              "casual"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "whitestuff-3-pack-stag-sock",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 10130,
+          "usage": {
+            "promptTokens": 2458,
+            "outputTokens": 59,
+            "thoughtTokens": 222,
+            "imageTokens": 2128,
+            "costUsd": 0.00289725
+          },
+          "output": {
+            "category": "accessories",
+            "primaryColour": "multi",
+            "secondaryColours": [
+              "green",
+              "navy",
+              "orange",
+              "blue"
+            ],
+            "sleeveLength": "not-applicable",
+            "neckline": "not-applicable",
+            "garmentLength": "not-applicable",
+            "pattern": "multi",
+            "materialAppearance": "cotton",
+            "occasions": [
+              "casual"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "whitestuff-leather-stitch-belt",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 3173,
+          "usage": {
+            "promptTokens": 1389,
+            "outputTokens": 58,
+            "thoughtTokens": 169,
+            "imageTokens": 1064,
+            "costUsd": 0.001893
+          },
+          "output": {
+            "category": "accessories",
+            "primaryColour": "green",
+            "secondaryColours": [
+              "beige",
+              "bronze"
+            ],
+            "sleeveLength": "not-applicable",
+            "neckline": "not-applicable",
+            "garmentLength": "not-applicable",
+            "pattern": "solid",
+            "materialAppearance": "leather",
+            "occasions": [
+              "casual",
+              "work"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "whitestuff-herringbone-bootie",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 3793,
+          "usage": {
+            "promptTokens": 3516,
+            "outputTokens": 93,
+            "thoughtTokens": 158,
+            "imageTokens": 3192,
+            "costUsd": 0.00357825
+          },
+          "output": {
+            "category": "boots",
+            "primaryColour": "blue",
+            "secondaryColours": [
+              "grey"
+            ],
+            "sleeveLength": "not-applicable",
+            "neckline": "not-applicable",
+            "garmentLength": "not-applicable",
+            "pattern": "herringbone",
+            "materialAppearance": "knit",
+            "occasions": [
+              "casual"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "whitestuff-suede-and-shearling-moccasin",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 4324,
+          "usage": {
+            "promptTokens": 3512,
+            "outputTokens": 109,
+            "thoughtTokens": 126,
+            "imageTokens": 3192,
+            "costUsd": 0.00351525
+          },
+          "output": {
+            "category": "shoes",
+            "primaryColour": "brown",
+            "secondaryColours": [
+              "cream",
+              "pink"
+            ],
+            "sleeveLength": "not-applicable",
+            "neckline": "not-applicable",
+            "garmentLength": "not-applicable",
+            "pattern": "solid",
+            "materialAppearance": "suede",
+            "occasions": [
+              "casual"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "whitestuff-lace-up-thistle-brogue",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 4133,
+          "usage": {
+            "promptTokens": 3524,
+            "outputTokens": 109,
+            "thoughtTokens": 156,
+            "imageTokens": 3192,
+            "costUsd": 0.00363675
+          },
+          "output": {
+            "category": "shoes",
+            "primaryColour": "pink",
+            "secondaryColours": [
+              "beige"
+            ],
+            "sleeveLength": "not-applicable",
+            "neckline": "not-applicable",
+            "garmentLength": "not-applicable",
+            "pattern": "solid",
+            "materialAppearance": "suede",
+            "occasions": [
+              "casual",
+              "work"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "whitestuff-issy-bag",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 3374,
+          "usage": {
+            "promptTokens": 3507,
+            "outputTokens": 100,
+            "thoughtTokens": 98,
+            "imageTokens": 3192,
+            "costUsd": 0.00337275
+          },
+          "output": {
+            "category": "bag",
+            "primaryColour": "black",
+            "secondaryColours": [],
+            "sleeveLength": "not-applicable",
+            "neckline": "not-applicable",
+            "garmentLength": "not-applicable",
+            "pattern": "solid",
+            "materialAppearance": "leather",
+            "occasions": [
+              "casual",
+              "work"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "whitestuff-mosaic-pendant-necklace",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 3654,
+          "usage": {
+            "promptTokens": 2453,
+            "outputTokens": 123,
+            "thoughtTokens": 110,
+            "imageTokens": 2128,
+            "costUsd": 0.0027135
+          },
+          "output": {
+            "category": "jewelry",
+            "primaryColour": "gold",
+            "secondaryColours": [
+              "green",
+              "red",
+              "yellow",
+              "white"
+            ],
+            "sleeveLength": "not-applicable",
+            "neckline": "not-applicable",
+            "garmentLength": "not-applicable",
+            "pattern": "multi",
+            "materialAppearance": "metal",
+            "occasions": [
+              "casual",
+              "evening"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "whitestuff-oceanna-jersey-dress",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 4182,
+          "usage": {
+            "promptTokens": 3508,
+            "outputTokens": 107,
+            "thoughtTokens": 151,
+            "imageTokens": 3192,
+            "costUsd": 0.0035985
+          },
+          "output": {
+            "category": "dress",
+            "primaryColour": "navy",
+            "secondaryColours": [
+              "red",
+              "green",
+              "yellow"
+            ],
+            "sleeveLength": "long",
+            "neckline": "crew",
+            "garmentLength": "knee",
+            "pattern": "print",
+            "materialAppearance": "jersey",
+            "occasions": [
+              "casual"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "whitestuff-layla-jacket",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 4518,
+          "usage": {
+            "promptTokens": 4571,
+            "outputTokens": 89,
+            "thoughtTokens": 192,
+            "imageTokens": 4256,
+            "costUsd": 0.004482
+          },
+          "output": {
+            "category": "jacket",
+            "primaryColour": "green",
+            "secondaryColours": [],
+            "sleeveLength": "long",
+            "neckline": "collar",
+            "garmentLength": "hip",
+            "pattern": "solid",
+            "materialAppearance": "cotton",
+            "occasions": [
+              "casual"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "whitestuff-harwood-straight-jean",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 17938,
+          "usage": {
+            "promptTokens": 4588,
+            "outputTokens": 51,
+            "thoughtTokens": 142,
+            "imageTokens": 4256,
+            "costUsd": 0.00416475
+          },
+          "output": {
+            "category": "pants",
+            "primaryColour": "blue",
+            "secondaryColours": [],
+            "sleeveLength": "not-applicable",
+            "neckline": "not-applicable",
+            "garmentLength": "full",
+            "pattern": "solid",
+            "materialAppearance": "denim",
+            "occasions": [
+              "casual"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "whitestuff-nelly-notch-tee",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 9792,
+          "usage": {
+            "promptTokens": 4571,
+            "outputTokens": 48,
+            "thoughtTokens": 239,
+            "imageTokens": 4256,
+            "costUsd": 0.0045045
+          },
+          "output": {
+            "category": "top",
+            "primaryColour": "navy",
+            "secondaryColours": [
+              "pink"
+            ],
+            "sleeveLength": "short",
+            "neckline": "notch",
+            "garmentLength": "hip",
+            "pattern": "solid",
+            "materialAppearance": "cotton",
+            "occasions": [
+              "casual"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "whitestuff-wool-blend-baseball-cap",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 3917,
+          "usage": {
+            "promptTokens": 2456,
+            "outputTokens": 110,
+            "thoughtTokens": 143,
+            "imageTokens": 2128,
+            "costUsd": 0.00279075
+          },
+          "output": {
+            "category": "accessories",
+            "primaryColour": "navy",
+            "secondaryColours": [
+              "green",
+              "white"
+            ],
+            "sleeveLength": "not-applicable",
+            "neckline": "not-applicable",
+            "garmentLength": "not-applicable",
+            "pattern": "herringbone",
+            "materialAppearance": "wool",
+            "occasions": [
+              "casual"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        }
+      ],
+      "metrics": {
+        "productsScored": 40,
+        "productsFailed": 0,
+        "accuracyPct": {
+          "category": 100,
+          "primaryColour": 100,
+          "sleeveLength": 100,
+          "neckline": 95,
+          "garmentLength": 97.5,
+          "pattern": 100,
+          "materialAppearance": 97.5
+        },
+        "meanAccuracyPct": 98.6,
+        "contaminationRatePct": 3.4,
+        "contaminationRateAllPct": 2.5,
+        "contaminatedProducts": 1,
+        "contaminationProneProducts": 29,
+        "costUsdPerImage": 0.001319771052631579,
+        "costUsdPerProduct": 0.0031344562499999997,
+        "costUsdTotal": 0.12537825,
+        "projectedUsdPer1000ProductsAt4Images": 5.279084210526316,
+        "medianLatencyMs": 5055,
+        "tokens": {
+          "prompt": 116451,
+          "output": 3274,
+          "thoughts": 6870,
+          "imageTokens": 101933,
+          "imageTokensPerImage": 1073
+        },
+        "retriedWithoutThinking": 0
+      }
+    },
+    {
+      "model": "gemini-3.1-pro-preview",
+      "thinkingLevel": "low",
+      "runs": [
+        {
+          "productId": "seed-layered-contrast-dress-white-black",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 68585,
+          "usage": {
+            "promptTokens": 1506,
+            "outputTokens": 104,
+            "thoughtTokens": 0,
+            "imageTokens": 1092,
+            "costUsd": 0.00426
+          },
+          "output": {
+            "category": "dress",
+            "primaryColour": "black",
+            "secondaryColours": [
+              "white"
+            ],
+            "sleeveLength": "short",
+            "neckline": "crew",
+            "garmentLength": "knee",
+            "pattern": "colour-block",
+            "materialAppearance": "wool",
+            "occasions": [
+              "work",
+              "evening"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "seed-asymmetric-dress-black",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 4297,
+          "usage": {
+            "promptTokens": 1486,
+            "outputTokens": 97,
+            "thoughtTokens": 0,
+            "imageTokens": 1092,
+            "costUsd": 0.004136
+          },
+          "output": {
+            "category": "dress",
+            "primaryColour": "black",
+            "secondaryColours": [],
+            "sleeveLength": "sleeveless",
+            "neckline": "asymmetric",
+            "garmentLength": "knee",
+            "pattern": "solid",
+            "materialAppearance": "wool",
+            "occasions": [
+              "work",
+              "evening"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "seed-s14-hac-dr-s13083891-tan",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 30938,
+          "usage": {
+            "promptTokens": 1502,
+            "outputTokens": 97,
+            "thoughtTokens": 0,
+            "imageTokens": 1092,
+            "costUsd": 0.004168
+          },
+          "output": {
+            "category": "dress",
+            "primaryColour": "brown",
+            "secondaryColours": [],
+            "sleeveLength": "short",
+            "neckline": "scoop",
+            "garmentLength": "thigh",
+            "pattern": "solid",
+            "materialAppearance": "leather",
+            "occasions": [
+              "casual",
+              "work"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "seed-a-line-pocket-shift-black",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 38194,
+          "usage": {
+            "promptTokens": 1477,
+            "outputTokens": 94,
+            "thoughtTokens": 0,
+            "imageTokens": 1092,
+            "costUsd": 0.004082
+          },
+          "output": {
+            "category": "dress",
+            "primaryColour": "black",
+            "secondaryColours": [],
+            "sleeveLength": "long",
+            "neckline": "notch",
+            "garmentLength": "knee",
+            "pattern": "solid",
+            "materialAppearance": "synthetic",
+            "occasions": [
+              "work",
+              "casual"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": false,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "seed-full-collar-poplin-blouse-navy",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 3871,
+          "usage": {
+            "promptTokens": 1484,
+            "outputTokens": 97,
+            "thoughtTokens": 0,
+            "imageTokens": 1092,
+            "costUsd": 0.004132
+          },
+          "output": {
+            "category": "top",
+            "primaryColour": "navy",
+            "secondaryColours": [],
+            "sleeveLength": "long",
+            "neckline": "high-neck",
+            "garmentLength": "hip",
+            "pattern": "solid",
+            "materialAppearance": "cotton",
+            "occasions": [
+              "work",
+              "casual"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "seed-madame-l-blouse-leopard",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 62958,
+          "usage": {
+            "promptTokens": 1471,
+            "outputTokens": 107,
+            "thoughtTokens": 0,
+            "imageTokens": 1092,
+            "costUsd": 0.004226
+          },
+          "output": {
+            "category": "top",
+            "primaryColour": "brown",
+            "secondaryColours": [
+              "black",
+              "white"
+            ],
+            "sleeveLength": "long",
+            "neckline": "collar",
+            "garmentLength": "hip",
+            "pattern": "animal",
+            "materialAppearance": "silk",
+            "occasions": [
+              "casual",
+              "work"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "seed-tulle-pleat-skirt-navy",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 42791,
+          "usage": {
+            "promptTokens": 1513,
+            "outputTokens": 99,
+            "thoughtTokens": 0,
+            "imageTokens": 1092,
+            "costUsd": 0.004214
+          },
+          "output": {
+            "category": "skirt",
+            "primaryColour": "navy",
+            "secondaryColours": [],
+            "sleeveLength": "not-applicable",
+            "neckline": "not-applicable",
+            "garmentLength": "midi",
+            "pattern": "solid",
+            "materialAppearance": "cotton",
+            "occasions": [
+              "work",
+              "casual"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "seed-circle-skirt-in-navy",
+          "ok": true,
+          "attempts": 2,
+          "latencyMs": 58744,
+          "usage": {
+            "promptTokens": 1518,
+            "outputTokens": 114,
+            "thoughtTokens": 0,
+            "imageTokens": 1092,
+            "costUsd": 0.004404
+          },
+          "output": {
+            "category": "skirt",
+            "primaryColour": "navy",
+            "secondaryColours": [
+              "white"
+            ],
+            "sleeveLength": "not-applicable",
+            "neckline": "not-applicable",
+            "garmentLength": "knee",
+            "pattern": "colour-block",
+            "materialAppearance": "silk",
+            "occasions": [
+              "work",
+              "casual",
+              "evening"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "seed-marquee-coat-steel",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 50807,
+          "usage": {
+            "promptTokens": 1495,
+            "outputTokens": 92,
+            "thoughtTokens": 0,
+            "imageTokens": 1092,
+            "costUsd": 0.004094
+          },
+          "output": {
+            "category": "coat",
+            "primaryColour": "navy",
+            "secondaryColours": [],
+            "sleeveLength": "long",
+            "neckline": "high-neck",
+            "garmentLength": "thigh",
+            "pattern": "solid",
+            "materialAppearance": "cotton",
+            "occasions": [
+              "casual"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "seed-deione-coat-graphite-floral",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 65146,
+          "usage": {
+            "promptTokens": 1482,
+            "outputTokens": 110,
+            "thoughtTokens": 0,
+            "imageTokens": 1092,
+            "costUsd": 0.004284
+          },
+          "output": {
+            "category": "jacket",
+            "primaryColour": "grey",
+            "secondaryColours": [
+              "beige",
+              "blue",
+              "white"
+            ],
+            "sleeveLength": "long",
+            "neckline": "high-neck",
+            "garmentLength": "hip",
+            "pattern": "floral",
+            "materialAppearance": "quilted",
+            "occasions": [
+              "casual"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": false,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": true,
+          "contaminationHits": [
+            "colour=white (white t-shirt)",
+            "colour=white (grey-white sneakers)"
+          ]
+        },
+        {
+          "productId": "seed-girlfriend-trouser-black",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 6446,
+          "usage": {
+            "promptTokens": 1475,
+            "outputTokens": 98,
+            "thoughtTokens": 0,
+            "imageTokens": 1092,
+            "costUsd": 0.004126
+          },
+          "output": {
+            "category": "pants",
+            "primaryColour": "black",
+            "secondaryColours": [],
+            "sleeveLength": "not-applicable",
+            "neckline": "not-applicable",
+            "garmentLength": "ankle",
+            "pattern": "solid",
+            "materialAppearance": "wool",
+            "occasions": [
+              "casual",
+              "work"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "seed-stiro-oxford-black",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 3039,
+          "usage": {
+            "promptTokens": 1480,
+            "outputTokens": 106,
+            "thoughtTokens": 0,
+            "imageTokens": 1092,
+            "costUsd": 0.004232
+          },
+          "output": {
+            "category": "shoes",
+            "primaryColour": "black",
+            "secondaryColours": [],
+            "sleeveLength": "not-applicable",
+            "neckline": "not-applicable",
+            "garmentLength": "not-applicable",
+            "pattern": "solid",
+            "materialAppearance": "leather",
+            "occasions": [
+              "work",
+              "evening",
+              "casual"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "seed-listello-short-boot-mud",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 3093,
+          "usage": {
+            "promptTokens": 1476,
+            "outputTokens": 102,
+            "thoughtTokens": 0,
+            "imageTokens": 1092,
+            "costUsd": 0.004176
+          },
+          "output": {
+            "category": "boots",
+            "primaryColour": "brown",
+            "secondaryColours": [],
+            "sleeveLength": "not-applicable",
+            "neckline": "not-applicable",
+            "garmentLength": "not-applicable",
+            "pattern": "solid",
+            "materialAppearance": "suede",
+            "occasions": [
+              "casual",
+              "work"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "seed-lemy-blazer-grey",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 7798,
+          "usage": {
+            "promptTokens": 1504,
+            "outputTokens": 94,
+            "thoughtTokens": 0,
+            "imageTokens": 1092,
+            "costUsd": 0.004136
+          },
+          "output": {
+            "category": "jacket",
+            "primaryColour": "grey",
+            "secondaryColours": [],
+            "sleeveLength": "long",
+            "neckline": "collar",
+            "garmentLength": "hip",
+            "pattern": "solid",
+            "materialAppearance": "knit",
+            "occasions": [
+              "casual",
+              "work"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "seed-floral-button-up-blue",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 70615,
+          "usage": {
+            "promptTokens": 1496,
+            "outputTokens": 94,
+            "thoughtTokens": 0,
+            "imageTokens": 1092,
+            "costUsd": 0.00412
+          },
+          "output": {
+            "category": "top",
+            "primaryColour": "blue",
+            "secondaryColours": [],
+            "sleeveLength": "long",
+            "neckline": "collar",
+            "garmentLength": "hip",
+            "pattern": "floral",
+            "materialAppearance": "cotton",
+            "occasions": [
+              "casual",
+              "work"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "seed-longsleeve-blouse-in-blue-stripe",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 75522,
+          "usage": {
+            "promptTokens": 1511,
+            "outputTokens": 107,
+            "thoughtTokens": 0,
+            "imageTokens": 1092,
+            "costUsd": 0.004306
+          },
+          "output": {
+            "category": "top",
+            "primaryColour": "blue",
+            "secondaryColours": [
+              "white",
+              "yellow"
+            ],
+            "sleeveLength": "long",
+            "neckline": "collar",
+            "garmentLength": "hip",
+            "pattern": "multi",
+            "materialAppearance": "cotton",
+            "occasions": [
+              "casual",
+              "work"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": false,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "tentree-colville-button-up",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 4236,
+          "usage": {
+            "promptTokens": 4647,
+            "outputTokens": 95,
+            "thoughtTokens": 0,
+            "imageTokens": 4292,
+            "costUsd": 0.010434
+          },
+          "output": {
+            "category": "top",
+            "primaryColour": "grey",
+            "secondaryColours": [],
+            "sleeveLength": "long",
+            "neckline": "collar",
+            "garmentLength": "hip",
+            "pattern": "quilted",
+            "materialAppearance": "cotton",
+            "occasions": [
+              "casual",
+              "work"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "tentree-valley-dress-deep-olive",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 4202,
+          "usage": {
+            "promptTokens": 3562,
+            "outputTokens": 95,
+            "thoughtTokens": 0,
+            "imageTokens": 3219,
+            "costUsd": 0.008264
+          },
+          "output": {
+            "category": "dress",
+            "primaryColour": "green",
+            "secondaryColours": [],
+            "sleeveLength": "sleeveless",
+            "neckline": "crew",
+            "garmentLength": "midi",
+            "pattern": "solid",
+            "materialAppearance": "jersey",
+            "occasions": [
+              "casual",
+              "work"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "tentree-juneau-dress-clay",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 16524,
+          "usage": {
+            "promptTokens": 4646,
+            "outputTokens": 97,
+            "thoughtTokens": 0,
+            "imageTokens": 4292,
+            "costUsd": 0.010456
+          },
+          "output": {
+            "category": "dress",
+            "primaryColour": "brown",
+            "secondaryColours": [],
+            "sleeveLength": "sleeveless",
+            "neckline": "v-neck",
+            "garmentLength": "midi",
+            "pattern": "solid",
+            "materialAppearance": "synthetic",
+            "occasions": [
+              "casual",
+              "beach"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "tentree-hopewell-dress-clay-railroad-stripe",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 3606,
+          "usage": {
+            "promptTokens": 3575,
+            "outputTokens": 104,
+            "thoughtTokens": 0,
+            "imageTokens": 3219,
+            "costUsd": 0.008398
+          },
+          "output": {
+            "category": "dress",
+            "primaryColour": "beige",
+            "secondaryColours": [
+              "white"
+            ],
+            "sleeveLength": "sleeveless",
+            "neckline": "scoop",
+            "garmentLength": "midi",
+            "pattern": "stripe",
+            "materialAppearance": "cotton",
+            "occasions": [
+              "casual",
+              "beach"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "tentree-recycled-boucle-fleece-jacket-pale-oak",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 11802,
+          "usage": {
+            "promptTokens": 4637,
+            "outputTokens": 91,
+            "thoughtTokens": 0,
+            "imageTokens": 4292,
+            "costUsd": 0.010366
+          },
+          "output": {
+            "category": "jacket",
+            "primaryColour": "beige",
+            "secondaryColours": [],
+            "sleeveLength": "long",
+            "neckline": "collar",
+            "garmentLength": "thigh",
+            "pattern": "solid",
+            "materialAppearance": "fleece",
+            "occasions": [
+              "casual"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "tentree-quilted-full-zip-meteorite-black-heather",
+          "ok": true,
+          "attempts": 2,
+          "latencyMs": 3859,
+          "usage": {
+            "promptTokens": 4640,
+            "outputTokens": 102,
+            "thoughtTokens": 0,
+            "imageTokens": 4292,
+            "costUsd": 0.010504
+          },
+          "output": {
+            "category": "jacket",
+            "primaryColour": "grey",
+            "secondaryColours": [],
+            "sleeveLength": "long",
+            "neckline": "high-neck",
+            "garmentLength": "hip",
+            "pattern": "quilted",
+            "materialAppearance": "knit",
+            "occasions": [
+              "casual",
+              "sport",
+              "work"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "tentree-atlin-legging-meteorite-black",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 101135,
+          "usage": {
+            "promptTokens": 4648,
+            "outputTokens": 98,
+            "thoughtTokens": 0,
+            "imageTokens": 4292,
+            "costUsd": 0.010472
+          },
+          "output": {
+            "category": "pants",
+            "primaryColour": "black",
+            "secondaryColours": [],
+            "sleeveLength": "not-applicable",
+            "neckline": "not-applicable",
+            "garmentLength": "ankle",
+            "pattern": "solid",
+            "materialAppearance": "synthetic",
+            "occasions": [
+              "casual",
+              "sport"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "tentree-narrows-pant-sand-stone",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 3646,
+          "usage": {
+            "promptTokens": 4670,
+            "outputTokens": 93,
+            "thoughtTokens": 0,
+            "imageTokens": 4292,
+            "costUsd": 0.010456
+          },
+          "output": {
+            "category": "pants",
+            "primaryColour": "grey",
+            "secondaryColours": [],
+            "sleeveLength": "not-applicable",
+            "neckline": "not-applicable",
+            "garmentLength": "cropped",
+            "pattern": "stripe",
+            "materialAppearance": "cotton",
+            "occasions": [
+              "casual"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "tentree-sasquatch-t-shirt-seaport-heather-hockey",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 3319,
+          "usage": {
+            "promptTokens": 4641,
+            "outputTokens": 89,
+            "thoughtTokens": 0,
+            "imageTokens": 4292,
+            "costUsd": 0.01035
+          },
+          "output": {
+            "category": "top",
+            "primaryColour": "blue",
+            "secondaryColours": [],
+            "sleeveLength": "short",
+            "neckline": "crew",
+            "garmentLength": "hip",
+            "pattern": "solid",
+            "materialAppearance": "cotton",
+            "occasions": [
+              "casual"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "tentree-yaletown-skirt-nightfall-watercolour-floral",
+          "ok": true,
+          "attempts": 2,
+          "latencyMs": 3613,
+          "usage": {
+            "promptTokens": 4636,
+            "outputTokens": 107,
+            "thoughtTokens": 0,
+            "imageTokens": 4292,
+            "costUsd": 0.010556
+          },
+          "output": {
+            "category": "skirt",
+            "primaryColour": "blue",
+            "secondaryColours": [
+              "white"
+            ],
+            "sleeveLength": "not-applicable",
+            "neckline": "not-applicable",
+            "garmentLength": "midi",
+            "pattern": "floral",
+            "materialAppearance": "synthetic",
+            "occasions": [
+              "casual",
+              "beach"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "tentree-somerset-shacket-sand-stone-multi-stripe",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 7403,
+          "usage": {
+            "promptTokens": 4649,
+            "outputTokens": 102,
+            "thoughtTokens": 0,
+            "imageTokens": 4292,
+            "costUsd": 0.010522
+          },
+          "output": {
+            "category": "jacket",
+            "primaryColour": "beige",
+            "secondaryColours": [
+              "brown",
+              "grey"
+            ],
+            "sleeveLength": "long",
+            "neckline": "collar",
+            "garmentLength": "hip",
+            "pattern": "stripe",
+            "materialAppearance": "cotton",
+            "occasions": [
+              "casual"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": true,
+          "contaminationHits": [
+            "colour=brown (tan clogs)"
+          ]
+        },
+        {
+          "productId": "tentree-astir-polo-nightfall-heather",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 75444,
+          "usage": {
+            "promptTokens": 3571,
+            "outputTokens": 99,
+            "thoughtTokens": 0,
+            "imageTokens": 3219,
+            "costUsd": 0.00833
+          },
+          "output": {
+            "category": "top",
+            "primaryColour": "blue",
+            "secondaryColours": [],
+            "sleeveLength": "short",
+            "neckline": "collar",
+            "garmentLength": "hip",
+            "pattern": "solid",
+            "materialAppearance": "cotton",
+            "occasions": [
+              "casual",
+              "work",
+              "sport"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "whitestuff-3-pack-stag-sock",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 7739,
+          "usage": {
+            "promptTokens": 2458,
+            "outputTokens": 118,
+            "thoughtTokens": 0,
+            "imageTokens": 2128,
+            "costUsd": 0.006332
+          },
+          "output": {
+            "category": "accessories",
+            "primaryColour": "multi",
+            "secondaryColours": [
+              "green",
+              "blue",
+              "brown",
+              "navy"
+            ],
+            "sleeveLength": "not-applicable",
+            "neckline": "not-applicable",
+            "garmentLength": "not-applicable",
+            "pattern": "multi",
+            "materialAppearance": "knit",
+            "occasions": [
+              "casual"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "whitestuff-leather-stitch-belt",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 68907,
+          "usage": {
+            "promptTokens": 1389,
+            "outputTokens": 113,
+            "thoughtTokens": 0,
+            "imageTokens": 1064,
+            "costUsd": 0.004134
+          },
+          "output": {
+            "category": "accessories",
+            "primaryColour": "green",
+            "secondaryColours": [
+              "brown",
+              "white"
+            ],
+            "sleeveLength": "not-applicable",
+            "neckline": "not-applicable",
+            "garmentLength": "not-applicable",
+            "pattern": "solid",
+            "materialAppearance": "leather",
+            "occasions": [
+              "casual",
+              "work"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "whitestuff-herringbone-bootie",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 6191,
+          "usage": {
+            "promptTokens": 3516,
+            "outputTokens": 111,
+            "thoughtTokens": 0,
+            "imageTokens": 3192,
+            "costUsd": 0.008364
+          },
+          "output": {
+            "category": "boots",
+            "primaryColour": "blue",
+            "secondaryColours": [
+              "grey",
+              "white"
+            ],
+            "sleeveLength": "not-applicable",
+            "neckline": "not-applicable",
+            "garmentLength": "not-applicable",
+            "pattern": "herringbone",
+            "materialAppearance": "fleece",
+            "occasions": [
+              "casual"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "whitestuff-suede-and-shearling-moccasin",
+          "ok": true,
+          "attempts": 2,
+          "latencyMs": 21397,
+          "usage": {
+            "promptTokens": 3512,
+            "outputTokens": 109,
+            "thoughtTokens": 0,
+            "imageTokens": 3192,
+            "costUsd": 0.008332
+          },
+          "output": {
+            "category": "shoes",
+            "primaryColour": "brown",
+            "secondaryColours": [
+              "beige",
+              "pink"
+            ],
+            "sleeveLength": "not-applicable",
+            "neckline": "not-applicable",
+            "garmentLength": "not-applicable",
+            "pattern": "solid",
+            "materialAppearance": "suede",
+            "occasions": [
+              "casual"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "whitestuff-lace-up-thistle-brogue",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 49257,
+          "usage": {
+            "promptTokens": 3524,
+            "outputTokens": 102,
+            "thoughtTokens": 0,
+            "imageTokens": 3192,
+            "costUsd": 0.008272
+          },
+          "output": {
+            "category": "shoes",
+            "primaryColour": "red",
+            "secondaryColours": [],
+            "sleeveLength": "not-applicable",
+            "neckline": "not-applicable",
+            "garmentLength": "not-applicable",
+            "pattern": "solid",
+            "materialAppearance": "suede",
+            "occasions": [
+              "casual",
+              "work"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "whitestuff-issy-bag",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 89548,
+          "usage": {
+            "promptTokens": 3507,
+            "outputTokens": 100,
+            "thoughtTokens": 0,
+            "imageTokens": 3192,
+            "costUsd": 0.008214
+          },
+          "output": {
+            "category": "bag",
+            "primaryColour": "black",
+            "secondaryColours": [],
+            "sleeveLength": "not-applicable",
+            "neckline": "not-applicable",
+            "garmentLength": "not-applicable",
+            "pattern": "solid",
+            "materialAppearance": "leather",
+            "occasions": [
+              "casual",
+              "work"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "whitestuff-mosaic-pendant-necklace",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 44093,
+          "usage": {
+            "promptTokens": 2453,
+            "outputTokens": 128,
+            "thoughtTokens": 0,
+            "imageTokens": 2128,
+            "costUsd": 0.006442
+          },
+          "output": {
+            "category": "jewelry",
+            "primaryColour": "gold",
+            "secondaryColours": [
+              "green",
+              "red",
+              "white",
+              "yellow"
+            ],
+            "sleeveLength": "not-applicable",
+            "neckline": "not-applicable",
+            "garmentLength": "not-applicable",
+            "pattern": "multi",
+            "materialAppearance": "metal",
+            "occasions": [
+              "casual",
+              "work",
+              "evening"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "whitestuff-oceanna-jersey-dress",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 4860,
+          "usage": {
+            "promptTokens": 3508,
+            "outputTokens": 107,
+            "thoughtTokens": 0,
+            "imageTokens": 3192,
+            "costUsd": 0.0083
+          },
+          "output": {
+            "category": "dress",
+            "primaryColour": "blue",
+            "secondaryColours": [
+              "red",
+              "green",
+              "yellow"
+            ],
+            "sleeveLength": "long",
+            "neckline": "crew",
+            "garmentLength": "knee",
+            "pattern": "print",
+            "materialAppearance": "jersey",
+            "occasions": [
+              "casual"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "whitestuff-layla-jacket",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 37521,
+          "usage": {
+            "promptTokens": 4571,
+            "outputTokens": 91,
+            "thoughtTokens": 0,
+            "imageTokens": 4256,
+            "costUsd": 0.010234
+          },
+          "output": {
+            "category": "jacket",
+            "primaryColour": "green",
+            "secondaryColours": [],
+            "sleeveLength": "long",
+            "neckline": "high-neck",
+            "garmentLength": "hip",
+            "pattern": "solid",
+            "materialAppearance": "cotton",
+            "occasions": [
+              "casual"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "whitestuff-harwood-straight-jean",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 3619,
+          "usage": {
+            "promptTokens": 4588,
+            "outputTokens": 94,
+            "thoughtTokens": 0,
+            "imageTokens": 4256,
+            "costUsd": 0.010304
+          },
+          "output": {
+            "category": "pants",
+            "primaryColour": "blue",
+            "secondaryColours": [],
+            "sleeveLength": "not-applicable",
+            "neckline": "not-applicable",
+            "garmentLength": "ankle",
+            "pattern": "solid",
+            "materialAppearance": "denim",
+            "occasions": [
+              "casual"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": false,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "whitestuff-nelly-notch-tee",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 41065,
+          "usage": {
+            "promptTokens": 4571,
+            "outputTokens": 102,
+            "thoughtTokens": 0,
+            "imageTokens": 4256,
+            "costUsd": 0.010366
+          },
+          "output": {
+            "category": "top",
+            "primaryColour": "navy",
+            "secondaryColours": [
+              "red",
+              "white"
+            ],
+            "sleeveLength": "short",
+            "neckline": "notch",
+            "garmentLength": "hip",
+            "pattern": "solid",
+            "materialAppearance": "cotton",
+            "occasions": [
+              "casual"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        },
+        {
+          "productId": "whitestuff-wool-blend-baseball-cap",
+          "ok": true,
+          "attempts": 1,
+          "latencyMs": 3723,
+          "usage": {
+            "promptTokens": 2456,
+            "outputTokens": 115,
+            "thoughtTokens": 0,
+            "imageTokens": 2128,
+            "costUsd": 0.006292
+          },
+          "output": {
+            "category": "accessories",
+            "primaryColour": "navy",
+            "secondaryColours": [
+              "white",
+              "green"
+            ],
+            "sleeveLength": "not-applicable",
+            "neckline": "not-applicable",
+            "garmentLength": "not-applicable",
+            "pattern": "herringbone",
+            "materialAppearance": "wool",
+            "occasions": [
+              "casual",
+              "sport"
+            ]
+          },
+          "fieldCorrect": {
+            "category": true,
+            "primaryColour": true,
+            "sleeveLength": true,
+            "neckline": true,
+            "garmentLength": true,
+            "pattern": true,
+            "materialAppearance": true
+          },
+          "contaminated": false,
+          "contaminationHits": []
+        }
+      ],
+      "metrics": {
+        "productsScored": 40,
+        "productsFailed": 0,
+        "accuracyPct": {
+          "category": 100,
+          "primaryColour": 100,
+          "sleeveLength": 100,
+          "neckline": 95,
+          "garmentLength": 97.5,
+          "pattern": 97.5,
+          "materialAppearance": 100
+        },
+        "meanAccuracyPct": 98.6,
+        "contaminationRatePct": 6.9,
+        "contaminationRateAllPct": 5,
+        "contaminatedProducts": 2,
+        "contaminationProneProducts": 29,
+        "costUsdPerImage": 0.00296621052631579,
+        "costUsdPerProduct": 0.007044750000000001,
+        "costUsdTotal": 0.28179000000000004,
+        "projectedUsdPer1000ProductsAt4Images": 11.86484210526316,
+        "medianLatencyMs": 14163,
+        "tokens": {
+          "prompt": 116451,
+          "output": 4074,
+          "thoughts": 0,
+          "imageTokens": 101933,
+          "imageTokensPerImage": 1073
+        },
+        "retriedWithoutThinking": 4
+      }
+    }
+  ]
+}

@@ -369,6 +369,7 @@ docs/
   M4-LIVE-RUN.md
   PORTABILITY.md
   PRD.md
+  VISION-MODEL.md
   evidence/
     YOY-100/
       0-origin-home-desktop.png
@@ -615,6 +616,10 @@ docs/
       5-loading-desktop.png
       6-empty-desktop.png
       7-error-desktop.png
+  vision/
+    compare.mts
+    results.json
+    sample.json
 package.json
 packages/
   engine/
@@ -773,6 +778,7 @@ vitest.setup.ts
 - apps/shopify-app/widget/src/native-render.ts → apps/shopify-app/widget/src/format.ts, apps/shopify-app/widget/src/native-page.ts, apps/shopify-app/widget/src/native-render.config.ts, apps/shopify-app/widget/src/native-render.css?inline (unresolved), apps/shopify-app/widget/src/overlay.ts, apps/shopify-app/widget/src/search-client.ts, apps/shopify-app/widget/src/strings.ts
 - apps/shopify-app/widget/src/overlay.ts → apps/shopify-app/widget/src/format.ts, apps/shopify-app/widget/src/search-client.ts, apps/shopify-app/widget/src/strings.ts, apps/shopify-app/widget/src/widget.css?inline (unresolved)
 - apps/shopify-app/widget/test-ui/localization.spec.ts → apps/shopify-app/widget/src/strings.ts
+- docs/vision/compare.mts → apps/shopify-app/app/playground/polite-fetch.server.ts, packages/engine/src/taxonomy.ts
 - packages/engine/src/classic.ts → packages/engine/src/retrieve.ts
 - packages/engine/src/classify.ts → packages/engine/src/index.ts
 - packages/engine/src/intent.ts → packages/engine/src/index.ts, packages/engine/src/taxonomy.ts
