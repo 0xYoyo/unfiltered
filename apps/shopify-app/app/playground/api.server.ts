@@ -285,6 +285,9 @@ export async function countAiSearchesToday(
     where: {
       shopDomain: { in: storeKeys },
       route: "ai",
+      // An exact-query reuse row (YOY-64 AC-4) is an AI-routed search that
+      // spent no LLM budget, so it must not consume the ceiling either.
+      OR: [{ routeReason: null }, { routeReason: { not: "intent-reuse" } }],
       createdAt: { gte: startOfUtcDay(now) },
     },
   });

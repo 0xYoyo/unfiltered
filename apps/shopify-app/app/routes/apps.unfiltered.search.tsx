@@ -10,6 +10,7 @@ import {
   serializeProxySearchResponse,
   type ProxySearchBody,
 } from "../search/proxy.server";
+import { normalizeReuseQuery } from "../search/events.server";
 import { getSessionThrottle } from "../search/throttle.server";
 import { authenticate } from "../shopify.server";
 
@@ -175,8 +176,10 @@ async function handleSearch(
     // classic searches ("short-query", "sku-pattern", non-degraded "model",
     // "model-error") consume nothing; chip removal and throttled responses
     // stay exempt (YOY-47 AC-4).
+    // An exact-query reuse (YOY-64 AC-4) made no LLM call and spends no
+    // budget, exactly like chip removal.
     const aiDecided =
-      response.route === "ai" ||
+      (response.route === "ai" && response.routeReason !== "intent-reuse") ||
       (response.degraded &&
         (response.routeReason === "model" ||
           response.routeReason === "classic-zero-hit"));
@@ -203,6 +206,11 @@ async function handleSearch(
         degraded: response.degraded,
         latencyMs,
         resultCount: response.hits.length,
+        // The intent a later identical query may reuse (YOY-64 AC-4): only
+        // a served, non-degraded AI intent, keyed by the normalized query.
+        ...(response.route === "ai" && !response.degraded && response.intent !== null
+          ? { intent: response.intent, normalizedQuery: normalizeReuseQuery(body.query) }
+          : {}),
       });
     }
 

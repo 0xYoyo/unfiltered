@@ -19,10 +19,13 @@ const PROVIDER = "google";
 const DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
 
 /** Adapter misconfiguration (e.g. missing API key). */
-export class GeminiConfigError extends Error {}
+export class GeminiConfigError extends Error {
+  override readonly name = "GeminiConfigError";
+}
 
 /** The Gemini API answered with a non-OK HTTP status. */
 export class GeminiApiError extends Error {
+  override readonly name = "GeminiApiError";
   constructor(
     message: string,
     readonly status: number,
@@ -33,7 +36,9 @@ export class GeminiApiError extends Error {
 }
 
 /** The Gemini API answered 200 but the payload was not usable. */
-export class GeminiResponseError extends Error {}
+export class GeminiResponseError extends Error {
+  override readonly name = "GeminiResponseError";
+}
 
 /**
  * A request exceeded its abort timeout before headers arrived. Carries the
@@ -41,6 +46,9 @@ export class GeminiResponseError extends Error {}
  * the live regeneration retry ladder) treat it like any network timeout.
  */
 export class GeminiTimeoutError extends Error {
+  // Named so a log line or an escalation reason carries the class, not
+  // "Error" (YOY-64: the intent-failure warn line read `"error":"Error"`).
+  override readonly name = "GeminiTimeoutError";
   readonly code = "ETIMEDOUT";
   constructor(
     message: string,
@@ -114,6 +122,15 @@ export const DEFAULT_INTENT_LITE_THINKING_LEVEL = "low";
  */
 export const DEFAULT_INTENT_LITE_TIMEOUT_MS = 8_000;
 /**
+ * Per-request abort timeout of the accuracy-tier intent call (YOY-64 AC-3):
+ * a never-answering upstream must degrade the search to classic well inside
+ * the widget's 30 s primary budget and after its 3 s classic-rescue budget
+ * (both asserted against the widget's constants by a test). The adapter's
+ * 60 s default stays for enrichment and embedding. Override with
+ * `GEMINI_INTENT_TIMEOUT_MS`.
+ */
+export const DEFAULT_INTENT_TIMEOUT_MS = 8_000;
+/**
  * `GEMINI_INTENT_THINKING_LEVEL` value that sends no thinkingConfig at all,
  * restoring the model's own default thinking (the pre-YOY-109 behaviour).
  */
@@ -140,6 +157,8 @@ export interface GeminiModelConfig {
   intentLiteThinkingLevel: string | undefined;
   /** Abort timeout for the lite intent call, ms (`GEMINI_INTENT_LITE_TIMEOUT_MS`). */
   intentLiteTimeoutMs: number;
+  /** Abort timeout for the accuracy-tier intent call, ms (`GEMINI_INTENT_TIMEOUT_MS`). */
+  intentTimeoutMs: number;
 }
 
 /**
@@ -147,7 +166,7 @@ export interface GeminiModelConfig {
  * GEMINI_CLASSIFICATION_MODEL, GEMINI_INTENT_MODEL, GEMINI_EMBEDDING_MODEL,
  * GEMINI_EMBEDDING_DIMENSION, GEMINI_INTENT_THINKING_LEVEL,
  * GEMINI_INTENT_LITE_MODEL, GEMINI_INTENT_LITE_THINKING_LEVEL,
- * GEMINI_INTENT_LITE_TIMEOUT_MS.
+ * GEMINI_INTENT_LITE_TIMEOUT_MS, GEMINI_INTENT_TIMEOUT_MS.
  */
 export function geminiModelsFromEnv(
   env: Record<string, string | undefined> = process.env,
@@ -173,6 +192,11 @@ export function geminiModelsFromEnv(
       "GEMINI_INTENT_LITE_TIMEOUT_MS",
       env.GEMINI_INTENT_LITE_TIMEOUT_MS,
       DEFAULT_INTENT_LITE_TIMEOUT_MS,
+    ),
+    intentTimeoutMs: parsePositiveInt(
+      "GEMINI_INTENT_TIMEOUT_MS",
+      env.GEMINI_INTENT_TIMEOUT_MS,
+      DEFAULT_INTENT_TIMEOUT_MS,
     ),
   };
 }

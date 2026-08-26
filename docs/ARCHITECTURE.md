@@ -426,6 +426,66 @@ golden — classic and AI alike — through `runSearch`, and treats a `degraded`
 response as a hard error: offline replay must never let the silent fallback
 mask a broken recording as classic-quality results.
 
+### Latency work on the AI path (YOY-64)
+
+Four mechanisms, all inside the orchestrator and its wiring, none touching
+retrieval semantics:
+
+- **The ledger leaves the hot path (AC-1).** Production wraps the Prisma
+  `CostRecorder` in `createQueuedCostRecorder`
+  (`app/ai/cost-recorder.server.ts`): `record` validates the usage
+  synchronously (an unpriced model still throws, before anything is queued)
+  and resolves as soon as the insert is queued; writes chain in order, a
+  failed insert is logged (`[ai-cost] ledger write failed …`) and never
+  fails the search, and `flush()` awaits the queue. The synchronous
+  recorder is what tests and the eval harness use, so ledger assertions
+  stay exact.
+- **Per-operation intent abort (AC-3).** The accuracy-tier intent client
+  runs with `GEMINI_INTENT_TIMEOUT_MS` (default 8000) and the lite tier with
+  `GEMINI_INTENT_LITE_TIMEOUT_MS` (default 8000): a never-answering upstream
+  degrades the search to classic inside the widget's budgets — after its 3 s
+  classic-rescue budget and long before its 30 s primary budget
+  (`orchestrator.test.ts` asserts the relation against the widget's
+  exported constants). The adapter's 60 s default stays for enrichment and
+  embedding.
+- **Exact-query intent reuse (AC-4).** Every submitted AI search that was
+  served non-degraded stores its `Intent` and the normalized query
+  (trimmed, whitespace-collapsed, case-folded) on its `SearchEvent`
+  (`intent`, `normalizedQuery`; migration
+  `20260826150000_search_event_intent_reuse`). A later query with the same
+  normalized text from the same store within
+  `INTENT_REUSE_WINDOW_MINUTES` (default 60; `0` disables) is answered from
+  that intent with **zero LLM calls** — no classification, no extraction —
+  as `routeReason: "intent-reuse"`, `intentTier: null`, and `stages` without
+  `classify`/`intent`; retrieval still runs, so a catalog change reaches
+  the repeated query. Refinements (`previousIntent`) and chip removals never
+  reuse; a lookup failure falls through to the full ladder. A reuse is
+  logged as a normal `SearchEvent` but spends no budget: the per-session and
+  per-IP throttles and the playground's daily ceilings skip it. Exact text
+  only — semantic caching is deferred (NG-5).
+- **Concurrency (AC-5).** Intent extraction depends on the query, not on
+  the classifier's decision, so when the classifier has no settled answer
+  (`QueryClassifier.settled` — a heuristic rule or a cached model decision;
+  an engine peek that never spends a call) the extraction starts alongside
+  the model classification; a model-decided classic route discards the
+  in-flight extraction and its cost is the price of the overlap on that
+  rare shape, while heuristic-classic queries stay LLM-free. On the AI path
+  the zero-hit rescue's keyword search runs alongside retrieval and is
+  dropped when retrieval finds hits. `stages` books each stage's own wall
+  time, so their sum may now exceed the response's wall time — that excess
+  is the overlap; no single stage exceeds it.
+
+The intent prompt itself was trimmed on AC-2 (the category vocabulary left
+the prompt — the response schema's enum binds it — and every rule is stated
+once) and the eval harness prints `intent input tokens: before N / after M
+(−P %)` against `fixtures/intent-token-baseline.json`, asserting ≥ 30 % fewer
+input tokens with every quality bar intact. Two guardrails survived the trim
+on live evidence against the lite tier (6 samples per golden): the occasion
+vocabulary stays spelled out with "null when the query states no occasion",
+and the "omit / never invent" rule sits last, right before the query —
+without either the lite model invents an occasion on g10/r09 in 2–3 of 6
+samples. The comment on `buildIntentPrompt` carries the numbers.
+
 ### Per-stage timing: `stages` (YOY-114)
 
 Every response carries `stages: Partial<Record<SearchStage, number>>` — whole

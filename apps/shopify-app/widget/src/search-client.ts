@@ -109,13 +109,13 @@ const DEFAULT_BASE_PATH = "/apps/unfiltered";
  * `timeoutMs` (the embed block's `searchTimeoutMs`), so the value can drop
  * once the server-side latency work lands.
  */
-const DEFAULT_TIMEOUT_MS = 30_000;
+export const DEFAULT_TIMEOUT_MS = 30_000;
 /**
  * The classic rescue's own budget (YOY-108). Unrelated to the primary
  * budget above, which stays untouched in this issue (NG-1): the rescue runs
  * the zero-LLM keyword path, measured in hundreds of milliseconds.
  */
-const DEFAULT_FALLBACK_TIMEOUT_MS = 3_000;
+export const DEFAULT_FALLBACK_TIMEOUT_MS = 3_000;
 
 /**
  * The request hit its own budget and the widget aborted it — distinct from

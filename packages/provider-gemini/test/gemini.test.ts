@@ -9,6 +9,7 @@ import {
   DEFAULT_INTENT_LITE_MODEL,
   DEFAULT_INTENT_LITE_THINKING_LEVEL,
   DEFAULT_INTENT_LITE_TIMEOUT_MS,
+  DEFAULT_INTENT_TIMEOUT_MS,
   DEFAULT_INTENT_MODEL,
   DEFAULT_INTENT_THINKING_LEVEL,
   MODEL_DEFAULT_THINKING_LEVEL,
@@ -91,8 +92,10 @@ describe("model configuration", () => {
       intentThinkingLevel: DEFAULT_INTENT_THINKING_LEVEL,
       intentLiteThinkingLevel: DEFAULT_INTENT_LITE_THINKING_LEVEL,
       intentLiteTimeoutMs: DEFAULT_INTENT_LITE_TIMEOUT_MS,
+      intentTimeoutMs: DEFAULT_INTENT_TIMEOUT_MS,
     });
     expect(DEFAULT_INTENT_LITE_TIMEOUT_MS).toBe(8_000);
+    expect(DEFAULT_INTENT_TIMEOUT_MS).toBe(8_000);
     expect(DEFAULT_INTENT_THINKING_LEVEL).toBe("low");
     // The lite tier (YOY-116): the cheap model, thinking set explicitly.
     expect(DEFAULT_INTENT_LITE_MODEL).toBe("gemini-3.5-flash-lite");
@@ -109,6 +112,7 @@ describe("model configuration", () => {
       GEMINI_INTENT_LITE_MODEL: "model-d",
       GEMINI_INTENT_LITE_THINKING_LEVEL: "medium",
       GEMINI_INTENT_LITE_TIMEOUT_MS: "5000",
+      GEMINI_INTENT_TIMEOUT_MS: "7000",
     });
     expect(models).toEqual({
       classificationModel: "model-a",
@@ -119,7 +123,11 @@ describe("model configuration", () => {
       intentThinkingLevel: "high",
       intentLiteThinkingLevel: "medium",
       intentLiteTimeoutMs: 5000,
+      intentTimeoutMs: 7000,
     });
+    expect(() => geminiModelsFromEnv({ GEMINI_INTENT_TIMEOUT_MS: "1.5" })).toThrow(
+      /GEMINI_INTENT_TIMEOUT_MS/,
+    );
     for (const raw of ["", "abc", "0", "-1", "1.5"]) {
       expect(() => geminiModelsFromEnv({ GEMINI_INTENT_LITE_TIMEOUT_MS: raw })).toThrow(
         /GEMINI_INTENT_LITE_TIMEOUT_MS/,

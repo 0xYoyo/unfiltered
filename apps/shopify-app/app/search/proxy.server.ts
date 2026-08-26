@@ -15,7 +15,10 @@ import {
   geminiModelsFromEnv,
 } from "@unfiltered/provider-gemini";
 
-import { createPrismaCostRecorder } from "../ai/cost-recorder.server";
+import {
+  createPrismaCostRecorder,
+  createQueuedCostRecorder,
+} from "../ai/cost-recorder.server";
 import { createPgTrgmClassicStore } from "./classic-store.server";
 import {
   createSearchOrchestrator,
@@ -432,6 +435,36 @@ export function intentEscalationThresholdFromEnv(
   return threshold;
 }
 
+/** Env var naming the exact-query intent reuse window, in minutes (YOY-64 AC-4). */
+export const INTENT_REUSE_WINDOW_MINUTES_ENV = "INTENT_REUSE_WINDOW_MINUTES";
+/**
+ * Default reuse window: an hour covers a demo's repeated "Try:" examples and
+ * a shopper re-running a search, while a catalog change still reaches a
+ * repeated query within the hour (the intent is reused, retrieval is not).
+ */
+export const DEFAULT_INTENT_REUSE_WINDOW_MINUTES = 60;
+
+/**
+ * The reuse window in milliseconds from `INTENT_REUSE_WINDOW_MINUTES`; unset
+ * means the committed default, `0` disables reuse, and a malformed value
+ * fails at construction.
+ */
+export function intentReuseWindowMsFromEnv(
+  env: Record<string, string | undefined> = process.env,
+): number {
+  const raw = env[INTENT_REUSE_WINDOW_MINUTES_ENV];
+  if (raw === undefined) {
+    return DEFAULT_INTENT_REUSE_WINDOW_MINUTES * 60_000;
+  }
+  const minutes = Number(raw);
+  if (raw.trim() === "" || !Number.isFinite(minutes) || minutes < 0) {
+    throw new Error(
+      `${INTENT_REUSE_WINDOW_MINUTES_ENV} must be a non-negative number of minutes, got ${JSON.stringify(raw)}`,
+    );
+  }
+  return minutes * 60_000;
+}
+
 /**
  * The orchestrator wired for production storefront traffic: configured
  * Gemini models metered through the Prisma cost ledger, over the pgvector
@@ -442,8 +475,12 @@ export function createProxySearchOrchestrator(
   db: PrismaClient,
 ): SearchOrchestrator {
   const models = geminiModelsFromEnv();
-  const costRecorder = createPrismaCostRecorder(db);
+  // The ledger write leaves the hot path (YOY-64 AC-1): every metered call
+  // resolves as soon as its row is queued; a failed insert is logged.
+  const costRecorder = createQueuedCostRecorder(createPrismaCostRecorder(db));
+  const reuseWindowMs = intentReuseWindowMsFromEnv();
   return createSearchOrchestrator({
+    ...(reuseWindowMs > 0 ? { intentReuse: { windowMs: reuseWindowMs } } : {}),
     db,
     classifier: createQueryClassifier({
       llm: createGeminiLlmClient({
@@ -476,6 +513,9 @@ export function createProxySearchOrchestrator(
           // queue tail and hangs were the live degraded-with-intent-null
           // failures.
           thinkingLevel: models.intentThinkingLevel,
+          // A hung accuracy call degrades to classic inside the widget's
+          // budget (YOY-64 AC-3) instead of the adapter's 60 s default.
+          requestTimeoutMs: models.intentTimeoutMs,
         }),
       }),
       threshold: intentEscalationThresholdFromEnv(),

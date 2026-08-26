@@ -149,11 +149,18 @@ model SearchEvent {
   degraded    Boolean
   latencyMs   Int
   resultCount Int
+  // Exact-query intent reuse (YOY-64 AC-4): the query as the reuse key
+  // (trimmed, whitespace-collapsed, case-folded) and the intent the search
+  // was served with, both null on classic, degraded, and pre-column rows.
+  normalizedQuery String?
+  intent          Json?
   createdAt   DateTime @default(now())
 
   @@index([shopDomain, createdAt])
   // The click beacon validates its searchId against this table.
   @@index([searchId])
+  // Intent reuse looks up the latest row for a shop's normalized query.
+  @@index([shopDomain, normalizedQuery, createdAt])
 }
 
 // Shopper click log (YOY-47): one row per click-beacon call whose searchId

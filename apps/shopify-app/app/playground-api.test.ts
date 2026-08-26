@@ -844,3 +844,28 @@ describe("event logging and the click beacon (AC-6)", () => {
     expect(response.status).toBe(404);
   });
 });
+
+describe("daily AI ceilings ignore exact-query reuse rows (YOY-64 AC-4)", () => {
+  it("counts AI-routed rows except those served from a stored intent", async () => {
+    const { countAiSearchesToday } = await import("./playground/api.server");
+    const now = new Date("2026-08-26T12:00:00Z");
+    const base = {
+      shopDomain: SEED_KEY,
+      sessionId: "s",
+      query: "q",
+      degraded: false,
+      latencyMs: 10,
+      resultCount: 1,
+      createdAt: now,
+    };
+    await db.searchEvent.createMany({
+      data: [
+        { ...base, searchId: "a1", route: "ai", routeReason: "model" },
+        { ...base, searchId: "a2", route: "ai", routeReason: null },
+        { ...base, searchId: "a3", route: "ai", routeReason: "intent-reuse" },
+        { ...base, searchId: "c1", route: "classic", routeReason: "short-query" },
+      ],
+    });
+    expect(await countAiSearchesToday(db, [SEED_KEY], now)).toBe(2);
+  });
+});

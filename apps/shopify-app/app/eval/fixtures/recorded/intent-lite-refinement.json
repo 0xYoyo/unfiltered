@@ -2,6 +2,26 @@
   "modelId": "gemini-3.5-flash-lite",
   "provenance": "live",
   "entries": {
+    "same but cheaper": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [
+          "black"
+        ],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "elegant",
+          "summer"
+        ],
+        "confidence": 0.9,
+        "outcome": "refinement",
+        "category": "dress",
+        "occasion": "wedding",
+        "priceMax": 300
+      },
+      "inputTokens": 734,
+      "outputTokens": 98
+    },
     "בלי שרוולים": {
       "output": {
         "colorsInclude": [],
@@ -14,15 +34,14 @@
           "בקיץ",
           "בלי שרוולים"
         ],
-        "confidence": 0.95,
+        "confidence": 0.9,
         "outcome": "refinement",
         "category": "dress",
-        "priceMax": 400,
-        "priceMin": null,
-        "size": null
+        "occasion": "wedding",
+        "priceMax": 400
       },
-      "inputTokens": 1014,
-      "outputTokens": 122
+      "inputTokens": 740,
+      "outputTokens": 112
     },
     "nike air max 90": {
       "output": {
@@ -30,14 +49,36 @@
         "colorsExclude": [],
         "availabilityRequired": false,
         "softAttributes": [
+          "nike",
           "air max 90"
         ],
-        "confidence": 1,
+        "confidence": 0.95,
         "outcome": "topic_change",
         "category": "sneakers"
       },
-      "inputTokens": 1011,
+      "inputTokens": 737,
       "outputTokens": 71
+    },
+    "בצבע אדום": {
+      "output": {
+        "colorsInclude": [
+          "red"
+        ],
+        "colorsExclude": [
+          "black"
+        ],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "חם",
+          "לחורף"
+        ],
+        "confidence": 0.95,
+        "outcome": "refinement",
+        "category": "coat",
+        "priceMax": 500
+      },
+      "inputTokens": 731,
+      "outputTokens": 102
     },
     "מידה M in stock only": {
       "output": {
@@ -50,14 +91,14 @@
           "formal",
           "gala"
         ],
-        "confidence": 0.95,
+        "confidence": 0.9,
         "outcome": "refinement",
         "category": "dress",
         "occasion": "evening",
-        "size": "m"
+        "size": "M"
       },
-      "inputTokens": 1001,
-      "outputTokens": 98
+      "inputTokens": 727,
+      "outputTokens": 97
     },
     "under 500 and only what is in stock": {
       "output": {
@@ -68,13 +109,13 @@
           "nike",
           "air max 90"
         ],
-        "confidence": 0.95,
+        "confidence": 0.9,
         "outcome": "refinement",
         "category": "sneakers",
         "priceMax": 500
       },
-      "inputTokens": 994,
-      "outputTokens": 88
+      "inputTokens": 720,
+      "outputTokens": 87
     },
     "אותו דבר אבל יותר זול": {
       "output": {
@@ -92,8 +133,8 @@
         "occasion": "wedding",
         "priceMax": 675
       },
-      "inputTokens": 1009,
-      "outputTokens": 97
+      "inputTokens": 735,
+      "outputTokens": 98
     },
     "show me more expensive ones": {
       "output": {
@@ -107,11 +148,10 @@
         "confidence": 0.9,
         "outcome": "refinement",
         "category": "coat",
-        "priceMin": 200,
-        "size": null
+        "priceMin": 200
       },
-      "inputTokens": 994,
-      "outputTokens": 91
+      "inputTokens": 720,
+      "outputTokens": 82
     },
     "יותר יקר": {
       "output": {
@@ -128,49 +168,8 @@
         "category": "skirt",
         "priceMin": 300
       },
-      "inputTokens": 999,
-      "outputTokens": 46
-    },
-    "same but cheaper": {
-      "output": {
-        "colorsInclude": [],
-        "colorsExclude": [
-          "black"
-        ],
-        "availabilityRequired": false,
-        "softAttributes": [
-          "elegant",
-          "summer"
-        ],
-        "confidence": 0.95,
-        "outcome": "refinement",
-        "category": "dress",
-        "occasion": "wedding",
-        "priceMax": 300
-      },
-      "inputTokens": 1008,
-      "outputTokens": 99
-    },
-    "בצבע אדום": {
-      "output": {
-        "colorsInclude": [
-          "red"
-        ],
-        "colorsExclude": [
-          "black"
-        ],
-        "availabilityRequired": false,
-        "softAttributes": [
-          "חם",
-          "לחורף"
-        ],
-        "confidence": 1,
-        "outcome": "refinement",
-        "category": "coat",
-        "priceMax": 500
-      },
-      "inputTokens": 1005,
-      "outputTokens": 99
+      "inputTokens": 725,
+      "outputTokens": 89
     }
   }
 }

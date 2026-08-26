@@ -66,12 +66,18 @@ const live = process.env.LIVE_LLM_TESTS === "1";
  * reshuffles the baseline the zero-regression bar is scored against.
  * Default `all` re-records everything, the lite files included.
  */
-const scope = process.env.REGEN_SCOPE === "lite" ? "lite" : "all";
+const scope =
+  process.env.REGEN_SCOPE === "lite"
+    ? "lite"
+    : process.env.REGEN_SCOPE === "intent"
+      ? "intent"
+      : "all";
 /**
  * `REGEN_RESUME=1` keeps the lite entries already on disk and records only
- * the missing keys — a lite run that a slow upstream cut short resumes
- * instead of re-spending every call. Never applies to the accuracy-tier
- * recordings.
+ * the missing keys and the recorded FAILURES — a lite run that a slow
+ * upstream cut short or timed out on resumes instead of re-spending every
+ * call, and a flaky-day failure gets another chance. Never applies to the
+ * accuracy-tier recordings.
  */
 const resume = process.env.REGEN_RESUME === "1";
 /** The lite tier is fast by design; a hung call is retried sooner. */
@@ -403,7 +409,7 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
     await db?.$disconnect();
   });
 
-  it.skipIf(scope === "lite")("re-records enrichments, classifications, intents, and embeddings", async () => {
+  it.skipIf(scope !== "all")("re-records enrichments, classifications, intents, and embeddings", async () => {
     const models = geminiModelsFromEnv();
     const catalog = loadCatalog();
     const goldens = loadGoldens();
@@ -689,6 +695,98 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
     expect(failures, `\n${failures.join("\n")}`).toEqual([]);
   }, 2_700_000);
 
+  it.skipIf(scope !== "intent")("re-records the accuracy-tier intents only (YOY-64 AC-2: REGEN_SCOPE=intent)", async () => {
+    // The trimmed prompt changes every intent answer's token count and may
+    // change its soft attributes; enrichment, classification, and the
+    // catalog embeddings are untouched, so the zero-regression baseline is
+    // scored against the same index. The lite step below re-records the
+    // lite tier and merges the query embeddings both tiers now need.
+    const models = geminiModelsFromEnv();
+    const goldens = loadGoldens();
+    const usage = captureUsage(createPrismaCostRecorder(db));
+    const failures: string[] = [];
+    const check = (condition: boolean, message: string): void => {
+      if (!condition) {
+        failures.push(message);
+      }
+    };
+    // REGEN_RESUME keeps this tier's entries on disk too (a flaky upstream
+    // cut a run short): only missing keys are recorded.
+    const existingAccuracy = (file: string): Record<string, RecordedEntry> => {
+      const path = join(recordedDir, file);
+      if (!resume || !existsSync(path)) {
+        return {};
+      }
+      const parsed = JSON.parse(readFileSync(path, "utf8")) as {
+        modelId?: string;
+        entries?: Record<string, RecordedEntry>;
+      };
+      return parsed.modelId === models.intentModel ? (parsed.entries ?? {}) : {};
+    };
+    const intentEntries: Record<string, RecordedEntry> = existingAccuracy("intent.json");
+    const extractor = createIntentExtractor({
+      llm: captureCompletions(
+        createGeminiLlmClient({
+          modelId: models.intentModel,
+          costRecorder: usage.recorder,
+          thinkingLevel: models.intentThinkingLevel,
+          // No production abort budget here: a recording captures the
+          // model's answer, and the 8 s intent budget (AC-3) is measured by
+          // the latency probe, not enforced on the recorder — g20 (mixed
+          // Hebrew/English) legitimately runs past it at this tier.
+        }),
+        usage.last,
+        intentEntries,
+      ),
+    });
+    for (const golden of goldens) {
+      if (intentEntries[golden.query] !== undefined) {
+        continue; // resumed from disk
+      }
+      try {
+        await extractor.extract(golden.query);
+      } catch (error) {
+        check(false, `intent: ${golden.id} extraction failed: ${String(error)}`);
+        continue;
+      }
+      check(intentEntries[golden.query] !== undefined, `intent: ${golden.id} recorded no completion`);
+    }
+    writeRecording("intent.json", models.intentModel, intentEntries);
+
+    const refinementEntries: Record<string, RecordedEntry> = existingAccuracy(
+      "intent-refinement.json",
+    );
+    const refinementExtractor = createIntentExtractor({
+      llm: captureCompletions(
+        createGeminiLlmClient({
+          modelId: models.intentModel,
+          costRecorder: usage.recorder,
+          thinkingLevel: models.intentThinkingLevel,
+        }),
+        usage.last,
+        refinementEntries,
+      ),
+    });
+    for (const golden of loadRefinementGoldens()) {
+      if (refinementEntries[golden.query] !== undefined) {
+        continue; // resumed from disk
+      }
+      try {
+        await refinementExtractor.extract(golden.query, { previousIntent: golden.previousIntent });
+      } catch (error) {
+        check(false, `refinement: ${golden.id} extraction failed: ${String(error)}`);
+        continue;
+      }
+      check(refinementEntries[golden.query] !== undefined, `refinement: ${golden.id} recorded no completion`);
+    }
+    writeRecording("intent-refinement.json", models.intentModel, refinementEntries);
+    check(
+      Object.keys(intentEntries).length === goldens.length,
+      `coverage: ${Object.keys(intentEntries).length}/${goldens.length} intents recorded`,
+    );
+    expect(failures, `\n${failures.join("\n")}`).toEqual([]);
+  }, 1_800_000);
+
   it("re-records the lite-tier intents (YOY-116 AC-5)", async () => {
     // The same goldens and refinement goldens, answered by the lite model at
     // its explicit thinking level — each answer carrying its `confidence`,
@@ -728,8 +826,8 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
       llm: captureCompletions(liteClient(), usage.last, liteEntries),
     });
     for (const golden of goldens) {
-      if (liteEntries[golden.query] !== undefined) {
-        continue; // resumed from disk
+      if (liteEntries[golden.query] !== undefined && liteEntries[golden.query]!.error === undefined) {
+        continue; // resumed from disk; a recorded failure is retried
       }
       try {
         const intent = await liteExtractor.extract(golden.query);
@@ -760,8 +858,11 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
       llm: captureCompletions(liteClient(), usage.last, liteRefinementEntries),
     });
     for (const golden of loadRefinementGoldens()) {
-      if (liteRefinementEntries[golden.query] !== undefined) {
-        continue; // resumed from disk
+      if (
+        liteRefinementEntries[golden.query] !== undefined &&
+        liteRefinementEntries[golden.query]!.error === undefined
+      ) {
+        continue; // resumed from disk; a recorded failure is retried
       }
       try {
         await liteRefinementExtractor.extract(golden.query, {
@@ -809,18 +910,24 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
       `embeddings.json is ${embeddingRecording.modelId}@${embeddingRecording.dimension}, env says ${models.embeddingModel}@${models.embeddingDimension}; regenerate with REGEN_SCOPE=all`,
     );
     const liteTexts = new Set<string>();
+    // Both tiers' query texts (YOY-64: the accuracy recordings change under
+    // REGEN_SCOPE=intent too, and their texts need vectors just the same).
+    const accuracyEntries = JSON.parse(
+      readFileSync(join(recordedDir, "intent.json"), "utf8"),
+    ) as { entries: Record<string, RecordedEntry> };
     for (const golden of goldens) {
-      const entry = liteEntries[golden.query];
-      if (entry === undefined || entry.error !== undefined) {
-        continue;
-      }
-      const intent = parseIntent(entry.output);
-      if (intent === null) {
-        continue; // a schema-violating lite answer escalates at replay
-      }
-      const text = composeQueryText(intent);
-      if (text !== "" && embeddingRecording.vectors[text] === undefined) {
-        liteTexts.add(text);
+      for (const entry of [liteEntries[golden.query], accuracyEntries.entries[golden.query]]) {
+        if (entry === undefined || entry.error !== undefined) {
+          continue;
+        }
+        const intent = parseIntent(entry.output);
+        if (intent === null) {
+          continue; // a schema-violating lite answer escalates at replay
+        }
+        const text = composeQueryText(intent);
+        if (text !== "" && embeddingRecording.vectors[text] === undefined) {
+          liteTexts.add(text);
+        }
       }
     }
     const missing = [...liteTexts];

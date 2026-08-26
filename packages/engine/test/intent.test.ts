@@ -985,7 +985,7 @@ describe("confidence (YOY-116 AC-1)", () => {
     };
     await createIntentExtractor({ llm }).extract("cheaper", { previousIntent });
     const prompt = calls[0]!.prompt;
-    expect(prompt).toContain("- confidence: a number from 0 to 1");
+    expect(prompt).toContain("- confidence: 0 to 1");
     // The previous intent's own confidence is not a constraint and is not
     // echoed into the prompt.
     const block = prompt.slice(prompt.indexOf("Previous intent:"));
