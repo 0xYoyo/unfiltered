@@ -1001,6 +1001,22 @@ combined. Three pieces implement it:
   measures the pipeline, not the guard. `scripts/latency-probe.test.ts`
   pins the nearest-rank math (including n=20) and the exit semantics.
 
+## Daily live smoke (YOY-112)
+
+`apps/shopify-app/scripts/live-smoke.mts` runs four read-only probes against
+the deployment — `/healthz` (HTTP 200 and `engine.version` equal to the
+engine's source `version`), classic `dress`, EN AI `elegant evening dress
+under 400`, HE AI `שמלה אלגנטית לערב מתחת ל-400` — with the ceilings in
+`scripts/live-smoke.config.json`, prints a JSON report and a one-screen
+summary, and exits 1 on any failure; every probe runs even after an earlier
+failure. `scripts/live-smoke.test.ts` drives it against an in-process fake
+deployment (`app/testing/fake-store.server.ts`). A Claude Code cloud routine
+runs it daily at 06:00 UTC and posts to Slack only on failure; the routine's
+prompt, the phone checklist for creating it (network allowlist, Slack-only
+connectors), and how to read a failure are in **docs/SMOKE.md**. It is a
+canary between milestone live runs, not a benchmark: no trend log, no
+percentiles — those are docs/LATENCY.md's.
+
 ## Deployment (YOY-91)
 
 The playground is deployed as a single Docker web service on Render, built
