@@ -80,6 +80,7 @@ export {
   type RetrievalHit,
   type RetrievalRequest,
   type RetrievalResult,
+  type RetrievalTimings,
   type Retriever,
   type RetrieverOptions,
   type RetrievalStore,

@@ -75,6 +75,11 @@
   "details": {
     "routeReason": "chip-removal",
     "latencyMs": 240,
-    "limited": null
+    "limited": null,
+    "stages": {
+      "embed": 1,
+      "retrieve": 51,
+      "hydrate": 8
+    }
   }
 }

@@ -53,6 +53,11 @@
   "details": {
     "routeReason": "heuristic",
     "latencyMs": 42,
-    "limited": null
+    "limited": null,
+    "stages": {
+      "classify": 1,
+      "classic": 28,
+      "hydrate": 7
+    }
   }
 }

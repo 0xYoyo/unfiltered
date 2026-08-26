@@ -35,6 +35,9 @@ export default defineConfig({
     setupFiles: ["./vitest.setup.ts"],
     include: [
       "apps/*/app/**/*.test.{ts,tsx}",
+      // Operational scripts with testable measurement logic (YOY-114: the
+      // latency probe's percentile math and exit semantics).
+      "apps/*/scripts/**/*.test.ts",
       "packages/*/test/**/*.test.ts",
     ],
   },

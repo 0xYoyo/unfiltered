@@ -1147,3 +1147,138 @@ describe("the full match set on both routes, uncapped (YOY-107)", () => {
     expect(response.hits).toHaveLength(5);
   });
 });
+
+describe("per-stage timing (YOY-114 AC-1)", () => {
+  let db: PrismaClient;
+
+  beforeEach(async () => {
+    db = await createTestDb();
+    await seed(db, [
+      { productId: "sneaker-90", title: "nike 90" },
+      {
+        productId: "silk-gown",
+        title: "silk gown",
+        vector: [0.9, 0.1, 0],
+        enrichment: { category: "dress", occasions: ["wedding"] },
+      },
+    ]);
+  });
+
+  /** Run one search and return it with the wall time measured around it. */
+  async function timed(
+    orchestrator: SearchOrchestrator,
+    request: Parameters<SearchOrchestrator["runSearch"]>[0],
+  ) {
+    const startedAt = performance.now();
+    const response = await orchestrator.runSearch(request);
+    const wallMs = performance.now() - startedAt;
+    const sum = Object.values(response.stages).reduce((a, b) => a + b, 0);
+    expect(sum).toBeLessThanOrEqual(Math.ceil(wallMs));
+    for (const ms of Object.values(response.stages)) {
+      expect(Number.isInteger(ms)).toBe(true);
+      expect(ms).toBeGreaterThanOrEqual(0);
+    }
+    return response;
+  }
+
+  it("a classic route ran classify, classic, hydrate — and nothing else", async () => {
+    const orchestrator = buildOrchestrator(db, { llm: fakeLlm({}) });
+    const response = await timed(orchestrator, { query: "nike 90", shopDomain: SHOP });
+    expect(response.route).toBe("classic");
+    expect(Object.keys(response.stages)).toEqual(["classify", "classic", "hydrate"]);
+  });
+
+  it("an AI route ran classify, intent, embed, retrieve, hydrate, in pipeline order", async () => {
+    const orchestrator = buildOrchestrator(db, {
+      llm: fakeLlm({
+        classification: () => ({ route: "ai" }),
+        intent: () => DRESS_INTENT,
+      }),
+    });
+    const response = await timed(orchestrator, { query: AI_QUERY, shopDomain: SHOP });
+    expect(response.route).toBe("ai");
+    expect(Object.keys(response.stages)).toEqual([
+      "classify",
+      "intent",
+      "embed",
+      "retrieve",
+      "hydrate",
+    ]);
+  });
+
+  it("an AI zero-hit adds closeMatches; hydrate covers the close matches", async () => {
+    const orchestrator = buildOrchestrator(db, {
+      llm: fakeLlm({
+        classification: () => ({ route: "ai" }),
+        intent: () => ({ ...DRESS_INTENT, priceMax: 1 }),
+      }),
+    });
+    const response = await timed(orchestrator, { query: AI_QUERY, shopDomain: SHOP });
+    expect(response.hits).toEqual([]);
+    expect(Object.keys(response.stages)).toEqual([
+      "classify",
+      "intent",
+      "embed",
+      "retrieve",
+      "hydrate",
+      "closeMatches",
+    ]);
+  });
+
+  it("a degraded fallback keeps the failed intent stage and adds the classic floor", async () => {
+    const orchestrator = buildOrchestrator(db, {
+      llm: fakeLlm({
+        classification: () => ({ route: "ai" }),
+        intent: () => {
+          throw new Error("intent backend down");
+        },
+      }),
+    });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const response = await timed(orchestrator, { query: AI_QUERY, shopDomain: SHOP });
+      expect(response.degraded).toBe(true);
+      expect(Object.keys(response.stages)).toEqual([
+        "classify",
+        "intent",
+        "classic",
+        "hydrate",
+      ]);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("a preview and a forced classic ran classic and hydrate only — no classify", async () => {
+    const orchestrator = buildOrchestrator(db, { llm: fakeLlm({}) });
+    const preview = await timed(orchestrator, {
+      query: "nike 90",
+      shopDomain: SHOP,
+      preview: true,
+    });
+    expect(Object.keys(preview.stages)).toEqual(["classic", "hydrate"]);
+    const throttled = await timed(orchestrator, {
+      query: "nike 90",
+      shopDomain: SHOP,
+      forceClassic: true,
+    });
+    expect(Object.keys(throttled.stages)).toEqual(["classic", "hydrate"]);
+  });
+
+  it("a chip removal enters at retrieval: embed, retrieve, hydrate", async () => {
+    const orchestrator = buildOrchestrator(db, { llm: fakeLlm({}) });
+    const response = await timed(orchestrator, {
+      query: AI_QUERY,
+      shopDomain: SHOP,
+      resolvedIntent: {
+        category: "dress",
+        colorsInclude: [],
+        colorsExclude: [],
+        availabilityRequired: false,
+        softAttributes: ["elegant"],
+      },
+    });
+    expect(response.routeReason).toBe("resolved-intent");
+    expect(Object.keys(response.stages)).toEqual(["embed", "retrieve", "hydrate"]);
+  });
+});

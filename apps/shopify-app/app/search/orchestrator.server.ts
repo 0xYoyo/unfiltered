@@ -15,6 +15,10 @@ import {
   type Retriever,
 } from "@unfiltered/engine";
 
+import { SEARCH_STAGES, type SearchStage, type SearchStages } from "./stages";
+
+export { SEARCH_STAGES, type SearchStage, type SearchStages } from "./stages";
+
 /**
  * The hybrid search orchestrator (YOY-45): one server-side function behind
  * the product's single search bar. It sequences classification → intent
@@ -235,7 +239,50 @@ export interface SearchResponse {
   degraded: boolean;
   /** Classic close matches, populated only on AI zero-hit responses. */
   closeMatches: ProductCard[];
+  /**
+   * Where the milliseconds went (YOY-114): whole ms per stage actually run,
+   * floored so their sum never exceeds the wall time around `runSearch`.
+   * Diagnostic — the playground shows it and the proxy logs it; it is never
+   * persisted and never reaches the storefront contract.
+   */
+  stages: SearchStages;
 }
+
+/**
+ * One search's stage ledger: accumulates fractional wall time per stage
+ * (a stage may run more than once — hydration of hits and of close matches
+ * both land on `hydrate`) and reports whole milliseconds in pipeline order.
+ */
+function createStageLedger() {
+  const elapsed = new Map<SearchStage, number>();
+  const add = (stage: SearchStage, ms: number): void => {
+    elapsed.set(stage, (elapsed.get(stage) ?? 0) + ms);
+  };
+  return {
+    add,
+    async time<T>(stage: SearchStage, run: () => Promise<T>): Promise<T> {
+      const startedAt = performance.now();
+      try {
+        return await run();
+      } finally {
+        add(stage, performance.now() - startedAt);
+      }
+    },
+    snapshot(): SearchStages {
+      const stages: SearchStages = {};
+      for (const stage of SEARCH_STAGES) {
+        const ms = elapsed.get(stage);
+        if (ms !== undefined) {
+          stages[stage] = Math.floor(ms);
+        }
+      }
+      return stages;
+    },
+  };
+}
+
+/** A response before its stage ledger is attached. */
+type StagelessResponse = Omit<SearchResponse, "stages">;
 
 export interface SearchOrchestrator {
   runSearch(request: SearchRequest): Promise<SearchResponse>;
@@ -301,137 +348,168 @@ export function createSearchOrchestrator(
 
   return {
     async runSearch(request: SearchRequest): Promise<SearchResponse> {
-      const { query, shopDomain } = request;
-      const searchId = request.searchId ?? randomUUID();
-      // Undefined by default: the full match set (YOY-107). Forwarded to the
-      // stores as-is, where an absent limit means no LIMIT clause.
-      const limit = request.limit;
+      const stages = createStageLedger();
+      const response = await execute(request, stages);
+      return { ...response, stages: stages.snapshot() };
+    },
+  };
 
-      const classicResponse = async (
-        routeReason: SearchRouteReason,
-        degraded: boolean,
-        intent: Intent | null = null,
-        escalateOnEmpty = false,
-      ): Promise<SearchResponse> => {
-        const result = await classicStore.search({
+  async function execute(
+    request: SearchRequest,
+    stages: ReturnType<typeof createStageLedger>,
+  ): Promise<StagelessResponse> {
+    const { query, shopDomain } = request;
+    const searchId = request.searchId ?? randomUUID();
+    // Undefined by default: the full match set (YOY-107). Forwarded to the
+    // stores as-is, where an absent limit means no LIMIT clause.
+    const limit = request.limit;
+    const hydrate = (
+      hits: ReadonlyArray<{ productId: string; colorUnknown?: boolean }>,
+    ): Promise<ProductCard[]> =>
+      stages.time("hydrate", () => hydrateCards(shopDomain, hits));
+
+    const classicResponse = async (
+      routeReason: SearchRouteReason,
+      degraded: boolean,
+      intent: Intent | null = null,
+      escalateOnEmpty = false,
+    ): Promise<StagelessResponse> => {
+      const result = await stages.time("classic", () =>
+        classicStore.search({
           storeId: shopDomain,
           query,
           ...(limit !== undefined ? { limit } : {}),
-        });
-        if (
-          escalateOnEmpty &&
-          result.hits.length === 0 &&
-          query.trim() !== ""
-        ) {
-          // Classic zero hits must not be a dead end (YOY-67 AC-3): the
-          // keyword engine has nothing for this query — a cross-language
-          // query against a Latin index being the live-run shape — so the
-          // search escalates ONCE into the full AI path. Only a genuine
-          // classic route escalates: throttled responses stay classic by
-          // budget decision, degraded fallbacks already failed the AI path,
-          // and the escalation's own failure lands back here with
-          // escalateOnEmpty unset, so there is no loop.
-          return escalatedAiPath();
-        }
-        return {
-          searchId,
-          route: "classic",
-          routeReason,
-          intent,
-          hits: await hydrateCards(shopDomain, result.hits),
-          chips: [],
-          degraded,
-          closeMatches: [],
-        };
+        }),
+      );
+      if (
+        escalateOnEmpty &&
+        result.hits.length === 0 &&
+        query.trim() !== ""
+      ) {
+        // Classic zero hits must not be a dead end (YOY-67 AC-3): the
+        // keyword engine has nothing for this query — a cross-language
+        // query against a Latin index being the live-run shape — so the
+        // search escalates ONCE into the full AI path. Only a genuine
+        // classic route escalates: throttled responses stay classic by
+        // budget decision, degraded fallbacks already failed the AI path,
+        // and the escalation's own failure lands back here with
+        // escalateOnEmpty unset, so there is no loop.
+        return escalatedAiPath();
+      }
+      return {
+        searchId,
+        route: "classic",
+        routeReason,
+        intent,
+        hits: await hydrate(result.hits),
+        chips: [],
+        degraded,
+        closeMatches: [],
       };
+    };
 
-      /**
-       * Relaxed-constraint close matches (YOY-52 AC-16): re-query the vector
-       * store with the intent's cached embedding — the query text composes
-       * from the same intent, so no further embedding call happens — first
-       * keeping only the category constraint (the shopper's most defining
-       * ask), then fully unconstrained. Best-effort: any failure returns no
-       * close matches rather than degrading the zero-hit response.
-       */
-      const relaxedCloseMatches = async (
-        intent: Intent,
-        limit: number,
-      ): Promise<Array<{ productId: string }>> => {
-        const unconstrained = {
-          colorsInclude: [],
-          colorsExclude: [],
-          availableOnly: false,
-        };
-        const ladders =
-          intent.category !== undefined
-            ? [{ ...unconstrained, category: intent.category }, unconstrained]
-            : [unconstrained];
-        for (const constraintsOverride of ladders) {
-          try {
-            const relaxed = await retriever.retrieve({
-              intent,
-              storeId: shopDomain,
-              limit,
-              searchId,
-              constraintsOverride,
-            });
-            if (relaxed.hits.length > 0) {
-              return relaxed.hits;
-            }
-          } catch {
-            return [];
-          }
-        }
-        return [];
+    /**
+     * Relaxed-constraint close matches (YOY-52 AC-16): re-query the vector
+     * store with the intent's cached embedding — the query text composes
+     * from the same intent, so no further embedding call happens — first
+     * keeping only the category constraint (the shopper's most defining
+     * ask), then fully unconstrained. Best-effort: any failure returns no
+     * close matches rather than degrading the zero-hit response.
+     */
+    const relaxedCloseMatches = async (
+      intent: Intent,
+      limit: number,
+    ): Promise<Array<{ productId: string }>> => {
+      const unconstrained = {
+        colorsInclude: [],
+        colorsExclude: [],
+        availableOnly: false,
       };
-
-      // Retrieval and everything below it on the ladder, shared by the
-      // extracted-intent path and the resolved-intent (chip removal) path.
-      const aiPath = async (
-        intent: Intent,
-        routeReason: SearchRouteReason,
-      ): Promise<SearchResponse> => {
-        let hits: Array<{ productId: string; colorUnknown?: boolean }>;
-        let chips: AppliedConstraint[];
+      const ladders =
+        intent.category !== undefined
+          ? [{ ...unconstrained, category: intent.category }, unconstrained]
+          : [unconstrained];
+      for (const constraintsOverride of ladders) {
         try {
-          const retrieval = await retriever.retrieve({
+          const relaxed = await retriever.retrieve({
             intent,
             storeId: shopDomain,
-            ...(limit !== undefined ? { limit } : {}),
+            limit,
             searchId,
+            constraintsOverride,
           });
-          hits = retrieval.hits;
-          chips = retrieval.appliedConstraints;
-        } catch (error) {
-          if (error instanceof EmptyQueryTextError) {
-            // AC-5: constraints without descriptive text. Constraint-only
-            // classic search, chips kept, not degraded — the response honors
-            // every constraint the shopper stated.
-            const constraints = constraintsFromIntent(intent);
-            const result = await classicStore.search({
+          if (relaxed.hits.length > 0) {
+            return relaxed.hits;
+          }
+        } catch {
+          return [];
+        }
+      }
+      return [];
+    };
+
+    // Retrieval and everything below it on the ladder, shared by the
+    // extracted-intent path and the resolved-intent (chip removal) path.
+    const aiPath = async (
+      intent: Intent,
+      routeReason: SearchRouteReason,
+    ): Promise<StagelessResponse> => {
+      let hits: Array<{ productId: string; colorUnknown?: boolean }>;
+      let chips: AppliedConstraint[];
+      const retrieveStartedAt = performance.now();
+      try {
+        const retrieval = await retriever.retrieve({
+          intent,
+          storeId: shopDomain,
+          ...(limit !== undefined ? { limit } : {}),
+          searchId,
+        });
+        // The retriever reports its own embed/query split; a retriever
+        // without one is booked whole as retrieval.
+        if (retrieval.timings !== undefined) {
+          stages.add("embed", retrieval.timings.embedMs);
+          stages.add("retrieve", retrieval.timings.retrieveMs);
+        } else {
+          stages.add("retrieve", performance.now() - retrieveStartedAt);
+        }
+        hits = retrieval.hits;
+        chips = retrieval.appliedConstraints;
+      } catch (error) {
+        // A failed retrieval still ran: book its wall time as retrieval
+        // so the ledger's sum stays honest about where the time went.
+        stages.add("retrieve", performance.now() - retrieveStartedAt);
+        if (error instanceof EmptyQueryTextError) {
+          // AC-5: constraints without descriptive text. Constraint-only
+          // classic search, chips kept, not degraded — the response honors
+          // every constraint the shopper stated.
+          const constraints = constraintsFromIntent(intent);
+          const result = await stages.time("classic", () =>
+            classicStore.search({
               storeId: shopDomain,
               constraints,
               ...(limit !== undefined ? { limit } : {}),
-            });
-            return {
-              searchId,
-              route: "ai",
-              routeReason,
-              intent,
-              hits: await hydrateCards(shopDomain, result.hits),
-              chips: appliedConstraints(constraints),
-              degraded: false,
-              closeMatches: [],
-            };
-          }
-          return classicResponse(routeReason, true, intent);
+            }),
+          );
+          return {
+            searchId,
+            route: "ai",
+            routeReason,
+            intent,
+            hits: await hydrate(result.hits),
+            chips: appliedConstraints(constraints),
+            degraded: false,
+            closeMatches: [],
+          };
         }
+        return classicResponse(routeReason, true, intent);
+      }
 
-        if (hits.length === 0) {
-          // AC-6: retrieval worked, nothing satisfied every constraint. Keep
-          // the chips and offer classic keyword matches as close matches;
-          // when the keyword engine finds nothing either, relax the vector
-          // search instead (YOY-52 AC-16).
+      if (hits.length === 0) {
+        // AC-6: retrieval worked, nothing satisfied every constraint. Keep
+        // the chips and offer classic keyword matches as close matches;
+        // when the keyword engine finds nothing either, relax the vector
+        // search instead (YOY-52 AC-16).
+        const closeHits = await stages.time("closeMatches", async () => {
           const close = await classicStore.search({
             storeId: shopDomain,
             query,
@@ -439,112 +517,117 @@ export function createSearchOrchestrator(
             // primary set's size.
             limit: CLOSE_MATCH_LIMIT,
           });
-          const closeHits: Array<{ productId: string; colorUnknown?: boolean }> =
-            close.hits.length > 0
-              ? close.hits
-              : await relaxedCloseMatches(intent, CLOSE_MATCH_LIMIT);
-          return {
-            searchId,
-            route: "ai",
-            routeReason,
-            intent,
-            hits: [],
-            chips,
-            degraded: false,
-            closeMatches: await hydrateCards(shopDomain, closeHits),
-          };
-        }
-
+          return close.hits.length > 0
+            ? close.hits
+            : relaxedCloseMatches(intent, CLOSE_MATCH_LIMIT);
+        });
         return {
           searchId,
           route: "ai",
           routeReason,
           intent,
-          hits: await hydrateCards(shopDomain, hits),
+          hits: [],
           chips,
           degraded: false,
-          closeMatches: [],
+          closeMatches: await hydrate(closeHits),
         };
-      };
-
-      /**
-       * The one-time classic zero-hit escalation (YOY-67 AC-3): the full AI
-       * path from intent extraction down, under reason "classic-zero-hit" so
-       * the caller's budget accounting can see LLM spend happened. An
-       * extraction failure degrades back to the (still empty) classic
-       * response rather than surfacing an error.
-       */
-      const escalatedAiPath = async (): Promise<SearchResponse> => {
-        let intent: Intent;
-        const startedAt = Date.now();
-        try {
-          intent = await extractor.extract(query, {
-            storeId: shopDomain,
-            searchId,
-            previousIntent: request.previousIntent,
-          });
-        } catch (error) {
-          warnIntentFailure(searchId, "classic-zero-hit", error, startedAt);
-          return classicResponse("classic-zero-hit", true);
-        }
-        return aiPath(intent, "classic-zero-hit");
-      };
-
-      if (request.preview === true) {
-        // Keystroke preview (YOY-68 AC-1): the shopper is still typing, so
-        // the bar behaves like a normal search bar — classic keyword results
-        // only, no classification, no escalation, and nothing degraded about
-        // it. The full pipeline waits for the explicit submit.
-        return classicResponse("preview", false);
       }
 
-      if (request.forceClassic === true) {
-        // Forced classic: the caller has decided this search must not reach
-        // the AI path — the session spent its budget (YOY-47, "throttled")
-        // or the widget is rescuing a submitted search that timed out on
-        // its side (YOY-96 AC-9, "client-timeout-rescue"). Classic keyword
-        // results, zero LLM calls, degraded so the response is honest about
-        // not being the AI path; the reason is what the ledger keeps.
-        return classicResponse(request.forceClassicReason ?? "throttled", true);
-      }
-
-      if (request.resolvedIntent !== undefined) {
-        // Chip removal (YOY-46): the caller already holds the intent, so no
-        // classification and no extraction — zero LLM calls on this path.
-        return aiPath(request.resolvedIntent, "resolved-intent");
-      }
-
-      // The classifier never rejects by contract: failures and timeouts come
-      // back as { route: "classic", reason: "model-error" }.
-      const decision = await classifier.classify(query, {
-        storeId: shopDomain,
+      return {
         searchId,
-      });
+        route: "ai",
+        routeReason,
+        intent,
+        hits: await hydrate(hits),
+        chips,
+        degraded: false,
+        closeMatches: [],
+      };
+    };
 
-      if (decision.route === "classic") {
-        // "model-error" means the model was needed and failed — served
-        // classic, but flagged degraded (AC-4). Heuristic and model-decided
-        // classic routes are the genuine article, and only those escalate
-        // when the keyword engine comes back empty (YOY-67 AC-3) — a failing
-        // model is not asked to rescue its own failure.
-        const degraded = decision.reason === "model-error";
-        return classicResponse(decision.reason, degraded, null, !degraded);
-      }
-
+    /**
+     * The one-time classic zero-hit escalation (YOY-67 AC-3): the full AI
+     * path from intent extraction down, under reason "classic-zero-hit" so
+     * the caller's budget accounting can see LLM spend happened. An
+     * extraction failure degrades back to the (still empty) classic
+     * response rather than surfacing an error.
+     */
+    const escalatedAiPath = async (): Promise<StagelessResponse> => {
       let intent: Intent;
       const startedAt = Date.now();
       try {
-        intent = await extractor.extract(query, {
+        intent = await stages.time("intent", () =>
+          extractor.extract(query, {
+            storeId: shopDomain,
+            searchId,
+            previousIntent: request.previousIntent,
+          }),
+        );
+      } catch (error) {
+        warnIntentFailure(searchId, "classic-zero-hit", error, startedAt);
+        return classicResponse("classic-zero-hit", true);
+      }
+      return aiPath(intent, "classic-zero-hit");
+    };
+
+    if (request.preview === true) {
+      // Keystroke preview (YOY-68 AC-1): the shopper is still typing, so
+      // the bar behaves like a normal search bar — classic keyword results
+      // only, no classification, no escalation, and nothing degraded about
+      // it. The full pipeline waits for the explicit submit.
+      return classicResponse("preview", false);
+    }
+
+    if (request.forceClassic === true) {
+      // Forced classic: the caller has decided this search must not reach
+      // the AI path — the session spent its budget (YOY-47, "throttled")
+      // or the widget is rescuing a submitted search that timed out on
+      // its side (YOY-96 AC-9, "client-timeout-rescue"). Classic keyword
+      // results, zero LLM calls, degraded so the response is honest about
+      // not being the AI path; the reason is what the ledger keeps.
+      return classicResponse(request.forceClassicReason ?? "throttled", true);
+    }
+
+    if (request.resolvedIntent !== undefined) {
+      // Chip removal (YOY-46): the caller already holds the intent, so no
+      // classification and no extraction — zero LLM calls on this path.
+      return aiPath(request.resolvedIntent, "resolved-intent");
+    }
+
+    // The classifier never rejects by contract: failures and timeouts come
+    // back as { route: "classic", reason: "model-error" }.
+    const decision = await stages.time("classify", () =>
+      classifier.classify(query, {
+        storeId: shopDomain,
+        searchId,
+      }),
+    );
+
+    if (decision.route === "classic") {
+      // "model-error" means the model was needed and failed — served
+      // classic, but flagged degraded (AC-4). Heuristic and model-decided
+      // classic routes are the genuine article, and only those escalate
+      // when the keyword engine comes back empty (YOY-67 AC-3) — a failing
+      // model is not asked to rescue its own failure.
+      const degraded = decision.reason === "model-error";
+      return classicResponse(decision.reason, degraded, null, !degraded);
+    }
+
+    let intent: Intent;
+    const startedAt = Date.now();
+    try {
+      intent = await stages.time("intent", () =>
+        extractor.extract(query, {
           storeId: shopDomain,
           searchId,
           previousIntent: request.previousIntent,
-        });
-      } catch (error) {
-        warnIntentFailure(searchId, decision.reason, error, startedAt);
-        return classicResponse(decision.reason, true);
-      }
+        }),
+      );
+    } catch (error) {
+      warnIntentFailure(searchId, decision.reason, error, startedAt);
+      return classicResponse(decision.reason, true);
+    }
 
-      return aiPath(intent, decision.reason);
-    },
-  };
+    return aiPath(intent, decision.reason);
+  }
 }

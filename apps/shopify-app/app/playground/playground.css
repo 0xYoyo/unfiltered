@@ -383,6 +383,30 @@ html:has(.playground) {
   margin: 0;
 }
 
+/* Stage timings (YOY-114): the same muted evidence voice as the rows above,
+   one line per stage the search ran, listed in pipeline order. Not
+   monospace — the intent JSON keeps that privilege (DESIGN §2). */
+.detailsStagesRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-block-start: var(--space-16);
+}
+
+.detailsStagesLabel {
+  color: var(--text-muted);
+  font-weight: var(--weight-ui);
+}
+
+.detailsStages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8) var(--space-16);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
 /* The intent block stacks under its label and takes the panel's full width:
    beside it, a wrapped JSON object reads as a stray column. */
 .detailsIntentRow {

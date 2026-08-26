@@ -146,6 +146,35 @@ adapter around a generic mechanism, never the mechanism itself. A design
 whose generic analog cannot be stated is rejected at spec time. The
 pre-Door-2 adapter-boundary audit is tracked as YOY-81.
 
+### Amendment (2026-08-22) — Colour exclusion, close matches, colourway families (binding; capabilities 2 and 3)
+
+Decided 2026-08-22; recorded here by YOY-114 so the law lives in the PRD
+and not only on Linear. Three rules bind capability 2 (AI understanding:
+how a constraint is applied) and capability 3 (filters as output: what the
+chips and the result set promise):
+
+(a) **A colour exclusion applies to the product's primary (displayed)
+colour, not its colourway list.** "Not black" excludes products whose
+primary colour is black. A pink dress that also comes in black is a
+CORRECT answer to "not black": the shopper is looking at a pink dress.
+Filtering on the colourway list would silently remove most of a catalog
+whose every family ships a black variant. (Implementation: YOY-110.)
+
+(b) **Close matches never violate an explicit exclusion, and relax
+constraints one at a time, price first.** The zero-hit rescue may loosen
+what the shopper asked for, but never by returning what they excluded —
+a "not black" query never rescues with a black product. Relaxation is
+stepwise, and each step says which constraint it dropped: price cap
+first, then the remaining hard constraints one by one. A close-match set
+that relaxes two things at once, or relaxes silently, is a defect.
+(Implementation: YOY-111.)
+
+(c) **Colourway near-duplicates render as one card per product family,
+showing the variant that matches the query colour.** A family sold as
+five colourways is one result, not five; the card shows the colourway the
+query asked for (or the primary colourway when the query named none).
+(Implementation: YOY-117.)
+
 ## 4. Explicitly out of v1 (Later)
 1. Image-input search ("a shoe like this Prada" + photo). Reuses the
    vision infrastructure built in the vision milestone.

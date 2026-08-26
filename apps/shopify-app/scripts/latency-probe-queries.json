@@ -1,0 +1,23 @@
+{
+  "classic": [
+    "dress",
+    "jeans",
+    "black shirt",
+    "skirt",
+    "jacket"
+  ],
+  "ai-en": [
+    "elegant evening dress under 400",
+    "summer dress, not black",
+    "something for a beach wedding that hides my arms",
+    "warm coat for winter under 600",
+    "comfortable sneakers for running"
+  ],
+  "ai-he": [
+    "שמלה אלגנטית לערב מתחת ל-400",
+    "שמלת קיץ, לא שחורה",
+    "משהו לחתונה על החוף שמסתיר את הידיים",
+    "מעיל חם לחורף עד 600",
+    "נעלי ספורט נוחות לריצה"
+  ]
+}

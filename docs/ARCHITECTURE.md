@@ -267,7 +267,9 @@ Retrieval (the AI result path; data reached only through injected ports):
   deliberately unmapped — no per-size inventory exists to filter on), embeds
   the intent's descriptive signal (`composeQueryText`, metered as operation
   `"embedding"` and cached for identical inputs), and returns
-  `{ hits: [{ productId, score }], appliedConstraints }` with
+  `{ hits: [{ productId, score }], appliedConstraints, timings? }` — `timings`
+  is `{ embedMs, retrieveMs }`, the retrieval's own wall-time split
+  (YOY-114; a cache hit reports an embed of ~0) — with
   `score = 1 - cosine distance`. Cosine distance spans [0, 2], so scores span
   [-1, 1]: anti-correlated vectors score below zero and are valid hits —
   consumers must not filter by `score > 0`. An intent with no descriptive
@@ -327,7 +329,7 @@ endpoint below (YOY-46). `runSearch({ query, shopDomain, previousIntent?,
 resolvedIntent?, forceClassic?, searchId?, limit? })` always resolves to one
 response shape:
 `{ searchId, route, routeReason, intent, hits, chips, degraded,
-closeMatches }`, where `hits` and `closeMatches` are display-ready product
+closeMatches, stages }`, where `hits` and `closeMatches` are display-ready product
 cards (`productId`, `title`, `url`, `imageUrl`, `priceMin`/`priceMax`,
 `currencyCode`, `available`; `handle` never leaves the adapter — YOY-87)
 hydrated from the `CatalogProduct` snapshot in
@@ -378,6 +380,26 @@ golden — classic and AI alike — through `runSearch`, and treats a `degraded`
 response as a hard error: offline replay must never let the silent fallback
 mask a broken recording as classic-quality results.
 
+### Per-stage timing: `stages` (YOY-114)
+
+Every response carries `stages: Partial<Record<SearchStage, number>>` — whole
+milliseconds per pipeline stage the search actually ran, keyed in pipeline
+order from the fixed set in `app/search/stages.ts`:
+`classify | intent | embed | retrieve | classic | hydrate | closeMatches`. A
+stage that did not run is absent, so the key set is itself the route's
+evidence: a classic search reads `classify, classic, hydrate`; an AI search
+`classify, intent, embed, retrieve, hydrate`; a preview or forced-classic
+response has no `classify`; a chip removal starts at `embed`. `embed` and
+`retrieve` come from the retriever's own split (`RetrievalResult.timings`);
+`hydrate` accumulates every card hydration the response needed (hits and
+close matches both); `closeMatches` covers the zero-hit rescue — keyword
+backfill plus relaxed retrieval. Values are floored, so their sum never
+exceeds the wall time around `runSearch` (`orchestrator.test.ts` pins both
+the key sets per route and the sum bound). `stages` is diagnostic: the
+playground shows it, the proxy route logs it, nothing persists it (no
+migration), and the storefront contract never carries it. The measurement
+method built on it is docs/LATENCY.md.
+
 ## Storefront search API over the app proxy (YOY-46)
 
 The storefront widget reaches the orchestrator through a Shopify app proxy:
@@ -415,7 +437,12 @@ chip removal, below.
 
 **Response JSON** — the exact contract, pinned by a shape test; no field
 beyond it appears in any response body, including on the degraded path, and
-no Shopify tokens or internal error details ever do:
+no Shopify tokens or internal error details ever do. The orchestrator's
+`stages` ledger (YOY-114) is deliberately NOT on it — the widget has no use
+for it and the storefront wire stays pinned (`proxy-contract.test.ts`
+asserts its absence on every route); instead the route logs one structured
+line per submitted search, never per preview:
+`[search] stages {"searchId","route","routeReason","latencyMs","stages"}`.
 
 ```json
 {
@@ -531,10 +558,14 @@ rather than a footgun is React Router's route registration
 never register as a route — which is also why the M1-era suites that predate
 the rule (`app/routes/webhooks.test.ts`, `app.auth.test.ts`,
 `healthz.test.ts`) are safe where they are. The `include` globs in the root
-`vitest.config.ts` (`apps/*/app/**/*.test.{ts,tsx}` and
-`packages/*/test/**/*.test.ts`) are the single source of truth for where
-tests live; a test outside those globs silently never runs, so new test
-locations must be added there deliberately.
+`vitest.config.ts` (`apps/*/app/**/*.test.{ts,tsx}`,
+`apps/*/scripts/**/*.test.ts`, and `packages/*/test/**/*.test.ts`) are the
+single source of truth for where tests live; a test outside those globs
+silently never runs, so new test locations must be added there
+deliberately. The `scripts` glob (YOY-114) exists for operational scripts
+whose measurement logic is testable without a network — the latency probe's
+percentile math and exit semantics — not for smoke-testing scripts against
+live services.
 
 ## Storefront widget and UI test lane
 
@@ -727,11 +758,13 @@ plus the engine details the playground shows on demand.
   party must not be able to spend our AI budget from their site.
 - **Response body** = the proxy contract (`searchId`, `route`, `degraded`,
   `results[]`, `chips`, `intent`, `closeMatches?`) plus
-  `details: { routeReason, latencyMs, limited }`, built by
+  `details: { routeReason, latencyMs, limited, stages }`, built by
   `serializePlaygroundSearchResponse` (`app/playground/api.server.ts`), which
   delegates the card/chip/intent mapping to the proxy's own serializer and
-  adds exactly those three fields. A shape test pins the top-level keys, so a
-  later orchestrator field cannot leak out. Primary hits are capped at 24.
+  adds exactly those four fields — `stages` copied key by key in pipeline
+  order (YOY-114). A shape test pins the top-level keys and the `details`
+  keys, so a later orchestrator field cannot leak out. Primary hits are
+  capped at 24.
 - **`POST /api/playground/click`** (`app/routes/api.playground.click.tsx`)
   takes the beacon body `{ searchId, sessionId, productId, position }` and
   the same `catalog` parameter. POST rather than the proxy's GET because
@@ -860,7 +893,11 @@ showing is the layer above it — the part a filter UI cannot do.
   `?details=1`, so an opened panel survives a reload and can be shared as a
   link; closed, the panel is absent from the DOM rather than hidden with its
   space reserved. The intent JSON is the one place monospace is permitted
-  (P-4, DESIGN §2).
+  (P-4, DESIGN §2). The panel's stage rows
+  (`[data-testid="playground-details-stages"]`, YOY-114) list one
+  `<stage> · <ms> ms` row per stage the search ran, in pipeline order, from
+  `details.stages`; a classic search's missing `intent`/`embed`/`retrieve`
+  rows are the visible proof it made no LLM call.
 - **Example queries are the page's argument for itself.** Six are shown —
   four in the chrome language and two in the other, because the claim is
   that either works. Each is tagged with the capability it demonstrates
@@ -913,6 +950,31 @@ from `fixture-mode.server.ts`, and `shopify.server.ts` swaps
 `PrismaSessionStorage` — which probes the session table as it boots and exits
 the process when nothing answers — for an in-memory implementation. Visual
 baselines are per-OS, like the widget's.
+
+## Latency measurement (YOY-114)
+
+The M5 latency bars — AI p50 < 2000 ms and p95 < 3500 ms, classic p95
+≤ 500 ms, all server-side — are stated and measured per **docs/LATENCY.md**,
+the binding method: server-side `latencyMs`, warm instance with the warm-up
+discarded, the live seed catalog, N ≥ 20 runs per set over the committed
+query set, nearest-rank percentiles, EN and HE AI reported separately and
+combined. Three pieces implement it:
+
+- **`stages` on every orchestrator response** (above): where the
+  milliseconds went, per pipeline stage actually run.
+- **The proxy log line** `[search] stages {...}` (one per submitted
+  storefront search) and **`details.stages`** on the playground API: the
+  two places the ledger is observable — never the storefront contract, never
+  the database.
+- **`apps/shopify-app/scripts/latency-probe.mts`**: drives the deployed
+  playground with `scripts/latency-probe-queries.json` (5 classic, 5 EN AI,
+  5 HE AI), one discarded warm-up then sequential runs with a fresh
+  `sessionId` each, and prints per set n, p50, p95, the mean per stage, and
+  the count of `degraded`/`limited` responses; `--assert-classic-p95`,
+  `--assert-ai-p50`, `--assert-ai-p95` turn the bars into an exit code. The
+  AI sets are paced under the playground's per-IP throttle so the probe
+  measures the pipeline, not the guard. `scripts/latency-probe.test.ts`
+  pins the nearest-rank math (including n=20) and the exit semantics.
 
 ## Deployment (YOY-91)
 

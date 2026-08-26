@@ -8,6 +8,10 @@
   "details": {
     "routeReason": "classic-zero-hit",
     "latencyMs": 21,
-    "limited": null
+    "limited": null,
+    "stages": {
+      "classify": 2,
+      "classic": 19
+    }
   }
 }
