@@ -55,6 +55,47 @@ export interface ProbeArgs {
 }
 
 const DEFAULT_RUNS = 20;
+
+/**
+ * Four zero-width format characters used as base-4 digits of an invisible
+ * per-request marker (YOY-64 AC-6). None is whitespace to `\s` or to
+ * `String.prototype.trim`, none is a letter or a digit, so the exact-query
+ * reuse key (`normalizeReuseQuery`: trim, collapse whitespace, case-fold)
+ * and the classifier's token rules both keep the marker while the shopper-
+ * visible text — and what the intent model reads — stays the committed
+ * query. U+FEFF is deliberately absent: `trim()` removes it.
+ */
+const INVISIBLE_DIGITS = ["\u200B", "\u200C", "\u200D", "\u2060"] as const;
+
+/**
+ * The committed query with an invisible marker unique to this probe
+ * invocation and run appended. Exact-query intent reuse (YOY-64 AC-4)
+ * answers a repeated query from its stored intent with zero LLM calls, so a
+ * probe that sent the same text `--runs` times would measure the cache from
+ * run 2 on and mask the AI bar; with a distinct text per (invocation, run)
+ * every AI sample pays the full path. Classic queries never store an intent
+ * and are sent unchanged.
+ */
+export function distinctQueryText(
+  query: string,
+  invocation: readonly number[],
+  run: number,
+): string {
+  const bytes = [...invocation, run & 0xff, (run >> 8) & 0xff];
+  const marker = bytes
+    .map((byte) =>
+      [3, 2, 1, 0]
+        .map((shift) => INVISIBLE_DIGITS[(byte >> (shift * 2)) & 3])
+        .join(""),
+    )
+    .join("");
+  return `${query} ${marker}`;
+}
+
+/** The committed text of a probed query: the marker stripped. */
+export function visibleQueryText(query: string): string {
+  return query.replace(/(?:\u200B|\u200C|\u200D|\u2060)/gu, "").trimEnd();
+}
 const DEFAULT_AI_PER_MINUTE = 10;
 const THROTTLE_WINDOW_MS = 60_000;
 /** Slack past the window so a request never lands on its exact edge. */
@@ -173,6 +214,8 @@ export interface SetSummary {
   p95: number;
   degraded: number;
   limited: number;
+  /** Responses served by exact-query intent reuse: a masked sample (AC-6). */
+  reused: number;
   routes: Record<string, number>;
   /** Mean ms per stage over the samples that ran it; absent when none did. */
   meanStages: Record<string, number>;
@@ -205,6 +248,7 @@ export function summarize(
     p95: percentile(latencies, 95),
     degraded: samples.filter((sample) => sample.degraded).length,
     limited: samples.filter((sample) => sample.limited !== null).length,
+    reused: samples.filter((sample) => sample.routeReason === "intent-reuse").length,
     routes,
     meanStages,
   };
@@ -260,7 +304,7 @@ export function formatSummary(summary: SetSummary): string {
   ).join(" · ");
   return [
     `[${summary.set}] n=${summary.n} p50=${summary.p50} ms p95=${summary.p95} ms` +
-      ` degraded=${summary.degraded} limited=${summary.limited} routes: ${routes}`,
+      ` degraded=${summary.degraded} limited=${summary.limited} reused=${summary.reused} routes: ${routes}`,
     `  mean per stage: ${stages === "" ? "(none)" : stages}`,
   ].join("\n");
 }
@@ -364,6 +408,9 @@ export async function main(argv: readonly string[]): Promise<0 | 1> {
   const pacer = createPacer(args.aiPerMinute);
   const samples: ProbeSample[] = [];
   let failures = 0;
+  // Four random bytes name this invocation in every AI query's marker, so
+  // two probe runs inside one reuse window never answer each other.
+  const invocation = [...crypto.getRandomValues(new Uint8Array(4))];
 
   // One discarded warm-up: the first request after an idle instance pays
   // for connection setup and cold caches that the method excludes.
@@ -390,11 +437,16 @@ export async function main(argv: readonly string[]): Promise<0 | 1> {
           await pacer.wait();
         }
         try {
-          const sample = await probeOnce(args, set, query);
+          const sample = await probeOnce(
+            args,
+            set,
+            paced ? distinctQueryText(query, invocation, run) : query,
+          );
           samples.push(sample);
           console.log(
             `${set} run ${run}/${args.runs} ${sample.latencyMs} ms ${sample.route}` +
               `${sample.degraded ? " degraded" : ""}${sample.limited !== null ? ` limited=${sample.limited}` : ""}` +
+              `${sample.routeReason === "intent-reuse" ? " REUSED" : ""}` +
               ` "${query}"`,
           );
         } catch (error) {
