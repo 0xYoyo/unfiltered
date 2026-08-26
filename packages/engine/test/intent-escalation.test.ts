@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   createEscalatingIntentExtractor,
   DEFAULT_INTENT_ESCALATION_THRESHOLD,
+  DEFAULT_INTENT_HEDGE_AFTER_MS,
   INTENT_ESCALATION_CLASSES,
   matchIntentEscalationClass,
   type Intent,
@@ -328,5 +329,215 @@ describe("ladder deadline (YOY-64 AC-3)", () => {
     expect(() =>
       createEscalatingIntentExtractor({ lite: lite.extractor, accuracy: accuracy.extractor, deadlineMs: 0 }),
     ).toThrow(RangeError);
+  });
+});
+
+describe("hedged class escalation (YOY-64 AC-6)", () => {
+  const context = { storeId: "s", searchId: "search-hedge" };
+
+  function abortError(name: string) {
+    const error = new Error(`${name} call aborted`);
+    error.name = "GeminiTimeoutError";
+    return error;
+  }
+
+  /** A stub tier that answers after `delayMs` unless aborted first. */
+  function slowTier(answer: Intent, delayMs: number, name = "tier") {
+    const calls: Array<{ query: string; context?: IntentExtractionContext; at: number }> = [];
+    const extractor: IntentExtractor = {
+      extract(query, context) {
+        calls.push({ query, context, at: performance.now() });
+        return new Promise<Intent>((resolve, reject) => {
+          if (context?.signal?.aborted) {
+            reject(abortError(name));
+            return;
+          }
+          const timer = setTimeout(() => resolve(answer), delayMs);
+          context?.signal?.addEventListener("abort", () => {
+            clearTimeout(timer);
+            reject(abortError(name));
+          });
+        });
+      },
+    };
+    return { extractor, calls };
+  }
+
+  /** A stub tier that fails after `delayMs` with the named error. */
+  function failingTier(errorName: string, delayMs: number) {
+    const calls: Array<{ query: string; context?: IntentExtractionContext }> = [];
+    const extractor: IntentExtractor = {
+      extract(query, context) {
+        calls.push({ query, context });
+        return new Promise<Intent>((_resolve, reject) => {
+          setTimeout(() => {
+            const error = new Error(`${errorName} from the stub`);
+            error.name = errorName;
+            reject(error);
+          }, delayMs);
+        });
+      },
+    };
+    return { extractor, calls };
+  }
+
+  /** A stub tier that never answers until its signal aborts. */
+  function hangingTier(name: string) {
+    return slowTier(intent(), 60_000, name);
+  }
+
+  it("commits a default hedge delay inside the ladder deadline the app wires (8000 ms)", () => {
+    expect(DEFAULT_INTENT_HEDGE_AFTER_MS).toBeGreaterThan(0);
+    expect(DEFAULT_INTENT_HEDGE_AFTER_MS).toBeLessThan(8000);
+  });
+
+  it("an accuracy answer inside the hedge delay is the whole story: no lite call at all", async () => {
+    const lite = slowTier(intent({ category: "dress", confidence: 1 }), 0, "lite");
+    const accuracy = slowTier(intent({ category: "dress", occasion: "wedding", confidence: 0.9 }), 5, "accuracy");
+    const ladder = createEscalatingIntentExtractor({
+      lite: lite.extractor,
+      accuracy: accuracy.extractor,
+      hedgeAfterMs: 80,
+    });
+    const result = await ladder.extractDetailed("something to wear to a wedding", context);
+    expect(result.tier).toBe("accuracy");
+    expect(result.escalation).toEqual({ kind: "class", name: "occasion" });
+    expect(lite.calls).toHaveLength(0);
+    // The accuracy tier saw the caller's context.
+    expect(accuracy.calls[0]!.context?.searchId).toBe("search-hedge");
+  });
+
+  it("past the hedge delay the lite tier runs alongside a pending accuracy call and its answer wins", async () => {
+    // Deliberately below the confidence floor: the hedge is a latency
+    // instrument, so a schema-valid lite answer wins regardless.
+    const lite = slowTier(intent({ category: "dress", occasion: "wedding", confidence: 0.5 }), 5, "lite");
+    const accuracy = hangingTier("accuracy");
+    const ladder = createEscalatingIntentExtractor({
+      lite: lite.extractor,
+      accuracy: accuracy.extractor,
+      hedgeAfterMs: 20,
+      deadlineMs: 2_000,
+    });
+    const startedAt = performance.now();
+    const result = await ladder.extractDetailed("something to wear to a wedding", context);
+    const elapsed = performance.now() - startedAt;
+    expect(result.tier).toBe("lite");
+    expect(result.escalation).toEqual({ kind: "hedge", name: "occasion", afterMs: 20 });
+    expect(result.intent.occasion).toBe("wedding");
+    expect(elapsed).toBeLessThan(500);
+    // The hedge fired after the delay, not up front, with the caller's context.
+    expect(lite.calls).toHaveLength(1);
+    expect(lite.calls[0]!.at - startedAt).toBeGreaterThanOrEqual(15);
+    expect(lite.calls[0]!.context?.searchId).toBe("search-hedge");
+    // The loser was cancelled through its own signal.
+    expect(accuracy.calls).toHaveLength(1);
+    expect(accuracy.calls[0]!.context?.signal?.aborted).toBe(true);
+  });
+
+  it("the accuracy answer still wins when it lands before the hedge does, and the hedge is cancelled", async () => {
+    const lite = slowTier(intent({ category: "dress", confidence: 1 }), 200, "lite");
+    const accuracy = slowTier(intent({ category: "dress", occasion: "wedding", confidence: 0.9 }), 40, "accuracy");
+    const ladder = createEscalatingIntentExtractor({
+      lite: lite.extractor,
+      accuracy: accuracy.extractor,
+      hedgeAfterMs: 10,
+    });
+    const result = await ladder.extractDetailed("something to wear to a wedding", context);
+    expect(result.tier).toBe("accuracy");
+    expect(result.escalation).toEqual({ kind: "class", name: "occasion" });
+    expect(lite.calls).toHaveLength(1);
+    expect(lite.calls[0]!.context?.signal?.aborted).toBe(true);
+  });
+
+  it("a failing hedge leaves the accuracy call to finish", async () => {
+    const lite = failingTier("GeminiProviderError", 0);
+    const accuracy = slowTier(intent({ category: "dress", occasion: "wedding", confidence: 0.9 }), 60, "accuracy");
+    const ladder = createEscalatingIntentExtractor({
+      lite: lite.extractor,
+      accuracy: accuracy.extractor,
+      hedgeAfterMs: 10,
+    });
+    const result = await ladder.extractDetailed("something to wear to a wedding", context);
+    expect(result.tier).toBe("accuracy");
+    expect(lite.calls).toHaveLength(1);
+  });
+
+  it("an accuracy failure after the hedge fired waits for the hedge; only both failing rejects, with the accuracy error", async () => {
+    const answered = createEscalatingIntentExtractor({
+      lite: slowTier(intent({ category: "dress", occasion: "wedding", confidence: 0.9 }), 60, "lite").extractor,
+      accuracy: failingTier("GeminiProviderError", 30).extractor,
+      hedgeAfterMs: 10,
+    });
+    const result = await answered.extractDetailed("something to wear to a wedding", context);
+    expect(result.tier).toBe("lite");
+    expect(result.escalation).toEqual({ kind: "hedge", name: "occasion", afterMs: 10 });
+
+    const bothFail = createEscalatingIntentExtractor({
+      lite: failingTier("IntentExtractionError", 40).extractor,
+      accuracy: failingTier("GeminiProviderError", 30).extractor,
+      hedgeAfterMs: 10,
+    });
+    await expect(bothFail.extract("something to wear to a wedding", context)).rejects.toMatchObject({
+      name: "GeminiProviderError",
+    });
+  });
+
+  it("an accuracy failure before the hedge fires rejects at once, and no hedge is started", async () => {
+    const lite = slowTier(intent({ confidence: 1 }), 0, "lite");
+    const ladder = createEscalatingIntentExtractor({
+      lite: lite.extractor,
+      accuracy: failingTier("GeminiProviderError", 5).extractor,
+      hedgeAfterMs: 80,
+    });
+    await expect(ladder.extract("something to wear to a wedding", context)).rejects.toMatchObject({
+      name: "GeminiProviderError",
+    });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(lite.calls).toHaveLength(0);
+  });
+
+  it("the hedge is bounded by the ladder deadline like both tiers (AC-3 holds)", async () => {
+    const lite = hangingTier("lite");
+    const accuracy = hangingTier("accuracy");
+    const ladder = createEscalatingIntentExtractor({
+      lite: lite.extractor,
+      accuracy: accuracy.extractor,
+      hedgeAfterMs: 10,
+      deadlineMs: 40,
+    });
+    const startedAt = performance.now();
+    await expect(ladder.extract("something to wear to a wedding", context)).rejects.toMatchObject({
+      name: "GeminiTimeoutError",
+    });
+    expect(performance.now() - startedAt).toBeLessThan(500);
+    expect(lite.calls).toHaveLength(1);
+    expect(accuracy.calls).toHaveLength(1);
+    expect(lite.calls[0]!.context?.signal?.aborted).toBe(true);
+    expect(accuracy.calls[0]!.context?.signal?.aborted).toBe(true);
+  });
+
+  it("never hedges the accuracy call that follows a lite answer or a lite failure", async () => {
+    const lite = slowTier(intent({ category: "dress", confidence: 0.1 }), 0, "lite");
+    const accuracy = slowTier(intent({ category: "dress", confidence: 0.9 }), 40, "accuracy");
+    const ladder = createEscalatingIntentExtractor({
+      lite: lite.extractor,
+      accuracy: accuracy.extractor,
+      hedgeAfterMs: 5,
+    });
+    const result = await ladder.extractDetailed("plain query", context);
+    expect(result.tier).toBe("accuracy");
+    expect(result.escalation).toEqual({ kind: "low-confidence", confidence: 0.1 });
+    // One lite call — the answer that escalated — and no second one as a hedge.
+    expect(lite.calls).toHaveLength(1);
+  });
+
+  it("rejects a non-positive hedge delay", () => {
+    const lite = slowTier(intent({ confidence: 1 }), 0);
+    const accuracy = slowTier(intent({ confidence: 1 }), 0);
+    for (const hedgeAfterMs of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(() =>
+        createEscalatingIntentExtractor({ lite: lite.extractor, accuracy: accuracy.extractor, hedgeAfterMs }),
+      ).toThrow(RangeError);
+    }
   });
 });

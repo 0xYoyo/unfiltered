@@ -32,6 +32,23 @@
  * not at its own per-request timeout. With no `deadlineMs` each tier is
  * bounded only by its own port's timeout — the eval harness's replay.
  *
+ * A class match's accuracy call is HEDGED (`hedgeAfterMs`, YOY-64 AC-6).
+ * The AC-6 measurement on the deployment (2026-08-26) found the accuracy
+ * model at 1.5–7 s on occasion-class prompts, hanging to the 8 s deadline
+ * in 13 of 60 such calls, while every lite-answered query sat at
+ * 640–1400 ms — the class rule was the entire AI p95 miss. Running the
+ * class lite-first instead regressed g09 on the eval harness (the lite tier
+ * labels gold wedding sandals `sneakers`; the golden needs `shoes`), so per
+ * the co-manager decision the class stays and its tail is bounded: when the
+ * accuracy call is still pending after `hedgeAfterMs`, the lite tier is
+ * fired alongside it and the first schema-valid answer wins, the loser's
+ * call aborted through its own signal. A lite win reports
+ * `{ kind: "hedge" }` with `tier: "lite"`; the hedge is a latency
+ * instrument, so the confidence floor does not apply to its answer — past
+ * the hedge delay a lite answer beats a classic degrade. Only class
+ * escalations hedge: the accuracy call after a low-confidence or failed
+ * lite answer already has the lite tier's verdict.
+ *
  * Both calls carry the caller's `searchId`, operation `"intent"`, and their
  * own model id through their own LLM port, so the cost ledger keeps them
  * distinguishable. Refinements (`previousIntent`) follow the same rules on
@@ -60,6 +77,16 @@ import type {
  * (the app reads `INTENT_ESCALATION_THRESHOLD`).
  */
 export const DEFAULT_INTENT_ESCALATION_THRESHOLD = 0.8;
+
+/**
+ * How long a class-escalated accuracy call may run before the lite hedge
+ * fires, ms (YOY-64 AC-6). Set from the AC-6 run: the accuracy tier
+ * answered occasion-class prompts in 1.5–7 s when it answered at all and the
+ * lite tier in 640–1400 ms, so a hedge at 2.5 s lands a lite answer near
+ * 3.1–3.9 s on a hung accuracy call instead of a classic degrade at 8 s.
+ * Consumers may override it (the app reads `INTENT_HEDGE_AFTER_MS`).
+ */
+export const DEFAULT_INTENT_HEDGE_AFTER_MS = 2500;
 
 /** One deterministic escalation class: a named predicate over the raw query. */
 export interface IntentEscalationClass {
@@ -142,7 +169,7 @@ export const INTENT_ESCALATION_CLASSES: readonly IntentEscalationClass[] = [
   {
     name: "occasion",
     description:
-      "occasion-bearing phrase (EN/HE): the lite tier mislabels events as soft attributes or picks the wrong canonical occasion",
+      "occasion-bearing phrase (EN/HE): the lite tier mislabels events as soft attributes or picks the wrong canonical occasion (YOY-64: kept after a lite-first trial regressed g09; its accuracy call is hedged instead)",
     matches(query) {
       const normalized = normalize(query);
       return (
@@ -172,6 +199,12 @@ export interface EscalatingIntentExtractorOptions {
   /** Escalation classes; defaults to the committed list. */
   classes?: readonly IntentEscalationClass[];
   /**
+   * How long a class match's accuracy call may run before the lite tier is
+   * fired alongside it and the first valid answer wins, ms (YOY-64 AC-6).
+   * Defaults to `DEFAULT_INTENT_HEDGE_AFTER_MS`.
+   */
+  hedgeAfterMs?: number;
+  /**
    * Wall-clock budget for the whole ladder, ms: one abort signal bounds the
    * lite call and any accuracy call after it. Absent means no ladder-level
    * bound (each tier's own port timeout applies).
@@ -198,6 +231,12 @@ export function createEscalatingIntentExtractor(
   if (deadlineMs !== undefined && !(Number.isFinite(deadlineMs) && deadlineMs > 0)) {
     throw new RangeError(
       `intent escalation deadlineMs must be a positive number, got ${deadlineMs}`,
+    );
+  }
+  const hedgeAfterMs = options.hedgeAfterMs ?? DEFAULT_INTENT_HEDGE_AFTER_MS;
+  if (!(Number.isFinite(hedgeAfterMs) && hedgeAfterMs > 0)) {
+    throw new RangeError(
+      `intent escalation hedgeAfterMs must be a positive number, got ${hedgeAfterMs}`,
     );
   }
 
@@ -229,6 +268,89 @@ export function createEscalatingIntentExtractor(
     return { intent, tier: "accuracy", escalation };
   }
 
+  /** The context plus one more abort signal, so the loser of a race is cancelled. */
+  function cancellable(
+    context: IntentExtractionContext | undefined,
+    controller: AbortController,
+  ): IntentExtractionContext {
+    const signal =
+      context?.signal === undefined
+        ? controller.signal
+        : AbortSignal.any([context.signal, controller.signal]);
+    return { ...context, signal };
+  }
+
+  /**
+   * A class match's accuracy call, hedged (YOY-64 AC-6): once it has run for
+   * `hedgeAfterMs` without answering, the lite tier is asked alongside it
+   * and whichever answers first wins; the other call is aborted. An
+   * accuracy failure while the hedge is in flight waits for the hedge, and
+   * only when both fail does the accuracy error propagate — so a failing
+   * hedge never makes the result worse than the unhedged call, and the
+   * error the caller logs is still the accuracy tier's (the deadline's
+   * GeminiTimeoutError when the budget cut both).
+   */
+  function hedgedAccuracy(
+    query: string,
+    context: IntentExtractionContext | undefined,
+    name: string,
+  ): Promise<IntentExtraction> {
+    const escalation: IntentEscalation = { kind: "class", name };
+    const accuracyAbort = new AbortController();
+    const liteAbort = new AbortController();
+    return new Promise<IntentExtraction>((resolve, reject) => {
+      let settled = false;
+      let hedgeInFlight = false;
+      let accuracyFailure: { error: unknown } | null = null;
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const settle = (outcome: () => void) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        if (timer !== undefined) {
+          clearTimeout(timer);
+        }
+        accuracyAbort.abort();
+        liteAbort.abort();
+        outcome();
+      };
+      options.accuracy.extract(query, cancellable(context, accuracyAbort)).then(
+        (intent) => settle(() => resolve({ intent, tier: "accuracy", escalation })),
+        (error: unknown) => {
+          accuracyFailure = { error };
+          if (!hedgeInFlight) {
+            settle(() => reject(error));
+          }
+        },
+      );
+      timer = setTimeout(() => {
+        timer = undefined;
+        if (settled || accuracyFailure !== null) {
+          return;
+        }
+        hedgeInFlight = true;
+        options.lite.extract(query, cancellable(context, liteAbort)).then(
+          (intent) =>
+            settle(() =>
+              resolve({
+                intent,
+                tier: "lite",
+                escalation: { kind: "hedge", name, afterMs: hedgeAfterMs },
+              }),
+            ),
+          () => {
+            hedgeInFlight = false;
+            const failure = accuracyFailure;
+            if (failure !== null) {
+              settle(() => reject(failure.error));
+            }
+          },
+        );
+      }, hedgeAfterMs);
+    });
+  }
+
   async function extractDetailed(
     query: string,
     rawContext?: IntentExtractionContext,
@@ -237,8 +359,9 @@ export function createEscalatingIntentExtractor(
     const context = budgeted(rawContext);
     const matched = matchIntentEscalationClass(query, classes);
     if (matched !== null) {
-      // Known-weak shape: straight to the accuracy tier, no lite call.
-      return accuracy(query, context, { kind: "class", name: matched.name });
+      // Known-weak shape: straight to the accuracy tier, no lite call up
+      // front — the lite tier joins only as the hedge past `hedgeAfterMs`.
+      return hedgedAccuracy(query, context, matched.name);
     }
     let lite: Intent;
     try {

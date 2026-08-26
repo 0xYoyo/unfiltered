@@ -64,6 +64,7 @@ export {
 export {
   createEscalatingIntentExtractor,
   DEFAULT_INTENT_ESCALATION_THRESHOLD,
+  DEFAULT_INTENT_HEDGE_AFTER_MS,
   INTENT_ESCALATION_CLASSES,
   matchIntentEscalationClass,
   type EscalatingIntentExtractorOptions,

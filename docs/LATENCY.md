@@ -105,6 +105,21 @@ per-run marker kept exact-query reuse out of the sample. The founder
 decision on this (a hang-rate bar, a mitigation slice, or a re-run) is
 recorded on YOY-64.
 
+**Decision and mitigation (2026-08-26, co-manager, binding).** AC-6 now
+reads "degraded ≤ 1 % of the run (≤ 2 of 200)": hangs are bounded by the
+deadline, not eliminated. The first-choice mitigation — run the occasion
+class lite-first like every other shape — regressed g09 on the eval
+harness (the lite tier labels `gold strappy sandals for a summer wedding`
+as `sneakers`; the golden needs `shoes`; hit rate 97 % → 94 %), and the
+zero-regression baseline is never loosened, so the fallback shipped
+instead: the occasion class stays on the accuracy tier and its call is
+**hedged** — past `INTENT_HEDGE_AFTER_MS` (default 2500) the lite tier
+runs alongside it and the first schema-valid answer wins (engine
+`createEscalatingIntentExtractor({ hedgeAfterMs })`, docs/ARCHITECTURE.md).
+On this run's numbers a hung accuracy call now lands a lite answer near
+3.1–3.9 s instead of a classic degrade at 8 s; whether that clears the
+3500 ms p95 is the next probe run's row, recorded below once deployed.
+
 ## Recorded measurements
 
 Every quoted row names the deployment region and the code it ran, and

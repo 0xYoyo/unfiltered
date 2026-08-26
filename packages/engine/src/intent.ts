@@ -149,17 +149,27 @@ export interface IntentExtractionContext {
 /** Which model tier produced an intent (YOY-116). */
 export type IntentTier = "lite" | "accuracy";
 
-/** Why an extraction went to the accuracy tier. */
+/**
+ * Why an extraction went to the accuracy tier — or, for `hedge`, why a
+ * class-escalated query was answered by the lite tier after all: the
+ * accuracy call was still pending after `afterMs` and the lite hedge fired
+ * alongside it answered first (YOY-64 AC-6).
+ */
 export type IntentEscalation =
   | { kind: "class"; name: string }
   | { kind: "low-confidence"; confidence: number | null }
-  | { kind: "lite-error"; error: string };
+  | { kind: "lite-error"; error: string }
+  | { kind: "hedge"; name: string; afterMs: number };
 
 /** An extraction with the tier that produced it. */
 export interface IntentExtraction {
   intent: Intent;
   tier: IntentTier;
-  /** Set when the accuracy tier answered because of an escalation. */
+  /**
+   * Set when the accuracy tier answered because of an escalation, or when
+   * the lite hedge outran a class-escalated accuracy call (`kind: "hedge"`,
+   * `tier: "lite"`).
+   */
   escalation: IntentEscalation | null;
 }
 

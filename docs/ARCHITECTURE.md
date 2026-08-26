@@ -259,7 +259,19 @@ Query understanding (all LLM access through the `LlmClient` port):
   class** (`INTENT_ESCALATION_CLASSES` in `intent-escalation.ts`: today
   `mixed-script`, Hebrew and Latin letters in one query, and `occasion`,
   occasion-bearing phrases EN/HE), in which case the accuracy tier is asked
-  directly with no lite call; or the lite answer's `confidence` is below the
+  directly with no lite call — **hedged** (YOY-64 AC-6): when that accuracy
+  call is still pending after `hedgeAfterMs` (`DEFAULT_INTENT_HEDGE_AFTER_MS`,
+  2500; the app reads `INTENT_HEDGE_AFTER_MS`) the lite tier is fired
+  alongside it and the first schema-valid answer wins, the loser aborted
+  through its own signal; a lite win reports `escalation: { kind: "hedge" }`
+  with `intentTier: "lite"`, and the confidence floor does not apply to it.
+  The YOY-64 live run put the accuracy model at 1.5–7 s on occasion-class
+  prompts with a hang to the 8 s deadline in 13 of 60 calls while the lite
+  tier answered in 640–1400 ms; running the class lite-first instead
+  regressed g09 on the harness (the lite tier labels gold wedding sandals
+  `sneakers`, the golden needs `shoes`), so the class stays and the hedge
+  bounds its tail. The accuracy call after a low-confidence or failed lite
+  answer is never hedged; or the lite answer's `confidence` is below the
   threshold (`DEFAULT_INTENT_ESCALATION_THRESHOLD`, 0.8, the lowest
   confidence a correct lite answer reported on the eval set) or missing, in
   which case the accuracy answer replaces the lite one entirely. Both calls
