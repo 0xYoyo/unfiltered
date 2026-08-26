@@ -429,7 +429,17 @@ export async function main(argv: readonly string[]): Promise<0 | 1> {
     console.log(`failed requests: ${failures} (excluded from the percentiles)`);
   }
   const breaches = evaluateAssertions(summaries, args);
-  console.log(formatBreaches(breaches));
+  const asserted =
+    args.assertClassicP95 !== null ||
+    args.assertAiP50 !== null ||
+    args.assertAiP95 !== null;
+  // "All bars met" must never print when no bar was asked for — a run
+  // without --assert-* flags reports numbers, not a verdict.
+  console.log(
+    asserted
+      ? formatBreaches(breaches)
+      : "assertions: none requested (pass --assert-* to enforce the bars)",
+  );
   return exitCode(breaches, failures);
 }
 
