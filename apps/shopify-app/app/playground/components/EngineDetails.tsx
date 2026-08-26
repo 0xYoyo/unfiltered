@@ -1,3 +1,4 @@
+import { SEARCH_STAGES } from "../../search/stages";
 import type { PlaygroundSearchResponse } from "../api.server";
 import type { PlaygroundStrings } from "../strings";
 
@@ -20,6 +21,11 @@ import type { PlaygroundStrings } from "../strings";
  * visitor would be asked to search again just to see how the last search
  * was understood. The `href` stays correct so the toggle still works
  * without JavaScript and can be opened in a new tab.
+ *
+ * The stage rows (YOY-114) say where the latency went: one row per pipeline
+ * stage the search actually ran, in pipeline order, as `<stage> · <ms> ms`.
+ * A stage that did not run has no row — an absent row is the evidence that
+ * a classic search made no LLM call.
  */
 export function EngineDetails({
   response,
@@ -47,6 +53,10 @@ export function EngineDetails({
       value: response.details.limited ?? strings.detailsNone,
     },
   ];
+  const stageRows = SEARCH_STAGES.flatMap((stage) => {
+    const ms = response.details.stages[stage];
+    return ms === undefined ? [] : [{ stage, ms }];
+  });
 
   return (
     <div className="details">
@@ -85,6 +95,22 @@ export function EngineDetails({
               </div>
             ))}
           </dl>
+          <div className="detailsStagesRow">
+            <span className="detailsStagesLabel">{strings.detailsStages}</span>
+            <ul
+              className="detailsStages"
+              data-testid="playground-details-stages"
+              dir="ltr"
+            >
+              {stageRows.map((row) => (
+                <li key={row.stage}>
+                  <bdi dir="ltr">
+                    {row.stage} · {row.ms} ms
+                  </bdi>
+                </li>
+              ))}
+            </ul>
+          </div>
           <div className="detailsIntentRow">
             <span className="detailsIntentLabel">{strings.detailsIntent}</span>
             <pre className="detailsIntent" data-testid="playground-details-intent" dir="ltr">

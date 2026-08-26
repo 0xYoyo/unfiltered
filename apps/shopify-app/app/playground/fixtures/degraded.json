@@ -42,6 +42,12 @@
   "details": {
     "routeReason": "model",
     "latencyMs": 1180,
-    "limited": "daily-global"
+    "limited": "daily-global",
+    "stages": {
+      "classify": 44,
+      "intent": 1002,
+      "classic": 31,
+      "hydrate": 6
+    }
   }
 }

@@ -70,6 +70,8 @@ export interface PlaygroundStrings {
   detailsDegraded: string;
   detailsLimited: string;
   detailsIntent: string;
+  /** Heading of the per-stage timing rows (YOY-114). */
+  detailsStages: string;
   /** Value shown for a detail the response left null. */
   detailsNone: string;
   detailsYes: string;
@@ -126,6 +128,7 @@ export const PLAYGROUND_STRING_CATALOG: Record<
     detailsDegraded: "Degraded",
     detailsLimited: "Limited",
     detailsIntent: "Extracted intent",
+    detailsStages: "Stages",
     detailsNone: "none",
     detailsYes: "yes",
     detailsNo: "no",
@@ -168,6 +171,7 @@ export const PLAYGROUND_STRING_CATALOG: Record<
     detailsDegraded: "מצומצם",
     detailsLimited: "הוגבל",
     detailsIntent: "כוונה שחולצה",
+    detailsStages: "שלבים",
     detailsNone: "אין",
     detailsYes: "כן",
     detailsNo: "לא",

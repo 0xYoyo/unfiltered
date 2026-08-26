@@ -540,6 +540,54 @@ describe("the response contract (AC-3, AC-5)", () => {
     expect(body.results[0]).not.toHaveProperty("handle");
   });
 
+  it("logs one [search] stages line per submitted search and none for a preview (YOY-114 AC-2)", async () => {
+    await seed([{ productId: "sneaker-90", title: "nike 90" }]);
+    installOrchestrator({ llm: fakeLlm({}) });
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    try {
+      const response = await action(
+        actionArgs(proxyRequest({ payload: { query: "nike 90", sessionId: "s1" } })),
+      );
+      const body = await response.json();
+      expect(body).not.toHaveProperty("stages");
+
+      const lines = log.mock.calls.filter(
+        (call) => call[0] === "[search] stages",
+      );
+      expect(lines).toHaveLength(1);
+      const logged = JSON.parse(lines[0]![1] as string) as Record<string, unknown>;
+      expect(Object.keys(logged)).toEqual([
+        "searchId",
+        "route",
+        "routeReason",
+        "latencyMs",
+        "stages",
+      ]);
+      expect(logged.searchId).toBe(body.searchId);
+      expect(logged.route).toBe("classic");
+      expect(logged.routeReason).toBe("sku-pattern");
+      expect(typeof logged.latencyMs).toBe("number");
+      expect(Object.keys(logged.stages as object)).toEqual([
+        "classify",
+        "classic",
+        "hydrate",
+      ]);
+
+      await action(
+        actionArgs(
+          proxyRequest({
+            payload: { query: "nike", sessionId: "s1", mode: "preview" },
+          }),
+        ),
+      );
+      expect(
+        log.mock.calls.filter((call) => call[0] === "[search] stages"),
+      ).toHaveLength(1);
+    } finally {
+      log.mockRestore();
+    }
+  });
+
   it("serves an AI query with chips and the resolved intent for the client to echo", async () => {
     await seed([
       {

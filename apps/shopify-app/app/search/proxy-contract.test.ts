@@ -53,6 +53,7 @@ const ORCHESTRATOR_RESPONSE = {
   chips: [{ field: "priceMax", value: "400" }],
   intent: null,
   closeMatches: [],
+  stages: { classify: 30, intent: 400, embed: 90, retrieve: 40, hydrate: 5 },
 } as unknown as SearchResponse;
 
 interface CapturedRequest {
@@ -202,6 +203,36 @@ describe("search response: route serialization → widget consumption", () => {
     expect(response.chips).toEqual([{ field: "priceMax", value: "400" }]);
     // The serializer's explicit re-mapping keeps internals off the wire.
     expect(response).not.toHaveProperty("routeReason");
+  });
+
+  it("never carries stages, on any route (YOY-114 AC-2, NG-3)", () => {
+    // Every response shape the orchestrator produces, each with a ledger
+    // the proxy must keep off the storefront wire.
+    const shapes: Array<Partial<SearchResponse>> = [
+      { route: "classic", stages: { classify: 1, classic: 20, hydrate: 3 } },
+      {
+        route: "classic",
+        degraded: true,
+        stages: { classify: 40, intent: 900, classic: 20, hydrate: 3 },
+      },
+      { route: "ai", stages: { classify: 30, intent: 400, embed: 90, retrieve: 40, hydrate: 5 } },
+      {
+        route: "ai",
+        hits: [],
+        closeMatches: ORCHESTRATOR_RESPONSE.hits,
+        stages: { classify: 30, intent: 400, embed: 90, retrieve: 40, closeMatches: 25, hydrate: 5 },
+      },
+      { route: "classic", routeReason: "preview", stages: { classic: 20, hydrate: 3 } },
+      { route: "classic", routeReason: "throttled", stages: { classic: 20, hydrate: 3 } },
+    ] as Array<Partial<SearchResponse>>;
+    for (const shape of shapes) {
+      const body = serializeProxySearchResponse({
+        ...ORCHESTRATOR_RESPONSE,
+        ...shape,
+      });
+      expect(body).not.toHaveProperty("stages");
+      expect(JSON.stringify(body)).not.toContain("stages");
+    }
   });
 });
 

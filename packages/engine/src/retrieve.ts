@@ -121,6 +121,19 @@ export interface RetrievalResult {
   hits: RetrievalHit[];
   /** The hard constraints that were applied as filters. */
   appliedConstraints: AppliedConstraint[];
+  /**
+   * Where this retrieval's wall time went (YOY-114): the query embedding
+   * (a cache hit reports ~0) and the store query, as fractional
+   * milliseconds. Diagnostic only — a consumer reading `hits` never needs
+   * it, and a fake retriever may omit it.
+   */
+  timings?: RetrievalTimings;
+}
+
+/** Per-stage wall time of one retrieval, fractional milliseconds. */
+export interface RetrievalTimings {
+  embedMs: number;
+  retrieveMs: number;
 }
 
 /** One retrieval request: an intent evaluated against one store. */
@@ -274,11 +287,13 @@ export function createRetriever(options: RetrieverOptions): Retriever {
           "intent has no descriptive signal to embed; similarity ranking is undefined",
         );
       }
+      const embedStartedAt = performance.now();
       const vector = await embedQuery(
         queryText,
         request.storeId,
         request.searchId,
       );
+      const retrieveStartedAt = performance.now();
       const hits = await options.store.query({
         storeId: request.storeId,
         constraints,
@@ -287,6 +302,10 @@ export function createRetriever(options: RetrieverOptions): Retriever {
         // ranked match set (YOY-107).
         ...(request.limit !== undefined ? { limit: request.limit } : {}),
       });
+      const timings: RetrievalTimings = {
+        embedMs: retrieveStartedAt - embedStartedAt,
+        retrieveMs: performance.now() - retrieveStartedAt,
+      };
       return {
         hits: hits.map((hit) => ({
           productId: hit.productId,
@@ -296,6 +315,7 @@ export function createRetriever(options: RetrieverOptions): Retriever {
             : {}),
         })),
         appliedConstraints: appliedConstraints(constraints),
+        timings,
       };
     },
   };

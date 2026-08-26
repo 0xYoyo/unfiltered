@@ -60,6 +60,14 @@
   "details": {
     "routeReason": "model",
     "latencyMs": 934,
-    "limited": null
+    "limited": null,
+    "stages": {
+      "classify": 41,
+      "intent": 455,
+      "embed": 102,
+      "retrieve": 44,
+      "closeMatches": 63,
+      "hydrate": 7
+    }
   }
 }

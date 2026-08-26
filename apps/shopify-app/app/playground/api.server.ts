@@ -1,7 +1,11 @@
 import type { PrismaClient } from "@prisma/client";
 
 import { PLAYGROUND_STORE_KEY_PREFIX } from "./ingest-public.server";
-import type { SearchResponse } from "../search/orchestrator.server";
+import {
+  SEARCH_STAGES,
+  type SearchResponse,
+  type SearchStages,
+} from "../search/orchestrator.server";
 import {
   serializeProxySearchResponse,
   type ProxySearchResponse,
@@ -51,6 +55,8 @@ export interface PlaygroundSearchDetails {
   routeReason: string;
   latencyMs: number;
   limited: PlaygroundLimit | null;
+  /** Whole ms per pipeline stage actually run, in pipeline order (YOY-114). */
+  stages: SearchStages;
 }
 
 /** The playground response: the proxy contract plus `details`, nothing else. */
@@ -61,9 +67,11 @@ export interface PlaygroundSearchResponse extends ProxySearchResponse {
 /**
  * Map an orchestrator response onto the playground wire contract. Delegates
  * the card/chip/intent mapping to the proxy's own serializer — the two APIs
- * must never drift — and adds exactly the three detail fields. Explicit
+ * must never drift — and adds exactly the four detail fields. Explicit
  * re-mapping is what keeps a later orchestrator field from leaking out
- * (AC-2, the same guarantee `serializeProxySearchResponse` gives).
+ * (AC-2, the same guarantee `serializeProxySearchResponse` gives); `stages`
+ * is copied key by key in pipeline order so the wire order is the
+ * pipeline's, whatever order the ledger ran in.
  */
 export function serializePlaygroundSearchResponse(
   response: SearchResponse,
@@ -75,8 +83,20 @@ export function serializePlaygroundSearchResponse(
       routeReason: details.routeReason,
       latencyMs: details.latencyMs,
       limited: details.limited,
+      stages: serializeStages(details.stages),
     },
   };
+}
+
+function serializeStages(stages: SearchStages): SearchStages {
+  const ordered: SearchStages = {};
+  for (const stage of SEARCH_STAGES) {
+    const ms = stages[stage];
+    if (ms !== undefined) {
+      ordered[stage] = ms;
+    }
+  }
+  return ordered;
 }
 
 /** The playground's env-configured limits; invalid values fall back. */

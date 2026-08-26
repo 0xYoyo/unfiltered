@@ -345,6 +345,60 @@ test.describe("engine details (AC-5, verify 5)", () => {
     await expect(intent).toContainText('"priceMax": 400');
   });
 
+  test("lists one row per stage the search ran, in pipeline order (YOY-114 AC-2)", async ({
+    page,
+  }) => {
+    await page.goto("/?details=1");
+    await submit(page, "ai elegant dress");
+    const rows = page.getByTestId("playground-details-stages").locator("li");
+    // The AI fixture ran classify → intent → embed → retrieve → hydrate; no
+    // classic and no closeMatches row, because those stages did not run.
+    await expect(rows).toHaveText([
+      "classify · 38 ms",
+      "intent · 412 ms",
+      "embed · 96 ms",
+      "retrieve · 57 ms",
+      "hydrate · 9 ms",
+    ]);
+
+    // A classic search shows only the stages a keyword search runs — the
+    // absent intent/embed/retrieve rows are the proof of zero LLM calls.
+    await submit(page, "dress");
+    await expect(rows).toHaveText([
+      "classify · 1 ms",
+      "classic · 28 ms",
+      "hydrate · 7 ms",
+    ]);
+
+    // Every row is numeric milliseconds in the `<stage> · <ms> ms` form.
+    for (const text of await rows.allTextContents()) {
+      expect(text).toMatch(/^[a-zA-Z]+ · \d+ ms$/);
+    }
+  });
+
+  test("the stage rows exist only while the panel is open", async ({ page }) => {
+    await page.goto("/");
+    await submit(page, "ai elegant dress");
+    await expect(chips(page)).toHaveCount(3);
+    await expect(page.getByTestId("playground-details-stages")).toHaveCount(0);
+
+    await page.getByTestId("playground-details-toggle").click();
+    await expect(page.getByTestId("playground-details-stages")).toBeVisible();
+
+    await page.getByTestId("playground-details-toggle").click();
+    await expect(page.getByTestId("playground-details-stages")).toHaveCount(0);
+  });
+
+  test("a zero-hit response adds the closeMatches row after hydrate's stage", async ({
+    page,
+  }) => {
+    await page.goto("/?details=1");
+    await submit(page, "ai zero hit dress");
+    const rows = page.getByTestId("playground-details-stages").locator("li");
+    await expect(rows).toHaveCount(6);
+    await expect(rows.last()).toHaveText("closeMatches · 63 ms");
+  });
+
   test("the intent block is the only monospace on the page (DESIGN §2)", async ({
     page,
   }) => {

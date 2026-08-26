@@ -52,6 +52,11 @@ vi.mock("./search/proxy.server", async (importOriginal) => {
           chips: forced || preview ? [] : [{ field: "category", value: "dress" }],
           degraded: forced,
           closeMatches: [],
+          // Out of pipeline order on purpose: the serializer re-orders.
+          stages:
+            forced || preview
+              ? { hydrate: 3, classic: 12 }
+              : { hydrate: 4, retrieve: 30, embed: 80, intent: 400, classify: 25 },
           ...(orchestratorSeam.response ?? {}),
         });
       },
@@ -94,7 +99,7 @@ const CONTRACT_KEYS = [
   "searchId",
 ].sort();
 
-const DETAIL_KEYS = ["latencyMs", "limited", "routeReason"].sort();
+const DETAIL_KEYS = ["latencyMs", "limited", "routeReason", "stages"].sort();
 
 const RESULT_KEYS = [
   "available",
@@ -287,6 +292,31 @@ describe("the response contract (AC-2)", () => {
     expect(
       (body.details as { latencyMs: number }).latencyMs,
     ).toBeGreaterThanOrEqual(0);
+  });
+
+  it("exposes the orchestrator's stages as details.stages, in pipeline order (YOY-114 AC-2)", async () => {
+    const ai = (await (
+      await searchLoader(loaderArgs(searchRequest({})))
+    ).json()) as { details: { stages: Record<string, number> } };
+    expect(Object.keys(ai.details.stages)).toEqual([
+      "classify",
+      "intent",
+      "embed",
+      "retrieve",
+      "hydrate",
+    ]);
+    expect(ai.details.stages).toEqual({
+      classify: 25,
+      intent: 400,
+      embed: 80,
+      retrieve: 30,
+      hydrate: 4,
+    });
+
+    const preview = (await (
+      await searchLoader(loaderArgs(searchRequest({ mode: "preview" })))
+    ).json()) as { details: { stages: Record<string, number> } };
+    expect(Object.keys(preview.details.stages)).toEqual(["classic", "hydrate"]);
   });
 
   it("includes closeMatches only when the response carries them", async () => {

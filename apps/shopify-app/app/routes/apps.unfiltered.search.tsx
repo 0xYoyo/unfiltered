@@ -146,6 +146,23 @@ async function handleSearch(
     );
     const latencyMs = Date.now() - startedAt;
 
+    // One structured line per SUBMITTED search (YOY-114 AC-2): the proxy
+    // contract never carries `stages` (NG-3) — the widget has no use for it
+    // and the storefront wire stays pinned — so the per-stage split reaches
+    // the server log instead, where the latency probe's method reads it.
+    if (!preview) {
+      console.log(
+        "[search] stages",
+        JSON.stringify({
+          searchId: response.searchId,
+          route: response.route,
+          routeReason: response.routeReason,
+          latencyMs,
+          stages: response.stages,
+        }),
+      );
+    }
+
     // Budget is consumed whenever the classifier decided the AI route (YOY-52
     // AC-5) — an AI-classified search that degraded to classic after intent
     // extraction or retrieval failed (route "classic", degraded, routeReason

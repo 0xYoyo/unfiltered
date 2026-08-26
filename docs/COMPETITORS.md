@@ -21,6 +21,7 @@ Fragmented early market, not a locked one. The incumbent's engine is a generatio
 
 - Boost AI Search & Discovery — incumbent, ~1,568 reviews, 4.7★. Keyword+semantic under AI branding; TURBO replaces theme templates with Boost-owned lookalike Liquid (per-theme maintenance); GMV-based pricing (~$29 Launch, ~$299 Convert, $2/extra $1K GMV). STEAL: revenue-impact analytics depth. ATTACK: theme-swap/campaign friction, old engine, GMV metering.
 - Cartally — the thesis twin: classic→AI→conversational ladder, search-count pricing ($59/20K AI searches, $209/180K; overages $1/1K), 5-min install. 1 review, EN+PL only, unproven at scale. STEAL: pricing-model validation. WATCH: closest architectural competitor; if it adds fashion depth or serious languages, accelerate.
+  - Findings (2026-08-22, YOY-114): Cartally runs three latency tiers — ~10 ms keyword, ~300 ms "advanced", and an LLM tier measured in seconds. That is independent convergence on our confidence routing (lite-first, escalate on low confidence — YOY-116) and is treated as validation of the ladder, not as a threat to it. Our AI bar — p50 < 2 s, p95 < 3.5 s server-side, measured per docs/LATENCY.md — beats the field's LLM tier, which is the tier a shopper actually waits on. Weaknesses to attack: an injected widget UI (we mirror the theme — the Mirror Bar); a chatbot pivot (we stay in the bar); generic multilingual with no fashion depth; no vision story.
 - Fast Simon — feature breadth, visual search, fashion clients, SSR of its own widget; session-based pricing (free ≤100 sessions, from ~$39.99). ATTACK: session-metering cost creep, widget-not-native.
 - Searchanise — value player ($19–49, priced per product count), pure JS widget ("no liquid template"), no NL depth. ATTACK: can't-customize-cards ceiling, translation gaps.
 - Doofinder — 15K stores, loud NL marketing, visual AI tagging; request-based metering with documented bill shock (public vendor reply: "we undeniably screwed up"). ATTACK: billing distrust, support inconsistency.
@@ -34,6 +35,10 @@ Algolia (NeuralSearch hybrid, paywalled to Elevate annual contracts), Constructo
 ## Threat ranking
 
 Shopify: 1) Boost (distribution) 2) Cartally (same thesis) 3) Fast Simon (breadth) 4) LLM-native newcomers. Enterprise: Constructor and Algolia define the technical ceiling.
+
+## Strategic law (binding, 2026-08-22)
+
+Do not chase breadth. Algolia, Klevu, and Searchspring own feature breadth and will always list more; a breadth race is lost before it starts and drags the core loop. The wedge is three things, in order: theme-mirroring results (native when possible, functional always); vision enrichment for attribute-starved catalogs (the differentiator on every plan — PRD capability 14); honest attribution (the merchant's money line, never inflated). Hebrew stays a local-sales convenience — never a headline, never a moat claim (see Positioning notes). A roadmap item that serves none of the three is deferred by default.
 
 ## Positioning notes (binding)
 
