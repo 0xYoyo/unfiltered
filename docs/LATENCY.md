@@ -34,7 +34,12 @@ on the combined AI set but missed in one language is missed.
    (`apps/shopify-app/scripts/latency-probe-queries.json`: 5 classic, 5 EN
    AI, 5 HE AI) is run sequentially, every query of the set, `--runs`
    times (20 minimum), each request with a fresh `sessionId`. A set's
-   sample is therefore ≥ 100 responses.
+   sample is therefore ≥ 100 responses. Every AI-set request carries an
+   invisible per-invocation, per-run marker (zero-width format characters
+   after a trailing space) so that exact-query intent reuse (YOY-64 AC-4)
+   never answers a run from a previous run's stored intent: each AI sample
+   pays the full pipeline, and the summary's `reused` count must be 0 for
+   the row to count. The visible query text is the committed one.
 5. **Nearest-rank percentiles.** Sort a set's `latencyMs` ascending and
    take the value at rank ⌈p/100 · n⌉ (1-based). No interpolation: every
    reported percentile is a latency that actually happened.
@@ -79,6 +84,27 @@ Frankfurt, one-statement search, unpooled) — 26× under the bar, from
 that motivated it. The pooled-connection row (row 3) is the deployment's
 final form and is measured in YOY-124 AC-11; it is not what meets the bar.
 
+### AI bars — EN met, HE missed on p95 (YOY-64, 2026-08-26)
+
+First M5-method run on the YOY-64 code (PR #117: queued ledger, trimmed
+prompt, ladder deadline, exact-query reuse, overlapping stages), rows
+7–10 below. **p50 is met in both languages** — 908 ms EN, 976 ms HE,
+933 ms combined against < 2000 — down from 1830/1820 ms on the baseline.
+**EN p95 is met** at 3354 ms (< 3500; was 6784). **HE p95 is missed** at
+8021 ms (was 7370), and so is the combined p95: 12 of the 100 HE samples
+and 1 of the 100 EN samples came back `degraded` — classic answers served
+after the accuracy-tier intent call hung to the 8 s ladder deadline
+(`GEMINI_INTENT_TIMEOUT_MS`), all at 8013–8155 ms. Nine of the twelve HE
+hangs are one query, `שמלה אלגנטית לערב מתחת ל-400`, three are
+`משהו לחתונה על החוף שמסתיר את הידיים`; both are occasion-class queries
+that skip the lite tier by design (YOY-116), so each hang is the accuracy
+model alone. The non-degraded HE tail is inside the bar — the miss is the
+hang rate, the same upstream failure class YOY-109 and YOY-116 recorded,
+now bounded at 8 s instead of 20–40 s. `reused=0` on every set: the
+per-run marker kept exact-query reuse out of the sample. The founder
+decision on this (a hang-rate bar, a mitigation slice, or a re-run) is
+recorded on YOY-64.
+
 ## Recorded measurements
 
 Every quoted row names the deployment region and the code it ran, and
@@ -93,3 +119,7 @@ links the issue comment carrying the probe's full output.
 | 2026-08-26 | Frankfurt | `main` before YOY-114 | ai-combined | 200 | 1830 ms | 7370 ms | Per-stage means absent: the deployed code predates `details.stages`. |
 | 2026-08-26 12:37 UTC | Frankfurt | PR #113 one-statement classic (YOY-115 AC-1..3), unpooled `DATABASE_URL` | classic | 100 | **9 ms** | **19 ms** | YOY-115 AC-6 row 2; `--assert-classic-p95 500` exit 0; full output on YOY-115. 1 `degraded` (a cold LLM-classifier timeout on "black shirt", served classic) — the classifier's cost, not the statement's: mean per stage classify 29 ms · classic 10 ms. |
 | — | Frankfurt | one-statement classic + pooled `-pooler` host (`pgbouncer=true`) | classic | — | — | — | YOY-115 AC-6 row 3: pooled — measured in YOY-124 AC-11 after the founder-lane env-group switch (docs/DEPLOY.md "Switching to the pooled connection"). |
+| 2026-08-26 ~21:30 UTC | Frankfurt | `main` at PR #117 (YOY-64 AC-1..5), unpooled | classic | 100 | **13 ms** | **22 ms** | YOY-64 AC-6 run; full output on YOY-64. One 948 ms sample (rank 100): "black shirt" is colour-shaped, so the model classified it while a speculative intent extraction ran alongside (AC-5) — the response was still classic; mean per stage classify 8 ms · classic 10 ms. |
+| 2026-08-26 ~21:30 UTC | Frankfurt | `main` at PR #117 | ai-en | 100 | **908 ms** | **3354 ms** | Both bars met. 1 degraded (an 8043 ms accuracy-tier hang cut by the ladder deadline), 0 limited, 0 reused. Mean per stage: classify 623 · intent 1232 · embed 26 · retrieve 31 · hydrate 12 · closeMatches 20 ms. |
+| 2026-08-26 ~21:30 UTC | Frankfurt | `main` at PR #117 | ai-he | 100 | **976 ms** | 8021 ms | p50 met; **p95 missed**: 12 degraded (accuracy-tier hangs at the 8 s deadline, 9 on one occasion-class query), 0 limited, 0 reused. Mean per stage: classify 585 · intent 2377 · embed 41 · retrieve 36 · hydrate 9 · closeMatches 18 ms. |
+| 2026-08-26 ~21:30 UTC | Frankfurt | `main` at PR #117 | ai-combined | 200 | **933 ms** | 8016 ms | p50 met; p95 missed through the HE hang rate (13 degraded of 200). `--assert-ai-p50 2000 --assert-ai-p95 3500` exit 1: `ai-he p95=8021 ms >= 3500 ms`, `ai-combined p95=8016 ms >= 3500 ms`. |

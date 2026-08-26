@@ -833,7 +833,7 @@ vitest.setup.ts
 - apps/shopify-app/app/workspace-resolution.test.ts → apps/shopify-app/app/eval/source-guard.server.ts, apps/shopify-app/vite.config.ts, vitest.config.ts
 - apps/shopify-app/scripts/ingest-public.mts → apps/shopify-app/app/catalog/embed.server.ts, apps/shopify-app/app/catalog/enrich.server.ts, apps/shopify-app/app/playground/ingest-public-cli.server.ts, apps/shopify-app/app/playground/jsonld-crawl-source.server.ts, apps/shopify-app/app/playground/polite-fetch.server.ts
 - apps/shopify-app/scripts/ingest.mts → apps/shopify-app/app/catalog/embed.server.ts, apps/shopify-app/app/catalog/enrich.server.ts, apps/shopify-app/app/catalog/ingest.server.ts, apps/shopify-app/app/catalog/offline-token.server.ts
-- apps/shopify-app/scripts/latency-probe.test.ts → apps/shopify-app/scripts/latency-probe.mts
+- apps/shopify-app/scripts/latency-probe.test.ts → apps/shopify-app/app/search/events.server.ts, apps/shopify-app/scripts/latency-probe.mts
 - apps/shopify-app/scripts/live-smoke.test.ts → apps/shopify-app/app/testing/fake-store.server.ts, apps/shopify-app/scripts/live-smoke.mts
 - apps/shopify-app/scripts/native-render-template.mts → apps/shopify-app/widget/src/native-render.config.ts
 - apps/shopify-app/scripts/render-migrate.test.ts → apps/shopify-app/scripts/render-migrate.mts

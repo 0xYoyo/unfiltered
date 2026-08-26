@@ -442,12 +442,20 @@ retrieval semantics:
   stay exact.
 - **Per-operation intent abort (AC-3).** The accuracy-tier intent client
   runs with `GEMINI_INTENT_TIMEOUT_MS` (default 8000) and the lite tier with
-  `GEMINI_INTENT_LITE_TIMEOUT_MS` (default 8000): a never-answering upstream
-  degrades the search to classic inside the widget's budgets — after its 3 s
-  classic-rescue budget and long before its 30 s primary budget
-  (`orchestrator.test.ts` asserts the relation against the widget's
-  exported constants). The adapter's 60 s default stays for enrichment and
-  embedding.
+  `GEMINI_INTENT_LITE_TIMEOUT_MS` (default 8000), and the same
+  `GEMINI_INTENT_TIMEOUT_MS` is the **deadline of the whole lite-first
+  ladder**: `createEscalatingIntentExtractor({ deadlineMs })` arms one
+  `AbortSignal` per extraction and forwards it to both tiers through
+  `IntentExtractionContext.signal` → `StructuredCompletionRequest.signal`,
+  which the Gemini adapter honours on top of its own per-request timeout.
+  A lite call that fails with the budget spent degrades right there instead
+  of escalating (lite 8 s + accuracy 8 s in series was ~16 s before the
+  classic fallback); an accuracy call reached with budget left is cut at the
+  deadline. So a never-answering upstream degrades the search to classic
+  inside the widget's budgets — after its 3 s classic-rescue budget and long
+  before its 30 s primary budget (`orchestrator.test.ts` asserts the relation
+  against the widget's exported constants, over the whole ladder). The
+  adapter's 60 s default stays for enrichment and embedding.
 - **Exact-query intent reuse (AC-4).** Every submitted AI search that was
   served non-degraded stores its `Intent` and the normalized query
   (trimmed, whitespace-collapsed, case-folded) on its `SearchEvent`
@@ -1091,7 +1099,15 @@ combined. Three pieces implement it:
   playground with `scripts/latency-probe-queries.json` (5 classic, 5 EN AI,
   5 HE AI), one discarded warm-up then sequential runs with a fresh
   `sessionId` each, and prints per set n, p50, p95, the mean per stage, and
-  the count of `degraded`/`limited` responses; `--assert-classic-p95`,
+  the count of `degraded`/`limited`/`reused` responses. Every AI-set request
+  carries an invisible marker (four zero-width format characters as base-4
+  digits of a per-invocation nonce plus the run number, appended after a
+  space) so its exact-query reuse key differs per run and per invocation:
+  without it, runs 2..N would be answered from the stored intent with zero
+  LLM calls (YOY-64 AC-4) and the probe would measure the cache, not the
+  pipeline. The visible text — and what the intent model reads — stays the
+  committed query; `reused` in the summary is the count of samples the
+  marker failed to protect and must read 0. `--assert-classic-p95`,
   `--assert-ai-p50`, `--assert-ai-p95` turn the bars into an exit code. The
   AI sets are paced under the playground's per-IP throttle so the probe
   measures the pipeline, not the guard. `scripts/latency-probe.test.ts`

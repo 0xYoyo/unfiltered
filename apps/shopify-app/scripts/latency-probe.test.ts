@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
+import { normalizeReuseQuery } from "../app/search/events.server";
 import {
+  distinctQueryText,
   evaluateAssertions,
   exitCode,
   formatBreaches,
@@ -10,6 +12,7 @@ import {
   percentile,
   ProbeUsageError,
   summarize,
+  visibleQueryText,
   type ProbeSample,
 } from "./latency-probe.mjs";
 
@@ -71,7 +74,7 @@ describe("set summaries", () => {
   it("reports n, p50, p95, degraded/limited counts, routes, and the mean per stage", () => {
     const summary = summarize("ai-en", [
       sample({ latencyMs: 900 }),
-      sample({ latencyMs: 1100, stages: { classify: 20, intent: 400, embed: 50, retrieve: 100, hydrate: 10 } }),
+      sample({ latencyMs: 1100, routeReason: "intent-reuse", stages: { classify: 20, intent: 400, embed: 50, retrieve: 100, hydrate: 10 } }),
       sample({ latencyMs: 300, route: "classic", degraded: true, stages: { classify: 30, intent: 900, classic: 20, hydrate: 5 } }),
       sample({ latencyMs: 250, route: "classic", degraded: true, limited: "ip", stages: { classic: 20, hydrate: 5 } }),
     ]);
@@ -81,6 +84,7 @@ describe("set summaries", () => {
     expect(summary!.p95).toBe(1100);
     expect(summary!.degraded).toBe(2);
     expect(summary!.limited).toBe(1);
+    expect(summary!.reused).toBe(1);
     expect(summary!.routes).toEqual({ ai: 2, classic: 2 });
     // Means are over the samples that ran the stage, in pipeline order.
     expect(Object.keys(summary!.meanStages)).toEqual([
@@ -93,7 +97,7 @@ describe("set summaries", () => {
     ]);
     expect(summary!.meanStages.intent).toBe(Math.round((600 + 400 + 900) / 3));
     expect(summary!.meanStages.classic).toBe(20);
-    expect(formatSummary(summary!)).toContain("p50=300 ms p95=1100 ms degraded=2 limited=1");
+    expect(formatSummary(summary!)).toContain("p50=300 ms p95=1100 ms degraded=2 limited=1 reused=1");
   });
 
   it("is null for an empty set rather than a fake zero", () => {
@@ -184,6 +188,38 @@ describe("the committed query set", () => {
     }
     for (const query of queries["ai-he"]) {
       expect(query).toMatch(/[֐-׿]/);
+    }
+  });
+});
+
+describe("distinct query text per run (YOY-64 AC-6)", () => {
+  // Exact-query intent reuse (AC-4) would answer runs 2..N of the same text
+  // from the stored intent with zero LLM calls and mask the AI bar; each
+  // (invocation, run) pair gets its own reuse key while the visible text
+  // stays the committed query.
+  const invocation = [0x12, 0x34, 0xab, 0xcd];
+
+  it("is a distinct reuse key per run and per invocation, never the base text", () => {
+    const base = "summer dress, not black";
+    const keys = new Set<string>();
+    for (let run = 1; run <= 20; run += 1) {
+      keys.add(normalizeReuseQuery(distinctQueryText(base, invocation, run)));
+      keys.add(normalizeReuseQuery(distinctQueryText(base, [0x12, 0x34, 0xab, 0xce], run)));
+    }
+    expect(keys.size).toBe(40);
+    expect(keys.has(normalizeReuseQuery(base))).toBe(false);
+  });
+
+  it("keeps the shopper-visible text — and every classifier token — exactly the committed query", () => {
+    for (const base of ["summer dress, not black", "מעיל חם לחורף עד 600", "warm coat for winter under 600"]) {
+      const varied = distinctQueryText(base, invocation, 7);
+      expect(visibleQueryText(varied)).toBe(base);
+      // The marker is one extra whitespace-delimited token holding no
+      // letter, digit, or whitespace: the committed tokens are untouched.
+      const tokens = normalizeReuseQuery(varied).split(" ");
+      expect(tokens.slice(0, -1)).toEqual(normalizeReuseQuery(base).split(" "));
+      expect(tokens.at(-1)).toMatch(/^(?:\u200B|\u200C|\u200D|\u2060)+$/u);
+      expect(tokens.at(-1)).not.toMatch(/[\p{L}\p{N}\s]/u);
     }
   });
 });
