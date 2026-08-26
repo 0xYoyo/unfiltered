@@ -567,11 +567,7 @@ describe("the response contract (AC-3, AC-5)", () => {
       expect(logged.route).toBe("classic");
       expect(logged.routeReason).toBe("sku-pattern");
       expect(typeof logged.latencyMs).toBe("number");
-      expect(Object.keys(logged.stages as object)).toEqual([
-        "classify",
-        "classic",
-        "hydrate",
-      ]);
+      expect(Object.keys(logged.stages as object)).toEqual(["classify", "classic"]);
 
       await action(
         actionArgs(

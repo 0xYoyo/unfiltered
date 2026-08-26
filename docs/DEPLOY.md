@@ -105,7 +105,8 @@ All of these live in the `unfiltered-prod` group (see above).
 
 | Variable | Source | Notes |
 | --- | --- | --- |
-| `DATABASE_URL` | Neon dashboard → connection string | Pooled Postgres URL with `sslmode=require`. Migrations run against it on every boot. |
+| `DATABASE_URL` | Neon dashboard → connection string, **pooled** | Must be Neon's pooled host — `ep-<name>-<id>-pooler.<region>.aws.neon.tech` — with `pgbouncer=true&sslmode=require` (YOY-115 AC-4/AC-5). Serves every query; the pooler is PgBouncer in transaction mode. Written by `render-migrate.mts pool-database-url unfiltered-prod`, never by hand. |
+| `DIRECT_DATABASE_URL` | the same string on the **direct** (unpooled) host | Prisma's `directUrl`: `prisma migrate deploy` runs over it on every boot. `pool-database-url` writes it as the previous unpooled `DATABASE_URL`; the entrypoint defaults it to `DATABASE_URL` when unset, so an unpooled deployment keeps working. |
 | `GEMINI_API_KEY` | Google AI Studio | Required — the playground search route builds its metered Gemini clients per request and 500s without it. |
 | `SHOPIFY_API_KEY` | `npm run env -- pull --workspace app`, or the Partner dashboard | Client ID of the app record. |
 | `SHOPIFY_API_SECRET` | same | Client secret. |
@@ -122,6 +123,29 @@ All of these live in the `unfiltered-prod` group (see above).
 | `GEMINI_INTENT_THINKING_LEVEL` | optional | Thinking level of the intent-extraction call; default `low` (YOY-109). `model-default` sends no thinking config and restores the model's own default. |
 
 `PORT` is supplied by Render and honoured by the entrypoint; do not set it.
+
+## Switching to the pooled connection (YOY-115 AC-5)
+
+Neon's direct host holds one server connection per client connection;
+the pooled `-pooler` host fronts them with PgBouncer in transaction mode,
+which is what a web service that opens many short connections should use.
+Prisma needs two strings for that: queries over the pooled URL
+(`pgbouncer=true`), migrations over the direct one (`directUrl`). The
+switch is one agent command plus a deploy — no value is ever displayed:
+
+```bash
+cd apps/shopify-app
+npx tsx scripts/render-migrate.mts pool-database-url unfiltered-prod   # DIRECT_DATABASE_URL := DATABASE_URL; DATABASE_URL := -pooler + pgbouncer=true
+npx tsx scripts/render-migrate.mts trigger-deploy srv-da6uhoh5efls73cvfis0
+npx tsx scripts/render-migrate.mts wait-deploy srv-da6uhoh5efls73cvfis0
+curl -s -o /dev/null -w "%{http_code}\n" https://unfiltered-eu.onrender.com/healthz   # 200
+```
+
+Then one classic and one AI search against the origin (docs/LATENCY.md's
+probe with `--runs 1` is the quickest), and the AC-6 measurement. The
+command refuses to run twice (a host already carrying `-pooler`) and
+refuses a non-Neon host, and it writes the direct URL before the pooled
+one so a failed second write leaves the group consistent.
 
 ## Re-creating the service (region move, YOY-115)
 

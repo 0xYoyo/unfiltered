@@ -66,8 +66,7 @@
       "intent": 455,
       "embed": 102,
       "retrieve": 44,
-      "closeMatches": 63,
-      "hydrate": 7
+      "closeMatches": 63
     }
   }
 }

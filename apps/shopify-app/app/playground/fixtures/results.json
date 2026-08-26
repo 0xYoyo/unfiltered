@@ -56,8 +56,7 @@
     "limited": null,
     "stages": {
       "classify": 1,
-      "classic": 28,
-      "hydrate": 7
+      "classic": 28
     }
   }
 }

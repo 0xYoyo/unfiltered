@@ -12,6 +12,11 @@ if [ -z "$DATABASE_URL" ]; then
   exit 1
 fi
 
+# Migrations run over the direct (unpooled) connection (YOY-115 AC-5, Prisma
+# `directUrl`); an environment that has not split its URLs yet — one
+# unpooled DATABASE_URL — keeps working because the direct URL defaults to it.
+export DIRECT_DATABASE_URL="${DIRECT_DATABASE_URL:-$DATABASE_URL}"
+
 cd /app/apps/shopify-app
 
 echo "Applying database migrations (prisma migrate deploy)..."

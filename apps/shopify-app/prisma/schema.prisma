@@ -9,9 +9,16 @@ generator client {
 // Note that some adapters may set a maximum length for the String type by default, please ensure your strings are long
 // enough when changing adapters.
 // See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
+// Two connection strings (YOY-115 AC-5): queries go over DATABASE_URL — on
+// Render, Neon's pooled `-pooler` host (PgBouncer, transaction mode) — and
+// migrations go over DIRECT_DATABASE_URL, the direct host, because
+// `prisma migrate deploy` needs session-level features a transaction pooler
+// does not offer. Locally and in the entrypoint the two may be the same
+// unpooled URL; the entrypoint defaults DIRECT_DATABASE_URL to DATABASE_URL.
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
 }
 
 // Cost-metering ledger: one row per AI call, written through the CostRecorder

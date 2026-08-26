@@ -33,8 +33,7 @@
     "latencyMs": 18,
     "limited": null,
     "stages": {
-      "classic": 24,
-      "hydrate": 6
+      "classic": 24
     }
   }
 }

@@ -3,7 +3,11 @@ import type { RetrievalConstraints } from "@unfiltered/engine";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { createTestDb } from "../testing/helpers.server";
-import { createPgTrgmClassicStore, SEARCH_TEXT } from "./classic-store.server";
+import {
+  buildClassicSearchSql,
+  createPgTrgmClassicStore,
+  SEARCH_TEXT,
+} from "./classic-store.server";
 
 // Classic-store tests run against the embedded PGlite database with the
 // committed migrations applied — the pg_trgm extension, the
@@ -504,5 +508,120 @@ describe("the full match set, uncapped (YOY-107 AC-1)", () => {
     await expect(searchIds(db, { query: "dress", limit: 0 })).rejects.toThrow(
       RangeError,
     );
+  });
+});
+
+describe("one statement per classic search, cards included (YOY-115 AC-1)", () => {
+  let db: PrismaClient;
+  const statements: string[] = [];
+  /** Prisma emits query events after the query resolves; drain them. */
+  const settle = () => new Promise<void>((done) => setTimeout(done, 0));
+  const startCounting = async (): Promise<void> => {
+    await settle();
+    statements.length = 0;
+  };
+
+  beforeAll(async () => {
+    db = await createTestDb({ onQuery: (sql) => statements.push(sql) });
+    await seed(db, [
+      {
+        productId: "nike",
+        title: "Nike Air Max 90",
+        productType: "Sneakers",
+        priceMin: 250,
+        priceMax: 300,
+        available: false,
+      },
+      {
+        productId: "aurora",
+        title: "Aurora Maxi Dress",
+        productType: "Dresses",
+        enrichment: { colors: ["red"] },
+      },
+    ]);
+  });
+
+  it("a trigram search is exactly one statement — no transaction, no set_config round trip", async () => {
+    await startCounting();
+    await createPgTrgmClassicStore(db).search({ storeId: SHOP, query: "nkie air max" });
+    await settle();
+    expect(statements).toHaveLength(1);
+    expect(statements[0]).toContain("set_config('pg_trgm.word_similarity_threshold', '0.3', true)");
+    expect(statements[0]).toContain("<%");
+    expect(statements.some((sql) => /^\s*(BEGIN|COMMIT)/i.test(sql))).toBe(false);
+  });
+
+  it("a constraint-only search is exactly one statement too", async () => {
+    await startCounting();
+    await createPgTrgmClassicStore(db).search({
+      storeId: SHOP,
+      constraints: { ...noConstraints(), priceMax: 400, colorsExclude: ["black"] },
+    });
+    await settle();
+    expect(statements).toHaveLength(1);
+    expect(statements[0]).not.toContain("<%");
+  });
+
+  it("the statement applies the 0.30 threshold: a two-edit typo still matches", async () => {
+    // Under pg_trgm's default 0.6 threshold this typo finds nothing; the
+    // in-statement set_config is what makes the GIN scan see 0.3.
+    expect(await searchIds(db, { query: "nkie air max" })).toEqual(["nike"]);
+  });
+
+  it("returns the card fields on every hit, read in the same statement", async () => {
+    await startCounting();
+    const result = await createPgTrgmClassicStore(db).search({ storeId: SHOP, query: "nike air max" });
+    await settle();
+    expect(statements).toHaveLength(1);
+    expect(result.hits[0]).toMatchObject({
+      productId: "nike",
+      card: {
+        title: "Nike Air Max 90",
+        url: null,
+        imageUrl: null,
+        priceMin: 250,
+        priceMax: 300,
+        currencyCode: "ILS",
+        available: false,
+      },
+    });
+    expect(Object.keys(result.hits[0]!.card).sort()).toEqual(
+      ["available", "currencyCode", "imageUrl", "priceMax", "priceMin", "title", "url"].sort(),
+    );
+    expect(result.hits[0]).not.toHaveProperty("colorUnknown");
+  });
+
+  it("keeps colour-evidence tiering and the colorUnknown flag beside the card", async () => {
+    const result = await createPgTrgmClassicStore(db).search({
+      storeId: SHOP,
+      constraints: { ...noConstraints(), colorsInclude: ["red"] },
+    });
+    expect(result.hits.map((hit) => [hit.productId, hit.colorUnknown])).toEqual([
+      ["aurora", false],
+      ["nike", true],
+    ]);
+    expect(result.hits[1]!.card.title).toBe("Nike Air Max 90");
+  });
+
+  it("the plan runs set_config before the search scan: the threshold row is the outer side of the join", async () => {
+    // The whole point of the LATERAL form: the executor must produce the
+    // set_config row before it scans CatalogProduct with `<%`, or the GIN
+    // scan would read pg_trgm's default 0.6 threshold. The plan shows one
+    // Nested Loop whose outer side is the threshold subquery and whose inner
+    // side is the search — and the `<%` predicate lives on the inner side.
+    const { sql, params } = buildClassicSearchSql({ storeId: SHOP, query: "nike air max 90" });
+    const plan = (
+      await db.$queryRawUnsafe<Array<Record<string, string>>>(`EXPLAIN ${sql}`, ...params)
+    )
+      .map((row) => Object.values(row).join(" "))
+      .join("\n");
+    expect(plan).toContain("Nested Loop");
+    const thresholdAt = plan.indexOf("Subquery Scan on s");
+    const searchAt = plan.indexOf('on "CatalogProduct" p');
+    expect(thresholdAt).toBeGreaterThan(-1);
+    expect(searchAt).toBeGreaterThan(thresholdAt);
+    expect(plan.slice(searchAt)).toContain("<%");
+    // Exactly one statement: the plan tree has one root.
+    expect(plan.split("\n").filter((line) => !line.startsWith(" "))).toHaveLength(1);
   });
 });
