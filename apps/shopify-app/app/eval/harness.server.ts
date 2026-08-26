@@ -186,6 +186,8 @@ export interface EvalRunResult {
   intentCalls: { lite: number; accuracy: number };
   /** The threshold the routed blend was scored under. */
   escalationThreshold: number;
+  /** Intent prompt size vs the pre-trim baseline (YOY-64 AC-2). */
+  intentInputTokens: { before: number; after: number; reduction: number };
 }
 
 /**
@@ -200,6 +202,38 @@ export interface BaselineHits {
 
 export function loadBaselineHits(): BaselineHits {
   return readJson<BaselineHits>("baseline-hits.json");
+}
+
+/** The pre-trim intent prompt size (YOY-64 AC-2). */
+export interface IntentTokenBaseline {
+  recordedAt: string;
+  meanInputTokens: number;
+  goldens: number;
+}
+
+export function loadIntentTokenBaseline(): IntentTokenBaseline {
+  return readJson<IntentTokenBaseline>("intent-token-baseline.json");
+}
+
+/**
+ * Mean accuracy-tier intent input tokens over the goldens' recordings — the
+ * prompt-size metric YOY-64 AC-2 trims — and its reduction vs the baseline.
+ */
+export function intentInputTokenStats(
+  recording: LlmRecording,
+  goldens: Golden[],
+  baseline: IntentTokenBaseline,
+): { before: number; after: number; reduction: number } {
+  const samples = goldens
+    .map((golden) => recording.entries[golden.query]?.inputTokens)
+    .filter((tokens): tokens is number => typeof tokens === "number");
+  const after =
+    samples.length === 0 ? 0 : samples.reduce((sum, tokens) => sum + tokens, 0) / samples.length;
+  return {
+    before: baseline.meanInputTokens,
+    after,
+    reduction: baseline.meanInputTokens === 0 ? 0 : 1 - after / baseline.meanInputTokens,
+  };
 }
 
 export function loadCatalog(): EvalProduct[] {
@@ -633,6 +667,11 @@ export async function runEval(db: PrismaClient): Promise<EvalRunResult> {
     refinementEscalationRate,
     intentCalls,
     escalationThreshold,
+    intentInputTokens: intentInputTokenStats(
+      intentRecording,
+      goldens,
+      loadIntentTokenBaseline(),
+    ),
   };
   printScorecard(result);
   return result;
@@ -706,6 +745,7 @@ function printScorecard(result: EvalRunResult): void {
     `refinement-only intent cost per 1,000 follow-ups (reported separately, not blended): $${result.refinementCostPer1000Usd.toFixed(2)}`,
     `intent escalation rate (lite → accuracy, threshold ${result.escalationThreshold}): ${(result.escalationRate * 100).toFixed(0)}% of AI searches, ${(result.refinementEscalationRate * 100).toFixed(0)}% of follow-ups`,
     `intent calls per tier: lite ${result.intentCalls.lite}, accuracy ${result.intentCalls.accuracy}`,
+    `intent input tokens: before ${result.intentInputTokens.before.toFixed(0)} / after ${result.intentInputTokens.after.toFixed(0)} (−${(result.intentInputTokens.reduction * 100).toFixed(0)} %; bar: −≥30 %)`,
     "",
   );
   console.log(lines.join("\n"));

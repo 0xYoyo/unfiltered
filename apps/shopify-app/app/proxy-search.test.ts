@@ -97,8 +97,11 @@ import { createSearchOrchestrator } from "./search/orchestrator.server";
 import {
   intentEscalationThresholdFromEnv,
   INTENT_ESCALATION_THRESHOLD_ENV,
+  intentReuseWindowMsFromEnv,
+  INTENT_REUSE_WINDOW_MINUTES_ENV,
   resetProxySearchOrchestrator,
 } from "./search/proxy.server";
+import { EXAMPLE_QUERIES } from "./playground/strings";
 import { createPgVectorRetrievalStore } from "./search/retrieval-store.server";
 import { createSessionThrottle } from "./search/throttle.server";
 
@@ -330,10 +333,15 @@ function fakeEmbeddings(options?: { costRecorder?: CostRecorder }): EmbeddingCli
 function installOrchestrator(options: {
   llm: LlmClient;
   embeddings?: EmbeddingClient;
+  /** Exact-query intent reuse window (YOY-64 AC-4); off by default. */
+  intentReuseWindowMs?: number;
 }): void {
   resetProxySearchOrchestrator();
   orchestratorSeam.build = (routeDb) =>
     createSearchOrchestrator({
+      ...(options.intentReuseWindowMs !== undefined
+        ? { intentReuse: { windowMs: options.intentReuseWindowMs } }
+        : {}),
       db: routeDb as PrismaClient,
       classifier: createQueryClassifier({ llm: options.llm, timeoutMs: 500 }),
       extractor: createIntentExtractor({ llm: options.llm }),
@@ -1484,6 +1492,94 @@ describe("intent escalation threshold from env (YOY-116 AC-2)", () => {
       expect(() =>
         intentEscalationThresholdFromEnv({ [INTENT_ESCALATION_THRESHOLD_ENV]: raw }),
       ).toThrow(/INTENT_ESCALATION_THRESHOLD/);
+    }
+  });
+});
+
+describe("exact-query intent reuse through the proxy (YOY-64 AC-4)", () => {
+  it("each playground example submitted twice: the second makes no LLM call, is logged, and is not budgeted", async () => {
+    await seed([
+      {
+        productId: "silk-gown",
+        title: "silk gown",
+        vector: [0.9, 0.1, 0],
+        category: "dress",
+        occasions: ["wedding"],
+      },
+    ]);
+    let intentCalls = 0;
+    installOrchestrator({
+      llm: fakeLlm({
+        classification: () => ({ route: "ai" }),
+        intent: () => {
+          intentCalls += 1;
+          return DRESS_INTENT;
+        },
+        costRecorder: createPrismaCostRecorder(db),
+      }),
+      intentReuseWindowMs: 60 * 60_000,
+    });
+    const examples = [...EXAMPLE_QUERIES.en, ...EXAMPLE_QUERIES.he]
+      .filter((example) => example.kind !== "refinement")
+      .map((example) => example.text);
+    expect(examples.length).toBeGreaterThanOrEqual(10);
+
+    for (const query of examples) {
+      const first = await (
+        await action(actionArgs(proxyRequest({ payload: { query, sessionId: "demo" } })))
+      ).json();
+      expect(first.route, query).toBe("ai");
+      const rowsAfterFirst = await db.aiCall.count({ where: { searchId: first.searchId } });
+      expect(rowsAfterFirst, query).toBeGreaterThan(0);
+
+      const second = await (
+        await action(actionArgs(proxyRequest({ payload: { query, sessionId: "demo-2" } })))
+      ).json();
+      expect(second.route, query).toBe("ai");
+      expect(second.results, query).toEqual(first.results);
+      expect(second.chips, query).toEqual(first.chips);
+      expect(second.intent, query).toEqual(first.intent);
+      // Zero LLM calls: no AiCall rows at all for the reused search.
+      expect(await db.aiCall.count({ where: { searchId: second.searchId } }), query).toBe(0);
+      // Logged as a normal SearchEvent, with the reuse reason.
+      const event = await db.searchEvent.findFirst({ where: { searchId: second.searchId } });
+      expect(event?.routeReason, query).toBe("intent-reuse");
+      expect(event?.route, query).toBe("ai");
+    }
+    // One intent call per distinct example, none for the repeats.
+    expect(intentCalls).toBe(examples.length);
+    // The throttle saw only the first submissions of each example.
+    const events = await db.searchEvent.findMany({ where: { routeReason: "intent-reuse" } });
+    expect(events).toHaveLength(examples.length);
+  });
+
+  it("stores the served intent keyed by the normalized query, and nothing for classic or degraded searches", async () => {
+    await seed([{ productId: "sneaker-90", title: "nike 90" }, { productId: "silk-gown", title: "silk gown", vector: [0.9, 0.1, 0], category: "dress" }]);
+    installOrchestrator({
+      llm: fakeLlm({ classification: () => ({ route: "ai" }), intent: () => DRESS_INTENT }),
+      intentReuseWindowMs: 60 * 60_000,
+    });
+    const ai = await (await action(actionArgs(proxyRequest({ payload: { query: "  Elegant DRESS for a summer   wedding", sessionId: "s1" } })))).json();
+    const aiRow = await db.searchEvent.findFirst({ where: { searchId: ai.searchId } });
+    expect(aiRow?.normalizedQuery).toBe("elegant dress for a summer wedding");
+    expect(aiRow?.intent).toMatchObject({ category: "dress", occasion: "wedding" });
+
+    const classic = await (await action(actionArgs(proxyRequest({ payload: { query: "nike 90", sessionId: "s1" } })))).json();
+    const classicRow = await db.searchEvent.findFirst({ where: { searchId: classic.searchId } });
+    expect(classicRow?.normalizedQuery).toBeNull();
+    expect(classicRow?.intent).toBeNull();
+  });
+});
+
+describe("intent reuse window from env (YOY-64 AC-4)", () => {
+  it("defaults to 60 minutes, reads minutes, and 0 disables", () => {
+    expect(intentReuseWindowMsFromEnv({})).toBe(60 * 60_000);
+    expect(intentReuseWindowMsFromEnv({ [INTENT_REUSE_WINDOW_MINUTES_ENV]: "15" })).toBe(15 * 60_000);
+    expect(intentReuseWindowMsFromEnv({ [INTENT_REUSE_WINDOW_MINUTES_ENV]: "0" })).toBe(0);
+    for (const raw of ["", "abc", "-1"]) {
+      expect(() => intentReuseWindowMsFromEnv({ [INTENT_REUSE_WINDOW_MINUTES_ENV]: raw })).toThrow(
+        /INTENT_REUSE_WINDOW_MINUTES/,
+      );
     }
   });
 });

@@ -225,3 +225,108 @@ describe("the lite-first ladder (AC-2)", () => {
     await expect(ladder.extract("plain query")).rejects.toThrow("accuracy backend down");
   });
 });
+
+describe("ladder deadline (YOY-64 AC-3)", () => {
+  /** A tier that never answers on its own and honours the context's signal. */
+  function hangingTier(name: string) {
+    const calls: Array<{ query: string; context?: IntentExtractionContext }> = [];
+    const extractor: IntentExtractor = {
+      extract(query, context) {
+        calls.push({ query, context });
+        return new Promise<Intent>((_resolve, reject) => {
+          context?.signal?.addEventListener("abort", () => {
+            const error = new Error(`${name} call timed out`);
+            error.name = "GeminiTimeoutError";
+            reject(error);
+          });
+        });
+      },
+    };
+    return { extractor, calls };
+  }
+
+  it("a hung lite call with no budget left degrades right there: no accuracy call", async () => {
+    const lite = hangingTier("lite");
+    const accuracy = tier(intent({ category: "dress", confidence: 1 }));
+    const ladder = createEscalatingIntentExtractor({
+      lite: lite.extractor,
+      accuracy: accuracy.extractor,
+      deadlineMs: 40,
+    });
+    const startedAt = performance.now();
+    await expect(ladder.extractDetailed("plain query", { searchId: "s1" })).rejects.toMatchObject({
+      name: "GeminiTimeoutError",
+    });
+    expect(performance.now() - startedAt).toBeLessThan(500);
+    expect(lite.calls).toHaveLength(1);
+    expect(accuracy.calls).toHaveLength(0);
+    // The tier saw the caller's context plus the ladder's signal.
+    expect(lite.calls[0]!.context?.searchId).toBe("s1");
+    expect(lite.calls[0]!.context?.signal?.aborted).toBe(true);
+  });
+
+  it("an accuracy call reached after a fast lite failure is cut at the same deadline", async () => {
+    const lite: IntentExtractor = {
+      async extract() {
+        throw new Error("lite backend 503");
+      },
+    };
+    const accuracy = hangingTier("accuracy");
+    const ladder = createEscalatingIntentExtractor({
+      lite,
+      accuracy: accuracy.extractor,
+      deadlineMs: 40,
+    });
+    const startedAt = performance.now();
+    await expect(ladder.extract("plain query")).rejects.toMatchObject({ name: "GeminiTimeoutError" });
+    expect(performance.now() - startedAt).toBeLessThan(500);
+    expect(accuracy.calls).toHaveLength(1);
+    expect(accuracy.calls[0]!.context?.signal?.aborted).toBe(true);
+  });
+
+  it("a class match's accuracy call is bounded by the deadline too", async () => {
+    const lite = tier(intent({ confidence: 1 }));
+    const accuracy = hangingTier("accuracy");
+    const ladder = createEscalatingIntentExtractor({
+      lite: lite.extractor,
+      accuracy: accuracy.extractor,
+      deadlineMs: 40,
+    });
+    await expect(ladder.extract("something to wear to a wedding")).rejects.toMatchObject({
+      name: "GeminiTimeoutError",
+    });
+    expect(lite.calls).toHaveLength(0);
+    expect(accuracy.calls).toHaveLength(1);
+  });
+
+  it("combines the caller's own signal with the deadline, and passes the context through untouched without one", async () => {
+    const lite = hangingTier("lite");
+    const accuracy = tier(intent({ confidence: 1 }));
+    const ladder = createEscalatingIntentExtractor({
+      lite: lite.extractor,
+      accuracy: accuracy.extractor,
+      deadlineMs: 10_000,
+    });
+    const caller = new AbortController();
+    const pending = ladder.extract("plain query", { signal: caller.signal });
+    caller.abort();
+    await expect(pending).rejects.toMatchObject({ name: "GeminiTimeoutError" });
+    expect(accuracy.calls).toHaveLength(0);
+
+    // No deadline: the context object reaches the tier as given (no signal invented).
+    const plainLite = tier(intent({ confidence: 1 }));
+    const plain = createEscalatingIntentExtractor({ lite: plainLite.extractor, accuracy: accuracy.extractor });
+    const context: IntentExtractionContext = { searchId: "s2" };
+    await plain.extract("plain query", context);
+    expect(plainLite.calls[0]!.context).toEqual(context);
+    expect(plainLite.calls[0]!.context?.signal).toBeUndefined();
+  });
+
+  it("rejects a non-positive deadline", () => {
+    const lite = tier(intent({ confidence: 1 }));
+    const accuracy = tier(intent({ confidence: 1 }));
+    expect(() =>
+      createEscalatingIntentExtractor({ lite: lite.extractor, accuracy: accuracy.extractor, deadlineMs: 0 }),
+    ).toThrow(RangeError);
+  });
+});

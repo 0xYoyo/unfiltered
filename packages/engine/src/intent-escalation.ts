@@ -22,6 +22,16 @@
  *    Found on YOY-116: gemini-3.5-flash-lite hangs deterministically on the
  *    "same but cheaper" refinement prompt (r01), at every thinking level.
  *
+ * The ladder runs under ONE budget (`deadlineMs`, YOY-64 AC-3): an abort
+ * signal armed per extraction is forwarded to both tiers through the
+ * extraction context, so a lite call that times out with no budget left
+ * degrades the search right there instead of spending a second full
+ * timeout on the accuracy tier (lite 8 s + accuracy 8 s = 16 s before the
+ * classic fallback, found in review of unfiltered PR #117), and an
+ * accuracy call reached after a fast lite failure is cut at the deadline,
+ * not at its own per-request timeout. With no `deadlineMs` each tier is
+ * bounded only by its own port's timeout — the eval harness's replay.
+ *
  * Both calls carry the caller's `searchId`, operation `"intent"`, and their
  * own model id through their own LLM port, so the cost ledger keeps them
  * distinguishable. Refinements (`previousIntent`) follow the same rules on
@@ -161,6 +171,12 @@ export interface EscalatingIntentExtractorOptions {
   threshold?: number;
   /** Escalation classes; defaults to the committed list. */
   classes?: readonly IntentEscalationClass[];
+  /**
+   * Wall-clock budget for the whole ladder, ms: one abort signal bounds the
+   * lite call and any accuracy call after it. Absent means no ladder-level
+   * bound (each tier's own port timeout applies).
+   */
+  deadlineMs?: number;
 }
 
 /**
@@ -178,6 +194,31 @@ export function createEscalatingIntentExtractor(
       `intent escalation threshold must be within [0, 1], got ${threshold}`,
     );
   }
+  const deadlineMs = options.deadlineMs;
+  if (deadlineMs !== undefined && !(Number.isFinite(deadlineMs) && deadlineMs > 0)) {
+    throw new RangeError(
+      `intent escalation deadlineMs must be a positive number, got ${deadlineMs}`,
+    );
+  }
+
+  /**
+   * The context both tiers see: the caller's, plus the ladder's deadline
+   * signal when one is configured (combined with the caller's own signal).
+   * Without a deadline the context passes through untouched.
+   */
+  function budgeted(
+    context: IntentExtractionContext | undefined,
+  ): IntentExtractionContext | undefined {
+    if (deadlineMs === undefined) {
+      return context;
+    }
+    const deadline = AbortSignal.timeout(deadlineMs);
+    const signal =
+      context?.signal === undefined
+        ? deadline
+        : AbortSignal.any([context.signal, deadline]);
+    return { ...context, signal };
+  }
 
   async function accuracy(
     query: string,
@@ -190,8 +231,10 @@ export function createEscalatingIntentExtractor(
 
   async function extractDetailed(
     query: string,
-    context?: IntentExtractionContext,
+    rawContext?: IntentExtractionContext,
   ): Promise<IntentExtraction> {
+    const startedAt = Date.now();
+    const context = budgeted(rawContext);
     const matched = matchIntentEscalationClass(query, classes);
     if (matched !== null) {
       // Known-weak shape: straight to the accuracy tier, no lite call.
@@ -201,6 +244,18 @@ export function createEscalatingIntentExtractor(
     try {
       lite = await options.lite.extract(query, context);
     } catch (error) {
+      const budgetSpent =
+        context?.signal?.aborted === true ||
+        (deadlineMs !== undefined && Date.now() - startedAt >= deadlineMs);
+      if (budgetSpent) {
+        // The ladder's budget is spent (or the caller gave up): a second
+        // call would only add a second timeout. The elapsed check covers a
+        // lite port whose own timeout equals the deadline and fires first —
+        // the production wiring, 8 s and 8 s — where the deadline signal may
+        // not have flipped yet. The lite error propagates unchanged so the
+        // caller's log names the class (GeminiTimeoutError).
+        throw error;
+      }
       const name = error instanceof Error ? error.name : "Error";
       return accuracy(query, context, { kind: "lite-error", error: name });
     }

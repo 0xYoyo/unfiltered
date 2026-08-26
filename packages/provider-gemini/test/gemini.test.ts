@@ -9,6 +9,7 @@ import {
   DEFAULT_INTENT_LITE_MODEL,
   DEFAULT_INTENT_LITE_THINKING_LEVEL,
   DEFAULT_INTENT_LITE_TIMEOUT_MS,
+  DEFAULT_INTENT_TIMEOUT_MS,
   DEFAULT_INTENT_MODEL,
   DEFAULT_INTENT_THINKING_LEVEL,
   MODEL_DEFAULT_THINKING_LEVEL,
@@ -91,8 +92,10 @@ describe("model configuration", () => {
       intentThinkingLevel: DEFAULT_INTENT_THINKING_LEVEL,
       intentLiteThinkingLevel: DEFAULT_INTENT_LITE_THINKING_LEVEL,
       intentLiteTimeoutMs: DEFAULT_INTENT_LITE_TIMEOUT_MS,
+      intentTimeoutMs: DEFAULT_INTENT_TIMEOUT_MS,
     });
     expect(DEFAULT_INTENT_LITE_TIMEOUT_MS).toBe(8_000);
+    expect(DEFAULT_INTENT_TIMEOUT_MS).toBe(8_000);
     expect(DEFAULT_INTENT_THINKING_LEVEL).toBe("low");
     // The lite tier (YOY-116): the cheap model, thinking set explicitly.
     expect(DEFAULT_INTENT_LITE_MODEL).toBe("gemini-3.5-flash-lite");
@@ -109,6 +112,7 @@ describe("model configuration", () => {
       GEMINI_INTENT_LITE_MODEL: "model-d",
       GEMINI_INTENT_LITE_THINKING_LEVEL: "medium",
       GEMINI_INTENT_LITE_TIMEOUT_MS: "5000",
+      GEMINI_INTENT_TIMEOUT_MS: "7000",
     });
     expect(models).toEqual({
       classificationModel: "model-a",
@@ -119,7 +123,11 @@ describe("model configuration", () => {
       intentThinkingLevel: "high",
       intentLiteThinkingLevel: "medium",
       intentLiteTimeoutMs: 5000,
+      intentTimeoutMs: 7000,
     });
+    expect(() => geminiModelsFromEnv({ GEMINI_INTENT_TIMEOUT_MS: "1.5" })).toThrow(
+      /GEMINI_INTENT_TIMEOUT_MS/,
+    );
     for (const raw of ["", "abc", "0", "-1", "1.5"]) {
       expect(() => geminiModelsFromEnv({ GEMINI_INTENT_LITE_TIMEOUT_MS: raw })).toThrow(
         /GEMINI_INTENT_LITE_TIMEOUT_MS/,
@@ -715,5 +723,46 @@ describe("embeddings", () => {
     await expect(client.embed({ texts: ["a", "b"] })).rejects.toThrow(
       /1 embeddings for 2 texts/,
     );
+  });
+});
+
+describe("caller abort signal (YOY-64 AC-3)", () => {
+  it("a caller's signal aborts a hung request before requestTimeoutMs, as GeminiTimeoutError", async () => {
+    let seen: AbortSignal | null | undefined;
+    const impl = ((_url: unknown, init?: RequestInit) => {
+      seen = init?.signal;
+      return new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => {
+          reject(init.signal!.reason as Error);
+        });
+      });
+    }) as typeof fetch;
+    const client = createGeminiLlmClient({
+      modelId: "test-flash-model",
+      apiKey: "test-key-not-real",
+      costRecorder: { async record() {} },
+      fetchImpl: impl,
+      // Far longer than the caller's deadline: the deadline must win.
+      requestTimeoutMs: 10_000,
+    });
+    const startedAt = performance.now();
+    const call = client.completeStructured({
+      prompt: "p",
+      schema: SCHEMA,
+      operation: "intent",
+      signal: AbortSignal.timeout(25),
+    });
+    await expect(call).rejects.toThrow(GeminiTimeoutError);
+    await expect(
+      client.completeStructured({
+        prompt: "p",
+        schema: SCHEMA,
+        operation: "intent",
+        signal: AbortSignal.timeout(25),
+      }),
+    ).rejects.toThrow(/caller's deadline/);
+    expect(performance.now() - startedAt).toBeLessThan(2_000);
+    // The request still carried a signal (the combined one), never none.
+    expect(seen).toBeInstanceOf(AbortSignal);
   });
 });

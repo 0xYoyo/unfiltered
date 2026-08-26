@@ -155,6 +155,13 @@ export interface StructuredCompletionRequest {
   storeId?: string;
   /** Correlation ID tying together every call serving one search. */
   searchId?: string;
+  /**
+   * Caller's abort signal, when the call runs under a budget that spans
+   * more than one call (the intent ladder's deadline, YOY-64 AC-3).
+   * Implementations abort the request when it fires, on top of their own
+   * per-request timeout.
+   */
+  signal?: AbortSignal;
 }
 
 /**

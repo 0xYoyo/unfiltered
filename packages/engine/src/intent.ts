@@ -138,6 +138,12 @@ export interface IntentExtractionContext {
    * caller's concern.
    */
   previousIntent?: Intent;
+  /**
+   * Abort signal bounding this extraction, forwarded to the LLM port. The
+   * lite-first ladder arms one per `extractDetailed` call from its
+   * `deadlineMs` (YOY-64 AC-3) so both tiers share one budget.
+   */
+  signal?: AbortSignal;
 }
 
 /** Which model tier produced an intent (YOY-116). */
@@ -392,74 +398,64 @@ export function mergeRefinementIntent(
 function refinementSection(previousIntent: Intent): string[] {
   return [
     "",
-    "This shopper already searched once. The intent extracted from their",
-    "previous query is below. Decide which of two things the new query is:",
-    "- a REFINEMENT of that search (it adjusts, adds, or removes constraints:",
-    '  "same but cheaper", "in red", "without sleeves"): return the previous',
-    "  intent with exactly those deltas applied, keeping every constraint and",
-    "  soft attribute the new query did not touch. A comparative MUST move",
-    "  the bound it names — repeating the previous value unchanged is wrong:",
-    '  "cheaper" ("יותר זול") returns a priceMax strictly below the previous',
-    "  priceMax (about a quarter lower when the shopper names no number);",
-    '  "more expensive" ("יותר יקר") returns a priceMin strictly above the',
-    "  previous priceMin, or above the previous priceMax when only that",
-    "  bound exists — clearing the now-contradicted priceMax.",
-    "  Worked example of a comparative refinement — previous intent:",
-    '    {"category": "boots", "priceMax": 80, "colorsInclude": ["purple"],',
-    '     "colorsExclude": [], "occasion": "sport",',
-    '     "availabilityRequired": false, "softAttributes": ["waterproof"]}',
-    '  follow-up "pricier" answers:',
-    '    {"outcome": "refinement",',
-    '     "category": "boots", "priceMin": 100, "priceMax": null,',
-    '     "colorsInclude": ["purple"], "colorsExclude": [],',
-    '     "occasion": "sport", "availabilityRequired": false,',
-    '     "softAttributes": ["waterproof"]}',
-    "  — the named bound moved, and every constraint the follow-up did not",
-    "  touch (occasion included) returned verbatim.",
-    "- a TOPIC CHANGE (it names a different product or search altogether):",
-    "  discard the previous intent entirely and extract the new query alone,",
-    "  carrying nothing over.",
-    "Either way, answer with a complete intent in the same JSON shape — never",
-    "a patch, never a reference to what changed — plus one extra field:",
-    '"outcome", set to "refinement" or "topic_change" to state which of the',
-    "two judgments you made.",
+    "This shopper already searched once; their previous intent is below.",
+    "Decide which the new query is:",
+    "- a REFINEMENT (it adjusts, adds, or removes constraints: \"same but",
+    "  cheaper\", \"in red\", \"without sleeves\"): return the previous intent",
+    "  with exactly those deltas applied, keeping every untouched constraint",
+    "  and soft attribute; add no constraint (occasion included) the",
+    "  follow-up did not state. A comparative MUST move the bound it names —",
+    "  repeating the previous value is wrong: \"cheaper\" (\"יותר זול\") returns",
+    "  a priceMax strictly below the previous priceMax (about a quarter lower",
+    "  when no number is named); \"more expensive\" (\"יותר יקר\") returns a",
+    "  priceMin strictly above the previous priceMin, or above the previous",
+    "  priceMax when only that bound exists, clearing the contradicted",
+    "  priceMax. Worked example — previous intent",
+    '  {"category": "boots", "priceMax": 80, "colorsInclude": ["purple"],',
+    '   "colorsExclude": [], "occasion": "sport", "availabilityRequired": false,',
+    '   "softAttributes": ["waterproof"]}, follow-up "pricier" answers',
+    '  {"outcome": "refinement", "category": "boots", "priceMin": 100,',
+    '   "priceMax": null, "colorsInclude": ["purple"], "colorsExclude": [],',
+    '   "occasion": "sport", "availabilityRequired": false,',
+    '   "softAttributes": ["waterproof"]}.',
+    "- a TOPIC CHANGE (a different product or search altogether): discard the",
+    "  previous intent entirely and extract the new query alone.",
+    "Either way answer with a complete intent in the same JSON shape — never a",
+    '  patch — plus "outcome": "refinement" or "topic_change".',
     "",
     `Previous intent: ${serializePreviousIntent(previousIntent)}`,
   ];
 }
 
 function buildIntentPrompt(query: string, previousIntent?: Intent): string {
+  // Trimmed on YOY-64 AC-2 (≥ 30 % fewer input tokens than the pre-M5
+  // prompt): the category vocabulary is no longer listed — the response
+  // schema's enum already binds it — and every rule is stated once, tersely.
+  // Two things the trim must keep, measured live against the lite tier on
+  // the eval goldens (6 samples each): the occasion vocabulary spelled out
+  // with "null when the query states no occasion" (without it the lite
+  // model invents "casual"/"evening" for g10 and r09 in 2–3 of 6 samples),
+  // and the "omit / never invent" rule placed LAST, right before the query
+  // (moved to the top it stopped binding the refinement answer).
   return [
-    "Extract structured shopping intent from this product search query.",
-    "Split what the shopper said into hard constraints and soft attributes:",
-    "- category: the product type asked for, when stated. Must be one of:",
-    `  ${CANONICAL_CATEGORIES.join(", ")}. Use null when the query states`,
-    '  no category and "other" when the stated category fits none of them.',
-    "- priceMin / priceMax: numeric price bounds, when stated; currency as an",
-    "  ISO 4217 code only when the query names or implies one.",
-    "- colorsInclude: colors the shopper wants; colorsExclude: colors the",
-    '  shopper rejects ("not black" → exclude black).',
-    "- occasion: an event the shopper dresses FOR (a wedding, the office, a",
-    "  night out), when stated. Must be one of:",
-    `  ${CANONICAL_OCCASIONS.join(", ")}. Seasons and times of day`,
-    '  ("winter", "evenings") are never occasions — they are softAttributes.',
-    '  Use null when the query states no occasion and "other" when it fits',
-    "  none of them.",
-    "- size: the requested size, when stated.",
-    "- availabilityRequired: true only when the shopper asks for in-stock or",
-    "  immediately available items.",
-    "- softAttributes: every remaining descriptive quality (style, season,",
-    "  material, mood) as short free-form phrases for similarity matching.",
-    "- confidence: a number from 0 to 1 — how sure you are that the hard",
-    "  constraints above (category, prices, colors, occasion, size,",
-    "  availability) are complete and correct for this query. Use a low",
-    "  value when the query is ambiguous, idiomatic, or mixes languages in a",
-    "  way you may have misread.",
-    "Hard-constraint values (category, colors, occasion, size) must be",
-    "lowercase English regardless of the query's language, so they match a",
-    "normalized catalog vocabulary; softAttributes may stay in the shopper's",
-    "language. Omit optional fields the query does not state; never invent",
-    "constraints. Answer as JSON.",
+    "Extract shopping intent from this search query as JSON.",
+    "Hard constraints are lowercase English whatever the query's language:",
+    '- category: the product type ("other" if none of the allowed values fits).',
+    "- priceMin / priceMax: numeric bounds; currency as ISO 4217 when named.",
+    '- colorsInclude / colorsExclude: colors wanted / rejected ("not black" →',
+    "  exclude black).",
+    `- occasion: one of ${CANONICAL_OCCASIONS.join(", ")} —`,
+    "  an event the shopper dresses FOR (a wedding, the office, a night out).",
+    "  Null when the query states no occasion.",
+    '  Seasons and times of day ("winter", "evenings") are softAttributes,',
+    "  never occasions.",
+    "- size: the requested size.",
+    "- availabilityRequired: true only for in-stock asks.",
+    "- softAttributes: every remaining quality (style, season, material, mood)",
+    "  as short phrases, in the shopper's language.",
+    "- confidence: 0 to 1, how sure the hard constraints are complete and",
+    "  correct; low when ambiguous or mixed-language.",
+    "Omit any constraint the query does not state; never invent one.",
     ...(previousIntent === undefined ? [] : refinementSection(previousIntent)),
     "",
     `Query: ${query}`,
@@ -593,6 +589,7 @@ export function createIntentExtractor(
       temperature: 0,
       storeId: context?.storeId,
       searchId: context?.searchId,
+      signal: context?.signal,
     });
     if (previousIntent === undefined) {
       return parseIntent(completion);

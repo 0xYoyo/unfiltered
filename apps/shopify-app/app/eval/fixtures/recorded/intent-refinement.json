@@ -13,6 +13,7 @@
           "elegant",
           "summer"
         ],
+        "confidence": 1,
         "outcome": "refinement",
         "category": "dress",
         "currency": null,
@@ -21,8 +22,8 @@
         "priceMin": null,
         "size": null
       },
-      "inputTokens": 932,
-      "outputTokens": 55
+      "inputTokens": 734,
+      "outputTokens": 237
     },
     "בלי שרוולים": {
       "output": {
@@ -36,6 +37,7 @@
           "בקיץ",
           "בלי שרוולים"
         ],
+        "confidence": 1,
         "outcome": "refinement",
         "category": "dress",
         "currency": null,
@@ -44,18 +46,16 @@
         "priceMin": null,
         "size": null
       },
-      "inputTokens": 938,
-      "outputTokens": 66
+      "inputTokens": 740,
+      "outputTokens": 134
     },
     "nike air max 90": {
       "output": {
         "colorsInclude": [],
         "colorsExclude": [],
         "availabilityRequired": false,
-        "softAttributes": [
-          "nike",
-          "air max 90"
-        ],
+        "softAttributes": [],
+        "confidence": 1,
         "outcome": "topic_change",
         "category": "sneakers",
         "currency": null,
@@ -64,8 +64,8 @@
         "priceMin": null,
         "size": null
       },
-      "inputTokens": 935,
-      "outputTokens": 104
+      "inputTokens": 737,
+      "outputTokens": 57
     },
     "בצבע אדום": {
       "output": {
@@ -80,6 +80,7 @@
           "חם",
           "לחורף"
         ],
+        "confidence": 1,
         "outcome": "refinement",
         "category": "coat",
         "currency": null,
@@ -88,8 +89,8 @@
         "priceMin": null,
         "size": null
       },
-      "inputTokens": 929,
-      "outputTokens": 120
+      "inputTokens": 731,
+      "outputTokens": 283
     },
     "מידה M in stock only": {
       "output": {
@@ -102,16 +103,17 @@
           "formal",
           "gala"
         ],
+        "confidence": 1,
         "outcome": "refinement",
         "category": "dress",
         "currency": null,
         "occasion": "evening",
         "priceMax": null,
         "priceMin": null,
-        "size": "m"
+        "size": "M"
       },
-      "inputTokens": 925,
-      "outputTokens": 54
+      "inputTokens": 727,
+      "outputTokens": 60
     },
     "under 500 and only what is in stock": {
       "output": {
@@ -122,6 +124,7 @@
           "nike",
           "air max 90"
         ],
+        "confidence": 1,
         "outcome": "refinement",
         "category": "sneakers",
         "currency": null,
@@ -130,8 +133,8 @@
         "priceMin": null,
         "size": null
       },
-      "inputTokens": 918,
-      "outputTokens": 59
+      "inputTokens": 720,
+      "outputTokens": 382
     },
     "אותו דבר אבל יותר זול": {
       "output": {
@@ -143,6 +146,7 @@
         "softAttributes": [
           "אלגנטית"
         ],
+        "confidence": 1,
         "outcome": "refinement",
         "category": "dress",
         "currency": null,
@@ -151,8 +155,8 @@
         "priceMin": null,
         "size": null
       },
-      "inputTokens": 933,
-      "outputTokens": 56
+      "inputTokens": 735,
+      "outputTokens": 234
     },
     "show me more expensive ones": {
       "output": {
@@ -163,15 +167,17 @@
           "wool",
           "winter"
         ],
+        "confidence": 1,
         "outcome": "refinement",
         "category": "coat",
         "currency": null,
         "occasion": null,
+        "priceMax": null,
         "priceMin": 250,
         "size": null
       },
-      "inputTokens": 918,
-      "outputTokens": 93
+      "inputTokens": 720,
+      "outputTokens": 280
     },
     "יותר יקר": {
       "output": {
@@ -183,15 +189,17 @@
         "softAttributes": [
           "למסיבה"
         ],
+        "confidence": 1,
         "outcome": "refinement",
         "category": "skirt",
         "currency": null,
         "occasion": null,
+        "priceMax": null,
         "priceMin": 375,
         "size": null
       },
-      "inputTokens": 923,
-      "outputTokens": 100
+      "inputTokens": 725,
+      "outputTokens": 377
     }
   }
 }

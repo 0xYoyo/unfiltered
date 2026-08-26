@@ -19,7 +19,7 @@ import {
   resolveLimit,
   serializePlaygroundSearchResponse,
 } from "../playground/api.server";
-import { writeSearchEvent } from "../search/events.server";
+import { normalizeReuseQuery, writeSearchEvent } from "../search/events.server";
 import {
   getProxySearchOrchestrator,
   parseProxySearchParams,
@@ -141,8 +141,9 @@ export const loader = async ({
     // Budget is consumed whenever the classifier actually took the AI route,
     // mirroring the proxy's accounting: a degraded response that still spent
     // its intent call counts, a heuristic classic route does not.
+    // An exact-query reuse (YOY-64 AC-4) made no LLM call: no budget spent.
     const aiDecided =
-      response.route === "ai" ||
+      (response.route === "ai" && response.routeReason !== "intent-reuse") ||
       (response.degraded &&
         (response.routeReason === "model" ||
           response.routeReason === "classic-zero-hit"));
@@ -164,6 +165,9 @@ export const loader = async ({
         degraded: response.degraded,
         latencyMs,
         resultCount: response.hits.length,
+        ...(response.route === "ai" && !response.degraded && response.intent !== null
+          ? { intent: response.intent, normalizedQuery: normalizeReuseQuery(body.query) }
+          : {}),
       });
     }
 

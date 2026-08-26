@@ -13,6 +13,7 @@
  */
 
 import aiChipRemovedFixture from "./fixtures/ai-chip-removed.json";
+import aiReuseFixture from "./fixtures/ai-reuse.json";
 import aiZeroHitFixture from "./fixtures/ai-zero-hit.json";
 import aiFixture from "./fixtures/ai.json";
 import colorUnknownFixture from "./fixtures/color-unknown.json";
@@ -38,6 +39,7 @@ export type PlaygroundFixtureName =
   | "ai-chip-removed"
   | "ai-zero-hit"
   | "ai-delayed"
+  | "ai-reuse"
   | "degraded"
   | "color-unknown";
 
@@ -77,6 +79,11 @@ export function selectFixture(
   if (!preview) {
     if (has("zero")) {
       return "ai-zero-hit";
+    }
+    if (has("reuse")) {
+      // Exact-query intent reuse (YOY-64 AC-4): the AI answer served from a
+      // stored intent — reason "intent-reuse", no classify/intent stages.
+      return "ai-reuse";
     }
     if (has("degraded")) {
       return "degraded";
@@ -132,6 +139,8 @@ export function fixtureOutcome(
         status: 200,
         body: asResponse(aiChipRemovedFixture),
       };
+    case "ai-reuse":
+      return { delayMs: 0, status: 200, body: asResponse(aiReuseFixture) };
     case "ai-zero-hit":
       return { delayMs: 0, status: 200, body: asResponse(aiZeroHitFixture) };
     case "ai-delayed":

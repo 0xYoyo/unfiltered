@@ -47,6 +47,12 @@ export interface QueryClassifier {
     query: string,
     context?: ClassificationContext,
   ): Promise<ClassificationDecision>;
+  /**
+   * The decision `classify` would reach with no model call — a heuristic
+   * rule or a cached model decision — or null when the model would be
+   * asked. Optional: consumers treat its absence as "unknown".
+   */
+  settled?(query: string): ClassificationDecision | null;
 }
 
 export interface QueryClassifierOptions {
@@ -332,6 +338,15 @@ export function createQueryClassifier(
         return cached;
       }
       return classifyByModel(normalized, context);
+    },
+    settled(query) {
+      // The decision `classify` would return without a model call — a
+      // heuristic rule or a cached model decision — or null when the model
+      // would be asked. Lets a caller overlap the model classification with
+      // work that does not depend on it (YOY-64 AC-5) without ever spending
+      // an LLM call the settled path would have avoided.
+      const normalized = normalizeQuery(query);
+      return classifyByHeuristics(normalized) ?? cache.get(normalized) ?? null;
     },
   };
 }

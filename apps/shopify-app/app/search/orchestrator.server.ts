@@ -17,6 +17,7 @@ import {
 } from "@unfiltered/engine";
 
 import type { ClassicCardHit } from "./classic-store.server";
+import { findReusableIntent, normalizeReuseQuery } from "./events.server";
 import { SEARCH_STAGES, type SearchStage, type SearchStages } from "./stages";
 
 export { SEARCH_STAGES, type SearchStage, type SearchStages } from "./stages";
@@ -132,7 +133,8 @@ export type SearchRouteReason =
   | "resolved-intent"
   | ForceClassicReason
   | "classic-zero-hit"
-  | "preview";
+  | "preview"
+  | "intent-reuse";
 
 /**
  * Why a caller forced the classic path (`forceClassic`): the session spent
@@ -249,7 +251,10 @@ export interface SearchResponse {
   intentTier: IntentTier | null;
   /**
    * Where the milliseconds went (YOY-114): whole ms per stage actually run,
-   * floored so their sum never exceeds the wall time around `runSearch`.
+   * floored. Stages that overlap (YOY-64 AC-5: classification ∥ intent
+   * extraction, retrieval ∥ the speculative close-match search) each book
+   * their own wall time, so the sum can exceed the response's wall time —
+   * that excess is the overlap, and every single stage stays ≤ wall.
    * Diagnostic — the playground shows it and the proxy logs it; it is never
    * persisted and never reaches the storefront contract.
    */
@@ -308,12 +313,20 @@ export interface SearchOrchestratorOptions {
   extractor: IntentExtractor;
   retriever: Retriever;
   classicStore: ClassicSearchStore;
+  /**
+   * Exact-query intent reuse (YOY-64 AC-4): a submitted query whose
+   * normalized text equals one this store was served within `windowMs` is
+   * answered from that search's stored intent with zero LLM calls. Absent
+   * means off (tests, the eval harness); production passes the env window.
+   */
+  intentReuse?: { windowMs: number; now?: () => Date };
 }
 
 export function createSearchOrchestrator(
   options: SearchOrchestratorOptions,
 ): SearchOrchestrator {
-  const { db, classifier, extractor, retriever, classicStore } = options;
+  const { db, classifier, extractor, retriever, classicStore, intentReuse } =
+    options;
 
   /** Hydrate ranked hits into display cards, preserving hit order. Hits
    * whose snapshot row vanished between ranking and hydration are dropped
@@ -385,10 +398,17 @@ export function createSearchOrchestrator(
 
     /**
      * One intent extraction, booked as the `intent` stage (both tiers of an
-     * escalated call land in the same stage) and recording which tier
-     * answered (YOY-116). A tier-agnostic extractor leaves the tier null.
+     * escalated call land in the same stage) and reporting which tier
+     * answered (YOY-116). A tier-agnostic extractor reports null. The tier
+     * is returned, not written to the response slot here: a speculative
+     * extraction (YOY-64 AC-5) that a classic route discards must leave
+     * `intentTier` null, so only the caller that consumes the intent
+     * commits its tier.
      */
-    const extractIntent = (): Promise<Intent> =>
+    const extractIntent = (): Promise<{
+      intent: Intent;
+      tier: IntentTier | null;
+    }> =>
       stages.time("intent", async () => {
         const context = {
           storeId: shopDomain,
@@ -397,11 +417,17 @@ export function createSearchOrchestrator(
         };
         if (extractor.extractDetailed !== undefined) {
           const detailed = await extractor.extractDetailed(query, context);
-          tier.value = detailed.tier;
-          return detailed.intent;
+          return { intent: detailed.intent, tier: detailed.tier };
         }
-        return extractor.extract(query, context);
+        return { intent: await extractor.extract(query, context), tier: null };
       });
+    const commitIntent = (extracted: {
+      intent: Intent;
+      tier: IntentTier | null;
+    }): Intent => {
+      tier.value = extracted.tier;
+      return extracted.intent;
+    };
 
     /**
      * Cards for classic hits (YOY-115 AC-1/AC-3): the pg_trgm store returns
@@ -522,6 +548,18 @@ export function createSearchOrchestrator(
     ): Promise<StagelessResponse> => {
       let hits: Array<{ productId: string; colorUnknown?: boolean }>;
       let chips: AppliedConstraint[];
+      // Speculative keyword close matches (YOY-64 AC-5): the zero-hit
+      // rescue's classic search depends only on the raw query, not on
+      // retrieval's output, so it runs alongside retrieval and is simply
+      // dropped when retrieval finds hits. A cheap indexed statement; its
+      // failure surfaces exactly as the sequential call's would — only when
+      // the rescue is used.
+      const speculativeClose = classicStore
+        .search({ storeId: shopDomain, query, limit: CLOSE_MATCH_LIMIT })
+        .then(
+          (result) => ({ ok: true as const, result }),
+          (error: unknown) => ({ ok: false as const, error }),
+        );
       const retrieveStartedAt = performance.now();
       try {
         const retrieval = await retriever.retrieve({
@@ -576,13 +614,14 @@ export function createSearchOrchestrator(
         // when the keyword engine finds nothing either, relax the vector
         // search instead (YOY-52 AC-16).
         const closeHits = await stages.time("closeMatches", async () => {
-          const close = await classicStore.search({
-            storeId: shopDomain,
-            query,
-            // AC-5: close matches stay a short curated list, whatever the
-            // primary set's size.
-            limit: CLOSE_MATCH_LIMIT,
-          });
+          // AC-5 (YOY-107): close matches stay a short curated list,
+          // whatever the primary set's size. The keyword search already ran
+          // alongside retrieval (YOY-64 AC-5).
+          const speculated = await speculativeClose;
+          if (!speculated.ok) {
+            throw speculated.error;
+          }
+          const close = speculated.result;
           return close.hits.length > 0
             ? close.hits
             : relaxedCloseMatches(intent, CLOSE_MATCH_LIMIT);
@@ -624,7 +663,7 @@ export function createSearchOrchestrator(
       let intent: Intent;
       const startedAt = Date.now();
       try {
-        intent = await extractIntent();
+        intent = commitIntent(await extractIntent());
       } catch (error) {
         warnIntentFailure(searchId, "classic-zero-hit", error, startedAt);
         return classicResponse("classic-zero-hit", true);
@@ -656,6 +695,49 @@ export function createSearchOrchestrator(
       return aiPath(request.resolvedIntent, "resolved-intent");
     }
 
+    // Exact-query intent reuse (YOY-64 AC-4): the same normalized query
+    // this store was served within the window is answered from that
+    // search's stored intent — no classification, no extraction, zero LLM
+    // calls. Never for a refinement (a follow-up's meaning depends on the
+    // previous intent) and never for chip removal (handled above). A
+    // lookup failure falls through to the full ladder: reuse is an
+    // optimisation, never a dependency.
+    if (intentReuse !== undefined && request.previousIntent === undefined) {
+      try {
+        const reusable = await findReusableIntent(db, {
+          shopDomain,
+          normalizedQuery: normalizeReuseQuery(query),
+          windowMs: intentReuse.windowMs,
+          now: intentReuse.now?.(),
+        });
+        if (reusable !== null) {
+          return aiPath(reusable.intent, "intent-reuse");
+        }
+      } catch (error) {
+        console.warn(
+          "[search] intent reuse lookup failed; running the full ladder",
+          JSON.stringify({ searchId, error: String(error) }),
+        );
+      }
+    }
+
+    // Classification ∥ intent extraction (YOY-64 AC-5): extraction depends
+    // only on the query, not on the classifier's decision, so when the
+    // classifier has no settled answer (no heuristic rule, no cached model
+    // decision) the intent call starts alongside the model classification
+    // instead of after it. A model-decided classic route then discards the
+    // in-flight extraction — its cost lands in the ledger and is the price
+    // of the overlap on that (rare) shape; a settled decision never
+    // speculates, so heuristic-classic queries stay LLM-free.
+    const settled = classifier.settled?.(query) ?? null;
+    const speculativeIntent =
+      settled === null
+        ? extractIntent().then(
+            (extracted) => ({ ok: true as const, extracted }),
+            (error: unknown) => ({ ok: false as const, error }),
+          )
+        : null;
+
     // The classifier never rejects by contract: failures and timeouts come
     // back as { route: "classic", reason: "model-error" }.
     const decision = await stages.time("classify", () =>
@@ -678,7 +760,15 @@ export function createSearchOrchestrator(
     let intent: Intent;
     const startedAt = Date.now();
     try {
-      intent = await extractIntent();
+      if (speculativeIntent !== null) {
+        const speculated = await speculativeIntent;
+        if (!speculated.ok) {
+          throw speculated.error;
+        }
+        intent = commitIntent(speculated.extracted);
+      } else {
+        intent = commitIntent(await extractIntent());
+      }
     } catch (error) {
       warnIntentFailure(searchId, decision.reason, error, startedAt);
       return classicResponse(decision.reason, true);

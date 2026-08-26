@@ -390,6 +390,21 @@ test.describe("engine details (AC-5, verify 5)", () => {
     await expect(panel).not.toContainText("accuracy");
   });
 
+  test("a reused intent reads reason intent-reuse with no classify or intent row (YOY-64 AC-4)", async ({
+    page,
+  }) => {
+    await page.goto("/?details=1");
+    await submit(page, "ai reuse elegant dress");
+    const panel = page.getByTestId("playground-details-panel");
+    await expect(panel).toContainText("intent-reuse");
+    const rows = page.getByTestId("playground-details-stages").locator("li");
+    await expect(rows).toHaveText(["embed · 1 ms", "retrieve · 52 ms", "hydrate · 8 ms"]);
+    await expect(rows.filter({ hasText: "classify" })).toHaveCount(0);
+    await expect(rows.filter({ hasText: "intent" })).toHaveCount(0);
+    // Still the AI answer: chips and results as on any AI response.
+    await expect(chips(page)).toHaveCount(3);
+  });
+
   test("the stage rows exist only while the panel is open", async ({ page }) => {
     await page.goto("/");
     await submit(page, "ai elegant dress");
