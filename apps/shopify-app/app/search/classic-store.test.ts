@@ -520,6 +520,21 @@ describe("one statement per classic search, cards included (YOY-115 AC-1)", () =
     await settle();
     statements.length = 0;
   };
+  /**
+   * Bounded wait for the query events of the statements just run: Prisma
+   * emits them asynchronously after the promise resolves, and on a loaded
+   * CI runner a single setTimeout(0) was not always enough (PR #115's gate
+   * flaked on it). Waits until at least `min` events arrived or 2 s passed
+   * — the deadline guards against a hang, and the assertion that follows
+   * still requires exactly one statement.
+   */
+  const drained = async (min: number): Promise<void> => {
+    const deadline = Date.now() + 2000;
+    while (statements.length < min && Date.now() < deadline) {
+      await new Promise<void>((done) => setTimeout(done, 5));
+    }
+    await settle();
+  };
 
   beforeAll(async () => {
     db = await createTestDb({ onQuery: (sql) => statements.push(sql) });
@@ -544,7 +559,7 @@ describe("one statement per classic search, cards included (YOY-115 AC-1)", () =
   it("a trigram search is exactly one statement — no transaction, no set_config round trip", async () => {
     await startCounting();
     await createPgTrgmClassicStore(db).search({ storeId: SHOP, query: "nkie air max" });
-    await settle();
+    await drained(1);
     expect(statements).toHaveLength(1);
     expect(statements[0]).toContain("set_config('pg_trgm.word_similarity_threshold', '0.3', true)");
     expect(statements[0]).toContain("<%");
@@ -557,7 +572,7 @@ describe("one statement per classic search, cards included (YOY-115 AC-1)", () =
       storeId: SHOP,
       constraints: { ...noConstraints(), priceMax: 400, colorsExclude: ["black"] },
     });
-    await settle();
+    await drained(1);
     expect(statements).toHaveLength(1);
     expect(statements[0]).not.toContain("<%");
   });
@@ -571,7 +586,7 @@ describe("one statement per classic search, cards included (YOY-115 AC-1)", () =
   it("returns the card fields on every hit, read in the same statement", async () => {
     await startCounting();
     const result = await createPgTrgmClassicStore(db).search({ storeId: SHOP, query: "nike air max" });
-    await settle();
+    await drained(1);
     expect(statements).toHaveLength(1);
     expect(result.hits[0]).toMatchObject({
       productId: "nike",
