@@ -51,12 +51,24 @@ export {
   REFINEMENT_INTENT_SCHEMA,
   REFINEMENT_OUTCOMES,
   type Intent,
+  type IntentEscalation,
+  type IntentExtraction,
   type IntentExtractionContext,
   type IntentExtractor,
   type IntentExtractorOptions,
+  type IntentTier,
   type RefinementAnswer,
   type RefinementOutcome,
 } from "./intent.js";
+
+export {
+  createEscalatingIntentExtractor,
+  DEFAULT_INTENT_ESCALATION_THRESHOLD,
+  INTENT_ESCALATION_CLASSES,
+  matchIntentEscalationClass,
+  type EscalatingIntentExtractorOptions,
+  type IntentEscalationClass,
+} from "./intent-escalation.js";
 
 export {
   CANONICAL_CATEGORIES,

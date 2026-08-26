@@ -18,11 +18,18 @@ import type {
  * would hide a coverage gap in the fixtures.
  */
 
-/** One recorded LLM completion. */
+/** One recorded LLM completion — or a recorded failure (YOY-116). */
 export interface RecordedCompletion {
   output: unknown;
   inputTokens: number;
   outputTokens: number;
+  /**
+   * The live call failed with this error name (a timeout, say) after every
+   * retry; replaying it throws the same way instead of answering, so the
+   * lite-first ladder's `lite-error` escalation is scored on what the
+   * model actually did. Recorded only for the lite tier; `output` is null.
+   */
+  error?: string;
 }
 
 /** One operation's recorded completions, keyed by extracted request content. */
@@ -90,6 +97,13 @@ export function createReplayLlmClient({
         storeId: request.storeId,
         searchId: request.searchId,
       });
+      if (entry.error !== undefined) {
+        // A recorded failure replays as the failure it was — the ledger row
+        // above matches a live hung call, which is metered by nothing.
+        const error = new Error(`eval replay: recorded ${entry.error} for key "${key}"`);
+        error.name = entry.error;
+        throw error;
+      }
       return structuredClone(entry.output);
     },
   };

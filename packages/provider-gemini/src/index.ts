@@ -93,10 +93,26 @@ export const DEFAULT_REQUEST_TIMEOUT_MS = 60_000;
 /** Documented default model IDs; override via env, never in code. */
 export const DEFAULT_CLASSIFICATION_MODEL = "gemini-3.5-flash-lite";
 export const DEFAULT_INTENT_MODEL = "gemini-3.6-flash";
+/** The lite intent tier the lite-first ladder asks first (YOY-116). */
+export const DEFAULT_INTENT_LITE_MODEL = "gemini-3.5-flash-lite";
 export const DEFAULT_EMBEDDING_MODEL = "gemini-embedding-001";
 export const DEFAULT_EMBEDDING_DIMENSION = 768;
 /** Thinking level the intent client runs at unless the env overrides it. */
 export const DEFAULT_INTENT_THINKING_LEVEL = "low";
+/**
+ * Thinking level of the lite intent call (YOY-116): set explicitly, never
+ * the model default — model configuration is a first-class dimension
+ * (YOY-109), and the lite tier's job is to be fast.
+ */
+export const DEFAULT_INTENT_LITE_THINKING_LEVEL = "low";
+/**
+ * Per-request abort timeout of the lite intent call (YOY-116): the lite
+ * tier exists to be fast, and a hung lite call escalates to the accuracy
+ * tier, so it must give up long before the adapter's 60 s default —
+ * gemini-3.5-flash-lite was observed hanging past 90 s on one refinement
+ * prompt. Override with `GEMINI_INTENT_LITE_TIMEOUT_MS`.
+ */
+export const DEFAULT_INTENT_LITE_TIMEOUT_MS = 8_000;
 /**
  * `GEMINI_INTENT_THINKING_LEVEL` value that sends no thinkingConfig at all,
  * restoring the model's own default thinking (the pre-YOY-109 behaviour).
@@ -108,6 +124,8 @@ export interface GeminiModelConfig {
   classificationModel: string;
   /** For intent extraction (the accuracy-tier model). */
   intentModel: string;
+  /** For the lite-first intent call (YOY-116); escalates to `intentModel`. */
+  intentLiteModel: string;
   embeddingModel: string;
   embeddingDimension: number;
   /**
@@ -115,12 +133,21 @@ export interface GeminiModelConfig {
    * its own default (`GEMINI_INTENT_THINKING_LEVEL=model-default`).
    */
   intentThinkingLevel: string | undefined;
+  /**
+   * Thinking level for the lite intent client, or undefined to leave the
+   * model at its own default (`GEMINI_INTENT_LITE_THINKING_LEVEL=model-default`).
+   */
+  intentLiteThinkingLevel: string | undefined;
+  /** Abort timeout for the lite intent call, ms (`GEMINI_INTENT_LITE_TIMEOUT_MS`). */
+  intentLiteTimeoutMs: number;
 }
 
 /**
  * Resolve model configuration from the environment with documented defaults:
  * GEMINI_CLASSIFICATION_MODEL, GEMINI_INTENT_MODEL, GEMINI_EMBEDDING_MODEL,
- * GEMINI_EMBEDDING_DIMENSION, GEMINI_INTENT_THINKING_LEVEL.
+ * GEMINI_EMBEDDING_DIMENSION, GEMINI_INTENT_THINKING_LEVEL,
+ * GEMINI_INTENT_LITE_MODEL, GEMINI_INTENT_LITE_THINKING_LEVEL,
+ * GEMINI_INTENT_LITE_TIMEOUT_MS.
  */
 export function geminiModelsFromEnv(
   env: Record<string, string | undefined> = process.env,
@@ -129,9 +156,24 @@ export function geminiModelsFromEnv(
     classificationModel:
       env.GEMINI_CLASSIFICATION_MODEL ?? DEFAULT_CLASSIFICATION_MODEL,
     intentModel: env.GEMINI_INTENT_MODEL ?? DEFAULT_INTENT_MODEL,
+    intentLiteModel: env.GEMINI_INTENT_LITE_MODEL ?? DEFAULT_INTENT_LITE_MODEL,
     embeddingModel: env.GEMINI_EMBEDDING_MODEL ?? DEFAULT_EMBEDDING_MODEL,
     embeddingDimension: parseEmbeddingDimension(env.GEMINI_EMBEDDING_DIMENSION),
-    intentThinkingLevel: parseThinkingLevel(env.GEMINI_INTENT_THINKING_LEVEL),
+    intentThinkingLevel: parseThinkingLevel(
+      "GEMINI_INTENT_THINKING_LEVEL",
+      env.GEMINI_INTENT_THINKING_LEVEL,
+      DEFAULT_INTENT_THINKING_LEVEL,
+    ),
+    intentLiteThinkingLevel: parseThinkingLevel(
+      "GEMINI_INTENT_LITE_THINKING_LEVEL",
+      env.GEMINI_INTENT_LITE_THINKING_LEVEL,
+      DEFAULT_INTENT_LITE_THINKING_LEVEL,
+    ),
+    intentLiteTimeoutMs: parsePositiveInt(
+      "GEMINI_INTENT_LITE_TIMEOUT_MS",
+      env.GEMINI_INTENT_LITE_TIMEOUT_MS,
+      DEFAULT_INTENT_LITE_TIMEOUT_MS,
+    ),
   };
 }
 
@@ -139,17 +181,39 @@ export function geminiModelsFromEnv(
  * Unset means the documented default; `model-default` means no override; a
  * blank value is a misconfiguration, not a silent fallback (YOY-109).
  */
-function parseThinkingLevel(raw: string | undefined): string | undefined {
+function parseThinkingLevel(
+  variable: string,
+  raw: string | undefined,
+  fallback: string,
+): string | undefined {
   if (raw === undefined) {
-    return DEFAULT_INTENT_THINKING_LEVEL;
+    return fallback;
   }
   const level = raw.trim();
   if (level === "") {
     throw new GeminiConfigError(
-      `GEMINI_INTENT_THINKING_LEVEL must name a thinking level or "${MODEL_DEFAULT_THINKING_LEVEL}", got ${JSON.stringify(raw)}`,
+      `${variable} must name a thinking level or "${MODEL_DEFAULT_THINKING_LEVEL}", got ${JSON.stringify(raw)}`,
     );
   }
   return level === MODEL_DEFAULT_THINKING_LEVEL ? undefined : level;
+}
+
+/** A positive-integer env value with a default; malformed fails loudly. */
+function parsePositiveInt(
+  variable: string,
+  raw: string | undefined,
+  fallback: number,
+): number {
+  if (raw === undefined) {
+    return fallback;
+  }
+  const value = Number(raw);
+  if (raw.trim() === "" || !Number.isInteger(value) || value <= 0) {
+    throw new GeminiConfigError(
+      `${variable} must be a positive integer, got ${JSON.stringify(raw)}`,
+    );
+  }
+  return value;
 }
 
 /**

@@ -1,8 +1,12 @@
 {
-  "$comment": "USD per 1M tokens, paid-tier rates from https://ai.google.dev/gemini-api/docs/pricing (verified 2026-08-03). Keys are provider model IDs. Cost computation fails loudly on any model ID missing from this table.",
+  "$comment": "USD per 1M tokens, paid-tier rates from https://ai.google.dev/gemini-api/docs/pricing. Keys are provider model IDs. Cost computation fails loudly on any model ID missing from this table.",
   "models": {
     "gemini-3.5-flash-lite": { "inputUsdPerMTok": 0.3, "outputUsdPerMTok": 2.5 },
-    "gemini-3.6-flash": { "inputUsdPerMTok": 1.5, "outputUsdPerMTok": 7.5 },
+    "gemini-3.6-flash": {
+      "$comment": "Corrected 2026-08-26 (YOY-116 AC-8): the table carried $1.50 / $7.50, which Google's pricing page (checked 2026-08-13) lists only from 2027-01-01; through 2026-12-31 the price in force is $0.75 / $3.75. Re-check and switch to 1.5 / 7.5 on 2027-01-01.",
+      "inputUsdPerMTok": 0.75,
+      "outputUsdPerMTok": 3.75
+    },
     "gemini-embedding-001": { "inputUsdPerMTok": 0.15, "outputUsdPerMTok": 0 }
   }
 }

@@ -77,7 +77,7 @@ describe("fixture outcomes", () => {
         ["chips", "degraded", "details", "intent", "results", "route", "searchId"].sort(),
       );
       expect(Object.keys(outcome.body!.details).sort()).toEqual(
-        ["latencyMs", "limited", "routeReason", "stages"].sort(),
+        ["intentTier", "latencyMs", "limited", "routeReason", "stages"].sort(),
       );
     }
   });

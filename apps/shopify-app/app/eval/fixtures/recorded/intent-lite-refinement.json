@@ -1,0 +1,176 @@
+{
+  "modelId": "gemini-3.5-flash-lite",
+  "provenance": "live",
+  "entries": {
+    "בלי שרוולים": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [
+          "black"
+        ],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "אלגנטית",
+          "בקיץ",
+          "בלי שרוולים"
+        ],
+        "confidence": 0.95,
+        "outcome": "refinement",
+        "category": "dress",
+        "priceMax": 400,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 1014,
+      "outputTokens": 122
+    },
+    "nike air max 90": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "air max 90"
+        ],
+        "confidence": 1,
+        "outcome": "topic_change",
+        "category": "sneakers"
+      },
+      "inputTokens": 1011,
+      "outputTokens": 71
+    },
+    "מידה M in stock only": {
+      "output": {
+        "colorsInclude": [
+          "black"
+        ],
+        "colorsExclude": [],
+        "availabilityRequired": true,
+        "softAttributes": [
+          "formal",
+          "gala"
+        ],
+        "confidence": 0.95,
+        "outcome": "refinement",
+        "category": "dress",
+        "occasion": "evening",
+        "size": "m"
+      },
+      "inputTokens": 1001,
+      "outputTokens": 98
+    },
+    "under 500 and only what is in stock": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "availabilityRequired": true,
+        "softAttributes": [
+          "nike",
+          "air max 90"
+        ],
+        "confidence": 0.95,
+        "outcome": "refinement",
+        "category": "sneakers",
+        "priceMax": 500
+      },
+      "inputTokens": 994,
+      "outputTokens": 88
+    },
+    "אותו דבר אבל יותר זול": {
+      "output": {
+        "colorsInclude": [
+          "blue"
+        ],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "אלגנטית"
+        ],
+        "confidence": 0.9,
+        "outcome": "refinement",
+        "category": "dress",
+        "occasion": "wedding",
+        "priceMax": 675
+      },
+      "inputTokens": 1009,
+      "outputTokens": 97
+    },
+    "show me more expensive ones": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "wool",
+          "winter"
+        ],
+        "confidence": 0.9,
+        "outcome": "refinement",
+        "category": "coat",
+        "priceMin": 200,
+        "size": null
+      },
+      "inputTokens": 994,
+      "outputTokens": 91
+    },
+    "יותר יקר": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [
+          "black"
+        ],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "למסיבה"
+        ],
+        "confidence": 0.9,
+        "outcome": "refinement",
+        "category": "skirt",
+        "priceMin": 300
+      },
+      "inputTokens": 999,
+      "outputTokens": 46
+    },
+    "same but cheaper": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [
+          "black"
+        ],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "elegant",
+          "summer"
+        ],
+        "confidence": 0.95,
+        "outcome": "refinement",
+        "category": "dress",
+        "occasion": "wedding",
+        "priceMax": 300
+      },
+      "inputTokens": 1008,
+      "outputTokens": 99
+    },
+    "בצבע אדום": {
+      "output": {
+        "colorsInclude": [
+          "red"
+        ],
+        "colorsExclude": [
+          "black"
+        ],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "חם",
+          "לחורף"
+        ],
+        "confidence": 1,
+        "outcome": "refinement",
+        "category": "coat",
+        "priceMax": 500
+      },
+      "inputTokens": 1005,
+      "outputTokens": 99
+    }
+  }
+}

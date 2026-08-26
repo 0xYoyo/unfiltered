@@ -72,6 +72,7 @@ apps/
       eval/
         README.md
         fixtures/
+          baseline-hits.json
           catalog.json
           goldens.json
           recorded/
@@ -79,6 +80,8 @@ apps/
             classification.json
             embeddings.json
             enrichment.json
+            intent-lite-refinement.json
+            intent-lite.json
             intent-refinement.json
             intent.json
           refinement-goldens.json
@@ -157,6 +160,7 @@ apps/
           evidence-ai.spec.ts
           evidence-classic-stages.spec.ts
           evidence-hardening.spec.ts
+          evidence-intent-tier.spec.ts
           evidence-latency.spec.ts
           evidence-store.spec.ts
           evidence.spec.ts
@@ -485,6 +489,19 @@ docs/
       desktop-he-classic-stages.png
       mobile-en-classic-stages.png
       mobile-he-classic-stages.png
+    YOY-116/
+      desktop-en-1-lite-tier.png
+      desktop-en-2-accuracy-tier.png
+      desktop-en-3-no-tier.png
+      desktop-he-1-lite-tier.png
+      desktop-he-2-accuracy-tier.png
+      desktop-he-3-no-tier.png
+      mobile-en-1-lite-tier.png
+      mobile-en-2-accuracy-tier.png
+      mobile-en-3-no-tier.png
+      mobile-he-1-lite-tier.png
+      mobile-he-2-accuracy-tier.png
+      mobile-he-3-no-tier.png
     YOY-70/
       live-A-desktop-panel.jpg
       live-A-he-rtl.jpg
@@ -655,6 +672,7 @@ packages/
       classic.ts
       classify.ts
       index.ts
+      intent-escalation.ts
       intent.ts
       retrieve.ts
       taxonomy.ts
@@ -663,6 +681,7 @@ packages/
       classic.test.ts
       classify.test.ts
       index.test.ts
+      intent-escalation.test.ts
       intent.test.ts
       retrieve.test.ts
       taxonomy.test.ts
@@ -690,7 +709,7 @@ vitest.setup.ts
 - **Env files (paths only — contents never read)**: .env (declared in .gitignore), .env.* (declared in .gitignore), .env.example, apps/shopify-app/.env (declared in .gitignore), apps/shopify-app/.env.example
 - **Entrypoints**: apps/shopify-app/app/routes/app.tsx, apps/shopify-app/widget/src/main.ts, packages/engine/src/index.ts, packages/provider-gemini/src/index.ts
 - **Scripts**: scripts/repo-map.mjs
-- **Fixtures**: apps/shopify-app/app/eval/fixtures/catalog.json, apps/shopify-app/app/eval/fixtures/goldens.json, apps/shopify-app/app/eval/fixtures/recorded/classification-synthesized.json, apps/shopify-app/app/eval/fixtures/recorded/classification.json, apps/shopify-app/app/eval/fixtures/recorded/embeddings.json, apps/shopify-app/app/eval/fixtures/recorded/enrichment.json, apps/shopify-app/app/eval/fixtures/recorded/intent-refinement.json, apps/shopify-app/app/eval/fixtures/recorded/intent.json, apps/shopify-app/app/eval/fixtures/refinement-goldens.json, apps/shopify-app/app/playground/fixtures/ai-chip-removed.json, apps/shopify-app/app/playground/fixtures/ai-zero-hit.json, apps/shopify-app/app/playground/fixtures/ai.json, apps/shopify-app/app/playground/fixtures/color-unknown.json, apps/shopify-app/app/playground/fixtures/crawl/about.html, apps/shopify-app/app/playground/fixtures/crawl/crawl-store.ts, apps/shopify-app/app/playground/fixtures/crawl/dupe-page.html, apps/shopify-app/app/playground/fixtures/crawl/group-sneaker.html, apps/shopify-app/app/playground/fixtures/crawl/magento-shirt.html, apps/shopify-app/app/playground/fixtures/crawl/priceless-scarf.html, apps/shopify-app/app/playground/fixtures/crawl/sitemap-index.xml, apps/shopify-app/app/playground/fixtures/crawl/sitemap-pages.xml, apps/shopify-app/app/playground/fixtures/crawl/sitemap-products.xml, apps/shopify-app/app/playground/fixtures/crawl/woo-dress.html, apps/shopify-app/app/playground/fixtures/degraded.json, apps/shopify-app/app/playground/fixtures/empty.json, apps/shopify-app/app/playground/fixtures/preview.json, apps/shopify-app/app/playground/fixtures/results.json, apps/shopify-app/app/playground/fixtures/shopify-public-products.ts
+- **Fixtures**: apps/shopify-app/app/eval/fixtures/baseline-hits.json, apps/shopify-app/app/eval/fixtures/catalog.json, apps/shopify-app/app/eval/fixtures/goldens.json, apps/shopify-app/app/eval/fixtures/recorded/classification-synthesized.json, apps/shopify-app/app/eval/fixtures/recorded/classification.json, apps/shopify-app/app/eval/fixtures/recorded/embeddings.json, apps/shopify-app/app/eval/fixtures/recorded/enrichment.json, apps/shopify-app/app/eval/fixtures/recorded/intent-lite-refinement.json, apps/shopify-app/app/eval/fixtures/recorded/intent-lite.json, apps/shopify-app/app/eval/fixtures/recorded/intent-refinement.json, apps/shopify-app/app/eval/fixtures/recorded/intent.json, apps/shopify-app/app/eval/fixtures/refinement-goldens.json, apps/shopify-app/app/playground/fixtures/ai-chip-removed.json, apps/shopify-app/app/playground/fixtures/ai-zero-hit.json, apps/shopify-app/app/playground/fixtures/ai.json, apps/shopify-app/app/playground/fixtures/color-unknown.json, apps/shopify-app/app/playground/fixtures/crawl/about.html, apps/shopify-app/app/playground/fixtures/crawl/crawl-store.ts, apps/shopify-app/app/playground/fixtures/crawl/dupe-page.html, apps/shopify-app/app/playground/fixtures/crawl/group-sneaker.html, apps/shopify-app/app/playground/fixtures/crawl/magento-shirt.html, apps/shopify-app/app/playground/fixtures/crawl/priceless-scarf.html, apps/shopify-app/app/playground/fixtures/crawl/sitemap-index.xml, apps/shopify-app/app/playground/fixtures/crawl/sitemap-pages.xml, apps/shopify-app/app/playground/fixtures/crawl/sitemap-products.xml, apps/shopify-app/app/playground/fixtures/crawl/woo-dress.html, apps/shopify-app/app/playground/fixtures/degraded.json, apps/shopify-app/app/playground/fixtures/empty.json, apps/shopify-app/app/playground/fixtures/preview.json, apps/shopify-app/app/playground/fixtures/results.json, apps/shopify-app/app/playground/fixtures/shopify-public-products.ts
 - **Migrations**: apps/shopify-app/prisma/migrations/20260803000000_init_postgres/migration.sql, apps/shopify-app/prisma/migrations/20260803134500_ai_call_ledger/migration.sql, apps/shopify-app/prisma/migrations/20260803150800_catalog_product/migration.sql, apps/shopify-app/prisma/migrations/20260804152800_product_enrichment/migration.sql, apps/shopify-app/prisma/migrations/20260805131800_product_embedding/migration.sql, apps/shopify-app/prisma/migrations/20260808160000_pg_trgm_classic_search/migration.sql, apps/shopify-app/prisma/migrations/20260808170000_product_display_snapshot/migration.sql, apps/shopify-app/prisma/migrations/20260808190000_search_click_events/migration.sql, apps/shopify-app/prisma/migrations/20260809190000_catalog_product_status/migration.sql, apps/shopify-app/prisma/migrations/20260810210000_catalog_product_published_at/migration.sql, apps/shopify-app/prisma/migrations/20260816200000_catalog_product_url/migration.sql, apps/shopify-app/prisma/migrations/20260817130000_playground_catalog/migration.sql, apps/shopify-app/prisma/migrations/20260824190000_search_event_route_reason/migration.sql, apps/shopify-app/prisma/migrations/migration_lock.toml
 
 ## Module dependency map
@@ -810,11 +829,13 @@ vitest.setup.ts
 - docs/vision/compare.mts → apps/shopify-app/app/playground/polite-fetch.server.ts, packages/engine/src/taxonomy.ts
 - packages/engine/src/classic.ts → packages/engine/src/retrieve.ts
 - packages/engine/src/classify.ts → packages/engine/src/index.ts
+- packages/engine/src/intent-escalation.ts → packages/engine/src/intent.ts
 - packages/engine/src/intent.ts → packages/engine/src/index.ts, packages/engine/src/taxonomy.ts
 - packages/engine/src/retrieve.ts → packages/engine/src/index.ts, packages/engine/src/intent.ts
 - packages/engine/test/classic.test.ts → packages/engine/src/index.ts
 - packages/engine/test/classify.test.ts → packages/engine/src/index.ts
 - packages/engine/test/index.test.ts → packages/engine/src/index.ts
+- packages/engine/test/intent-escalation.test.ts → packages/engine/src/index.ts
 - packages/engine/test/intent.test.ts → packages/engine/src/index.ts
 - packages/engine/test/retrieve.test.ts → packages/engine/src/index.ts
 - packages/engine/test/taxonomy.test.ts → packages/engine/src/index.ts

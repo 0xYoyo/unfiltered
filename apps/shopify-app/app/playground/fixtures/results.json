@@ -57,6 +57,7 @@
     "stages": {
       "classify": 1,
       "classic": 28
-    }
+    },
+    "intentTier": null
   }
 }

@@ -80,6 +80,7 @@
       "embed": 1,
       "retrieve": 51,
       "hydrate": 8
-    }
+    },
+    "intentTier": null
   }
 }

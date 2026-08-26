@@ -10,6 +10,7 @@ import {
   type ClassificationReason,
   type Intent,
   type IntentExtractor,
+  type IntentTier,
   type QueryClassifier,
   type QueryRoute,
   type Retriever,
@@ -241,6 +242,12 @@ export interface SearchResponse {
   /** Classic close matches, populated only on AI zero-hit responses. */
   closeMatches: ProductCard[];
   /**
+   * Which model tier produced `intent` (YOY-116): "lite" or "accuracy" from
+   * a tier-aware extractor, null when no intent call ran (classic routes,
+   * chip removal, previews) or the extractor is tier-agnostic.
+   */
+  intentTier: IntentTier | null;
+  /**
    * Where the milliseconds went (YOY-114): whole ms per stage actually run,
    * floored so their sum never exceeds the wall time around `runSearch`.
    * Diagnostic — the playground shows it and the proxy logs it; it is never
@@ -282,8 +289,13 @@ function createStageLedger() {
   };
 }
 
-/** A response before its stage ledger is attached. */
-type StagelessResponse = Omit<SearchResponse, "stages">;
+/** A response before its stage ledger and intent tier are attached. */
+type StagelessResponse = Omit<SearchResponse, "stages" | "intentTier">;
+
+/** Mutable slot the intent call fills with the tier that answered. */
+interface TierSlot {
+  value: IntentTier | null;
+}
 
 export interface SearchOrchestrator {
   runSearch(request: SearchRequest): Promise<SearchResponse>;
@@ -350,14 +362,16 @@ export function createSearchOrchestrator(
   return {
     async runSearch(request: SearchRequest): Promise<SearchResponse> {
       const stages = createStageLedger();
-      const response = await execute(request, stages);
-      return { ...response, stages: stages.snapshot() };
+      const tier: TierSlot = { value: null };
+      const response = await execute(request, stages, tier);
+      return { ...response, stages: stages.snapshot(), intentTier: tier.value };
     },
   };
 
   async function execute(
     request: SearchRequest,
     stages: ReturnType<typeof createStageLedger>,
+    tier: TierSlot,
   ): Promise<StagelessResponse> {
     const { query, shopDomain } = request;
     const searchId = request.searchId ?? randomUUID();
@@ -368,6 +382,26 @@ export function createSearchOrchestrator(
       hits: ReadonlyArray<{ productId: string; colorUnknown?: boolean }>,
     ): Promise<ProductCard[]> =>
       stages.time("hydrate", () => hydrateCards(shopDomain, hits));
+
+    /**
+     * One intent extraction, booked as the `intent` stage (both tiers of an
+     * escalated call land in the same stage) and recording which tier
+     * answered (YOY-116). A tier-agnostic extractor leaves the tier null.
+     */
+    const extractIntent = (): Promise<Intent> =>
+      stages.time("intent", async () => {
+        const context = {
+          storeId: shopDomain,
+          searchId,
+          previousIntent: request.previousIntent,
+        };
+        if (extractor.extractDetailed !== undefined) {
+          const detailed = await extractor.extractDetailed(query, context);
+          tier.value = detailed.tier;
+          return detailed.intent;
+        }
+        return extractor.extract(query, context);
+      });
 
     /**
      * Cards for classic hits (YOY-115 AC-1/AC-3): the pg_trgm store returns
@@ -590,13 +624,7 @@ export function createSearchOrchestrator(
       let intent: Intent;
       const startedAt = Date.now();
       try {
-        intent = await stages.time("intent", () =>
-          extractor.extract(query, {
-            storeId: shopDomain,
-            searchId,
-            previousIntent: request.previousIntent,
-          }),
-        );
+        intent = await extractIntent();
       } catch (error) {
         warnIntentFailure(searchId, "classic-zero-hit", error, startedAt);
         return classicResponse("classic-zero-hit", true);
@@ -650,13 +678,7 @@ export function createSearchOrchestrator(
     let intent: Intent;
     const startedAt = Date.now();
     try {
-      intent = await stages.time("intent", () =>
-        extractor.extract(query, {
-          storeId: shopDomain,
-          searchId,
-          previousIntent: request.previousIntent,
-        }),
-      );
+      intent = await extractIntent();
     } catch (error) {
       warnIntentFailure(searchId, decision.reason, error, startedAt);
       return classicResponse(decision.reason, true);

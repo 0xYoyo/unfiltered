@@ -67,6 +67,7 @@
       "embed": 102,
       "retrieve": 44,
       "closeMatches": 63
-    }
+    },
+    "intentTier": "accuracy"
   }
 }

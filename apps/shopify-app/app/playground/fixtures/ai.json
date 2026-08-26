@@ -77,6 +77,7 @@
       "embed": 96,
       "retrieve": 57,
       "hydrate": 9
-    }
+    },
+    "intentTier": "lite"
   }
 }

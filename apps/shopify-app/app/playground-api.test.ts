@@ -57,6 +57,7 @@ vi.mock("./search/proxy.server", async (importOriginal) => {
             forced || preview
               ? { classic: 12 }
               : { hydrate: 4, retrieve: 30, embed: 80, intent: 400, classify: 25 },
+          intentTier: forced || preview ? null : "lite",
           ...(orchestratorSeam.response ?? {}),
         });
       },
@@ -99,7 +100,7 @@ const CONTRACT_KEYS = [
   "searchId",
 ].sort();
 
-const DETAIL_KEYS = ["latencyMs", "limited", "routeReason", "stages"].sort();
+const DETAIL_KEYS = ["intentTier", "latencyMs", "limited", "routeReason", "stages"].sort();
 
 const RESULT_KEYS = [
   "available",
@@ -317,6 +318,10 @@ describe("the response contract (AC-2)", () => {
       await searchLoader(loaderArgs(searchRequest({ mode: "preview" })))
     ).json()) as { details: { stages: Record<string, number> } };
     expect(Object.keys(preview.details.stages)).toEqual(["classic"]);
+    // The intent tier rides details too (YOY-116 AC-3): the tier that
+    // answered on the AI route, null when no intent call ran.
+    expect((ai.details as { intentTier?: unknown }).intentTier).toBe("lite");
+    expect((preview.details as { intentTier?: unknown }).intentTier).toBeNull();
   });
 
   it("includes closeMatches only when the response carries them", async () => {

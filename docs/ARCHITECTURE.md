@@ -247,8 +247,29 @@ Query understanding (all LLM access through the `LlmClient` port):
 - `createIntentExtractor({ llm }): IntentExtractor` — turns free text into a
   vendor-free `Intent` (category, price bounds with currency, color
   inclusions/exclusions, occasion, size, availability requirement, soft
-  attributes) via the model (operation `"intent"`), with one retry on schema
-  violation and then a typed `IntentExtractionError`.
+  attributes, and the model's own `confidence` 0–1 that the hard constraints
+  are complete and correct — required of every answer by `INTENT_SCHEMA`
+  since YOY-116; answers recorded before it parse with none) via the model
+  (operation `"intent"`), with one retry on schema violation and then a
+  typed `IntentExtractionError`.
+- `createEscalatingIntentExtractor({ lite, accuracy, threshold?, classes? })`
+  — the lite-first ladder (YOY-116): an `IntentExtractor` over two tier
+  extractors that asks the lite tier first and escalates to the accuracy
+  tier in exactly two cases — the query matches a committed **escalation
+  class** (`INTENT_ESCALATION_CLASSES` in `intent-escalation.ts`: today
+  `mixed-script`, Hebrew and Latin letters in one query, and `occasion`,
+  occasion-bearing phrases EN/HE), in which case the accuracy tier is asked
+  directly with no lite call; or the lite answer's `confidence` is below the
+  threshold (`DEFAULT_INTENT_ESCALATION_THRESHOLD`, 0.8, the lowest
+  confidence a correct lite answer reported on the eval set) or missing, in
+  which case the accuracy answer replaces the lite one entirely. Both calls
+  carry the same `searchId` and operation `"intent"` through their own port,
+  so the ledger keeps their model ids apart. `extractDetailed` reports
+  `{ intent, tier, escalation }`; the orchestrator surfaces the tier as
+  `intentTier` (playground `details.intentTier`, the proxy's `[search]
+  stages` log line — never the storefront contract). Refinements follow the
+  same rules on the follow-up text; chip removal never reaches an extractor.
+  Measured on the eval set (2026-08-26): 14 of 25 AI goldens escalate, all by class (11 `occasion`, 3 `mixed-script`), none by low confidence — every lite answer reported 0.8–1.0; 11 are answered by the lite tier with every rank preserved (gc05 improved 2 → 1); 1 of 9 follow-ups escalates (`mixed-script`). The one lite miss in the diff, g15, is the mixed-script class's reason to exist.
 - Refinement (`extract(query, { previousIntent })`): a follow-up query is
   extracted against the intent of the previous one. The prompt asks the model
   to decide between a **refinement** — the previous intent with only the new
@@ -562,6 +583,21 @@ throw rather than metering $0) and appends one `AiCall` ledger row per call.
 The internal admin at `/internal/costs` renders ledger aggregates and is
 gated by `ADMIN_TOKEN` (`?token=` query parameter): without the exact token
 it answers 404, indistinguishable from a nonexistent route.
+
+Intent extraction is lite-first (YOY-116): the app wires
+`createEscalatingIntentExtractor` over two metered Gemini clients —
+`GEMINI_INTENT_LITE_MODEL` (default `gemini-3.5-flash-lite`) at
+`GEMINI_INTENT_LITE_THINKING_LEVEL` (default `low`, explicit, never the model
+default) and `GEMINI_INTENT_MODEL` (the accuracy tier, unchanged) — with
+`INTENT_ESCALATION_THRESHOLD` (default the engine's 0.8) as the confidence
+floor. The eval harness replays the same ladder over two recording sets
+(`intent-lite*.json` beside the accuracy `intent*.json`) and prints the
+escalation rate, calls per tier, and the blended per-search cost, whose bar
+is **≤ $0.60 per 1,000 AI searches** (PRD §8). `config/ai-prices.json` was
+corrected on YOY-116 AC-8: `gemini-3.6-flash` is $0.75 / $3.75 per 1M tokens
+through 2026-12-31 (the $1.50 / $7.50 the table carried is the 2027 price),
+so every cost figure from before that date is 2× over-metered on the
+accuracy tier. Measured on the eval harness (2026-08-26, YOY-116): blended per-search cost **$0.52 per 1,000 AI searches** on the routed blend (the accuracy-only blend at the same corrected prices is $0.54; at the over-metered 2026 table it read $1.07), refinement follow-ups $0.60 per 1,000, escalation rate 56% of AI searches and 11% of follow-ups, intent calls 19 lite / 15 accuracy across 25 AI goldens and 9 follow-ups. Under the corrected accuracy price the bar is met by pricing alone by a hair; lite-first is what moves the blend off the line and, on the live tail, is the cheaper tier for the majority of plain queries.
 
 Embedding calls are the one estimated entry in the ledger: Gemini
 `batchEmbedContents` returns no usage metadata, so the adapter meters input

@@ -375,6 +375,21 @@ test.describe("engine details (AC-5, verify 5)", () => {
     }
   });
 
+  test("names the intent tier: lite on the AI fixture, none on a classic response (YOY-116 AC-3)", async ({
+    page,
+  }) => {
+    await page.goto("/?details=1");
+    await submit(page, "ai elegant dress");
+    const panel = page.getByTestId("playground-details-panel");
+    await expect(panel).toContainText(`${strings("en").detailsIntentTier}lite`);
+
+    await submit(page, "dress");
+    await expect(panel).toContainText(
+      `${strings("en").detailsIntentTier}${strings("en").detailsNone}`,
+    );
+    await expect(panel).not.toContainText("accuracy");
+  });
+
   test("the stage rows exist only while the panel is open", async ({ page }) => {
     await page.goto("/");
     await submit(page, "ai elegant dress");

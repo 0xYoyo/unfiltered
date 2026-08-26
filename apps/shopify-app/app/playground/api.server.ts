@@ -1,6 +1,8 @@
 import type { PrismaClient } from "@prisma/client";
 
 import { PLAYGROUND_STORE_KEY_PREFIX } from "./ingest-public.server";
+import type { IntentTier } from "@unfiltered/engine";
+
 import {
   SEARCH_STAGES,
   type SearchResponse,
@@ -57,6 +59,8 @@ export interface PlaygroundSearchDetails {
   limited: PlaygroundLimit | null;
   /** Whole ms per pipeline stage actually run, in pipeline order (YOY-114). */
   stages: SearchStages;
+  /** Which model tier extracted the intent; null when no intent call ran (YOY-116). */
+  intentTier: IntentTier | null;
 }
 
 /** The playground response: the proxy contract plus `details`, nothing else. */
@@ -67,7 +71,7 @@ export interface PlaygroundSearchResponse extends ProxySearchResponse {
 /**
  * Map an orchestrator response onto the playground wire contract. Delegates
  * the card/chip/intent mapping to the proxy's own serializer — the two APIs
- * must never drift — and adds exactly the four detail fields. Explicit
+ * must never drift — and adds exactly the five detail fields. Explicit
  * re-mapping is what keeps a later orchestrator field from leaking out
  * (AC-2, the same guarantee `serializeProxySearchResponse` gives); `stages`
  * is copied key by key in pipeline order so the wire order is the
@@ -84,6 +88,7 @@ export function serializePlaygroundSearchResponse(
       latencyMs: details.latencyMs,
       limited: details.limited,
       stages: serializeStages(details.stages),
+      intentTier: details.intentTier,
     },
   };
 }

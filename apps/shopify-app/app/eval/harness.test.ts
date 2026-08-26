@@ -4,6 +4,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { createTestDb } from "../testing/helpers.server";
 import {
   findViolations,
+  loadBaselineHits,
   loadCatalog,
   loadGoldens,
   loadRefinementGoldens,
@@ -397,11 +398,28 @@ describe("eval run (AC-2, AC-3, AC-4, AC-6)", () => {
       expect(fresh.intent!.softAttributes).not.toContain(attribute);
     }
 
-    // Every golden's documented soft attributes hold too.
+    // Every golden's documented soft attributes hold too. The documented
+    // sets were pinned against the accuracy tier; under lite-first routing
+    // (YOY-116) a lite-tier answer may split them differently — r03 answers
+    // ["air max 90"] where the accuracy tier said ["nike", "air max 90"] —
+    // so a lite answer must be a non-empty subset or superset of the
+    // documented set (nothing invented, nothing foreign), while an
+    // accuracy-tier answer still matches exactly. Soft attributes are
+    // similarity hints; the hard-constraint misses above are the contract.
     for (const entry of result.perRefinement) {
-      expect(entry.intent!.softAttributes, entry.golden.id).toEqual(
-        entry.golden.expectedSoftAttributes,
-      );
+      const produced = entry.intent!.softAttributes;
+      const documented = entry.golden.expectedSoftAttributes;
+      if (entry.intentTier === "accuracy") {
+        expect(produced, entry.golden.id).toEqual(documented);
+        continue;
+      }
+      expect(produced.length, entry.golden.id).toBeGreaterThan(0);
+      const subset = produced.every((attribute) => documented.includes(attribute));
+      const superset = documented.every((attribute) => produced.includes(attribute));
+      expect(
+        subset || superset,
+        `${entry.golden.id}: lite soft attributes ${JSON.stringify(produced)} vs documented ${JSON.stringify(documented)}`,
+      ).toBe(true);
     }
   });
 
@@ -411,9 +429,57 @@ describe("eval run (AC-2, AC-3, AC-4, AC-6)", () => {
     ).toEqual([]);
   });
 
-  it("keeps blended per-search cost within $2.00 per 1,000 AI searches (AC-4)", () => {
+  it("keeps blended per-search cost within $0.60 per 1,000 AI searches (AC-4; YOY-116 AC-5 bar)", () => {
     expect(result.perSearchCostPer1000Usd).toBeGreaterThan(0);
-    expect(result.perSearchCostPer1000Usd).toBeLessThanOrEqual(2.0);
+    expect(result.perSearchCostPer1000Usd).toBeLessThanOrEqual(0.6);
+  });
+
+  it("regresses no golden and no refinement against the committed baseline (YOY-116 AC-5)", () => {
+    const baseline = loadBaselineHits();
+    const regressions: string[] = [];
+    for (const score of result.perQuery) {
+      if (baseline.goldens[score.golden.id] === true && score.firstExpectedRank === null) {
+        regressions.push(`${score.golden.id} hit at baseline, misses now`);
+      }
+    }
+    for (const score of result.perRefinement) {
+      if (baseline.refinements[score.golden.id] === true && score.violations.length > 0) {
+        regressions.push(`${score.golden.id} clean at baseline, ${score.violations.length} miss(es) now`);
+      }
+    }
+    expect(regressions, `regressions: ${regressions.join("; ")}`).toEqual([]);
+    // The baseline covers every golden that runs, so a new golden cannot
+    // slip in unbaselined.
+    for (const score of result.perQuery) {
+      expect(baseline.goldens, score.golden.id).toHaveProperty(score.golden.id);
+    }
+    for (const score of result.perRefinement) {
+      expect(baseline.refinements, score.golden.id).toHaveProperty(score.golden.id);
+    }
+  });
+
+  it("reports the lite-first blend: a tier per AI golden, escalation rate, calls per tier (YOY-116 AC-5)", () => {
+    for (const score of result.perQuery) {
+      if (score.route === "ai") {
+        expect(score.intentTier, score.golden.id).toMatch(/^(lite|accuracy)$/);
+      } else {
+        expect(score.intentTier, score.golden.id).toBeNull();
+      }
+    }
+    for (const score of result.perRefinement) {
+      expect(score.intentTier, score.golden.id).toMatch(/^(lite|accuracy)$/);
+    }
+    expect(result.escalationRate).toBeGreaterThanOrEqual(0);
+    expect(result.escalationRate).toBeLessThanOrEqual(1);
+    // Every AI golden spent at least one intent call; an escalated one two.
+    const aiGoldens = result.perQuery.filter((score) => score.route === "ai").length;
+    expect(result.intentCalls.lite + result.intentCalls.accuracy).toBeGreaterThanOrEqual(
+      aiGoldens + result.perRefinement.length,
+    );
+    // The lite tier answers something: lite-first is not accuracy-only in
+    // disguise.
+    expect(result.intentCalls.lite).toBeGreaterThan(0);
+    expect(result.escalationThreshold).toBeGreaterThan(0);
   });
 
   it("blends only full-path AI searches; refinement cost is its own line (YOY-52 AC-2)", () => {

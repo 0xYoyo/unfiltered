@@ -1,4 +1,4 @@
-import { writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -59,6 +59,23 @@ assertEngineSourceExecution();
 // GEMINI_API_KEY. After a successful run, re-run `npm test` to prove the
 // harness still clears the bar on fresh recordings, then commit the JSONs.
 const live = process.env.LIVE_LLM_TESTS === "1";
+/**
+ * `REGEN_SCOPE=lite` (YOY-116) re-records only the lite-tier intents —
+ * `intent-lite.json` and `intent-lite-refinement.json` — leaving every
+ * accuracy-tier recording untouched, so a lite-tier change never silently
+ * reshuffles the baseline the zero-regression bar is scored against.
+ * Default `all` re-records everything, the lite files included.
+ */
+const scope = process.env.REGEN_SCOPE === "lite" ? "lite" : "all";
+/**
+ * `REGEN_RESUME=1` keeps the lite entries already on disk and records only
+ * the missing keys — a lite run that a slow upstream cut short resumes
+ * instead of re-spending every call. Never applies to the accuracy-tier
+ * recordings.
+ */
+const resume = process.env.REGEN_RESUME === "1";
+/** The lite tier is fast by design; a hung call is retried sooner. */
+const LITE_REQUEST_TIMEOUT_MS = 20_000;
 
 const recordedDir = join(
   dirname(fileURLToPath(import.meta.url)),
@@ -70,6 +87,28 @@ interface RecordedEntry {
   output: unknown;
   inputTokens: number;
   outputTokens: number;
+  /** A recorded failure of the lite tier (YOY-116); see replay.server.ts. */
+  error?: string;
+}
+
+/**
+ * Record a lite-tier failure as evidence (YOY-116): when the lite model
+ * still fails after the retry ladder, the recording carries the error name
+ * so the offline harness replays the failure and scores the ladder's
+ * escalation on it — gemini-3.5-flash-lite hung deterministically on one
+ * refinement prompt, and hiding that would score a ladder that never ran.
+ */
+function recordLiteFailure(
+  entries: Record<string, RecordedEntry>,
+  query: string,
+  error: unknown,
+): void {
+  entries[query] = {
+    output: null,
+    inputTokens: 0,
+    outputTokens: 0,
+    error: error instanceof Error ? error.name : "Error",
+  };
 }
 
 // Free-tier Gemini keys rate-limit hard (YOY-28): every live call is paced by
@@ -364,7 +403,7 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
     await db?.$disconnect();
   });
 
-  it("re-records enrichments, classifications, intents, and embeddings", async () => {
+  it.skipIf(scope === "lite")("re-records enrichments, classifications, intents, and embeddings", async () => {
     const models = geminiModelsFromEnv();
     const catalog = loadCatalog();
     const goldens = loadGoldens();
@@ -636,8 +675,8 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
         check(false, `rescore: ${violation}`);
       }
       check(
-        rescored.perSearchCostPer1000Usd <= 2.0,
-        `rescore: blended cost $${rescored.perSearchCostPer1000Usd.toFixed(4)}/1k exceeds the $2.00 bar`,
+        rescored.perSearchCostPer1000Usd <= 0.6,
+        `rescore: blended cost $${rescored.perSearchCostPer1000Usd.toFixed(4)}/1k exceeds the $0.60 bar`,
       );
     } catch (error) {
       check(false, `rescore: eval run failed: ${String(error)}`);
@@ -649,4 +688,161 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
     // once. An empty list is the green run that ends the regeneration loop.
     expect(failures, `\n${failures.join("\n")}`).toEqual([]);
   }, 2_700_000);
+
+  it("re-records the lite-tier intents (YOY-116 AC-5)", async () => {
+    // The same goldens and refinement goldens, answered by the lite model at
+    // its explicit thinking level — each answer carrying its `confidence`,
+    // which is what the offline harness routes on. Written beside the
+    // accuracy recordings, never over them.
+    const models = geminiModelsFromEnv();
+    const goldens = loadGoldens();
+    const usage = captureUsage(createPrismaCostRecorder(db));
+    const failures: string[] = [];
+    const check = (condition: boolean, message: string): void => {
+      if (!condition) {
+        failures.push(message);
+      }
+    };
+    const liteClient = () =>
+      createGeminiLlmClient({
+        modelId: models.intentLiteModel,
+        costRecorder: usage.recorder,
+        thinkingLevel: models.intentLiteThinkingLevel,
+        requestTimeoutMs: LITE_REQUEST_TIMEOUT_MS,
+      });
+    const existing = (file: string): Record<string, RecordedEntry> => {
+      const path = join(recordedDir, file);
+      if (!resume || !existsSync(path)) {
+        return {};
+      }
+      const parsed = JSON.parse(readFileSync(path, "utf8")) as {
+        modelId?: string;
+        entries?: Record<string, RecordedEntry>;
+      };
+      // Resume only what the same model recorded.
+      return parsed.modelId === models.intentLiteModel ? (parsed.entries ?? {}) : {};
+    };
+
+    const liteEntries: Record<string, RecordedEntry> = existing("intent-lite.json");
+    const liteExtractor = createIntentExtractor({
+      llm: captureCompletions(liteClient(), usage.last, liteEntries),
+    });
+    for (const golden of goldens) {
+      if (liteEntries[golden.query] !== undefined) {
+        continue; // resumed from disk
+      }
+      try {
+        const intent = await liteExtractor.extract(golden.query);
+        check(
+          typeof intent.confidence === "number",
+          `intent-lite: ${golden.id} reported no confidence`,
+        );
+      } catch (error) {
+        if (error instanceof GeminiTimeoutError) {
+          console.warn(`[regenerate-live] intent-lite: ${golden.id} timed out after retries; recorded as a lite failure`);
+          recordLiteFailure(liteEntries, golden.query, error);
+          continue;
+        }
+        check(false, `intent-lite: ${golden.id} extraction failed: ${String(error)}`);
+        continue;
+      }
+      check(
+        liteEntries[golden.query] !== undefined,
+        `intent-lite: ${golden.id} recorded no completion`,
+      );
+    }
+    writeRecording("intent-lite.json", models.intentLiteModel, liteEntries);
+
+    const liteRefinementEntries: Record<string, RecordedEntry> = existing(
+      "intent-lite-refinement.json",
+    );
+    const liteRefinementExtractor = createIntentExtractor({
+      llm: captureCompletions(liteClient(), usage.last, liteRefinementEntries),
+    });
+    for (const golden of loadRefinementGoldens()) {
+      if (liteRefinementEntries[golden.query] !== undefined) {
+        continue; // resumed from disk
+      }
+      try {
+        await liteRefinementExtractor.extract(golden.query, {
+          previousIntent: golden.previousIntent,
+        });
+      } catch (error) {
+        if (error instanceof GeminiTimeoutError) {
+          console.warn(`[regenerate-live] intent-lite-refinement: ${golden.id} timed out after retries; recorded as a lite failure`);
+          recordLiteFailure(liteRefinementEntries, golden.query, error);
+          continue;
+        }
+        check(false, `intent-lite-refinement: ${golden.id} extraction failed: ${String(error)}`);
+        continue;
+      }
+      check(
+        liteRefinementEntries[golden.query] !== undefined,
+        `intent-lite-refinement: ${golden.id} recorded no completion`,
+      );
+    }
+    writeRecording(
+      "intent-lite-refinement.json",
+      models.intentLiteModel,
+      liteRefinementEntries,
+    );
+
+    check(
+      Object.keys(liteEntries).length === goldens.length,
+      `coverage: ${Object.keys(liteEntries).length}/${goldens.length} lite intents recorded`,
+    );
+
+    // Query embeddings for the lite intents: a lite answer composes its own
+    // query text (its soft attributes differ from the accuracy tier's), and
+    // the retrieval replay is keyed by exact text — a text with no recorded
+    // vector degrades the golden. Embed only the texts embeddings.json lacks
+    // and MERGE them in: the accuracy tier's vectors stay untouched.
+    const embeddingsPath = join(recordedDir, "embeddings.json");
+    const embeddingRecording = JSON.parse(readFileSync(embeddingsPath, "utf8")) as {
+      modelId: string;
+      dimension: number;
+      vectors: Record<string, number[]>;
+    };
+    check(
+      embeddingRecording.modelId === models.embeddingModel &&
+        embeddingRecording.dimension === models.embeddingDimension,
+      `embeddings.json is ${embeddingRecording.modelId}@${embeddingRecording.dimension}, env says ${models.embeddingModel}@${models.embeddingDimension}; regenerate with REGEN_SCOPE=all`,
+    );
+    const liteTexts = new Set<string>();
+    for (const golden of goldens) {
+      const entry = liteEntries[golden.query];
+      if (entry === undefined || entry.error !== undefined) {
+        continue;
+      }
+      const intent = parseIntent(entry.output);
+      if (intent === null) {
+        continue; // a schema-violating lite answer escalates at replay
+      }
+      const text = composeQueryText(intent);
+      if (text !== "" && embeddingRecording.vectors[text] === undefined) {
+        liteTexts.add(text);
+      }
+    }
+    const missing = [...liteTexts];
+    if (missing.length > 0) {
+      const embeddings = createGeminiEmbeddingClient({
+        modelId: models.embeddingModel,
+        dimension: models.embeddingDimension,
+        costRecorder: usage.recorder,
+      });
+      const BATCH = 100;
+      for (let start = 0; start < missing.length; start += BATCH) {
+        const batch = missing.slice(start, start + BATCH);
+        const batchVectors = await paced(() => embeddings.embed({ texts: batch }));
+        batch.forEach((text, index) => {
+          embeddingRecording.vectors[text] = batchVectors[index]!;
+        });
+      }
+      writeFileSync(embeddingsPath, `${JSON.stringify(embeddingRecording, null, 2)}\n`);
+    }
+    console.log(
+      `[regenerate-live] lite query embeddings: ${missing.length} new text(s) merged into embeddings.json`,
+    );
+    expect(failures, `\n${failures.join("\n")}`).toEqual([]);
+  }, 1_800_000);
 });

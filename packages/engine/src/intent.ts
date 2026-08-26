@@ -40,6 +40,13 @@ export interface Intent {
   availabilityRequired: boolean;
   /** Free-form soft attributes for similarity, e.g. "elegant", "summer". */
   softAttributes: string[];
+  /**
+   * The model's own confidence, 0–1, that the hard constraints above are
+   * complete and correct for the query (YOY-116 AC-1). Required of every
+   * model answer; absent only on answers recorded before it existed. The
+   * lite-first ladder escalates on a low or missing value.
+   */
+  confidence?: number;
 }
 
 /** JSON Schema the model's extraction answer must satisfy. */
@@ -70,12 +77,14 @@ export const INTENT_SCHEMA: JsonSchema = {
     size: { type: ["string", "null"] },
     availabilityRequired: { type: "boolean" },
     softAttributes: { type: "array", items: { type: "string" } },
+    confidence: { type: "number", minimum: 0, maximum: 1 },
   },
   required: [
     "colorsInclude",
     "colorsExclude",
     "availabilityRequired",
     "softAttributes",
+    "confidence",
   ],
 };
 
@@ -131,6 +140,23 @@ export interface IntentExtractionContext {
   previousIntent?: Intent;
 }
 
+/** Which model tier produced an intent (YOY-116). */
+export type IntentTier = "lite" | "accuracy";
+
+/** Why an extraction went to the accuracy tier. */
+export type IntentEscalation =
+  | { kind: "class"; name: string }
+  | { kind: "low-confidence"; confidence: number | null }
+  | { kind: "lite-error"; error: string };
+
+/** An extraction with the tier that produced it. */
+export interface IntentExtraction {
+  intent: Intent;
+  tier: IntentTier;
+  /** Set when the accuracy tier answered because of an escalation. */
+  escalation: IntentEscalation | null;
+}
+
 export interface IntentExtractor {
   /**
    * Extract structured intent from one free-text query. With
@@ -141,6 +167,15 @@ export interface IntentExtractor {
    * errors (network, provider) propagate unchanged.
    */
   extract(query: string, context?: IntentExtractionContext): Promise<Intent>;
+  /**
+   * The same extraction, reporting which tier answered (YOY-116). Present on
+   * tier-aware extractors (the lite-first ladder); a plain single-model
+   * extractor is tier-agnostic and leaves it out, so consumers report null.
+   */
+  extractDetailed?(
+    query: string,
+    context?: IntentExtractionContext,
+  ): Promise<IntentExtraction>;
 }
 
 export interface IntentExtractorOptions {
@@ -154,7 +189,13 @@ export interface IntentExtractorOptions {
  * the eval replay keys recordings by (YOY-42 AC-4).
  */
 function serializePreviousIntent(intent: Intent): string {
-  return JSON.stringify(intent, null, 2);
+  // The previous intent's confidence is the last call's self-assessment,
+  // not a constraint; it stays out of the prompt so the block reads as the
+  // shopper's intent alone (and stays byte-identical to pre-YOY-116 prompts
+  // for the same intent).
+  const { confidence: _confidence, ...previous } = intent;
+  void _confidence;
+  return JSON.stringify(previous, null, 2);
 }
 
 /**
@@ -409,6 +450,11 @@ function buildIntentPrompt(query: string, previousIntent?: Intent): string {
     "  immediately available items.",
     "- softAttributes: every remaining descriptive quality (style, season,",
     "  material, mood) as short free-form phrases for similarity matching.",
+    "- confidence: a number from 0 to 1 — how sure you are that the hard",
+    "  constraints above (category, prices, colors, occasion, size,",
+    "  availability) are complete and correct for this query. Use a low",
+    "  value when the query is ambiguous, idiomatic, or mixes languages in a",
+    "  way you may have misread.",
     "Hard-constraint values (category, colors, occasion, size) must be",
     "lowercase English regardless of the query's language, so they match a",
     "normalized catalog vocabulary; softAttributes may stay in the shopper's",
@@ -478,9 +524,12 @@ export function parseIntent(value: unknown): Intent | null {
     size,
     availabilityRequired,
     softAttributes,
+    confidence,
   } = record;
 
   if (
+    !isOptionalNumber(confidence) ||
+    (typeof confidence === "number" && (confidence < 0 || confidence > 1)) ||
     !isOptionalString(category) ||
     !isOptionalNumber(priceMin) ||
     !isOptionalNumber(priceMax) ||
@@ -508,6 +557,10 @@ export function parseIntent(value: unknown): Intent | null {
     size: (size ?? undefined)?.toUpperCase(),
     availabilityRequired,
     softAttributes,
+    // Optional at parse on purpose: the schema requires it of the model, but
+    // recordings made before YOY-116 carry none, and a missing value reads
+    // as "unknown" — which the escalation ladder treats as low.
+    ...(confidence === undefined || confidence === null ? {} : { confidence }),
   };
 }
 

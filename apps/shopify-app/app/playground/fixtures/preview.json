@@ -34,6 +34,7 @@
     "limited": null,
     "stages": {
       "classic": 24
-    }
+    },
+    "intentTier": null
   }
 }
