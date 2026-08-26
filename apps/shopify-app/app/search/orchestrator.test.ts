@@ -12,7 +12,11 @@ import {
 } from "@unfiltered/engine";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createGeminiLlmClient, DEFAULT_INTENT_TIMEOUT_MS } from "@unfiltered/provider-gemini";
+import {
+  createGeminiLlmClient,
+  DEFAULT_INTENT_LITE_TIMEOUT_MS,
+  DEFAULT_INTENT_TIMEOUT_MS,
+} from "@unfiltered/provider-gemini";
 
 import { createPrismaCostRecorder } from "../ai/cost-recorder.server";
 import {
@@ -1768,15 +1772,103 @@ describe("per-operation intent abort (YOY-64 AC-3)", () => {
     }
   });
 
-  it("the 8000 ms server abort sits between the widget's rescue and primary budgets", () => {
+  // The production wiring runs the lite-first ladder, not a single
+  // extractor: without one budget for the ladder a hung upstream cost the
+  // lite timeout plus the accuracy timeout in series (≈16 s at the 8 s
+  // defaults) before the classic fallback — nearly twice the AC's 9 s bound
+  // (review of PR #117). Two hanging Gemini clients, short test timeouts,
+  // the same `deadlineMs` wiring as `createProxySearchOrchestrator`.
+  function hangingGeminiFetch() {
+    const urls: string[] = [];
+    const impl: typeof fetch = (input, init) => {
+      urls.push(String(input));
+      return new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => {
+          reject(Object.assign(new Error("aborted"), { name: "TimeoutError" }));
+        });
+      });
+    };
+    return { urls, impl };
+  }
+
+  it("the production ladder with a never-answering upstream degrades within the ladder deadline, not lite + accuracy", async () => {
+    const db = await createTestDb();
+    await seed(db, [{ productId: "silk-gown", title: "silk gown", vector: [0.9, 0.1, 0], enrichment: { category: "dress" } }]);
+    const { urls, impl } = hangingGeminiFetch();
+    const costRecorder = createPrismaCostRecorder(db);
+    // Per-call timeouts at or above the deadline, as in production (8 s and
+    // 8 s): the deadline, not the lite timeout, is what cuts the lite call.
+    const perCallTimeoutMs = 400;
+    const deadlineMs = 250;
+    const orchestrator = createSearchOrchestrator({
+      db,
+      classifier: createQueryClassifier({ llm: fakeLlm({ classification: () => ({ route: "ai" }) }), timeoutMs: 500 }),
+      extractor: createEscalatingIntentExtractor({
+        lite: createIntentExtractor({
+          llm: createGeminiLlmClient({
+            modelId: "gemini-3.5-flash-lite",
+            apiKey: "test-key-not-real",
+            costRecorder,
+            fetchImpl: impl,
+            requestTimeoutMs: perCallTimeoutMs,
+          }),
+        }),
+        accuracy: createIntentExtractor({
+          llm: createGeminiLlmClient({
+            modelId: "gemini-3.6-flash",
+            apiKey: "test-key-not-real",
+            costRecorder,
+            fetchImpl: impl,
+            requestTimeoutMs: perCallTimeoutMs,
+          }),
+        }),
+        deadlineMs,
+      }),
+      retriever: createRetriever({ embeddings: fakeEmbeddings(), store: createPgVectorRetrievalStore(db) }),
+      classicStore: createPgTrgmClassicStore(db),
+    });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const startedAt = performance.now();
+      // No escalation class matches, so the ladder really starts at lite.
+      const response = await orchestrator.runSearch({
+        query: "flowing silk gown with long sleeves and a high neckline",
+        shopDomain: SHOP,
+      });
+      const wallMs = performance.now() - startedAt;
+      expect(response.route).toBe("classic");
+      expect(response.degraded).toBe(true);
+      // Within the ladder deadline plus slack — under even ONE per-call
+      // timeout, let alone two in series (800 ms here; 16 s in production).
+      expect(wallMs).toBeLessThan(deadlineMs + 100);
+      expect(wallMs).toBeLessThan(perCallTimeoutMs);
+      // The lite call timed out with no budget left: the accuracy tier was
+      // never called.
+      expect(urls).toHaveLength(1);
+      expect(urls[0]).toContain("gemini-3.5-flash-lite");
+      const warned = warn.mock.calls.map((call) => call.map(String).join(" ")).join("\n");
+      expect(warned, warned).toContain("GeminiTimeoutError");
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("the 8000 ms budget bounds the whole ladder and sits between the widget's rescue and primary budgets", () => {
     expect(DEFAULT_INTENT_TIMEOUT_MS).toBe(8000);
     expect(DEFAULT_FALLBACK_TIMEOUT_MS).toBe(3000);
     expect(DEFAULT_TIMEOUT_MS).toBe(30_000);
     // Classic fallback always arrives before the client gives up, and
     // never before the client has even tried its own rescue.
     expect(DEFAULT_INTENT_TIMEOUT_MS).toBeGreaterThanOrEqual(DEFAULT_FALLBACK_TIMEOUT_MS);
-    // The AC's bound: a hung upstream degrades with latencyMs ≤ 9000.
-    expect(DEFAULT_INTENT_TIMEOUT_MS + 1000).toBeLessThanOrEqual(9000);
-    expect(DEFAULT_INTENT_TIMEOUT_MS).toBeLessThanOrEqual(DEFAULT_TIMEOUT_MS);
+    // The AC's bound over the WHOLE ladder: `createProxySearchOrchestrator`
+    // passes DEFAULT_INTENT_TIMEOUT_MS as the ladder's `deadlineMs`, so a
+    // hung upstream degrades with latencyMs ≤ deadline + slack ≤ 9000
+    // regardless of how the lite and accuracy per-call timeouts add up.
+    const ladderDeadlineMs = DEFAULT_INTENT_TIMEOUT_MS;
+    expect(ladderDeadlineMs + 1000).toBeLessThanOrEqual(9000);
+    expect(ladderDeadlineMs).toBeLessThanOrEqual(DEFAULT_TIMEOUT_MS);
+    // And the lite tier's own timeout never exceeds the ladder's budget, so
+    // the budget — not the lite timeout — is what a hung lite call costs.
+    expect(DEFAULT_INTENT_LITE_TIMEOUT_MS).toBeLessThanOrEqual(ladderDeadlineMs);
   });
 });

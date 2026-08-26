@@ -519,6 +519,10 @@ export function createProxySearchOrchestrator(
         }),
       }),
       threshold: intentEscalationThresholdFromEnv(),
+      // One budget for the whole ladder (YOY-64 AC-3): a hung upstream
+      // degrades to classic at GEMINI_INTENT_TIMEOUT_MS, not at the lite
+      // timeout plus the accuracy timeout in series.
+      deadlineMs: models.intentTimeoutMs,
     }),
     retriever: createRetriever({
       embeddings: createGeminiEmbeddingClient({

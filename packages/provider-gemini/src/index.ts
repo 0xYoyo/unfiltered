@@ -122,11 +122,14 @@ export const DEFAULT_INTENT_LITE_THINKING_LEVEL = "low";
  */
 export const DEFAULT_INTENT_LITE_TIMEOUT_MS = 8_000;
 /**
- * Per-request abort timeout of the accuracy-tier intent call (YOY-64 AC-3):
- * a never-answering upstream must degrade the search to classic well inside
+ * Per-request abort timeout of the accuracy-tier intent call AND the
+ * wall-clock deadline of the whole lite-first ladder (YOY-64 AC-3): a
+ * never-answering upstream must degrade the search to classic well inside
  * the widget's 30 s primary budget and after its 3 s classic-rescue budget
- * (both asserted against the widget's constants by a test). The adapter's
- * 60 s default stays for enrichment and embedding. Override with
+ * (both asserted against the widget's constants by a test). The ladder
+ * deadline is what makes the bound hold end to end — without it a hung
+ * upstream costs the lite timeout plus the accuracy timeout in series. The
+ * adapter's 60 s default stays for enrichment and embedding. Override with
  * `GEMINI_INTENT_TIMEOUT_MS`.
  */
 export const DEFAULT_INTENT_TIMEOUT_MS = 8_000;
@@ -289,8 +292,14 @@ async function postJson(
   resolved: ResolvedOptions,
   path: string,
   body: unknown,
+  callerSignal?: AbortSignal,
 ): Promise<Record<string, unknown>> {
   let response: Response;
+  // The per-request timeout always arms; a caller's signal (the intent
+  // ladder's deadline, YOY-64 AC-3) aborts the same request earlier.
+  const timeout = AbortSignal.timeout(resolved.requestTimeoutMs);
+  const signal =
+    callerSignal === undefined ? timeout : AbortSignal.any([callerSignal, timeout]);
   try {
     response = await resolved.fetchImpl(`${resolved.baseUrl}/${path}`, {
       method: "POST",
@@ -299,7 +308,7 @@ async function postJson(
         "x-goog-api-key": resolved.apiKey,
       },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(resolved.requestTimeoutMs),
+      signal,
     });
   } catch (error) {
     if (
@@ -307,7 +316,9 @@ async function postJson(
       (error.name === "TimeoutError" || error.name === "AbortError")
     ) {
       throw new GeminiTimeoutError(
-        `Gemini API ${path} timed out after ${resolved.requestTimeoutMs}ms`,
+        callerSignal?.aborted === true && !timeout.aborted
+          ? `Gemini API ${path} aborted by the caller's deadline before its ${resolved.requestTimeoutMs}ms timeout`
+          : `Gemini API ${path} timed out after ${resolved.requestTimeoutMs}ms`,
         resolved.requestTimeoutMs,
       );
     }
@@ -399,6 +410,7 @@ export function createGeminiLlmClient(options: GeminiClientOptions): LlmClient {
               : {}),
           },
         },
+        request.signal,
       )) as GenerateContentResponse;
 
       const usage = payload.usageMetadata;

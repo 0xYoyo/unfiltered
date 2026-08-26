@@ -725,3 +725,44 @@ describe("embeddings", () => {
     );
   });
 });
+
+describe("caller abort signal (YOY-64 AC-3)", () => {
+  it("a caller's signal aborts a hung request before requestTimeoutMs, as GeminiTimeoutError", async () => {
+    let seen: AbortSignal | null | undefined;
+    const impl = ((_url: unknown, init?: RequestInit) => {
+      seen = init?.signal;
+      return new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => {
+          reject(init.signal!.reason as Error);
+        });
+      });
+    }) as typeof fetch;
+    const client = createGeminiLlmClient({
+      modelId: "test-flash-model",
+      apiKey: "test-key-not-real",
+      costRecorder: { async record() {} },
+      fetchImpl: impl,
+      // Far longer than the caller's deadline: the deadline must win.
+      requestTimeoutMs: 10_000,
+    });
+    const startedAt = performance.now();
+    const call = client.completeStructured({
+      prompt: "p",
+      schema: SCHEMA,
+      operation: "intent",
+      signal: AbortSignal.timeout(25),
+    });
+    await expect(call).rejects.toThrow(GeminiTimeoutError);
+    await expect(
+      client.completeStructured({
+        prompt: "p",
+        schema: SCHEMA,
+        operation: "intent",
+        signal: AbortSignal.timeout(25),
+      }),
+    ).rejects.toThrow(/caller's deadline/);
+    expect(performance.now() - startedAt).toBeLessThan(2_000);
+    // The request still carried a signal (the combined one), never none.
+    expect(seen).toBeInstanceOf(AbortSignal);
+  });
+});

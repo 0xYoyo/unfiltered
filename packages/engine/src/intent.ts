@@ -138,6 +138,12 @@ export interface IntentExtractionContext {
    * caller's concern.
    */
   previousIntent?: Intent;
+  /**
+   * Abort signal bounding this extraction, forwarded to the LLM port. The
+   * lite-first ladder arms one per `extractDetailed` call from its
+   * `deadlineMs` (YOY-64 AC-3) so both tiers share one budget.
+   */
+  signal?: AbortSignal;
 }
 
 /** Which model tier produced an intent (YOY-116). */
@@ -583,6 +589,7 @@ export function createIntentExtractor(
       temperature: 0,
       storeId: context?.storeId,
       searchId: context?.searchId,
+      signal: context?.signal,
     });
     if (previousIntent === undefined) {
       return parseIntent(completion);
