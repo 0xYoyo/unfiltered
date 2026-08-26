@@ -3,6 +3,7 @@ import {
   createEscalatingIntentExtractor,
   createIntentExtractor,
   DEFAULT_INTENT_ESCALATION_THRESHOLD,
+  DEFAULT_INTENT_HEDGE_AFTER_MS,
   createQueryClassifier,
   createRetriever,
   parseIntent,
@@ -435,6 +436,31 @@ export function intentEscalationThresholdFromEnv(
   return threshold;
 }
 
+/** Env var naming the class-escalation hedge delay, in milliseconds (YOY-64 AC-6). */
+export const INTENT_HEDGE_AFTER_MS_ENV = "INTENT_HEDGE_AFTER_MS";
+
+/**
+ * How long a class-escalated accuracy-tier intent call may run before the
+ * lite tier is fired alongside it and the first valid answer wins:
+ * `INTENT_HEDGE_AFTER_MS`, a positive number of milliseconds; unset means
+ * the engine's committed default. A malformed value fails at construction.
+ */
+export function intentHedgeAfterMsFromEnv(
+  env: Record<string, string | undefined> = process.env,
+): number {
+  const raw = env[INTENT_HEDGE_AFTER_MS_ENV];
+  if (raw === undefined) {
+    return DEFAULT_INTENT_HEDGE_AFTER_MS;
+  }
+  const ms = Number(raw);
+  if (raw.trim() === "" || !Number.isFinite(ms) || ms <= 0) {
+    throw new Error(
+      `${INTENT_HEDGE_AFTER_MS_ENV} must be a positive number of milliseconds, got ${JSON.stringify(raw)}`,
+    );
+  }
+  return ms;
+}
+
 /** Env var naming the exact-query intent reuse window, in minutes (YOY-64 AC-4). */
 export const INTENT_REUSE_WINDOW_MINUTES_ENV = "INTENT_REUSE_WINDOW_MINUTES";
 /**
@@ -519,6 +545,10 @@ export function createProxySearchOrchestrator(
         }),
       }),
       threshold: intentEscalationThresholdFromEnv(),
+      // A class match's accuracy call is hedged with the lite tier past this
+      // delay (YOY-64 AC-6): the accuracy model's occasion-class tail — and
+      // its hangs to the deadline — no longer decide the AI p95 alone.
+      hedgeAfterMs: intentHedgeAfterMsFromEnv(),
       // One budget for the whole ladder (YOY-64 AC-3): a hung upstream
       // degrades to classic at GEMINI_INTENT_TIMEOUT_MS, not at the lite
       // timeout plus the accuracy timeout in series.

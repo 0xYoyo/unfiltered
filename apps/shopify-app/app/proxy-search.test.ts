@@ -97,6 +97,8 @@ import { createSearchOrchestrator } from "./search/orchestrator.server";
 import {
   intentEscalationThresholdFromEnv,
   INTENT_ESCALATION_THRESHOLD_ENV,
+  intentHedgeAfterMsFromEnv,
+  INTENT_HEDGE_AFTER_MS_ENV,
   intentReuseWindowMsFromEnv,
   INTENT_REUSE_WINDOW_MINUTES_ENV,
   resetProxySearchOrchestrator,
@@ -1492,6 +1494,21 @@ describe("intent escalation threshold from env (YOY-116 AC-2)", () => {
       expect(() =>
         intentEscalationThresholdFromEnv({ [INTENT_ESCALATION_THRESHOLD_ENV]: raw }),
       ).toThrow(/INTENT_ESCALATION_THRESHOLD/);
+    }
+  });
+});
+
+describe("intent hedge delay from env (YOY-64 AC-6)", () => {
+  it("defaults to the engine's committed delay and reads a positive millisecond override", () => {
+    expect(intentHedgeAfterMsFromEnv({})).toBe(2500);
+    expect(intentHedgeAfterMsFromEnv({ [INTENT_HEDGE_AFTER_MS_ENV]: "1500" })).toBe(1500);
+  });
+
+  it("rejects a malformed or non-positive value, naming the variable", () => {
+    for (const raw of ["", " ", "abc", "0", "-100"]) {
+      expect(() => intentHedgeAfterMsFromEnv({ [INTENT_HEDGE_AFTER_MS_ENV]: raw })).toThrow(
+        /INTENT_HEDGE_AFTER_MS/,
+      );
     }
   });
 });
