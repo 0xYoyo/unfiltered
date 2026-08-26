@@ -155,6 +155,7 @@ apps/
         test-ui/
           ai-states.spec.ts
           evidence-ai.spec.ts
+          evidence-classic-stages.spec.ts
           evidence-hardening.spec.ts
           evidence-latency.spec.ts
           evidence-store.spec.ts
@@ -301,6 +302,7 @@ apps/
       latency-probe.test.ts
       native-render-template.mts
       render-migrate.mts
+      render-migrate.test.ts
     shopify.app.toml
     shopify.web.toml
     tsconfig.json
@@ -478,6 +480,11 @@ docs/
       mobile-he-1-ai-stages.png
       mobile-he-2-classic-stages.png
       mobile-he-3-zero-hit-stages.png
+    YOY-115/
+      desktop-en-classic-stages.png
+      desktop-he-classic-stages.png
+      mobile-en-classic-stages.png
+      mobile-he-classic-stages.png
     YOY-70/
       live-A-desktop-panel.jpg
       live-A-he-rtl.jpg
@@ -776,7 +783,7 @@ vitest.setup.ts
 - apps/shopify-app/app/routes/webhooks.shop.redact.tsx → apps/shopify-app/app/shopify.server.ts
 - apps/shopify-app/app/routes/webhooks.test.ts → apps/shopify-app/app/db.server.ts, apps/shopify-app/app/routes/webhooks.app.uninstalled.tsx, apps/shopify-app/app/routes/webhooks.customers.data_request.tsx, apps/shopify-app/app/routes/webhooks.customers.redact.tsx, apps/shopify-app/app/routes/webhooks.shop.redact.tsx, apps/shopify-app/app/testing/helpers.server.ts
 - apps/shopify-app/app/search/classic-store.test.ts → apps/shopify-app/app/search/classic-store.server.ts, apps/shopify-app/app/testing/helpers.server.ts
-- apps/shopify-app/app/search/orchestrator.server.ts → apps/shopify-app/app/search/stages.ts
+- apps/shopify-app/app/search/orchestrator.server.ts → apps/shopify-app/app/search/classic-store.server.ts, apps/shopify-app/app/search/stages.ts
 - apps/shopify-app/app/search/orchestrator.test.ts → apps/shopify-app/app/ai/cost-recorder.server.ts, apps/shopify-app/app/search/classic-store.server.ts, apps/shopify-app/app/search/orchestrator.server.ts, apps/shopify-app/app/search/retrieval-store.server.ts, apps/shopify-app/app/testing/helpers.server.ts
 - apps/shopify-app/app/search/proxy-contract.test.ts → apps/shopify-app/app/search/orchestrator.server.ts, apps/shopify-app/app/search/proxy.server.ts, apps/shopify-app/widget/src/search-client.ts
 - apps/shopify-app/app/search/proxy.server.ts → apps/shopify-app/app/ai/cost-recorder.server.ts, apps/shopify-app/app/search/classic-store.server.ts, apps/shopify-app/app/search/orchestrator.server.ts, apps/shopify-app/app/search/retrieval-store.server.ts
@@ -793,6 +800,7 @@ vitest.setup.ts
 - apps/shopify-app/scripts/ingest.mts → apps/shopify-app/app/catalog/embed.server.ts, apps/shopify-app/app/catalog/enrich.server.ts, apps/shopify-app/app/catalog/ingest.server.ts, apps/shopify-app/app/catalog/offline-token.server.ts
 - apps/shopify-app/scripts/latency-probe.test.ts → apps/shopify-app/scripts/latency-probe.mts
 - apps/shopify-app/scripts/native-render-template.mts → apps/shopify-app/widget/src/native-render.config.ts
+- apps/shopify-app/scripts/render-migrate.test.ts → apps/shopify-app/scripts/render-migrate.mts
 - apps/shopify-app/widget/src/format.ts → apps/shopify-app/widget/src/strings.ts
 - apps/shopify-app/widget/src/main.ts → apps/shopify-app/widget/src/native-page.ts, apps/shopify-app/widget/src/native-render.config.ts, apps/shopify-app/widget/src/native-render.ts, apps/shopify-app/widget/src/overlay.ts, apps/shopify-app/widget/src/search-client.ts, apps/shopify-app/widget/src/session.ts, apps/shopify-app/widget/src/strings.ts
 - apps/shopify-app/widget/src/native-page.ts → apps/shopify-app/widget/src/native-render.config.ts

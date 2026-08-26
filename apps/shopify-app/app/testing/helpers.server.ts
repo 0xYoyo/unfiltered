@@ -17,7 +17,15 @@ const appRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
  * applied. Keeps every test fully offline: no DATABASE_URL and no external
  * Postgres server is ever needed.
  */
-export async function createTestDb(): Promise<PrismaClient> {
+export async function createTestDb(
+  options: {
+    /**
+     * Statement listener (YOY-115 AC-1): called once per SQL statement the
+     * client sends, with its text. Lets a test count round trips.
+     */
+    onQuery?: (sql: string) => void;
+  } = {},
+): Promise<PrismaClient> {
   const pglite = new PGlite({ extensions: { vector, pg_trgm } });
   // pglite-prisma-adapter pins @prisma/driver-adapter-utils@6.10.1 while
   // @prisma/client ships its own copy, so TS sees two structurally identical
@@ -25,7 +33,20 @@ export async function createTestDb(): Promise<PrismaClient> {
   const adapter = new PrismaPGlite(pglite) as unknown as NonNullable<
     NonNullable<ConstructorParameters<typeof PrismaClient>[0]>["adapter"]
   >;
-  const client = new PrismaClient({ adapter });
+  const client =
+    options.onQuery === undefined
+      ? new PrismaClient({ adapter })
+      : new PrismaClient({
+          adapter,
+          log: [{ level: "query", emit: "event" }],
+        });
+  if (options.onQuery !== undefined) {
+    const onQuery = options.onQuery;
+    (client as PrismaClient<{ log: [{ level: "query"; emit: "event" }] }>).$on(
+      "query",
+      (event) => onQuery(event.query),
+    );
+  }
 
   const migrationsDir = join(appRoot, "prisma", "migrations");
   for (const migration of (await readdir(migrationsDir)).sort()) {

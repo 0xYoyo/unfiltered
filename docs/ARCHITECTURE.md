@@ -136,9 +136,19 @@ cards — deliberately outside `contentHash`, so ingestion and webhook sync
 refresh them even when searchable content is unchanged, and a display-only
 change never triggers re-enrichment or re-embedding); the baseline migration runs
 `CREATE EXTENSION IF NOT EXISTS vector`, and the classic-search migration
-`CREATE EXTENSION IF NOT EXISTS pg_trgm`). The app knows only a Postgres connection string: `DATABASE_URL`
-from a gitignored `.env` (a managed Neon database in dev), documented in
-`.env.example`. SQLite is gone.
+`CREATE EXTENSION IF NOT EXISTS pg_trgm`). The app knows only Postgres
+connection strings, from a gitignored `.env` (a managed Neon database in
+dev), documented in `.env.example`: `DATABASE_URL` serves queries and
+`DIRECT_DATABASE_URL` serves migrations (Prisma `directUrl`, YOY-115 AC-5).
+On Render the two differ — `DATABASE_URL` is Neon's pooled `-pooler` host
+(PgBouncer, transaction mode, `pgbouncer=true`) and `DIRECT_DATABASE_URL`
+the direct host, because `prisma migrate deploy` needs session features a
+transaction pooler does not offer; locally both may be the same unpooled
+URL, and `docker-entrypoint.sh` defaults the direct URL to `DATABASE_URL`
+so an unsplit environment still boots. The classic search's in-statement
+`set_config(..., is_local = true)` and every `SET LOCAL` stay
+transaction-scoped, which is exactly what transaction pooling preserves.
+SQLite is gone.
 
 Tests never require a live database: `createTestDb()`
 (`apps/shopify-app/app/testing/helpers.server.ts`) spins up an in-process
@@ -294,10 +304,25 @@ Classic keyword search (the zero-LLM result path; YOY-41):
   `CatalogProduct`'s keyword fields (title, tags, vendor, productType,
   imageAltTexts) — and creates a trigram GIN index over that expression;
   classic queries filter with `query <% catalog_search_text(...)` (word
-  similarity, threshold lowered to 0.30 transaction-locally) and rank by
+  similarity, threshold lowered to 0.30) and rank by
   `word_similarity(query, ...)`, so the index serves the plan and one- or
   two-edit typos ("nkie air max") still find the intended product, in
-  English and Hebrew alike. Constraint predicates mirror the pgvector store
+  English and Hebrew alike. **One statement per search (YOY-115 AC-1):**
+  the threshold is set inside the statement — a one-row
+  `SELECT set_config('pg_trgm.word_similarity_threshold', '0.3', true)`
+  subquery is the outer side of a `CROSS JOIN LATERAL` whose inner side is
+  the search and references that row, so the executor runs `set_config`
+  before the `<%` scan reads the GUC (the plan is one Nested Loop with the
+  threshold subquery outer; `classic-store.test.ts` pins that order and
+  counts exactly one statement per search in both modes). `is_local` scopes
+  the setting to the statement's transaction, so it never leaks through a
+  pooler. The same statement returns the card fields (title, url, image,
+  prices, currency, availability) on every hit (`ClassicCardHit`), so the
+  orchestrator builds classic result cards without a follow-up hydration
+  query — a classic-routed response's `stages` reads `classify, classic`
+  with no `hydrate` (AC-3), and a keystroke preview or classic rescue is
+  exactly one database round trip. A classic store that returns bare hits
+  (a fake, another implementation) still hydrates as before. Constraint predicates mirror the pgvector store
   verbatim: unknown enrichment passes positive occasion/color constraints,
   category is evidence-required and expands through the taxonomy's category
   groups, and a price cap compares against `priceMin`.

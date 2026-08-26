@@ -46,8 +46,7 @@
     "stages": {
       "classify": 44,
       "intent": 1002,
-      "classic": 31,
-      "hydrate": 6
+      "classic": 31
     }
   }
 }

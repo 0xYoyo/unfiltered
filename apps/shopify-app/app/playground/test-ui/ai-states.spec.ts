@@ -362,13 +362,12 @@ test.describe("engine details (AC-5, verify 5)", () => {
     ]);
 
     // A classic search shows only the stages a keyword search runs — the
-    // absent intent/embed/retrieve rows are the proof of zero LLM calls.
+    // absent intent/embed/retrieve rows are the proof of zero LLM calls, and
+    // the absent hydrate row is the one-statement search (YOY-115 AC-3):
+    // `classify`, `classic`, and nothing else.
     await submit(page, "dress");
-    await expect(rows).toHaveText([
-      "classify · 1 ms",
-      "classic · 28 ms",
-      "hydrate · 7 ms",
-    ]);
+    await expect(rows).toHaveText(["classify · 1 ms", "classic · 28 ms"]);
+    await expect(rows.filter({ hasText: "hydrate" })).toHaveCount(0);
 
     // Every row is numeric milliseconds in the `<stage> · <ms> ms` form.
     for (const text of await rows.allTextContents()) {
@@ -389,13 +388,13 @@ test.describe("engine details (AC-5, verify 5)", () => {
     await expect(page.getByTestId("playground-details-stages")).toHaveCount(0);
   });
 
-  test("a zero-hit response adds the closeMatches row after hydrate's stage", async ({
+  test("a zero-hit response adds the closeMatches row last", async ({
     page,
   }) => {
     await page.goto("/?details=1");
     await submit(page, "ai zero hit dress");
     const rows = page.getByTestId("playground-details-stages").locator("li");
-    await expect(rows).toHaveCount(6);
+    await expect(rows).toHaveCount(5);
     await expect(rows.last()).toHaveText("closeMatches · 63 ms");
   });
 

@@ -55,7 +55,7 @@ vi.mock("./search/proxy.server", async (importOriginal) => {
           // Out of pipeline order on purpose: the serializer re-orders.
           stages:
             forced || preview
-              ? { hydrate: 3, classic: 12 }
+              ? { classic: 12 }
               : { hydrate: 4, retrieve: 30, embed: 80, intent: 400, classify: 25 },
           ...(orchestratorSeam.response ?? {}),
         });
@@ -316,7 +316,7 @@ describe("the response contract (AC-2)", () => {
     const preview = (await (
       await searchLoader(loaderArgs(searchRequest({ mode: "preview" })))
     ).json()) as { details: { stages: Record<string, number> } };
-    expect(Object.keys(preview.details.stages)).toEqual(["classic", "hydrate"]);
+    expect(Object.keys(preview.details.stages)).toEqual(["classic"]);
   });
 
   it("includes closeMatches only when the response carries them", async () => {

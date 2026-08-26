@@ -41,11 +41,19 @@
  *   npx tsx scripts/render-migrate.mts set-group-var <groupName> <key> <value>
  *     → sets one variable in an environment group (for non-secret values
  *       such as SHOPIFY_APP_URL). Prints the key name only, never the value.
+ *   npx tsx scripts/render-migrate.mts pool-database-url <groupName>
+ *     → switches the group to Neon's pooled connection (YOY-115 AC-5):
+ *       reads DATABASE_URL from the group in-process, writes
+ *       DIRECT_DATABASE_URL = that value (the direct host, for migrations),
+ *       and rewrites DATABASE_URL with `-pooler` inserted after the Neon
+ *       endpoint id in the host plus `pgbouncer=true` (keeping
+ *       `sslmode=require`). Prints key names only. Refuses when
+ *       DATABASE_URL already contains `-pooler`. Follow with trigger-deploy.
  *
  * Stops (non-zero exit, no partial writes) on any 401/403/5xx from Render.
  */
 
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, resolve } from "node:path";
 
 const RENDER_API = "https://api.render.com/v1";
@@ -274,6 +282,43 @@ function readDeploy(apiKey: string, serviceId: string, deployId: string): Promis
 
 const sleep = (ms: number) => new Promise<void>((done) => setTimeout(done, ms));
 
+// --- pooled URL rewrite (pure; unit-tested) ---------------------------------
+
+export class PoolUrlError extends Error {}
+
+/**
+ * Rewrite a Neon direct connection string into its pooled twin (YOY-115
+ * AC-5): the host `ep-<name>-<id>.<region>.aws.neon.tech` becomes
+ * `ep-<name>-<id>-pooler.<region>.aws.neon.tech`, and `pgbouncer=true` is
+ * added so Prisma speaks PgBouncer's transaction mode. Every other part of
+ * the URL — user, password, database, `sslmode=require`, any other
+ * parameter — is kept verbatim. Refuses a URL that is already pooled and a
+ * URL whose host is not a Neon endpoint, so a mistaken group never gets a
+ * nonsense host written into it.
+ */
+export function poolDatabaseUrl(directUrl: string): string {
+  let url: URL;
+  try {
+    url = new URL(directUrl);
+  } catch {
+    throw new PoolUrlError("DATABASE_URL is not a valid URL");
+  }
+  if (url.hostname.includes("-pooler")) {
+    throw new PoolUrlError("DATABASE_URL already uses the pooled (-pooler) host");
+  }
+  const match = /^(ep-[a-z0-9-]+?-[a-z0-9]+)(\..+)$/.exec(url.hostname);
+  if (match === null || !url.hostname.endsWith(".neon.tech")) {
+    throw new PoolUrlError(
+      `DATABASE_URL host is not a Neon endpoint (ep-<name>-<id>.<region>.aws.neon.tech): ${url.hostname}`,
+    );
+  }
+  url.hostname = `${match[1]}-pooler${match[2]}`;
+  if (url.searchParams.get("pgbouncer") !== "true") {
+    url.searchParams.set("pgbouncer", "true");
+  }
+  return url.toString();
+}
+
 // --- output (names only, never values) ------------------------------------
 
 function printSettings(settings: ServiceSettings): void {
@@ -486,12 +531,59 @@ async function setGroupVar(
   if (!present) process.exit(3);
 }
 
+async function findGroupAnyOwner(
+  apiKey: string,
+  groupName: string,
+): Promise<EnvGroup | undefined> {
+  const owners = await render<Array<{ owner: { id: string } }>>(apiKey, "GET", "/owners?limit=100");
+  for (const row of owners) {
+    const group = await findEnvGroup(apiKey, row.owner.id, groupName);
+    if (group) return group;
+  }
+  return undefined;
+}
+
+async function poolGroupDatabaseUrl(apiKey: string, groupName: string): Promise<void> {
+  const group = await findGroupAnyOwner(apiKey, groupName);
+  if (!group) {
+    console.error(`STOP: environment group "${groupName}" not found.`);
+    process.exit(2);
+  }
+  const full = await render<EnvGroup>(apiKey, "GET", `/env-groups/${group.id}`);
+  const direct = (full.envVars ?? []).find((entry) => entry.key === "DATABASE_URL")?.value;
+  if (direct === undefined) {
+    console.error(`STOP: group "${groupName}" has no DATABASE_URL.`);
+    process.exit(2);
+  }
+  let pooled: string;
+  try {
+    pooled = poolDatabaseUrl(direct);
+  } catch (error) {
+    console.error(`STOP: ${error instanceof Error ? error.message : String(error)}`);
+    process.exit(2);
+  }
+  // Direct first, then pooled: if the second write fails, the group still
+  // holds a consistent pair (direct == unpooled DATABASE_URL, as before).
+  await render(apiKey, "PUT", `/env-groups/${group.id}/env-vars/DIRECT_DATABASE_URL`, { value: direct });
+  await render(apiKey, "PUT", `/env-groups/${group.id}/env-vars/DATABASE_URL`, { value: pooled });
+  const reread = await render<EnvGroup>(apiKey, "GET", `/env-groups/${group.id}`);
+  const vars = reread.envVars ?? [];
+  const directOk = vars.some((entry) => entry.key === "DIRECT_DATABASE_URL" && entry.value === direct);
+  const pooledOk = vars.some((entry) => entry.key === "DATABASE_URL" && entry.value === pooled);
+  console.log(`Group "${groupName}" (${group.id}):`);
+  console.log(`  DIRECT_DATABASE_URL ${directOk ? "written (= previous DATABASE_URL)" : "NOT written"}`);
+  console.log(`  DATABASE_URL        ${pooledOk ? "rewritten to the -pooler host with pgbouncer=true" : "NOT rewritten"}`);
+  if (!directOk || !pooledOk) process.exit(3);
+  console.log("Next: trigger-deploy, wait-deploy, then verify /healthz and one classic + one AI search.");
+}
+
 // --- main -----------------------------------------------------------------
 
-const [command, ...rest] = process.argv.slice(2);
 const usage =
-  "usage: render-migrate.mts preflight | inspect <serviceId> | create-group <serviceId> <groupName> | link-group <groupName> <serviceId> | create-service <oldServiceId> <name> <region> | deploys <serviceId> | trigger-deploy <serviceId> | wait-deploy <serviceId> [deployId] [timeoutMinutes] | set-group-var <groupName> <key> <value>";
+  "usage: render-migrate.mts preflight | inspect <serviceId> | create-group <serviceId> <groupName> | link-group <groupName> <serviceId> | create-service <oldServiceId> <name> <region> | deploys <serviceId> | trigger-deploy <serviceId> | wait-deploy <serviceId> [deployId] [timeoutMinutes] | set-group-var <groupName> <key> <value> | pool-database-url <groupName>";
 
+async function main(argv: readonly string[]): Promise<void> {
+const [command, ...rest] = argv;
 loadEnvInProcess();
 
 try {
@@ -548,6 +640,12 @@ try {
       await setGroupVar(requireApiKey(), groupName, key, value);
       break;
     }
+    case "pool-database-url": {
+      const [groupName] = rest;
+      if (!groupName) throw new Error(usage);
+      await poolGroupDatabaseUrl(requireApiKey(), groupName);
+      break;
+    }
     default:
       throw new Error(usage);
   }
@@ -557,4 +655,14 @@ try {
     process.exit(1);
   }
   throw error;
+}
+}
+
+// Run only as a CLI: the unit test imports poolDatabaseUrl without
+// executing a command (same guard as latency-probe.mts).
+if (
+  process.argv[1] !== undefined &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
+  await main(process.argv.slice(2));
 }

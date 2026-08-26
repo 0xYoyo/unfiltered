@@ -15,6 +15,7 @@ import {
   type Retriever,
 } from "@unfiltered/engine";
 
+import type { ClassicCardHit } from "./classic-store.server";
 import { SEARCH_STAGES, type SearchStage, type SearchStages } from "./stages";
 
 export { SEARCH_STAGES, type SearchStage, type SearchStages } from "./stages";
@@ -368,6 +369,37 @@ export function createSearchOrchestrator(
     ): Promise<ProductCard[]> =>
       stages.time("hydrate", () => hydrateCards(shopDomain, hits));
 
+    /**
+     * Cards for classic hits (YOY-115 AC-1/AC-3): the pg_trgm store returns
+     * the card fields in its one statement, so no hydration query runs and
+     * no `hydrate` stage is booked. A classic store that hands back bare
+     * hits (a fake, another implementation) still hydrates as before — the
+     * publication guard in `hydrateCards` is then the only guard, exactly
+     * as it was.
+     */
+    const classicCards = (
+      hits: ReadonlyArray<
+        { productId: string; colorUnknown?: boolean } | ClassicCardHit
+      >,
+    ): Promise<ProductCard[]> => {
+      if (!hits.every((hit): hit is ClassicCardHit => "card" in hit)) {
+        return hydrate(hits);
+      }
+      return Promise.resolve(
+        hits.map((hit) => ({
+          productId: hit.productId,
+          title: hit.card.title,
+          url: hit.card.url,
+          imageUrl: hit.card.imageUrl,
+          priceMin: hit.card.priceMin,
+          priceMax: hit.card.priceMax,
+          currencyCode: hit.card.currencyCode,
+          available: hit.card.available,
+          colorUnknown: hit.colorUnknown === true,
+        })),
+      );
+    };
+
     const classicResponse = async (
       routeReason: SearchRouteReason,
       degraded: boolean,
@@ -401,7 +433,7 @@ export function createSearchOrchestrator(
         route: "classic",
         routeReason,
         intent,
-        hits: await hydrate(result.hits),
+        hits: await classicCards(result.hits),
         chips: [],
         degraded,
         closeMatches: [],
@@ -495,7 +527,7 @@ export function createSearchOrchestrator(
             route: "ai",
             routeReason,
             intent,
-            hits: await hydrate(result.hits),
+            hits: await classicCards(result.hits),
             chips: appliedConstraints(constraints),
             degraded: false,
             closeMatches: [],
@@ -529,7 +561,9 @@ export function createSearchOrchestrator(
           hits: [],
           chips,
           degraded: false,
-          closeMatches: await hydrate(closeHits),
+          // Keyword close matches carry their cards; relaxed vector rescues
+          // are bare ids and hydrate as before.
+          closeMatches: await classicCards(closeHits),
         };
       }
 

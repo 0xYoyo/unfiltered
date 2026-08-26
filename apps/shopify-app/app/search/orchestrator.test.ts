@@ -1181,11 +1181,13 @@ describe("per-stage timing (YOY-114 AC-1)", () => {
     return response;
   }
 
-  it("a classic route ran classify, classic, hydrate — and nothing else", async () => {
+  it("a classic route ran classify and classic — no hydrate: the cards ride the one statement (YOY-115 AC-3)", async () => {
     const orchestrator = buildOrchestrator(db, { llm: fakeLlm({}) });
     const response = await timed(orchestrator, { query: "nike 90", shopDomain: SHOP });
     expect(response.route).toBe("classic");
-    expect(Object.keys(response.stages)).toEqual(["classify", "classic", "hydrate"]);
+    expect(Object.keys(response.stages)).toEqual(["classify", "classic"]);
+    expect(response.stages.hydrate).toBeUndefined();
+    expect(response.hits[0]).toMatchObject({ productId: "sneaker-90", title: "nike 90" });
   });
 
   it("an AI route ran classify, intent, embed, retrieve, hydrate, in pipeline order", async () => {
@@ -1206,7 +1208,37 @@ describe("per-stage timing (YOY-114 AC-1)", () => {
     ]);
   });
 
-  it("an AI zero-hit adds closeMatches; hydrate covers the close matches", async () => {
+  it("an AI zero-hit rescued by relaxed vector retrieval adds closeMatches and hydrates the bare ids", async () => {
+    const orchestrator = buildOrchestrator(db, {
+      llm: fakeLlm({
+        classification: () => ({ route: "ai" }),
+        intent: () => ({ ...DRESS_INTENT, priceMax: 1 }),
+      }),
+    });
+    // No seeded title matches AI_QUERY by keyword, so the rescue is the
+    // relaxed vector ladder — bare ids, hydrated as before.
+    const response = await timed(orchestrator, { query: AI_QUERY, shopDomain: SHOP });
+    expect(response.hits).toEqual([]);
+    expect(response.closeMatches.map((card) => card.productId)).toEqual(["silk-gown"]);
+    expect(Object.keys(response.stages)).toEqual([
+      "classify",
+      "intent",
+      "embed",
+      "retrieve",
+      "hydrate",
+      "closeMatches",
+    ]);
+  });
+
+  it("an AI zero-hit rescued by keyword close matches books no hydrate: the cards ride the one statement (YOY-115 AC-3)", async () => {
+    await seed(db, [
+      {
+        productId: "wedding-dress",
+        title: AI_QUERY,
+        vector: [0, 1, 0],
+        enrichment: { category: "dress" },
+      },
+    ]);
     const orchestrator = buildOrchestrator(db, {
       llm: fakeLlm({
         classification: () => ({ route: "ai" }),
@@ -1215,12 +1247,12 @@ describe("per-stage timing (YOY-114 AC-1)", () => {
     });
     const response = await timed(orchestrator, { query: AI_QUERY, shopDomain: SHOP });
     expect(response.hits).toEqual([]);
+    expect(response.closeMatches[0]).toMatchObject({ productId: "wedding-dress", title: AI_QUERY });
     expect(Object.keys(response.stages)).toEqual([
       "classify",
       "intent",
       "embed",
       "retrieve",
-      "hydrate",
       "closeMatches",
     ]);
   });
@@ -1238,31 +1270,46 @@ describe("per-stage timing (YOY-114 AC-1)", () => {
     try {
       const response = await timed(orchestrator, { query: AI_QUERY, shopDomain: SHOP });
       expect(response.degraded).toBe(true);
-      expect(Object.keys(response.stages)).toEqual([
-        "classify",
-        "intent",
-        "classic",
-        "hydrate",
-      ]);
+      expect(Object.keys(response.stages)).toEqual(["classify", "intent", "classic"]);
     } finally {
       warn.mockRestore();
     }
   });
 
-  it("a preview and a forced classic ran classic and hydrate only — no classify", async () => {
+  it("a preview and a forced classic ran classic only — no classify, no hydrate", async () => {
     const orchestrator = buildOrchestrator(db, { llm: fakeLlm({}) });
     const preview = await timed(orchestrator, {
       query: "nike 90",
       shopDomain: SHOP,
       preview: true,
     });
-    expect(Object.keys(preview.stages)).toEqual(["classic", "hydrate"]);
+    expect(Object.keys(preview.stages)).toEqual(["classic"]);
     const throttled = await timed(orchestrator, {
       query: "nike 90",
       shopDomain: SHOP,
       forceClassic: true,
     });
-    expect(Object.keys(throttled.stages)).toEqual(["classic", "hydrate"]);
+    expect(Object.keys(throttled.stages)).toEqual(["classic"]);
+  });
+
+  it("a classic store that returns bare hits still hydrates, with the publication guard (YOY-115 AC-1 fallback)", async () => {
+    const orchestrator = createSearchOrchestrator({
+      db,
+      classifier: createQueryClassifier({ llm: fakeLlm({}), timeoutMs: 500 }),
+      extractor: createIntentExtractor({ llm: fakeLlm({}) }),
+      retriever: createRetriever({
+        embeddings: fakeEmbeddings(),
+        store: createPgVectorRetrievalStore(db),
+      }),
+      classicStore: {
+        async search() {
+          return { hits: [{ productId: "sneaker-90", score: 1 }] };
+        },
+      },
+    });
+    const response = await timed(orchestrator, { query: "nike 90", shopDomain: SHOP });
+    expect(Object.keys(response.stages)).toEqual(["classify", "classic", "hydrate"]);
+    expect(response.hits[0]).toMatchObject({ productId: "sneaker-90", title: "nike 90" });
   });
 
   it("a chip removal enters at retrieval: embed, retrieve, hydrate", async () => {
