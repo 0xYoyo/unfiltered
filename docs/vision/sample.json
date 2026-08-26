@@ -1,0 +1,2640 @@
+{
+  "$comment": "YOY-119 vision-model comparison sample. 40 products from the live seed (unfiltered-dev), tentree and whitestuff catalogs, up to 4 public image URLs each. key = hand label from inspecting the images (value = canonical answer, accept = also-correct answers). nonSoldItems = garments/shoes/accessories visible in the shots that are NOT the product; a model output that carries any of their attributes (category, colour, pattern, material) not shared by the sold item counts as contamination. flags: contamination = model wearing other items; text-sparse = product text < 80 chars; flat = flat/packshot only; text-conflict = product text contradicts the image.",
+  "fields": [
+    "category",
+    "primaryColour",
+    "sleeveLength",
+    "neckline",
+    "garmentLength",
+    "pattern",
+    "materialAppearance"
+  ],
+  "categories": "packages/engine/src/taxonomy.ts CANONICAL_CATEGORIES",
+  "generatedAt": "2026-08-26",
+  "products": [
+    {
+      "id": "seed-layered-contrast-dress-white-black",
+      "catalog": "seed",
+      "url": "https://unfiltered-dev.myshopify.com/products/layered-contrast-dress-white-black",
+      "title": "Layered Contrast Dress in Cream/Black",
+      "productType": "women's dresses",
+      "text": "This is a demonstration store. You can purchase products like this from Baby & CompanyHand crafted from concept to finished product, this Columbian label is authentically kind and creative. Distinctive layering cape of silk and crepe wool with caped sleeves. Tie and zip closure with back paneling. Amelia Toro. Color Cream/Black. 100% Crepe Wool Body, 100% Silk Bodice. Made in Columbia. Lana is wearing a Size 2.",
+      "images": [
+        "https://cdn.shopify.com/s/files/1/0680/8374/4843/files/2014_11_17_Lana_Look02_05.jpg?v=1786878465"
+      ],
+      "flags": [
+        "contamination"
+      ],
+      "key": {
+        "category": {
+          "value": "dress",
+          "accept": []
+        },
+        "primaryColour": {
+          "value": "black",
+          "accept": [
+            "cream",
+            "white"
+          ]
+        },
+        "sleeveLength": {
+          "value": "short",
+          "accept": []
+        },
+        "neckline": {
+          "value": "crew",
+          "accept": [
+            "boat"
+          ]
+        },
+        "garmentLength": {
+          "value": "knee",
+          "accept": [
+            "midi"
+          ]
+        },
+        "pattern": {
+          "value": "colour-block",
+          "accept": [
+            "solid"
+          ]
+        },
+        "materialAppearance": {
+          "value": "wool",
+          "accept": [
+            "crepe",
+            "silk"
+          ]
+        }
+      },
+      "nonSoldItems": [
+        {
+          "item": "black heeled pumps",
+          "category": "shoes",
+          "colours": [
+            "black"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "seed-asymmetric-dress-black",
+      "catalog": "seed",
+      "url": "https://unfiltered-dev.myshopify.com/products/asymmetric-dress-black",
+      "title": "Asymmetric Dress in Black",
+      "productType": "women's dresses",
+      "text": "Hand crafted from concept to finished product, the Columbian label Amelia Toro is authentically kind and creative. Sleeveless dress with asymmetrical collar takes a traditional piece unforgettable. Interesting banded fabrication on front, long paneling in back. Back zip closure. Color Black. 100% Crepe Wool. Made in Columbia. Lana is wearing a Size 2. Also available in Cream/Black.",
+      "images": [
+        "https://cdn.shopify.com/s/files/1/0680/8374/4843/files/2014_11_17_Lana_Look034_02.jpg?v=1786878466"
+      ],
+      "flags": [
+        "contamination"
+      ],
+      "key": {
+        "category": {
+          "value": "dress",
+          "accept": []
+        },
+        "primaryColour": {
+          "value": "black",
+          "accept": []
+        },
+        "sleeveLength": {
+          "value": "sleeveless",
+          "accept": [
+            "short"
+          ]
+        },
+        "neckline": {
+          "value": "asymmetric",
+          "accept": [
+            "collar",
+            "boat"
+          ]
+        },
+        "garmentLength": {
+          "value": "knee",
+          "accept": [
+            "midi"
+          ]
+        },
+        "pattern": {
+          "value": "solid",
+          "accept": []
+        },
+        "materialAppearance": {
+          "value": "wool",
+          "accept": [
+            "crepe"
+          ]
+        }
+      },
+      "nonSoldItems": [
+        {
+          "item": "black heeled pumps",
+          "category": "shoes",
+          "colours": [
+            "black"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "seed-s14-hac-dr-s13083891-tan",
+      "catalog": "seed",
+      "url": "https://unfiltered-dev.myshopify.com/products/s14-hac-dr-s13083891-tan",
+      "title": "Leather Front Tunic",
+      "productType": "women's dresses",
+      "text": "This is a demonstration store. You can purchase products like this from Baby & CompanyTimeless and inventive, Manuela Arcari’s designs for Ter et Bantine are exquisitely minimalistic while including touches of femininity. Lamb leather with unfinished seams paired with mesh back creates a rustic elegance. Back zip closure, raglan sleeves. Color Tan. 100% lamb leather, 100% cotton lining. Made in Italy. Lana is wearing an Italian 38.",
+      "images": [
+        "https://cdn.shopify.com/s/files/1/0680/8374/4843/files/2014_10_25_Lana_Look42_02.jpg?v=1786878484"
+      ],
+      "flags": [
+        "contamination"
+      ],
+      "key": {
+        "category": {
+          "value": "dress",
+          "accept": [
+            "top"
+          ]
+        },
+        "primaryColour": {
+          "value": "tan",
+          "accept": [
+            "brown",
+            "camel",
+            "taupe"
+          ]
+        },
+        "sleeveLength": {
+          "value": "short",
+          "accept": []
+        },
+        "neckline": {
+          "value": "scoop",
+          "accept": [
+            "crew",
+            "v-neck"
+          ]
+        },
+        "garmentLength": {
+          "value": "thigh",
+          "accept": [
+            "mini"
+          ]
+        },
+        "pattern": {
+          "value": "solid",
+          "accept": []
+        },
+        "materialAppearance": {
+          "value": "leather",
+          "accept": []
+        }
+      },
+      "nonSoldItems": [
+        {
+          "item": "black leather leggings",
+          "category": "pants",
+          "colours": [
+            "black"
+          ],
+          "material": "leather"
+        }
+      ]
+    },
+    {
+      "id": "seed-a-line-pocket-shift-black",
+      "catalog": "seed",
+      "url": "https://unfiltered-dev.myshopify.com/products/a-line-pocket-shift-black",
+      "title": "A-Line Pocket Shift in Black",
+      "productType": "women's dresses",
+      "text": "This shift dress possesses many virtues. This A-line by Mauro Grifoni, v-neck version has convenient side seam pockets, an invisible zip closure and back darts for a tailored fit. Color Black. 80% Polyester, 14% Viscose. Made in Italy. Lana is wearing an Italian 38.",
+      "images": [
+        "https://cdn.shopify.com/s/files/1/0680/8374/4843/files/2014_10_25_Lana_Look5_01.jpg?v=1786878599"
+      ],
+      "flags": [
+        "contamination"
+      ],
+      "key": {
+        "category": {
+          "value": "dress",
+          "accept": []
+        },
+        "primaryColour": {
+          "value": "black",
+          "accept": []
+        },
+        "sleeveLength": {
+          "value": "long",
+          "accept": []
+        },
+        "neckline": {
+          "value": "v-neck",
+          "accept": []
+        },
+        "garmentLength": {
+          "value": "knee",
+          "accept": []
+        },
+        "pattern": {
+          "value": "solid",
+          "accept": []
+        },
+        "materialAppearance": {
+          "value": "crepe",
+          "accept": [
+            "synthetic",
+            "wool",
+            "polyester"
+          ]
+        }
+      },
+      "nonSoldItems": [
+        {
+          "item": "white collared shirt worn underneath",
+          "category": "top",
+          "colours": [
+            "white"
+          ]
+        },
+        {
+          "item": "black heeled pumps",
+          "category": "shoes",
+          "colours": [
+            "black"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "seed-full-collar-poplin-blouse-navy",
+      "catalog": "seed",
+      "url": "https://unfiltered-dev.myshopify.com/products/full-collar-poplin-blouse-navy",
+      "title": "Full Collar Poplin Blouse in Navy",
+      "productType": "women's tops",
+      "text": "The softest cotton manages to also be the crispest in Gianfranco Scotti's semi-couture poplin blouse. The hidden placket button-up is given an artful flair with a standing collar and full sleeves. Color Navy. 100% Cotton. Lana is wearing a French 38. Also available in Off-White.",
+      "images": [
+        "https://cdn.shopify.com/s/files/1/0680/8374/4843/files/2014_10_25_Lana_Look37_02.jpg?v=1786878569"
+      ],
+      "flags": [
+        "contamination"
+      ],
+      "key": {
+        "category": {
+          "value": "top",
+          "accept": []
+        },
+        "primaryColour": {
+          "value": "navy",
+          "accept": [
+            "blue"
+          ]
+        },
+        "sleeveLength": {
+          "value": "long",
+          "accept": []
+        },
+        "neckline": {
+          "value": "collar",
+          "accept": [
+            "high-neck"
+          ]
+        },
+        "garmentLength": {
+          "value": "hip",
+          "accept": []
+        },
+        "pattern": {
+          "value": "solid",
+          "accept": []
+        },
+        "materialAppearance": {
+          "value": "cotton",
+          "accept": [
+            "poplin"
+          ]
+        }
+      },
+      "nonSoldItems": [
+        {
+          "item": "black trousers",
+          "category": "pants",
+          "colours": [
+            "black"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "seed-madame-l-blouse-leopard",
+      "catalog": "seed",
+      "url": "https://unfiltered-dev.myshopify.com/products/madame-l-blouse-leopard",
+      "title": "Madame L Blouse in Leopard",
+      "productType": "women's tops",
+      "text": "A bold leopard adds a playful dimension to this collarless half-placket, shirt-tail hem pullover blouse. The front features a buttoned placket and slightly gathered yoke with Mother of Pearl buttons. La Prestic Ouiston. Color Leopard. 100% Silk. Also available in Mix Pattern.",
+      "images": [
+        "https://cdn.shopify.com/s/files/1/0680/8374/4843/files/2014_08_10_Lana_Look24_07.jpg?v=1786878613"
+      ],
+      "flags": [
+        "contamination"
+      ],
+      "key": {
+        "category": {
+          "value": "top",
+          "accept": []
+        },
+        "primaryColour": {
+          "value": "brown",
+          "accept": [
+            "beige",
+            "tan",
+            "cream"
+          ]
+        },
+        "sleeveLength": {
+          "value": "long",
+          "accept": [
+            "three-quarter"
+          ]
+        },
+        "neckline": {
+          "value": "crew",
+          "accept": [
+            "collar",
+            "v-neck"
+          ]
+        },
+        "garmentLength": {
+          "value": "hip",
+          "accept": []
+        },
+        "pattern": {
+          "value": "animal",
+          "accept": [
+            "leopard"
+          ]
+        },
+        "materialAppearance": {
+          "value": "silk",
+          "accept": [
+            "satin"
+          ]
+        }
+      },
+      "nonSoldItems": [
+        {
+          "item": "grey-green trousers",
+          "category": "pants",
+          "colours": [
+            "grey",
+            "green",
+            "olive"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "seed-tulle-pleat-skirt-navy",
+      "catalog": "seed",
+      "url": "https://unfiltered-dev.myshopify.com/products/tulle-pleat-skirt-navy",
+      "title": "Tulle Pleat Skirt in Navy",
+      "productType": "women's skirts",
+      "text": "This is a demonstration store. You can purchase products like this from Baby & CompanyTimeless and inventive, Manuela Arcari’s designs for Ter et Bantine are exquisitely minimalistic while including touches of femininity. A-line skirt with subtle paneling. Back darts add to clean silhouette. Zip closure in back. Color Navy. 63% Cotton, 21% Polyester, 16% Seta. Made in Italy. Lana is wearing a Size 38. Also available in Cream.",
+      "images": [
+        "https://cdn.shopify.com/s/files/1/0680/8374/4843/files/2014_11_17_Lana_Look13_03.jpg?v=1786878524"
+      ],
+      "flags": [
+        "contamination"
+      ],
+      "key": {
+        "category": {
+          "value": "skirt",
+          "accept": []
+        },
+        "primaryColour": {
+          "value": "navy",
+          "accept": [
+            "black",
+            "blue"
+          ]
+        },
+        "sleeveLength": {
+          "value": "not-applicable",
+          "accept": []
+        },
+        "neckline": {
+          "value": "not-applicable",
+          "accept": []
+        },
+        "garmentLength": {
+          "value": "midi",
+          "accept": [
+            "knee"
+          ]
+        },
+        "pattern": {
+          "value": "solid",
+          "accept": []
+        },
+        "materialAppearance": {
+          "value": "wool",
+          "accept": [
+            "cotton",
+            "crepe"
+          ]
+        }
+      },
+      "nonSoldItems": [
+        {
+          "item": "white button-up shirt",
+          "category": "top",
+          "colours": [
+            "white"
+          ]
+        },
+        {
+          "item": "black heeled pumps",
+          "category": "shoes",
+          "colours": [
+            "black"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "seed-circle-skirt-in-navy",
+      "catalog": "seed",
+      "url": "https://unfiltered-dev.myshopify.com/products/circle-skirt-in-navy",
+      "title": "Circle Skirt in Navy",
+      "productType": "women's skirts",
+      "text": "This is a demonstration store. You can purchase products like this from Baby & CompanyWith the structure of wool, and a silk hand, the Circle Skirt from Harvey Faircloth is sophistication with just enough fun. Add some sway to your workday, or elegance to Sunday brunch. Invisible zip closure in back. Fully-lined. Color Navy. 51% Silk, 49% Wool, 100% Silk. Made in U.S.A. Lana is wearing a Size 2. Shop our collection of Harvey Faircloth.",
+      "images": [
+        "https://cdn.shopify.com/s/files/1/0680/8374/4843/files/2014_11_17_Lana_Look10_01.jpg?v=1786878754"
+      ],
+      "flags": [
+        "contamination"
+      ],
+      "key": {
+        "category": {
+          "value": "skirt",
+          "accept": []
+        },
+        "primaryColour": {
+          "value": "navy",
+          "accept": [
+            "black",
+            "blue"
+          ]
+        },
+        "sleeveLength": {
+          "value": "not-applicable",
+          "accept": []
+        },
+        "neckline": {
+          "value": "not-applicable",
+          "accept": []
+        },
+        "garmentLength": {
+          "value": "knee",
+          "accept": [
+            "midi"
+          ]
+        },
+        "pattern": {
+          "value": "solid",
+          "accept": [
+            "colour-block"
+          ]
+        },
+        "materialAppearance": {
+          "value": "wool",
+          "accept": [
+            "silk",
+            "satin"
+          ]
+        }
+      },
+      "nonSoldItems": [
+        {
+          "item": "white button-up shirt (colour not counted: the skirt itself has a white hem band)",
+          "category": "top",
+          "colours": []
+        },
+        {
+          "item": "black heeled pumps",
+          "category": "shoes",
+          "colours": [
+            "black"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "seed-marquee-coat-steel",
+      "catalog": "seed",
+      "url": "https://unfiltered-dev.myshopify.com/products/marquee-coat-steel",
+      "title": "Marquee Coat in Steel",
+      "productType": "women's coats & jackets",
+      "text": "This is a demonstration store. You can purchase products like this from Baby & CompanyThe Marquee Coat is the ideal sidekick. Intricately detailed hood and collar. Exterior chest and waist pockets. Elbow pads and detailed seaming. Waist and hip interior drawstring. Front button closure with full zip. Hannes Roether. Color Steel. 100% Cotton. Made in Czech Republic. Lana is wearing the Medium.",
+      "images": [
+        "https://cdn.shopify.com/s/files/1/0680/8374/4843/files/2014_08_11_Lana_Look4_11.jpg?v=1786878514"
+      ],
+      "flags": [
+        "contamination"
+      ],
+      "key": {
+        "category": {
+          "value": "coat",
+          "accept": [
+            "jacket"
+          ]
+        },
+        "primaryColour": {
+          "value": "navy",
+          "accept": [
+            "blue",
+            "steel"
+          ]
+        },
+        "sleeveLength": {
+          "value": "long",
+          "accept": []
+        },
+        "neckline": {
+          "value": "collar",
+          "accept": [
+            "high-neck",
+            "hooded"
+          ]
+        },
+        "garmentLength": {
+          "value": "hip",
+          "accept": [
+            "thigh"
+          ]
+        },
+        "pattern": {
+          "value": "solid",
+          "accept": []
+        },
+        "materialAppearance": {
+          "value": "cotton",
+          "accept": [
+            "canvas",
+            "twill"
+          ]
+        }
+      },
+      "nonSoldItems": [
+        {
+          "item": "black leggings",
+          "category": "pants",
+          "colours": [
+            "black"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "seed-deione-coat-graphite-floral",
+      "catalog": "seed",
+      "url": "https://unfiltered-dev.myshopify.com/products/deione-coat-graphite-floral",
+      "title": "Deione Coat in Graphite Floral",
+      "productType": "women's coats & jackets",
+      "text": "Duvetica's reversible goose down gives you two jackets in one. A muted floral can be reversed to reveal a versatile solid with two angled zip pockets and adjustable toggles at the hem. Color Graphite Floral. 100% Polyamide, 100% Goose Down. Made in Italy. Lana is wearing an Italian 42.",
+      "images": [
+        "https://cdn.shopify.com/s/files/1/0680/8374/4843/files/2014_08_10_Lana_Look5_06.jpg?v=1786878611"
+      ],
+      "flags": [
+        "contamination"
+      ],
+      "key": {
+        "category": {
+          "value": "jacket",
+          "accept": [
+            "coat"
+          ]
+        },
+        "primaryColour": {
+          "value": "grey",
+          "accept": [
+            "blue",
+            "multi",
+            "graphite"
+          ]
+        },
+        "sleeveLength": {
+          "value": "long",
+          "accept": []
+        },
+        "neckline": {
+          "value": "collar",
+          "accept": [
+            "crew"
+          ]
+        },
+        "garmentLength": {
+          "value": "hip",
+          "accept": []
+        },
+        "pattern": {
+          "value": "floral",
+          "accept": []
+        },
+        "materialAppearance": {
+          "value": "quilted",
+          "accept": [
+            "synthetic",
+            "nylon",
+            "down"
+          ]
+        }
+      },
+      "nonSoldItems": [
+        {
+          "item": "white t-shirt",
+          "category": "top",
+          "colours": [
+            "white"
+          ]
+        },
+        {
+          "item": "grey drop-crotch joggers",
+          "category": "pants",
+          "colours": [
+            "grey"
+          ]
+        },
+        {
+          "item": "grey-white sneakers",
+          "category": "sneakers",
+          "colours": [
+            "grey",
+            "white"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "seed-girlfriend-trouser-black",
+      "catalog": "seed",
+      "url": "https://unfiltered-dev.myshopify.com/products/girlfriend-trouser-black",
+      "title": "Girlfriend Trouser in Black",
+      "productType": "women's pants",
+      "text": "Classic and sharp, the Girlfriend Trouser sits firmly at the hip and slims the leg with the addition of an invisible zip at the inner ankle. Mother of pearl button through out, welt back pockets and button fly. La Prestic Ouiston. Color Black. 100% Wool. Lana is wearing a size 1.",
+      "images": [
+        "https://cdn.shopify.com/s/files/1/0680/8374/4843/files/2014_09_06_Lana_Look14_07.jpg?v=1786878654"
+      ],
+      "flags": [
+        "contamination"
+      ],
+      "key": {
+        "category": {
+          "value": "pants",
+          "accept": []
+        },
+        "primaryColour": {
+          "value": "black",
+          "accept": []
+        },
+        "sleeveLength": {
+          "value": "not-applicable",
+          "accept": []
+        },
+        "neckline": {
+          "value": "not-applicable",
+          "accept": []
+        },
+        "garmentLength": {
+          "value": "full",
+          "accept": [
+            "ankle"
+          ]
+        },
+        "pattern": {
+          "value": "solid",
+          "accept": []
+        },
+        "materialAppearance": {
+          "value": "wool",
+          "accept": []
+        }
+      },
+      "nonSoldItems": [
+        {
+          "item": "grey cardigan with green trim",
+          "category": "top",
+          "colours": [
+            "grey",
+            "green"
+          ]
+        },
+        {
+          "item": "white tank top",
+          "category": "top",
+          "colours": [
+            "white"
+          ]
+        },
+        {
+          "item": "black ankle boots",
+          "category": "boots",
+          "colours": [
+            "black"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "seed-stiro-oxford-black",
+      "catalog": "seed",
+      "url": "https://unfiltered-dev.myshopify.com/products/stiro-oxford-black",
+      "title": "Stiro Oxford in Black",
+      "productType": "men's shoes",
+      "text": "Marsèll's Oxfords are a superb example of fine construction and simple design. The lace up design is reinvented with a pebbled effect finish. These versatile Italian made shoes will ensure long lasting comfort and cool through the seasons. Color Black. 100% Leather. Made in Italy. Also Available in Chocolate, Slate, and Petroleum Blue.",
+      "images": [
+        "https://cdn.shopify.com/s/files/1/0680/8374/4843/files/2015-05-13_Reshoot_Look8_16572_21799.jpg?v=1786878498"
+      ],
+      "flags": [
+        "flat"
+      ],
+      "key": {
+        "category": {
+          "value": "shoes",
+          "accept": []
+        },
+        "primaryColour": {
+          "value": "black",
+          "accept": []
+        },
+        "sleeveLength": {
+          "value": "not-applicable",
+          "accept": []
+        },
+        "neckline": {
+          "value": "not-applicable",
+          "accept": []
+        },
+        "garmentLength": {
+          "value": "not-applicable",
+          "accept": []
+        },
+        "pattern": {
+          "value": "solid",
+          "accept": []
+        },
+        "materialAppearance": {
+          "value": "leather",
+          "accept": []
+        }
+      },
+      "nonSoldItems": []
+    },
+    {
+      "id": "seed-listello-short-boot-mud",
+      "catalog": "seed",
+      "url": "https://unfiltered-dev.myshopify.com/products/listello-short-boot-mud",
+      "title": "Listello Short Boot in Mud",
+      "productType": "men's shoes",
+      "text": "Expertly constructed, Marsèll focuses on material and craftsmanship. Made from premium Italian leather these shoes are thoughtful and faultlessly stylish. Distressed grained indentations mark the Listello Short Boot featuring lace up ties and an upturned rounded toe. Color Black. 100% Leather. Made in Italy. Also available in Black.",
+      "images": [
+        "https://cdn.shopify.com/s/files/1/0680/8374/4843/files/2015-05-13_Reshoot_Look5_16995_21792.jpg?v=1786878593"
+      ],
+      "flags": [
+        "flat",
+        "text-conflict"
+      ],
+      "key": {
+        "category": {
+          "value": "boots",
+          "accept": [
+            "shoes"
+          ]
+        },
+        "primaryColour": {
+          "value": "brown",
+          "accept": [
+            "mud"
+          ]
+        },
+        "sleeveLength": {
+          "value": "not-applicable",
+          "accept": []
+        },
+        "neckline": {
+          "value": "not-applicable",
+          "accept": []
+        },
+        "garmentLength": {
+          "value": "not-applicable",
+          "accept": []
+        },
+        "pattern": {
+          "value": "solid",
+          "accept": []
+        },
+        "materialAppearance": {
+          "value": "suede",
+          "accept": [
+            "leather"
+          ]
+        }
+      },
+      "nonSoldItems": []
+    },
+    {
+      "id": "seed-lemy-blazer-grey",
+      "catalog": "seed",
+      "url": "https://unfiltered-dev.myshopify.com/products/lemy-blazer-grey",
+      "title": "Lemy Blazer in Grey",
+      "productType": "men's button-ups",
+      "text": "This is a demonstration store. You can purchase products like this from Baby & CompanyUnderstated yet classic, Hannes Roether’s pieces offer versatility through timeless silhouette. Knit blazer with side paneling, soft lapels, and front pockets. Grey. 100% Cotton. Made in Portugal. Addis is wearing a size Small. Addis is 6’2”, Chest 38.5”, Waist 31”, Inseam 32”.",
+      "images": [
+        "https://cdn.shopify.com/s/files/1/0680/8374/4843/files/2014_11_3_Addis_Look10_10.jpg?v=1786878463"
+      ],
+      "flags": [
+        "contamination"
+      ],
+      "key": {
+        "category": {
+          "value": "jacket",
+          "accept": [
+            "top"
+          ]
+        },
+        "primaryColour": {
+          "value": "grey",
+          "accept": [
+            "blue",
+            "teal",
+            "slate"
+          ]
+        },
+        "sleeveLength": {
+          "value": "long",
+          "accept": []
+        },
+        "neckline": {
+          "value": "collar",
+          "accept": [
+            "v-neck"
+          ]
+        },
+        "garmentLength": {
+          "value": "hip",
+          "accept": []
+        },
+        "pattern": {
+          "value": "solid",
+          "accept": []
+        },
+        "materialAppearance": {
+          "value": "knit",
+          "accept": [
+            "cotton",
+            "jersey"
+          ]
+        }
+      },
+      "nonSoldItems": [
+        {
+          "item": "dark grey t-shirt",
+          "category": "top",
+          "colours": [
+            "grey",
+            "charcoal"
+          ]
+        },
+        {
+          "item": "black drop-crotch trousers",
+          "category": "pants",
+          "colours": [
+            "black"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "seed-floral-button-up-blue",
+      "catalog": "seed",
+      "url": "https://unfiltered-dev.myshopify.com/products/floral-button-up-blue",
+      "title": "Floral Button-Up in Blue",
+      "productType": "men's button-ups",
+      "text": "A hybrid of traditional Scottish fiber preparations and Italian construction is the Drumohr label. Floral print button-down tailored shirt with all the trimmings. Built to last, and impress. Color Blue. 100% Cotton. Made in Italy. Addis is wearing a size 40. Addis is 6’2”, Chest 38.5”, Waist 31”, Inseam 32”.",
+      "images": [
+        "https://cdn.shopify.com/s/files/1/0680/8374/4843/files/2014_11_3_Addis_Look5_01.jpg?v=1786878487"
+      ],
+      "flags": [
+        "contamination"
+      ],
+      "key": {
+        "category": {
+          "value": "top",
+          "accept": []
+        },
+        "primaryColour": {
+          "value": "blue",
+          "accept": []
+        },
+        "sleeveLength": {
+          "value": "long",
+          "accept": []
+        },
+        "neckline": {
+          "value": "collar",
+          "accept": []
+        },
+        "garmentLength": {
+          "value": "hip",
+          "accept": []
+        },
+        "pattern": {
+          "value": "floral",
+          "accept": [
+            "print",
+            "paisley"
+          ]
+        },
+        "materialAppearance": {
+          "value": "cotton",
+          "accept": [
+            "chambray",
+            "denim"
+          ]
+        }
+      },
+      "nonSoldItems": [
+        {
+          "item": "dark grey corduroy trousers",
+          "category": "pants",
+          "colours": [
+            "grey",
+            "black",
+            "charcoal"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "seed-longsleeve-blouse-in-blue-stripe",
+      "catalog": "seed",
+      "url": "https://unfiltered-dev.myshopify.com/products/longsleeve-blouse-in-blue-stripe",
+      "title": "Longsleeve Blouse in Blue Stripe",
+      "productType": "women's button-ups",
+      "text": "This is a demonstration store. You can purchase products like this from Baby & CompanyEffortless chic Harvey Faircloth blouse makes a lively twist of yellow. Contrasting in color and material, the back panel navigates any age. Single front button placket opening. Peter Pan collar. Color Blue Stripe. 100% Cotton, 100% Silk. Made in U.S.A. Lana is wearing a Size 2. Shop our collection of Harvey Faircloth.",
+      "images": [
+        "https://cdn.shopify.com/s/files/1/0680/8374/4843/files/2014_11_17_Lana_Look36_06.jpg?v=1786878756"
+      ],
+      "flags": [
+        "contamination"
+      ],
+      "key": {
+        "category": {
+          "value": "top",
+          "accept": []
+        },
+        "primaryColour": {
+          "value": "blue",
+          "accept": [
+            "white"
+          ]
+        },
+        "sleeveLength": {
+          "value": "long",
+          "accept": []
+        },
+        "neckline": {
+          "value": "collar",
+          "accept": []
+        },
+        "garmentLength": {
+          "value": "hip",
+          "accept": [
+            "cropped"
+          ]
+        },
+        "pattern": {
+          "value": "stripe",
+          "accept": [
+            "check",
+            "gingham",
+            "colour-block"
+          ]
+        },
+        "materialAppearance": {
+          "value": "cotton",
+          "accept": [
+            "silk"
+          ]
+        }
+      },
+      "nonSoldItems": [
+        {
+          "item": "black wide-leg trousers",
+          "category": "pants",
+          "colours": [
+            "black"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tentree-colville-button-up",
+      "catalog": "tentree",
+      "url": "https://www.tentree.com/products/colville-button-up",
+      "title": "Quilted Colville Overshirt",
+      "productType": "Mens",
+      "text": "Keep you warm and fashionable for any season you desire. This sustainable Colville Longsleeve shirt is made from our blend of Organic Cotton and Recycled Polyester, which happens to be good for the planet.",
+      "images": [
+        "https://cdn.shopify.com/s/files/1/2341/3995/files/Black-Quilt-Knit-Regular-Fit-Set-in-Shirt-TCM2676-0451_7.jpg?v=1784760579",
+        "https://cdn.shopify.com/s/files/1/2341/3995/files/Black-Quilt-Knit-Regular-Fit-Set-in-Shirt-TCM2676-0451_6.jpg?v=1784760579",
+        "https://cdn.shopify.com/s/files/1/2341/3995/files/Black-Quilt-Knit-Regular-Fit-Set-in-Shirt-TCM2676-0451_9.jpg?v=1784760579",
+        "https://cdn.shopify.com/s/files/1/2341/3995/files/Black-Quilt-Knit-Regular-Fit-Set-in-Shirt-TCM2676-0451_8.jpg?v=1784760579"
+      ],
+      "flags": [
+        "contamination"
+      ],
+      "key": {
+        "category": {
+          "value": "jacket",
+          "accept": [
+            "top"
+          ]
+        },
+        "primaryColour": {
+          "value": "black",
+          "accept": [
+            "charcoal",
+            "grey"
+          ]
+        },
+        "sleeveLength": {
+          "value": "long",
+          "accept": []
+        },
+        "neckline": {
+          "value": "collar",
+          "accept": []
+        },
+        "garmentLength": {
+          "value": "hip",
+          "accept": []
+        },
+        "pattern": {
+          "value": "solid",
+          "accept": [
+            "quilted"
+          ]
+        },
+        "materialAppearance": {
+          "value": "quilted",
+          "accept": [
+            "cotton",
+            "knit"
+          ]
+        }
+      },
+      "nonSoldItems": [
+        {
+          "item": "white t-shirt",
+          "category": "top",
+          "colours": [
+            "white"
+          ]
+        },
+        {
+          "item": "black trousers",
+          "category": "pants",
+          "colours": [
+            "black"
+          ]
+        },
+        {
+          "item": "black sneakers",
+          "category": "sneakers",
+          "colours": [
+            "black"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tentree-valley-dress-deep-olive",
+      "catalog": "tentree",
+      "url": "https://www.tentree.com/products/valley-dress-deep-olive",
+      "title": "Valley Dress",
+      "productType": "Womens",
+      "text": "This clean, casual dress is the perfect piece to wear on its own for an afternoon out. Evening plans? Pair it with a jacket or cardigan to dress it up.",
+      "images": [
+        "https://cdn.shopify.com/s/files/1/2341/3995/files/Green-Treeblend-Tank-Dress-TCW6233-4157_1.jpg?v=1769630774",
+        "https://cdn.shopify.com/s/files/1/2341/3995/files/Green-Treeblend-Tank-Dress-TCW6233-4157_3.jpg?v=1769639981",
+        "https://cdn.shopify.com/s/files/1/2341/3995/files/Green-Treeblend-Tank-Dress-TCW6233-4157_2.jpg?v=1769639982"
+      ],
+      "flags": [
+        "contamination"
+      ],
+      "key": {
+        "category": {
+          "value": "dress",
+          "accept": []
+        },
+        "primaryColour": {
+          "value": "green",
+          "accept": [
+            "olive",
+            "khaki"
+          ]
+        },
+        "sleeveLength": {
+          "value": "sleeveless",
+          "accept": []
+        },
+        "neckline": {
+          "value": "crew",
+          "accept": []
+        },
+        "garmentLength": {
+          "value": "midi",
+          "accept": []
+        },
+        "pattern": {
+          "value": "solid",
+          "accept": []
+        },
+        "materialAppearance": {
+          "value": "jersey",
+          "accept": [
+            "cotton",
+            "knit"
+          ]
+        }
+      },
+      "nonSoldItems": [
+        {
+          "item": "white sneakers",
+          "category": "sneakers",
+          "colours": [
+            "white"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tentree-juneau-dress-clay",
+      "catalog": "tentree",
+      "url": "https://www.tentree.com/products/juneau-dress-clay",
+      "title": "Juneau Dress",
+      "productType": "Womens",
+      "text": "One word: pockets. This fit-and-flare midi dress is made from an eco-conscious blend of recycled materials that offers stretch, an all-in-one outfit, and a place to put your hands.",
+      "images": [
+        "https://cdn.shopify.com/s/files/1/2341/3995/files/Brown-Slim-Fit-Adjustable-Midi-Dress-TCW6502-6033_1.jpg?v=1769630976",
+        "https://cdn.shopify.com/s/files/1/2341/3995/files/Brown-Slim-Fit-Adjustable-Midi-Dress-TCW6502-6033_4.jpg?v=1769639798",
+        "https://cdn.shopify.com/s/files/1/2341/3995/files/Brown-Slim-Fit-Adjustable-Midi-Dress-TCW6502-6033_3.jpg?v=1769639798",
+        "https://cdn.shopify.com/s/files/1/2341/3995/files/Brown-Slim-Fit-Adjustable-Midi-Dress-TCW6502-6033_2.jpg?v=1769639799"
+      ],
+      "flags": [
+        "contamination"
+      ],
+      "key": {
+        "category": {
+          "value": "dress",
+          "accept": []
+        },
+        "primaryColour": {
+          "value": "brown",
+          "accept": [
+            "taupe",
+            "tan",
+            "mauve",
+            "clay"
+          ]
+        },
+        "sleeveLength": {
+          "value": "sleeveless",
+          "accept": []
+        },
+        "neckline": {
+          "value": "v-neck",
+          "accept": []
+        },
+        "garmentLength": {
+          "value": "midi",
+          "accept": []
+        },
+        "pattern": {
+          "value": "solid",
+          "accept": []
+        },
+        "materialAppearance": {
+          "value": "jersey",
+          "accept": [
+            "ribbed",
+            "knit",
+            "synthetic"
+          ]
+        }
+      },
+      "nonSoldItems": [
+        {
+          "item": "tan clogs",
+          "category": "shoes",
+          "colours": [
+            "tan",
+            "brown"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tentree-hopewell-dress-clay-railroad-stripe",
+      "catalog": "tentree",
+      "url": "https://www.tentree.com/products/hopewell-dress-clay-railroad-stripe",
+      "title": "Hopewell Dress",
+      "productType": "Womens",
+      "text": "This tiered dress is a must-have for summer for a couple of reasons. One, it looks great. Two, it's made with natural hemp and Tencel fibres, so you can stay outside longer. Bonus.",
+      "images": [
+        "https://cdn.shopify.com/s/files/1/2341/3995/files/Multi-Hemp-Tiered-Midi-Cami-Dress-TCW5009-6074_1.jpg?v=1769631020",
+        "https://cdn.shopify.com/s/files/1/2341/3995/files/Multi-Hemp-Tiered-Midi-Cami-Dress-TCW5009-6074_3.jpg?v=1769639824",
+        "https://cdn.shopify.com/s/files/1/2341/3995/files/Multi-Hemp-Tiered-Midi-Cami-Dress-TCW5009-6074_2.jpg?v=1769639823"
+      ],
+      "flags": [
+        "contamination"
+      ],
+      "key": {
+        "category": {
+          "value": "dress",
+          "accept": []
+        },
+        "primaryColour": {
+          "value": "white",
+          "accept": [
+            "cream",
+            "beige"
+          ]
+        },
+        "sleeveLength": {
+          "value": "sleeveless",
+          "accept": []
+        },
+        "neckline": {
+          "value": "scoop",
+          "accept": [
+            "v-neck"
+          ]
+        },
+        "garmentLength": {
+          "value": "maxi",
+          "accept": [
+            "midi"
+          ]
+        },
+        "pattern": {
+          "value": "stripe",
+          "accept": []
+        },
+        "materialAppearance": {
+          "value": "cotton",
+          "accept": [
+            "linen",
+            "hemp"
+          ]
+        }
+      },
+      "nonSoldItems": [
+        {
+          "item": "white sneakers",
+          "category": "sneakers",
+          "colours": [
+            "white"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tentree-recycled-boucle-fleece-jacket-pale-oak",
+      "catalog": "tentree",
+      "url": "https://www.tentree.com/products/recycled-boucle-fleece-jacket-pale-oak",
+      "title": "Sunday Jacket",
+      "productType": "Womens",
+      "text": "With the silhouette of a shirt and the warmth of a jacket, weather any season with this indoor-outdoor essential. Its relaxed fit's perfect for layering with your favorite sweater.",
+      "images": [
+        "https://cdn.shopify.com/s/files/1/2341/3995/files/Oatmeal-Boucle-Oversized-Fit-Fleece-Jacket-TCW5349-2858_4_6fb6faea-99e9-49a7-b8aa-258dd30a0c46.jpg?v=1769732114",
+        "https://cdn.shopify.com/s/files/1/2341/3995/files/Oatmeal-Boucle-Oversized-Fit-Fleece-Jacket-TCW5349-2858_5.jpg?v=1769732114",
+        "https://cdn.shopify.com/s/files/1/2341/3995/files/Oatmeal-Boucle-Oversized-Fit-Fleece-Jacket-TCW5349-2858_1.jpg?v=1769732114",
+        "https://cdn.shopify.com/s/files/1/2341/3995/files/Oatmeal-Boucle-Oversized-Fit-Fleece-Jacket-TCW5349-2858_6.jpg?v=1769732114"
+      ],
+      "flags": [
+        "contamination"
+      ],
+      "key": {
+        "category": {
+          "value": "jacket",
+          "accept": [
+            "coat"
+          ]
+        },
+        "primaryColour": {
+          "value": "beige",
+          "accept": [
+            "cream",
+            "oatmeal",
+            "white"
+          ]
+        },
+        "sleeveLength": {
+          "value": "long",
+          "accept": []
+        },
+        "neckline": {
+          "value": "collar",
+          "accept": []
+        },
+        "garmentLength": {
+          "value": "thigh",
+          "accept": [
+            "hip"
+          ]
+        },
+        "pattern": {
+          "value": "solid",
+          "accept": []
+        },
+        "materialAppearance": {
+          "value": "fleece",
+          "accept": [
+            "sherpa",
+            "boucle",
+            "wool"
+          ]
+        }
+      },
+      "nonSoldItems": [
+        {
+          "item": "white tank top",
+          "category": "top",
+          "colours": [
+            "white"
+          ]
+        },
+        {
+          "item": "black wide trousers",
+          "category": "pants",
+          "colours": [
+            "black"
+          ]
+        },
+        {
+          "item": "black boots",
+          "category": "boots",
+          "colours": [
+            "black"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tentree-quilted-full-zip-meteorite-black-heather",
+      "catalog": "tentree",
+      "url": "https://www.tentree.com/products/quilted-full-zip-meteorite-black-heather",
+      "title": "Begbie Full Zip",
+      "productType": "Mens",
+      "text": "Whether you're hitting a local trail or heading to work on a frosty morning, this is a go-to layer you can depend on to keep you warm and on the go.",
+      "images": [
+        "https://cdn.shopify.com/s/files/1/2341/3995/files/Black-Mock-Neck-Full-Front-Zip-Sweatshirt-TCM5420-0451_4_resized.png?v=1784766757",
+        "https://cdn.shopify.com/s/files/1/2341/3995/files/Black-Mock-Neck-Full-Front-Zip-Sweatshirt-TCM5420-0451_1_resized.png?v=1784766757",
+        "https://cdn.shopify.com/s/files/1/2341/3995/files/Black-Mock-Neck-Full-Front-Zip-Sweatshirt-TCM5420-0451_2.png?v=1784766681",
+        "https://cdn.shopify.com/s/files/1/2341/3995/files/Black-Mock-Neck-Full-Front-Zip-Sweatshirt-TCM5420-0451_3_resized.jpg?v=1784766756"
+      ],
+      "flags": [
+        "contamination"
+      ],
+      "key": {
+        "category": {
+          "value": "jacket",
+          "accept": [
+            "top"
+          ]
+        },
+        "primaryColour": {
+          "value": "black",
+          "accept": [
+            "charcoal",
+            "grey"
+          ]
+        },
+        "sleeveLength": {
+          "value": "long",
+          "accept": []
+        },
+        "neckline": {
+          "value": "high-neck",
+          "accept": [
+            "collar"
+          ]
+        },
+        "garmentLength": {
+          "value": "hip",
+          "accept": []
+        },
+        "pattern": {
+          "value": "solid",
+          "accept": [
+            "quilted"
+          ]
+        },
+        "materialAppearance": {
+          "value": "quilted",
+          "accept": [
+            "fleece",
+            "knit",
+            "cotton"
+          ]
+        }
+      },
+      "nonSoldItems": [
+        {
+          "item": "green t-shirt",
+          "category": "top",
+          "colours": [
+            "green",
+            "teal"
+          ]
+        },
+        {
+          "item": "black trousers",
+          "category": "pants",
+          "colours": [
+            "black"
+          ]
+        },
+        {
+          "item": "black shoes",
+          "category": "shoes",
+          "colours": [
+            "black"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tentree-atlin-legging-meteorite-black",
+      "catalog": "tentree",
+      "url": "https://www.tentree.com/products/atlin-legging-meteorite-black",
+      "title": "Atlin Legging",
+      "productType": "Womens",
+      "text": "For hikes, hangouts, and everything in between. These high-stretch leggings feature an anti-odour finish and three sneaky pockets — including one zip — to keep your stuff close while you’re doing your thing.",
+      "images": [
+        "https://cdn.shopify.com/s/files/1/2341/3995/files/Black-High-Rise-Brushed-Legging-TCW6254-0164_1.jpg?v=1749231028",
+        "https://cdn.shopify.com/s/files/1/2341/3995/files/Black-High-Rise-Brushed-Legging-TCW6254-0164_6.jpg?v=1749231028",
+        "https://cdn.shopify.com/s/files/1/2341/3995/files/Black-High-Rise-Brushed-Legging-TCW6254-0164_5.jpg?v=1749231028",
+        "https://cdn.shopify.com/s/files/1/2341/3995/files/Black-High-Rise-Brushed-Legging-TCW6254-0164_2.jpg?v=1749231028"
+      ],
+      "flags": [
+        "contamination"
+      ],
+      "key": {
+        "category": {
+          "value": "pants",
+          "accept": []
+        },
+        "primaryColour": {
+          "value": "black",
+          "accept": [
+            "charcoal",
+            "grey"
+          ]
+        },
+        "sleeveLength": {
+          "value": "not-applicable",
+          "accept": []
+        },
+        "neckline": {
+          "value": "not-applicable",
+          "accept": []
+        },
+        "garmentLength": {
+          "value": "full",
+          "accept": [
+            "ankle"
+          ]
+        },
+        "pattern": {
+          "value": "solid",
+          "accept": []
+        },
+        "materialAppearance": {
+          "value": "synthetic",
+          "accept": [
+            "jersey",
+            "knit",
+            "stretch"
+          ]
+        }
+      },
+      "nonSoldItems": [
+        {
+          "item": "grey-yellow ombre sweater",
+          "category": "top",
+          "colours": [
+            "grey",
+            "yellow",
+            "lime"
+          ]
+        },
+        {
+          "item": "black chelsea boots",
+          "category": "boots",
+          "colours": [
+            "black"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tentree-narrows-pant-sand-stone",
+      "catalog": "tentree",
+      "url": "https://www.tentree.com/products/narrows-pant-sand-stone",
+      "title": "Narrows Pant",
+      "productType": "Womens",
+      "text": "A textured twist. Our take on an everyday pant but make them adventure ready. This pair has a cropped length and a pull-on design with an elasticated waist for comfort that feels like joggers but looks more dialled. The best part? They’re made in our garment-washed organic cotton so they’re surfaced yet soft.",
+      "images": [
+        "https://cdn.shopify.com/s/files/1/2341/3995/files/Oatmeal-Cropped-Straight-Fit-Organic-Cotton-Pant-TCW6491-6029_4.jpg?v=1770708303",
+        "https://cdn.shopify.com/s/files/1/2341/3995/files/Oatmeal-Cropped-Straight-Fit-Organic-Cotton-Pant-TCW6491-6029_1.jpg?v=1770708303",
+        "https://cdn.shopify.com/s/files/1/2341/3995/files/Oatmeal-Cropped-Straight-Fit-Organic-Cotton-Pant-TCW6491-6029_2.jpg?v=1770708303",
+        "https://cdn.shopify.com/s/files/1/2341/3995/files/Oatmeal-Cropped-Straight-Fit-Organic-Cotton-Pant-TCW6491-6029_3.jpg?v=1770708303"
+      ],
+      "flags": [
+        "contamination"
+      ],
+      "key": {
+        "category": {
+          "value": "pants",
+          "accept": []
+        },
+        "primaryColour": {
+          "value": "beige",
+          "accept": [
+            "grey",
+            "oatmeal",
+            "stone",
+            "sand"
+          ]
+        },
+        "sleeveLength": {
+          "value": "not-applicable",
+          "accept": []
+        },
+        "neckline": {
+          "value": "not-applicable",
+          "accept": []
+        },
+        "garmentLength": {
+          "value": "cropped",
+          "accept": [
+            "ankle",
+            "full"
+          ]
+        },
+        "pattern": {
+          "value": "solid",
+          "accept": [
+            "stripe"
+          ]
+        },
+        "materialAppearance": {
+          "value": "cotton",
+          "accept": [
+            "linen"
+          ]
+        }
+      },
+      "nonSoldItems": [
+        {
+          "item": "cream graphic t-shirt",
+          "category": "top",
+          "colours": [
+            "white",
+            "cream"
+          ]
+        },
+        {
+          "item": "black high-top sneakers",
+          "category": "sneakers",
+          "colours": [
+            "black"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tentree-sasquatch-t-shirt-seaport-heather-hockey",
+      "catalog": "tentree",
+      "url": "https://www.tentree.com/products/sasquatch-t-shirt-seaport-heather-hockey",
+      "title": "Sasquatch T-Shirt",
+      "productType": "Mens",
+      "text": "This Sasquatch T-Shirt is a daily reminder to step outside your comfort zone and into the outdoors. Who knows, maybe you'll even see bigfoot out there.",
+      "images": [
+        "https://cdn.shopify.com/s/files/1/2341/3995/files/Blue-Regular-Fit-Embroidered-Graphic-T-Shirt-TCM5755-5676_1.jpg?v=1749230558",
+        "https://cdn.shopify.com/s/files/1/2341/3995/files/Blue-Regular-Fit-Embroidered-Graphic-T-Shirt-TCM5755-5676_4.jpg?v=1749230558",
+        "https://cdn.shopify.com/s/files/1/2341/3995/files/Blue-Regular-Fit-Embroidered-Graphic-T-Shirt-TCM5755-5676_3.jpg?v=1749230558",
+        "https://cdn.shopify.com/s/files/1/2341/3995/files/Blue-Regular-Fit-Embroidered-Graphic-T-Shirt-TCM5755-5676_2.jpg?v=1749230558"
+      ],
+      "flags": [
+        "contamination"
+      ],
+      "key": {
+        "category": {
+          "value": "top",
+          "accept": []
+        },
+        "primaryColour": {
+          "value": "blue",
+          "accept": []
+        },
+        "sleeveLength": {
+          "value": "short",
+          "accept": []
+        },
+        "neckline": {
+          "value": "crew",
+          "accept": []
+        },
+        "garmentLength": {
+          "value": "hip",
+          "accept": []
+        },
+        "pattern": {
+          "value": "solid",
+          "accept": [
+            "graphic"
+          ]
+        },
+        "materialAppearance": {
+          "value": "cotton",
+          "accept": [
+            "jersey",
+            "heather"
+          ]
+        }
+      },
+      "nonSoldItems": [
+        {
+          "item": "grey joggers",
+          "category": "pants",
+          "colours": [
+            "grey"
+          ]
+        },
+        {
+          "item": "black shoes",
+          "category": "shoes",
+          "colours": [
+            "black"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tentree-yaletown-skirt-nightfall-watercolour-floral",
+      "catalog": "tentree",
+      "url": "https://www.tentree.com/products/yaletown-skirt-nightfall-watercolour-floral",
+      "title": "Yaletown Skirt",
+      "productType": "Womens",
+      "text": "This pull-on printed skirt is made from fibres that are not only silky soft and breathable, but that help reduce waste and water usage in the apparel industry.",
+      "images": [
+        "https://cdn.shopify.com/s/files/1/2341/3995/files/Blue-EcoWoven-Crepe-Skirt-TCW5674-6192_3.jpg?v=1774030433",
+        "https://cdn.shopify.com/s/files/1/2341/3995/files/Blue-EcoWoven-Crepe-Skirt-TCW5674-6192_1.jpg?v=1774030433",
+        "https://cdn.shopify.com/s/files/1/2341/3995/files/Blue-EcoWoven-Crepe-Skirt-TCW5674-6192_2.jpg?v=1774030433",
+        "https://cdn.shopify.com/s/files/1/2341/3995/files/TCW5703-6192_TCW5674-6192_Nightfall_WatercolourFloral_ed441a0c-c4b4-42eb-b312-c44e2fbe8bc8.jpg?v=1774388163"
+      ],
+      "flags": [
+        "contamination"
+      ],
+      "key": {
+        "category": {
+          "value": "skirt",
+          "accept": []
+        },
+        "primaryColour": {
+          "value": "blue",
+          "accept": [
+            "navy",
+            "white",
+            "multi"
+          ]
+        },
+        "sleeveLength": {
+          "value": "not-applicable",
+          "accept": []
+        },
+        "neckline": {
+          "value": "not-applicable",
+          "accept": []
+        },
+        "garmentLength": {
+          "value": "midi",
+          "accept": [
+            "maxi"
+          ]
+        },
+        "pattern": {
+          "value": "floral",
+          "accept": []
+        },
+        "materialAppearance": {
+          "value": "crepe",
+          "accept": [
+            "synthetic",
+            "viscose",
+            "silk"
+          ]
+        }
+      },
+      "nonSoldItems": [
+        {
+          "item": "cream cropped t-shirt",
+          "category": "top",
+          "colours": [
+            "white",
+            "cream"
+          ]
+        },
+        {
+          "item": "tan sandals",
+          "category": "shoes",
+          "colours": [
+            "tan",
+            "brown"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tentree-somerset-shacket-sand-stone-multi-stripe",
+      "catalog": "tentree",
+      "url": "https://www.tentree.com/products/somerset-shacket-sand-stone-multi-stripe",
+      "title": "Somerset Shacket",
+      "productType": "Womens",
+      "text": "We took a classic shirt jacket silhouette and recreated it in a sweatshirt-soft, organic cotton fabric with angled seams for texture and a shirt-tail hem to make styling easy. We also left it unlined to keep layering a breeze.",
+      "images": [
+        "https://cdn.shopify.com/s/files/1/2341/3995/files/Oatmeal-Brushed-Organic-Cotton-Overshirt-TCW6482-6263_040.jpg?v=1773702191",
+        "https://cdn.shopify.com/s/files/1/2341/3995/files/Oatmeal-Brushed-Organic-Cotton-Overshirt-TCW6482-6263_040dfsdf.jpg?v=1773702191",
+        "https://cdn.shopify.com/s/files/1/2341/3995/files/Oatmeal-Brushed-Organic-Cotton-Overshirt-TCW6482-6263_0.jpg?v=1773702191",
+        "https://cdn.shopify.com/s/files/1/2341/3995/files/Oatmeal-Brushed-Organic-Cotton-Overshirt-TCW6482-6263_1.jpg?v=1773702191"
+      ],
+      "flags": [
+        "contamination"
+      ],
+      "key": {
+        "category": {
+          "value": "jacket",
+          "accept": [
+            "top"
+          ]
+        },
+        "primaryColour": {
+          "value": "beige",
+          "accept": [
+            "cream",
+            "multi",
+            "oatmeal"
+          ]
+        },
+        "sleeveLength": {
+          "value": "long",
+          "accept": []
+        },
+        "neckline": {
+          "value": "collar",
+          "accept": []
+        },
+        "garmentLength": {
+          "value": "hip",
+          "accept": [
+            "thigh"
+          ]
+        },
+        "pattern": {
+          "value": "stripe",
+          "accept": []
+        },
+        "materialAppearance": {
+          "value": "cotton",
+          "accept": [
+            "fleece",
+            "knit"
+          ]
+        }
+      },
+      "nonSoldItems": [
+        {
+          "item": "green baseball cap",
+          "category": "accessories",
+          "colours": [
+            "green"
+          ]
+        },
+        {
+          "item": "cream ribbed tank",
+          "category": "top",
+          "colours": [
+            "cream",
+            "white"
+          ]
+        },
+        {
+          "item": "light blue jeans",
+          "category": "pants",
+          "colours": [
+            "blue"
+          ],
+          "material": "denim"
+        },
+        {
+          "item": "tan clogs",
+          "category": "shoes",
+          "colours": [
+            "tan",
+            "brown"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tentree-astir-polo-nightfall-heather",
+      "catalog": "tentree",
+      "url": "https://www.tentree.com/products/astir-polo-nightfall-heather",
+      "title": "Astir Polo",
+      "productType": "Mens",
+      "text": "The Astir Polo is back in a new sustainable fabric, blending organic cotton, recycled polyester, and TENCEL™ Lyocell for a collared shirt so comfortable you’ll want to wear it everywhere.",
+      "images": [
+        "https://cdn.shopify.com/s/files/1/2341/3995/files/Blue-Treeblend-Regular-Fit-Polo-TCM6522-6048_2.jpg?v=1774030164",
+        "https://cdn.shopify.com/s/files/1/2341/3995/files/Blue-Treeblend-Regular-Fit-Polo-TCM6522-6048_3.jpg?v=1774030164",
+        "https://cdn.shopify.com/s/files/1/2341/3995/files/Blue-Treeblend-Regular-Fit-Polo-TCM6522-6048_1.jpg?v=1774030164"
+      ],
+      "flags": [
+        "contamination"
+      ],
+      "key": {
+        "category": {
+          "value": "top",
+          "accept": []
+        },
+        "primaryColour": {
+          "value": "blue",
+          "accept": [
+            "navy"
+          ]
+        },
+        "sleeveLength": {
+          "value": "short",
+          "accept": []
+        },
+        "neckline": {
+          "value": "collar",
+          "accept": []
+        },
+        "garmentLength": {
+          "value": "hip",
+          "accept": []
+        },
+        "pattern": {
+          "value": "solid",
+          "accept": []
+        },
+        "materialAppearance": {
+          "value": "cotton",
+          "accept": [
+            "jersey"
+          ]
+        }
+      },
+      "nonSoldItems": [
+        {
+          "item": "charcoal shorts",
+          "category": "pants",
+          "colours": [
+            "grey",
+            "charcoal"
+          ]
+        },
+        {
+          "item": "white sneakers",
+          "category": "sneakers",
+          "colours": [
+            "white"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "whitestuff-3-pack-stag-sock",
+      "catalog": "whitestuff",
+      "url": "https://www.whitestuff.com/eu/p/1029/3-pack-stag-sock/NAVY_MULTI",
+      "title": "3 Pack Stag Sock",
+      "productType": "",
+      "text": "You need new socks? Oh deer. Three pairs of stag-themed socks.",
+      "images": [
+        "https://cdn.media.amplience.net/i/whitestuff/437807-NAVY_MULTI-FF",
+        "https://cdn.media.amplience.net/i/whitestuff/437807-NAVY_MULTI-FD"
+      ],
+      "flags": [
+        "text-sparse",
+        "flat"
+      ],
+      "key": {
+        "category": {
+          "value": "accessories",
+          "accept": []
+        },
+        "primaryColour": {
+          "value": "multi",
+          "accept": [
+            "green",
+            "navy",
+            "orange"
+          ]
+        },
+        "sleeveLength": {
+          "value": "not-applicable",
+          "accept": []
+        },
+        "neckline": {
+          "value": "not-applicable",
+          "accept": []
+        },
+        "garmentLength": {
+          "value": "not-applicable",
+          "accept": []
+        },
+        "pattern": {
+          "value": "animal",
+          "accept": [
+            "graphic",
+            "print",
+            "multi"
+          ]
+        },
+        "materialAppearance": {
+          "value": "knit",
+          "accept": [
+            "cotton"
+          ]
+        }
+      },
+      "nonSoldItems": []
+    },
+    {
+      "id": "whitestuff-leather-stitch-belt",
+      "catalog": "whitestuff",
+      "url": "https://www.whitestuff.com/eu/p/1097/leather-stitch-belt/KHAKI_GRN",
+      "title": "Leather Stitch Belt",
+      "productType": "",
+      "text": "A leather belt that looks great with jeans. Buckle up.",
+      "images": [
+        "https://cdn.media.amplience.net/i/whitestuff/437577-KHAKI_GRN-MF"
+      ],
+      "flags": [
+        "text-sparse",
+        "flat"
+      ],
+      "key": {
+        "category": {
+          "value": "accessories",
+          "accept": []
+        },
+        "primaryColour": {
+          "value": "green",
+          "accept": [
+            "khaki",
+            "olive"
+          ]
+        },
+        "sleeveLength": {
+          "value": "not-applicable",
+          "accept": []
+        },
+        "neckline": {
+          "value": "not-applicable",
+          "accept": []
+        },
+        "garmentLength": {
+          "value": "not-applicable",
+          "accept": []
+        },
+        "pattern": {
+          "value": "solid",
+          "accept": []
+        },
+        "materialAppearance": {
+          "value": "leather",
+          "accept": []
+        }
+      },
+      "nonSoldItems": []
+    },
+    {
+      "id": "whitestuff-herringbone-bootie",
+      "catalog": "whitestuff",
+      "url": "https://www.whitestuff.com/eu/p/141/herringbone-bootie/BLUE_MLT",
+      "title": "Herringbone Bootie",
+      "productType": "",
+      "text": "Cosy slipper boots. Comfort just got a reboot.",
+      "images": [
+        "https://cdn.media.amplience.net/i/whitestuff/434372-BLUE_MLT-MF",
+        "https://cdn.media.amplience.net/i/whitestuff/434372-BLUE_MLT-FF",
+        "https://cdn.media.amplience.net/i/whitestuff/434372-BLUE_MLT-FB"
+      ],
+      "flags": [
+        "text-sparse",
+        "flat"
+      ],
+      "key": {
+        "category": {
+          "value": "boots",
+          "accept": [
+            "shoes"
+          ]
+        },
+        "primaryColour": {
+          "value": "blue",
+          "accept": [
+            "mint",
+            "green",
+            "light-blue"
+          ]
+        },
+        "sleeveLength": {
+          "value": "not-applicable",
+          "accept": []
+        },
+        "neckline": {
+          "value": "not-applicable",
+          "accept": []
+        },
+        "garmentLength": {
+          "value": "not-applicable",
+          "accept": []
+        },
+        "pattern": {
+          "value": "herringbone",
+          "accept": [
+            "solid",
+            "stripe"
+          ]
+        },
+        "materialAppearance": {
+          "value": "wool",
+          "accept": [
+            "knit",
+            "fleece",
+            "textile",
+            "faux-fur"
+          ]
+        }
+      },
+      "nonSoldItems": []
+    },
+    {
+      "id": "whitestuff-suede-and-shearling-moccasin",
+      "catalog": "whitestuff",
+      "url": "https://www.whitestuff.com/eu/p/146/suede-and-shearling-moccasin/MID_TAN",
+      "title": "Suede and Shearling Moccasin",
+      "productType": "",
+      "text": "",
+      "images": [
+        "https://cdn.media.amplience.net/i/whitestuff/434383-MID_TAN-MF",
+        "https://cdn.media.amplience.net/i/whitestuff/434383-MID_TAN-FF",
+        "https://cdn.media.amplience.net/i/whitestuff/434383-MID_TAN-FB"
+      ],
+      "flags": [
+        "text-sparse",
+        "flat"
+      ],
+      "key": {
+        "category": {
+          "value": "shoes",
+          "accept": []
+        },
+        "primaryColour": {
+          "value": "tan",
+          "accept": [
+            "brown"
+          ]
+        },
+        "sleeveLength": {
+          "value": "not-applicable",
+          "accept": []
+        },
+        "neckline": {
+          "value": "not-applicable",
+          "accept": []
+        },
+        "garmentLength": {
+          "value": "not-applicable",
+          "accept": []
+        },
+        "pattern": {
+          "value": "solid",
+          "accept": []
+        },
+        "materialAppearance": {
+          "value": "suede",
+          "accept": [
+            "shearling",
+            "leather"
+          ]
+        }
+      },
+      "nonSoldItems": []
+    },
+    {
+      "id": "whitestuff-lace-up-thistle-brogue",
+      "catalog": "whitestuff",
+      "url": "https://www.whitestuff.com/eu/p/201/lace-up-thistle-brogue/BRT_PINK",
+      "title": "Lace Up Thistle Brogue",
+      "productType": "",
+      "text": "Leather brogues with comfy, cushioned insoles. Step up your footwear game.",
+      "images": [
+        "https://cdn.media.amplience.net/i/whitestuff/435334-BRT_PINK-MF",
+        "https://cdn.media.amplience.net/i/whitestuff/435334-BRT_PINK-FF",
+        "https://cdn.media.amplience.net/i/whitestuff/435334-BRT_PINK-FB"
+      ],
+      "flags": [
+        "text-sparse",
+        "flat"
+      ],
+      "key": {
+        "category": {
+          "value": "shoes",
+          "accept": []
+        },
+        "primaryColour": {
+          "value": "pink",
+          "accept": [
+            "red",
+            "raspberry",
+            "burgundy"
+          ]
+        },
+        "sleeveLength": {
+          "value": "not-applicable",
+          "accept": []
+        },
+        "neckline": {
+          "value": "not-applicable",
+          "accept": []
+        },
+        "garmentLength": {
+          "value": "not-applicable",
+          "accept": []
+        },
+        "pattern": {
+          "value": "solid",
+          "accept": []
+        },
+        "materialAppearance": {
+          "value": "suede",
+          "accept": [
+            "leather"
+          ]
+        }
+      },
+      "nonSoldItems": []
+    },
+    {
+      "id": "whitestuff-issy-bag",
+      "catalog": "whitestuff",
+      "url": "https://www.whitestuff.com/eu/p/3147/issy-bag/PURE_BLK",
+      "title": "Issy Bag",
+      "productType": "",
+      "text": "",
+      "images": [
+        "https://cdn.media.amplience.net/i/whitestuff/436585-PURE_BLK-MF",
+        "https://cdn.media.amplience.net/i/whitestuff/436585-PURE_BLK-FF",
+        "https://cdn.media.amplience.net/i/whitestuff/436585-PURE_BLK-FB"
+      ],
+      "flags": [
+        "text-sparse",
+        "flat"
+      ],
+      "key": {
+        "category": {
+          "value": "bag",
+          "accept": []
+        },
+        "primaryColour": {
+          "value": "black",
+          "accept": []
+        },
+        "sleeveLength": {
+          "value": "not-applicable",
+          "accept": []
+        },
+        "neckline": {
+          "value": "not-applicable",
+          "accept": []
+        },
+        "garmentLength": {
+          "value": "not-applicable",
+          "accept": []
+        },
+        "pattern": {
+          "value": "solid",
+          "accept": [
+            "floral"
+          ]
+        },
+        "materialAppearance": {
+          "value": "leather",
+          "accept": []
+        }
+      },
+      "nonSoldItems": []
+    },
+    {
+      "id": "whitestuff-mosaic-pendant-necklace",
+      "catalog": "whitestuff",
+      "url": "https://www.whitestuff.com/eu/p/2328/mosaic-pendant-necklace/NAVY_MULTI",
+      "title": "Mosaic Pendant Necklace",
+      "productType": "",
+      "text": "A short and sweet mosaic pendant. Looks great with a tee.",
+      "images": [
+        "https://cdn.media.amplience.net/i/whitestuff/437036-NAVY_MULTI-FF",
+        "https://cdn.media.amplience.net/i/whitestuff/437036-NAVY_MULTI-FD"
+      ],
+      "flags": [
+        "text-sparse",
+        "flat"
+      ],
+      "key": {
+        "category": {
+          "value": "jewelry",
+          "accept": []
+        },
+        "primaryColour": {
+          "value": "gold",
+          "accept": [
+            "multi"
+          ]
+        },
+        "sleeveLength": {
+          "value": "not-applicable",
+          "accept": []
+        },
+        "neckline": {
+          "value": "not-applicable",
+          "accept": []
+        },
+        "garmentLength": {
+          "value": "not-applicable",
+          "accept": []
+        },
+        "pattern": {
+          "value": "multi",
+          "accept": [
+            "mosaic",
+            "solid",
+            "colour-block"
+          ]
+        },
+        "materialAppearance": {
+          "value": "metal",
+          "accept": [
+            "gold",
+            "enamel",
+            "glass",
+            "resin"
+          ]
+        }
+      },
+      "nonSoldItems": []
+    },
+    {
+      "id": "whitestuff-oceanna-jersey-dress",
+      "catalog": "whitestuff",
+      "url": "https://www.whitestuff.com/eu/p/1913/oceanna-jersey-dress/NAVY_MULTI",
+      "title": "Oceanna Jersey Dress",
+      "productType": "",
+      "text": "",
+      "images": [
+        "https://cdn.media.amplience.net/i/whitestuff/435911-NAVY_MULTI-FF",
+        "https://cdn.media.amplience.net/i/whitestuff/435911-NAVY_MULTI-FD",
+        "https://cdn.media.amplience.net/i/whitestuff/435911-NAVY_MULTI-FB"
+      ],
+      "flags": [
+        "text-sparse",
+        "flat"
+      ],
+      "key": {
+        "category": {
+          "value": "dress",
+          "accept": []
+        },
+        "primaryColour": {
+          "value": "navy",
+          "accept": [
+            "blue",
+            "multi",
+            "green"
+          ]
+        },
+        "sleeveLength": {
+          "value": "long",
+          "accept": []
+        },
+        "neckline": {
+          "value": "crew",
+          "accept": []
+        },
+        "garmentLength": {
+          "value": "knee",
+          "accept": [
+            "midi",
+            "mini"
+          ]
+        },
+        "pattern": {
+          "value": "print",
+          "accept": [
+            "floral",
+            "graphic"
+          ]
+        },
+        "materialAppearance": {
+          "value": "jersey",
+          "accept": [
+            "cotton"
+          ]
+        }
+      },
+      "nonSoldItems": []
+    },
+    {
+      "id": "whitestuff-layla-jacket",
+      "catalog": "whitestuff",
+      "url": "https://www.whitestuff.com/eu/p/1892/layla-jacket/KHAKI_GRN",
+      "title": "Layla Jacket",
+      "productType": "",
+      "text": "",
+      "images": [
+        "https://cdn.media.amplience.net/i/whitestuff/437178-KHAKI_GRN-MF",
+        "https://cdn.media.amplience.net/i/whitestuff/437178-KHAKI_GRN-FF",
+        "https://cdn.media.amplience.net/i/whitestuff/437178-KHAKI_GRN-L",
+        "https://cdn.media.amplience.net/i/whitestuff/437178-KHAKI_GRN-MB"
+      ],
+      "flags": [
+        "text-sparse",
+        "contamination"
+      ],
+      "key": {
+        "category": {
+          "value": "jacket",
+          "accept": []
+        },
+        "primaryColour": {
+          "value": "green",
+          "accept": [
+            "khaki",
+            "olive"
+          ]
+        },
+        "sleeveLength": {
+          "value": "long",
+          "accept": []
+        },
+        "neckline": {
+          "value": "collar",
+          "accept": [
+            "high-neck"
+          ]
+        },
+        "garmentLength": {
+          "value": "hip",
+          "accept": []
+        },
+        "pattern": {
+          "value": "solid",
+          "accept": []
+        },
+        "materialAppearance": {
+          "value": "cotton",
+          "accept": [
+            "twill",
+            "canvas",
+            "tencel"
+          ]
+        }
+      },
+      "nonSoldItems": [
+        {
+          "item": "black-and-white floral midi dress",
+          "category": "dress",
+          "colours": [
+            "white",
+            "black"
+          ],
+          "pattern": "floral"
+        },
+        {
+          "item": "black sandals",
+          "category": "shoes",
+          "colours": [
+            "black"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "whitestuff-harwood-straight-jean",
+      "catalog": "whitestuff",
+      "url": "https://www.whitestuff.com/eu/p/2112/harwood-straight-jean/MID_DENIM",
+      "title": "Harwood Straight Jean",
+      "productType": "",
+      "text": "A pair of classic, tailored straight leg jeans. Straight up 24/7 style.",
+      "images": [
+        "https://cdn.media.amplience.net/i/whitestuff/433343-MID_DENIM-MF",
+        "https://cdn.media.amplience.net/i/whitestuff/433343-MID_DENIM-FF",
+        "https://cdn.media.amplience.net/i/whitestuff/433343-MID_DENIM-L",
+        "https://cdn.media.amplience.net/i/whitestuff/433343-MID_DENIM-MB"
+      ],
+      "flags": [
+        "text-sparse",
+        "contamination"
+      ],
+      "key": {
+        "category": {
+          "value": "pants",
+          "accept": []
+        },
+        "primaryColour": {
+          "value": "blue",
+          "accept": [
+            "indigo",
+            "navy"
+          ]
+        },
+        "sleeveLength": {
+          "value": "not-applicable",
+          "accept": []
+        },
+        "neckline": {
+          "value": "not-applicable",
+          "accept": []
+        },
+        "garmentLength": {
+          "value": "full",
+          "accept": []
+        },
+        "pattern": {
+          "value": "solid",
+          "accept": []
+        },
+        "materialAppearance": {
+          "value": "denim",
+          "accept": []
+        }
+      },
+      "nonSoldItems": [
+        {
+          "item": "white t-shirt",
+          "category": "top",
+          "colours": [
+            "white"
+          ]
+        },
+        {
+          "item": "olive suede sneakers",
+          "category": "sneakers",
+          "colours": [
+            "green",
+            "olive",
+            "khaki"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "whitestuff-nelly-notch-tee",
+      "catalog": "whitestuff",
+      "url": "https://www.whitestuff.com/eu/p/2273/nelly-notch-tee/FR_NAVY",
+      "title": "Nelly Notch Tee",
+      "productType": "",
+      "text": "",
+      "images": [
+        "https://cdn.media.amplience.net/i/whitestuff/433363-FR_NAVY-MF",
+        "https://cdn.media.amplience.net/i/whitestuff/433363-FR_NAVY-FF",
+        "https://cdn.media.amplience.net/i/whitestuff/433363-FR_NAVY-MB",
+        "https://cdn.media.amplience.net/i/whitestuff/433363-FR_NAVY-FD"
+      ],
+      "flags": [
+        "text-sparse",
+        "contamination"
+      ],
+      "key": {
+        "category": {
+          "value": "top",
+          "accept": []
+        },
+        "primaryColour": {
+          "value": "navy",
+          "accept": [
+            "blue"
+          ]
+        },
+        "sleeveLength": {
+          "value": "short",
+          "accept": []
+        },
+        "neckline": {
+          "value": "v-neck",
+          "accept": [
+            "notch",
+            "slit"
+          ]
+        },
+        "garmentLength": {
+          "value": "hip",
+          "accept": []
+        },
+        "pattern": {
+          "value": "solid",
+          "accept": []
+        },
+        "materialAppearance": {
+          "value": "cotton",
+          "accept": [
+            "jersey",
+            "linen"
+          ]
+        }
+      },
+      "nonSoldItems": [
+        {
+          "item": "light blue jeans",
+          "category": "pants",
+          "colours": [
+            "blue"
+          ],
+          "material": "denim"
+        }
+      ]
+    },
+    {
+      "id": "whitestuff-wool-blend-baseball-cap",
+      "catalog": "whitestuff",
+      "url": "https://www.whitestuff.com/eu/p/2712/wool-blend-baseball-cap/DARK_NAVY",
+      "title": "Wool Blend Baseball Cap",
+      "productType": "",
+      "text": "A wool blend hat. We'll (baseball) cap it there.",
+      "images": [
+        "https://cdn.media.amplience.net/i/whitestuff/437461-DARK_NAVY-FF",
+        "https://cdn.media.amplience.net/i/whitestuff/437461-DARK_NAVY-FD"
+      ],
+      "flags": [
+        "text-sparse",
+        "flat"
+      ],
+      "key": {
+        "category": {
+          "value": "accessories",
+          "accept": []
+        },
+        "primaryColour": {
+          "value": "navy",
+          "accept": [
+            "blue"
+          ]
+        },
+        "sleeveLength": {
+          "value": "not-applicable",
+          "accept": []
+        },
+        "neckline": {
+          "value": "not-applicable",
+          "accept": []
+        },
+        "garmentLength": {
+          "value": "not-applicable",
+          "accept": []
+        },
+        "pattern": {
+          "value": "solid",
+          "accept": [
+            "herringbone"
+          ]
+        },
+        "materialAppearance": {
+          "value": "wool",
+          "accept": [
+            "felt",
+            "tweed"
+          ]
+        }
+      },
+      "nonSoldItems": []
+    }
+  ]
+}
