@@ -18,11 +18,16 @@ zero network calls, identical ledger shape to a live run.
 
 ## Fixtures
 
-- `fixtures/catalog.json` — 60 sparse fashion products (EN + HE): one-line or
+- `fixtures/catalog.json` — 63 sparse fashion products (EN + HE): one-line or
   empty descriptions, ≤2 tags. Deliberately low-quality by design (NG-3).
-- `fixtures/goldens.json` — 20 golden natural-language queries (EN, HE,
+  p62 "Mesh Over Dress in Pink" (colourways pink, black, navy; primary pink)
+  and p63 "Tie Waist Dress in Black" pin the primary-colour exclusion rule
+  (YOY-110).
+- `fixtures/goldens.json` — 32 golden natural-language queries (EN, HE,
   mixed), each with expected product IDs and the hard constraints its results
-  are checked against.
+  are checked against. g24 `summer dress, not black, under 200` expects the
+  pink colourway dress: an excluded colour is judged by `primaryColor`, not
+  by any colourway.
 - `fixtures/refinement-goldens.json` — 6 follow-up queries (EN, HE, mixed),
   each with the previous query's intent and the constraint outcome the merged
   intent must produce (YOY-42). They run intent extraction only: a follow-up
@@ -75,11 +80,21 @@ never in CI, which holds no key (NG-2):
 
     LIVE_LLM_TESTS=1 GEMINI_API_KEY=... npm run regen:live
     LIVE_LLM_TESTS=1 GEMINI_API_KEY=... REGEN_SCOPE=lite npm run regen:live   # lite-tier intents only
+    LIVE_LLM_TESTS=1 GEMINI_API_KEY=... REGEN_SCOPE=catalog npm run regen:live   # enrichment + missing entries only
 
 `REGEN_SCOPE=lite` re-records only `intent-lite.json` and
 `intent-lite-refinement.json` and leaves every accuracy-tier recording
 untouched, so a lite-tier change never silently reshuffles the baseline the
 zero-regression bar is scored against.
+
+`REGEN_SCOPE=catalog` (YOY-110) re-records the enrichment of every product —
+for an enrichment prompt/schema/rule change, which invalidates every
+enrichment recording — and then records only the **missing** classification,
+intent (both tiers), and embedding entries: new goldens, new products, and
+product texts whose composed embedding text changed with the fresh
+attributes. Every existing intent recording stays byte-identical, so the
+baseline is scored against the same intents. Orphaned embedding vectors are
+dropped. The run prints its metered spend per operation from the ledger.
 
 The root `regen:live` script pins the run to the root `vitest.config.ts`,
 whose alias resolves `@unfiltered/*` to the TypeScript source. Invoking
@@ -93,8 +108,12 @@ the fresh recordings, then commit the changed JSONs.
 
 Provenance of what is committed today:
 
-- `enrichment.json`, `classification.json`, `intent.json`, `embeddings.json` —
-  live Gemini output, recorded by the regenerate flow (YOY-28).
+- `enrichment.json` — live `gemini-3.5-flash-lite` output recorded on
+  YOY-110 (2026-08-27) with the `primaryColor` prompt, via
+  `REGEN_SCOPE=catalog`.
+- `classification.json`, `intent.json`, `embeddings.json` —
+  live Gemini output, recorded by the regenerate flow (YOY-28); g24's
+  entries and the re-enriched product vectors were added on YOY-110.
 - `intent-refinement.json` — live Gemini output (`"provenance": "live"`)
   since the run-8 regeneration (YOY-67): the refinement rows are real model
   evidence, not hand-written plumbing checks.

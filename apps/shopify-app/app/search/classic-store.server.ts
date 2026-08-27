@@ -8,6 +8,8 @@ import type {
 } from "@unfiltered/engine";
 import { expandCategoryConstraint, normalizeQuery } from "@unfiltered/engine";
 
+import { colorUnknownSql } from "./retrieval-store.server";
+
 /**
  * Postgres/pg_trgm implementation of the engine's ClassicSearchStore port
  * (YOY-41): trigram keyword search over catalog_search_text(...) — the
@@ -36,8 +38,9 @@ import { expandCategoryConstraint, normalizeQuery } from "@unfiltered/engine";
  * (retrieval-store.server.ts) verbatim — the two stores must never drift,
  * because the orchestrator falls back from one to the other: unknown
  * enrichment passes positive occasion/color constraints, category stays
- * evidence-required and expands through the taxonomy's category groups, and
- * a price cap compares against `priceMin`. Constraint-only requests (no
+ * evidence-required and expands through the taxonomy's category groups, a
+ * colour exclusion applies to the primary colour only (YOY-110), and a
+ * price cap compares against `priceMin`. Constraint-only requests (no
  * query text) filter without ranking and score every hit 0, ordered
  * deterministically by productId.
  */
@@ -134,7 +137,7 @@ export function buildClassicSearchSql(request: ClassicSearchRequest): {
   // are flagged for the consumer.
   const colorUnknownExpr =
     constraints.colorsInclude.length > 0 || constraints.colorsExclude.length > 0
-      ? `(COALESCE(cardinality(en."colors"), 0) = 0)`
+      ? colorUnknownSql(constraints)
       : null;
   const colorTierPrefix =
     colorUnknownExpr === null ? "" : `t."colorUnknown" ASC, `;
@@ -187,9 +190,12 @@ export function buildClassicSearchSql(request: ClassicSearchRequest): {
     );
   }
   if (constraints.colorsExclude.length > 0) {
+    // Exclusion by PRIMARY colour (YOY-110 AC-3), mirroring the pgvector
+    // store: only the primary/displayed colour can violate an exclusion,
+    // and a null primary colour passes.
     where.push(
-      `NOT EXISTS (SELECT 1 FROM unnest(COALESCE(en."colors", '{}')) c
-         WHERE lower(c) IN (SELECT lower(v)
+      `(en."primaryColor" IS NULL
+         OR lower(en."primaryColor") NOT IN (SELECT lower(v)
            FROM json_array_elements_text(${param(JSON.stringify(constraints.colorsExclude))}::json) v))`,
     );
   }

@@ -134,7 +134,22 @@ server-resolved product link `url` (YOY-87: Admin API `onlineStoreUrl`, else
 `https://<shop>/products/<handle>`; null when unresolvable) for result
 cards — deliberately outside `contentHash`, so ingestion and webhook sync
 refresh them even when searchable content is unchanged, and a display-only
-change never triggers re-enrichment or re-embedding); the baseline migration runs
+change never triggers re-enrichment or re-embedding); the `ProductEnrichment`
+attribute record per product (`app/catalog/enrich.server.ts`: `category`,
+`colors` — every colourway the text states — `occasions`, `fit`,
+`styleTags`, `seasons`, plus **`primaryColor`** (YOY-110), the
+primary/displayed colour: the colour named by the title's colourway
+designator — `in <Colour>`, `- <Colour>`, `/ <Colour>`, `(<Colour>)` — else
+the first colour the text states in reading order (title, description,
+tags), else null; the model answers it and `parseEnrichment` re-validates it
+against the title and the stated colours, never accepting a colour the text
+does not state. Rows are cached by `contentHash` **and** versioned: each row
+stores the `ENRICHMENT_VERSION` it was written at (`enrichmentVersion`,
+0 for rows from before versioning), and a row at an older version
+re-enriches on the next run even when its content is unchanged, so a
+prompt/schema/rule change re-runs the catalog exactly once — the content
+hash alone could never trigger that. Unchanged content at the current
+version makes zero LLM calls); the baseline migration runs
 `CREATE EXTENSION IF NOT EXISTS vector`, and the classic-search migration
 `CREATE EXTENSION IF NOT EXISTS pg_trgm`). The app knows only Postgres
 connection strings, from a gitignored `.env` (a managed Neon database in
@@ -358,7 +373,22 @@ Classic keyword search (the zero-LLM result path; YOY-41):
   (a fake, another implementation) still hydrates as before. Constraint predicates mirror the pgvector store
   verbatim: unknown enrichment passes positive occasion/color constraints,
   category is evidence-required and expands through the taxonomy's category
-  groups, and a price cap compares against `priceMin`.
+  groups, a colour exclusion applies to `primaryColor` only, and a price cap
+  compares against `priceMin`.
+
+**Colour exclusion rule (YOY-110, binding — PRD §3 amendment, founder
+decision 2026-08-22):** `colorsExclude` is applied by both stores against
+the enrichment's `primaryColor` alone, case-insensitively — a pink dress
+that also comes in black is not excluded by "not black" — and a null
+`primaryColor` passes (unknown passes, as for every enrichment constraint).
+`colorsInclude` is unchanged and still reads every colourway in `colors`.
+The colour-evidence tier flag `colorUnknown` follows the evidence the
+constraint reads: under an exclusion-only colour constraint it means
+`primaryColor IS NULL`; under an inclusion it still means `colors` is empty
+(`colorUnknownSql` in `retrieval-store.server.ts`, shared by both stores).
+The eval harness's `findViolations` judges excluded colours by
+`primaryColor` the same way. The live seed catalog re-enriches at version 1
+on the next `npm run ingest` (AC-6, a separate slice).
 - The eval harness routes goldens marked `expectedRoute: "classic"` through
   this store (≥8 classic goldens: exact EN, EN typo, Hebrew, and SKU-like
   queries) and asserts the expected product ranks in the top 5 at zero AI

@@ -65,13 +65,22 @@ const live = process.env.LIVE_LLM_TESTS === "1";
  * accuracy-tier recording untouched, so a lite-tier change never silently
  * reshuffles the baseline the zero-regression bar is scored against.
  * Default `all` re-records everything, the lite files included.
+ *
+ * `REGEN_SCOPE=catalog` (YOY-110 AC-5) re-records the enrichment of every
+ * product — the enrichment prompt/rule changed, so every recording must —
+ * and then records only the MISSING classification, intent (both tiers), and
+ * embedding entries: new goldens and new or re-enriched product texts. Every
+ * existing intent recording stays byte-identical, so the zero-regression
+ * baseline is scored against the same intents; only the index changes.
  */
 const scope =
   process.env.REGEN_SCOPE === "lite"
     ? "lite"
     : process.env.REGEN_SCOPE === "intent"
       ? "intent"
-      : "all";
+      : process.env.REGEN_SCOPE === "catalog"
+        ? "catalog"
+        : "all";
 /**
  * `REGEN_RESUME=1` keeps the lite entries already on disk and records only
  * the missing keys and the recorded FAILURES — a lite run that a slow
@@ -449,7 +458,7 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
         schema: ENRICHMENT_SCHEMA,
         operation: "enrichment",
       });
-      const attributes = parseEnrichment(completion);
+      const attributes = parseEnrichment(completion, product);
       check(
         attributes !== null,
         `enrichment: ${product.productId} answered outside the schema`,
@@ -787,7 +796,277 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
     expect(failures, `\n${failures.join("\n")}`).toEqual([]);
   }, 1_800_000);
 
-  it("re-records the lite-tier intents (YOY-116 AC-5)", async () => {
+  it.skipIf(scope !== "catalog")("re-records every enrichment and only the missing classification/intent/embedding entries (YOY-110 AC-5: REGEN_SCOPE=catalog)", async () => {
+    const models = geminiModelsFromEnv();
+    const catalog = loadCatalog();
+    const goldens = loadGoldens();
+    const refinementGoldens = loadRefinementGoldens();
+    const usage = captureUsage(createPrismaCostRecorder(db));
+    const failures: string[] = [];
+    const check = (condition: boolean, message: string): void => {
+      if (!condition) {
+        failures.push(message);
+      }
+    };
+    const readRecording = (file: string): { modelId: string; provenance?: string; entries: Record<string, RecordedEntry> } =>
+      JSON.parse(readFileSync(join(recordedDir, file), "utf8"));
+
+    // 1. Enrichment: every product, at the current prompt and rule. The
+    //    recording is keyed by title, so a product's entry is replaced, not
+    //    merged — a stale entry would replay the pre-rule output shape.
+    const enrichmentEntries: Record<string, RecordedEntry> = {};
+    const enrichmentLlm = captureCompletions(
+      createGeminiLlmClient({
+        modelId: models.classificationModel,
+        costRecorder: usage.recorder,
+      }),
+      usage.last,
+      enrichmentEntries,
+    );
+    const attributesByProduct = new Map<string, ReturnType<typeof parseEnrichment>>();
+    for (const { sourceUpdatedAt, ...product } of catalog) {
+      void sourceUpdatedAt;
+      const completion = await enrichmentLlm.completeStructured({
+        prompt: buildEnrichmentPrompt({ ...product, contentHash: computeContentHash(product) }),
+        schema: ENRICHMENT_SCHEMA,
+        operation: "enrichment",
+      });
+      const attributes = parseEnrichment(completion, product);
+      check(attributes !== null, `enrichment: ${product.productId} answered outside the schema`);
+      attributesByProduct.set(product.productId, attributes);
+    }
+    writeRecording("enrichment.json", models.classificationModel, enrichmentEntries);
+    check(
+      Object.keys(enrichmentEntries).length === catalog.length,
+      `coverage: ${Object.keys(enrichmentEntries).length}/${catalog.length} enrichments recorded`,
+    );
+
+    // 2. Classification: only model-answered goldens with no live entry yet.
+    const classification = readRecording("classification.json");
+    check(
+      classification.modelId === models.classificationModel,
+      `classification.json is ${classification.modelId}, env says ${models.classificationModel}; regenerate with REGEN_SCOPE=all`,
+    );
+    const classifier = createQueryClassifier({
+      llm: captureCompletions(
+        createGeminiLlmClient({ modelId: models.classificationModel, costRecorder: usage.recorder }),
+        usage.last,
+        classification.entries,
+      ),
+      timeoutMs: 600_000,
+    });
+    let classificationsRecorded = 0;
+    for (const golden of goldens) {
+      const key = normalizeQuery(golden.query);
+      if (classifyByHeuristics(key) !== null || classification.entries[key] !== undefined) {
+        continue; // heuristic-settled, or already recorded live
+      }
+      const decision = await classifier.classify(golden.query);
+      classificationsRecorded += 1;
+      check(
+        decision.route === (golden.expectedRoute ?? "ai"),
+        `classification: ${golden.id} routed ${decision.route}, expected ${golden.expectedRoute ?? "ai"}`,
+      );
+      check(classification.entries[key] !== undefined, `classification: ${golden.id} recorded no completion`);
+    }
+    writeRecording("classification.json", classification.modelId, classification.entries);
+
+    // 3. Accuracy-tier intents: only goldens with no entry yet.
+    const intentRecording = readRecording("intent.json");
+    check(
+      intentRecording.modelId === models.intentModel,
+      `intent.json is ${intentRecording.modelId}, env says ${models.intentModel}; regenerate with REGEN_SCOPE=intent`,
+    );
+    const extractor = createIntentExtractor({
+      llm: captureCompletions(
+        createGeminiLlmClient({
+          modelId: models.intentModel,
+          costRecorder: usage.recorder,
+          thinkingLevel: models.intentThinkingLevel,
+        }),
+        usage.last,
+        intentRecording.entries,
+      ),
+    });
+    let intentsRecorded = 0;
+    for (const golden of goldens) {
+      if (intentRecording.entries[golden.query] !== undefined) {
+        continue;
+      }
+      try {
+        await extractor.extract(golden.query);
+        intentsRecorded += 1;
+      } catch (error) {
+        check(false, `intent: ${golden.id} extraction failed: ${String(error)}`);
+        continue;
+      }
+      check(intentRecording.entries[golden.query] !== undefined, `intent: ${golden.id} recorded no completion`);
+    }
+    writeRecording("intent.json", intentRecording.modelId, intentRecording.entries);
+    check(
+      Object.keys(intentRecording.entries).length === goldens.length,
+      `coverage: ${Object.keys(intentRecording.entries).length}/${goldens.length} intents recorded`,
+    );
+
+    // 4. Lite-tier intents: only goldens with no entry yet (a recorded lite
+    //    failure stays as it was recorded — this scope adds, never re-judges).
+    const liteRecording = readRecording("intent-lite.json");
+    check(
+      liteRecording.modelId === models.intentLiteModel,
+      `intent-lite.json is ${liteRecording.modelId}, env says ${models.intentLiteModel}; regenerate with REGEN_SCOPE=lite`,
+    );
+    const liteExtractor = createIntentExtractor({
+      llm: captureCompletions(
+        createGeminiLlmClient({
+          modelId: models.intentLiteModel,
+          costRecorder: usage.recorder,
+          thinkingLevel: models.intentLiteThinkingLevel,
+          requestTimeoutMs: LITE_REQUEST_TIMEOUT_MS,
+        }),
+        usage.last,
+        liteRecording.entries,
+      ),
+    });
+    let liteRecorded = 0;
+    for (const golden of goldens) {
+      if (liteRecording.entries[golden.query] !== undefined) {
+        continue;
+      }
+      try {
+        const intent = await liteExtractor.extract(golden.query);
+        liteRecorded += 1;
+        check(typeof intent.confidence === "number", `intent-lite: ${golden.id} reported no confidence`);
+      } catch (error) {
+        if (error instanceof GeminiTimeoutError) {
+          console.warn(`[regenerate-live] intent-lite: ${golden.id} timed out after retries; recorded as a lite failure`);
+          recordLiteFailure(liteRecording.entries, golden.query, error);
+          continue;
+        }
+        check(false, `intent-lite: ${golden.id} extraction failed: ${String(error)}`);
+        continue;
+      }
+      check(liteRecording.entries[golden.query] !== undefined, `intent-lite: ${golden.id} recorded no completion`);
+    }
+    writeRecording("intent-lite.json", liteRecording.modelId, liteRecording.entries);
+
+    // 5. Embeddings: every product text (fresh enrichment attributes change
+    //    the composed text) and every query text of both tiers, for goldens
+    //    and refinement goldens alike — only texts embeddings.json lacks,
+    //    merged in; existing vectors stay untouched.
+    const embeddingsPath = join(recordedDir, "embeddings.json");
+    const embeddingRecording = JSON.parse(readFileSync(embeddingsPath, "utf8")) as {
+      modelId: string;
+      dimension: number;
+      vectors: Record<string, number[]>;
+    };
+    check(
+      embeddingRecording.modelId === models.embeddingModel &&
+        embeddingRecording.dimension === models.embeddingDimension,
+      `embeddings.json is ${embeddingRecording.modelId}@${embeddingRecording.dimension}, env says ${models.embeddingModel}@${models.embeddingDimension}; regenerate with REGEN_SCOPE=all`,
+    );
+    const wanted = new Set<string>();
+    for (const { sourceUpdatedAt, ...product } of catalog) {
+      void sourceUpdatedAt;
+      wanted.add(
+        composeEmbeddingText(
+          { ...product, contentHash: computeContentHash(product) },
+          attributesByProduct.get(product.productId) ?? null,
+        ),
+      );
+    }
+    const liteRefinement = readRecording("intent-lite-refinement.json");
+    const accuracyRefinement = readRecording("intent-refinement.json");
+    const queryEntries = [
+      ...goldens.flatMap((golden) => [intentRecording.entries[golden.query], liteRecording.entries[golden.query]]),
+      ...refinementGoldens.flatMap((golden) => [
+        accuracyRefinement.entries[golden.query],
+        liteRefinement.entries[golden.query],
+      ]),
+    ];
+    for (const entry of queryEntries) {
+      if (entry === undefined || entry.error !== undefined) {
+        continue;
+      }
+      const intent = parseIntent(entry.output);
+      if (intent === null) {
+        continue;
+      }
+      const text = composeQueryText(intent);
+      if (text !== "") {
+        wanted.add(text);
+      }
+    }
+    const missing = [...wanted].filter((text) => embeddingRecording.vectors[text] === undefined);
+    // Vectors no product text or recorded intent references any more — a
+    // re-enriched product's previous composed text — are dropped, so the
+    // recording holds exactly the replay set and does not grow run over run.
+    const orphaned = Object.keys(embeddingRecording.vectors).filter((text) => !wanted.has(text));
+    for (const text of orphaned) {
+      delete embeddingRecording.vectors[text];
+    }
+    if (missing.length > 0 || orphaned.length > 0) {
+      const embeddings = createGeminiEmbeddingClient({
+        modelId: models.embeddingModel,
+        dimension: models.embeddingDimension,
+        costRecorder: usage.recorder,
+      });
+      const BATCH = 100;
+      for (let start = 0; start < missing.length; start += BATCH) {
+        const batch = missing.slice(start, start + BATCH);
+        const batchVectors = await paced(() => embeddings.embed({ texts: batch }));
+        batch.forEach((text, index) => {
+          embeddingRecording.vectors[text] = batchVectors[index]!;
+        });
+      }
+      writeFileSync(embeddingsPath, `${JSON.stringify(embeddingRecording, null, 2)}\n`);
+    }
+
+    // 6. Re-score against the fresh recordings (same reason as scope=all),
+    //    and report the run's metered spend from the ledger.
+    const evalDb = await createTestDb();
+    try {
+      const rescored = await runEval(evalDb);
+      const misses = rescored.perQuery
+        .filter((score) => score.firstExpectedRank === null)
+        .map((score) => score.golden.id);
+      check(
+        rescored.hitRate >= 0.8,
+        `rescore: hit rate ${rescored.hitRate.toFixed(2)} misses the 0.8 bar; misses: ${misses.join(", ")}`,
+      );
+      for (const violation of rescored.perQuery.flatMap((score) => score.violations)) {
+        check(false, `rescore: ${violation}`);
+      }
+      for (const violation of rescored.perRefinement.flatMap((score) => score.violations)) {
+        check(false, `rescore: ${violation}`);
+      }
+      check(
+        rescored.perSearchCostPer1000Usd <= 0.6,
+        `rescore: blended cost $${rescored.perSearchCostPer1000Usd.toFixed(4)}/1k exceeds the $0.60 bar`,
+      );
+    } catch (error) {
+      check(false, `rescore: eval run failed: ${String(error)}`);
+    } finally {
+      await evalDb.$disconnect();
+    }
+    const spent = await db.aiCall.findMany();
+    const byOperation = new Map<string, { calls: number; usd: number }>();
+    for (const row of spent) {
+      const bucket = byOperation.get(row.operation) ?? { calls: 0, usd: 0 };
+      bucket.calls += 1;
+      bucket.usd += row.costUsd;
+      byOperation.set(row.operation, bucket);
+    }
+    console.log(
+      [
+        `[regenerate-live] scope=catalog recorded: ${catalog.length} enrichments, ${classificationsRecorded} classifications, ${intentsRecorded} accuracy intents, ${liteRecorded} lite intents, ${missing.length} embeddings (${orphaned.length} orphaned vector(s) dropped)`,
+        ...[...byOperation].map(([operation, bucket]) => `[regenerate-live]   ${operation}: ${bucket.calls} call(s), $${bucket.usd.toFixed(4)}`),
+        `[regenerate-live]   total metered spend: $${spent.reduce((sum, row) => sum + row.costUsd, 0).toFixed(4)}`,
+      ].join("\n"),
+    );
+    expect(failures, `\n${failures.join("\n")}`).toEqual([]);
+  }, 2_700_000);
+
+  it.skipIf(scope === "catalog")("re-records the lite-tier intents (YOY-116 AC-5)", async () => {
     // The same goldens and refinement goldens, answered by the lite model at
     // its explicit thinking level — each answer carrying its `confidence`,
     // which is what the offline harness routes on. Written beside the

@@ -48,6 +48,8 @@ interface SeedProduct {
   enrichment?: {
     category?: string | null;
     colors?: string[];
+    /** Displayed colour (YOY-110); defaults to the first of `colors`. */
+    primaryColor?: string | null;
     occasions?: string[];
   };
 }
@@ -85,6 +87,14 @@ async function seed(db: PrismaClient, products: SeedProduct[]): Promise<void> {
           category: product.enrichment.category ?? null,
           colors: product.enrichment.colors ?? [],
           occasions: product.enrichment.occasions ?? [],
+          // Default primary colour = the first stated colour, mirroring the
+          // enrichment fallback rule (YOY-110); pass `primaryColor` to seed a
+          // colourway product whose displayed colour differs, or null for an
+          // unknown one.
+          primaryColor:
+            product.enrichment.primaryColor === undefined
+              ? (product.enrichment.colors?.[0] ?? null)
+              : product.enrichment.primaryColor,
           fit: null,
           styleTags: [],
           seasons: [],
@@ -267,6 +277,19 @@ describe("constraint-only mode mirrors pgvector predicate semantics (AC-4)", () 
       },
       { productId: "unenriched", title: "Raw Import" },
       { productId: "sold-out", title: "Gone Dress", available: false },
+      // Colourway products (YOY-110): displayed pink, also sold in black;
+      // and one with stated colours but no primary colour.
+      {
+        productId: "mesh-pink",
+        title: "Mesh Over Dress in Pink",
+        priceMin: 128,
+        enrichment: { category: "dress", colors: ["pink", "black", "navy"], primaryColor: "pink" },
+      },
+      {
+        productId: "stated-no-primary",
+        title: "Mystery Dress",
+        enrichment: { category: "dress", colors: ["black"], primaryColor: null },
+      },
     ]);
   });
 
@@ -323,6 +346,38 @@ describe("constraint-only mode mirrors pgvector predicate semantics (AC-4)", () 
     expect(ids).not.toContain("pricey-dress");
     expect(ids).toContain("unknown-attrs");
     expect(ids).toContain("unenriched");
+  });
+
+  it("color exclusion judges the PRIMARY colour only; a colourway product survives (YOY-110 AC-3, AC-4)", async () => {
+    // The colourway shape from the seed: mesh-pink also comes in black.
+    const ids = await searchIds(db, {
+      constraints: { ...noConstraints(), colorsExclude: ["Black"] },
+    });
+    expect(ids).toContain("mesh-pink");
+    expect(ids).toContain("stated-no-primary");
+    expect(ids).not.toContain("pricey-dress");
+    // The same product with query text (keyword mode) — same predicate.
+    expect(
+      await searchIds(db, {
+        query: "dress",
+        constraints: { ...noConstraints(), colorsExclude: ["black"] },
+      }),
+    ).toContain("mesh-pink");
+    // Inclusion still reads every colourway (NG-1).
+    expect(
+      await searchIds(db, { constraints: { ...noConstraints(), colorsInclude: ["black"] } }),
+    ).toContain("mesh-pink");
+  });
+
+  it("under an exclusion-only colour constraint, colorUnknown means the primary colour is unknown (YOY-110 AC-3)", async () => {
+    const result = await createPgTrgmClassicStore(db).search({
+      storeId: SHOP,
+      constraints: { ...noConstraints(), colorsExclude: ["black"] },
+    });
+    const byId = new Map(result.hits.map((hit) => [hit.productId, hit]));
+    expect(byId.get("mesh-pink")!.colorUnknown).toBe(false);
+    expect(byId.get("stated-no-primary")!.colorUnknown).toBe(true);
+    expect(byId.get("unenriched")!.colorUnknown).toBe(true);
   });
 
   it("tiers unknown-color hits below known matches and flags them (YOY-67 AC-5)", async () => {

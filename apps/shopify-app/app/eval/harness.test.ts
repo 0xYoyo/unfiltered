@@ -29,8 +29,8 @@ describe("eval fixtures (AC-1)", () => {
     const catalog = loadCatalog();
     const goldens = loadGoldens();
 
-    expect(catalog).toHaveLength(61);
-    expect(goldens).toHaveLength(31);
+    expect(catalog).toHaveLength(63);
+    expect(goldens).toHaveLength(32);
 
     // Deliberately sparse: descriptions are one-liners or empty, tags minimal.
     for (const product of catalog) {
@@ -176,7 +176,7 @@ describe("violation scoring covers occasion (YOY-29 AC-11)", () => {
     const enrichments = new Map([
       [
         product.productId,
-        { category: null, colors: [], occasions: ["Casual"] },
+        { category: null, colors: [], occasions: ["Casual"], primaryColor: null },
       ],
     ]);
 
@@ -190,7 +190,7 @@ describe("violation scoring covers occasion (YOY-29 AC-11)", () => {
     const enrichments = new Map([
       [
         product.productId,
-        { category: null, colors: [], occasions: ["Wedding", "party"] },
+        { category: null, colors: [], occasions: ["Wedding", "party"], primaryColor: null },
       ],
     ]);
 
@@ -223,8 +223,20 @@ describe("violation scoring mirrors unknown-passes filtering (YOY-35 AC-2, AC-5)
     expectedProductIds: [product.productId],
   });
   const enrich = (
-    enrichment: { category: string | null; colors: string[]; occasions: string[] },
-  ) => new Map([[product.productId, enrichment]]);
+    enrichment: {
+      category: string | null;
+      colors: string[];
+      occasions: string[];
+      primaryColor?: string | null;
+    },
+  ) =>
+    new Map([
+      [
+        product.productId,
+        // Like the store seeds: the first stated colour is the default primary.
+        { primaryColor: enrichment.colors[0] ?? null, ...enrichment },
+      ],
+    ]);
 
   it("does not flag empty enrichment occasions or colors against positive constraints", () => {
     const sparse = enrich({ category: null, colors: [], occasions: [] });
@@ -251,6 +263,38 @@ describe("violation scoring mirrors unknown-passes filtering (YOY-35 AC-2, AC-5)
       stated,
     );
     expect(violations).toHaveLength(2);
+  });
+
+  it("judges an excluded colour by the primary colour alone (YOY-110 AC-5)", () => {
+    // p62's shape: displayed pink, also in black — not a "black" violation.
+    const colourway = enrich({
+      category: "dress",
+      colors: ["pink", "black", "navy"],
+      occasions: [],
+      primaryColor: "pink",
+    });
+    expect(
+      findViolations(golden({ colorsExclude: ["black"] }), product.productId, products, colourway),
+    ).toEqual([]);
+    // Primary colour IS the excluded colour: a violation, case-insensitively.
+    const black = enrich({ category: "dress", colors: ["black"], occasions: [], primaryColor: "Black" });
+    expect(
+      findViolations(golden({ colorsExclude: ["black"] }), product.productId, products, black),
+    ).toHaveLength(1);
+    // Unknown primary colour passes, even with the colour among the colourways.
+    const unknownPrimary = enrich({
+      category: "dress",
+      colors: ["black"],
+      occasions: [],
+      primaryColor: null,
+    });
+    expect(
+      findViolations(golden({ colorsExclude: ["black"] }), product.productId, products, unknownPrimary),
+    ).toEqual([]);
+    // Inclusion still reads every colourway (NG-1).
+    expect(
+      findViolations(golden({ colorsInclude: ["black"] }), product.productId, products, colourway),
+    ).toEqual([]);
   });
 
   it("admits a category group's members for a parent constraint, exact for a child (AC-5)", () => {

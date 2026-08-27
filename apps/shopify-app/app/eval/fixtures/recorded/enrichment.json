@@ -8,16 +8,16 @@
         "colors": [
           "ivory"
         ],
+        "primaryColor": "ivory",
         "occasions": [],
-        "fit": "",
+        "fit": "flowing",
         "styleTags": [
-          "maxi",
-          "flowing"
+          "maxi"
         ],
         "seasons": []
       },
-      "inputTokens": 183,
-      "outputTokens": 67
+      "inputTokens": 373,
+      "outputTokens": 62
     },
     "Noir Evening Gown": {
       "output": {
@@ -25,17 +25,18 @@
         "colors": [
           "black"
         ],
+        "primaryColor": "black",
         "occasions": [
           "evening"
         ],
         "fit": "",
         "styleTags": [
-          "gown"
+          "evening gown"
         ],
         "seasons": []
       },
-      "inputTokens": 180,
-      "outputTokens": 68
+      "inputTokens": 370,
+      "outputTokens": 78
     },
     "שמלת ערב שחורה": {
       "output": {
@@ -43,6 +44,7 @@
         "colors": [
           "black"
         ],
+        "primaryColor": "black",
         "occasions": [
           "evening"
         ],
@@ -52,8 +54,8 @@
         ],
         "seasons": []
       },
-      "inputTokens": 191,
-      "outputTokens": 68
+      "inputTokens": 381,
+      "outputTokens": 77
     },
     "Blush Midi Dress": {
       "output": {
@@ -61,6 +63,7 @@
         "colors": [
           "blush"
         ],
+        "primaryColor": "blush",
         "occasions": [],
         "fit": "midi",
         "styleTags": [
@@ -68,27 +71,25 @@
         ],
         "seasons": []
       },
-      "inputTokens": 182,
-      "outputTokens": 63
+      "inputTokens": 372,
+      "outputTokens": 61
     },
     "שמלת קיץ פרחונית": {
       "output": {
         "category": "dress",
         "colors": [],
-        "occasions": [
-          "casual"
-        ],
+        "primaryColor": "",
+        "occasions": [],
         "fit": "",
         "styleTags": [
-          "floral",
-          "summer"
+          "floral"
         ],
         "seasons": [
           "summer"
         ]
       },
-      "inputTokens": 185,
-      "outputTokens": 73
+      "inputTokens": 375,
+      "outputTokens": 55
     },
     "Linen Beach Dress": {
       "output": {
@@ -96,26 +97,29 @@
         "colors": [
           "white"
         ],
+        "primaryColor": "white",
         "occasions": [
           "beach",
           "casual"
         ],
-        "fit": "",
+        "fit": "breezy",
         "styleTags": [
-          "breezy",
           "linen"
         ],
         "seasons": [
           "summer"
         ]
       },
-      "inputTokens": 183,
-      "outputTokens": 88
+      "inputTokens": 373,
+      "outputTokens": 94
     },
     "Emerald Cocktail Dress": {
       "output": {
         "category": "dress",
-        "colors": [],
+        "colors": [
+          "emerald"
+        ],
+        "primaryColor": "emerald",
         "occasions": [
           "evening"
         ],
@@ -125,8 +129,8 @@
         ],
         "seasons": []
       },
-      "inputTokens": 179,
-      "outputTokens": 61
+      "inputTokens": 369,
+      "outputTokens": 78
     },
     "שמלת מקסי לבנה": {
       "output": {
@@ -134,29 +138,31 @@
         "colors": [
           "white"
         ],
+        "primaryColor": "white",
         "occasions": [
           "evening"
         ],
-        "fit": "",
+        "fit": "maxi",
         "styleTags": [
           "maxi"
         ],
         "seasons": []
       },
-      "inputTokens": 190,
-      "outputTokens": 69
+      "inputTokens": 380,
+      "outputTokens": 81
     },
     "Ruby Wrap Dress": {
       "output": {
         "category": "dress",
         "colors": [],
+        "primaryColor": "",
         "occasions": [],
-        "fit": "wrap silhouette",
+        "fit": "wrap",
         "styleTags": [],
         "seasons": []
       },
-      "inputTokens": 181,
-      "outputTokens": 48
+      "inputTokens": 371,
+      "outputTokens": 53
     },
     "Slate Shift Dress": {
       "output": {
@@ -164,33 +170,36 @@
         "colors": [
           "slate"
         ],
+        "primaryColor": "slate",
         "occasions": [
           "work"
         ],
-        "fit": "shift",
+        "fit": "",
         "styleTags": [],
         "seasons": []
       },
-      "inputTokens": 179,
-      "outputTokens": 62
+      "inputTokens": 369,
+      "outputTokens": 69
     },
     "Golden Sequin Dress": {
       "output": {
         "category": "dress",
         "colors": [
-          "golden"
+          "gold"
         ],
+        "primaryColor": "gold",
         "occasions": [
           "evening"
         ],
         "fit": "",
         "styleTags": [
+          "sequin",
           "party"
         ],
         "seasons": []
       },
-      "inputTokens": 184,
-      "outputTokens": 68
+      "inputTokens": 374,
+      "outputTokens": 63
     },
     "שמלת סאטן ורודה": {
       "output": {
@@ -198,13 +207,14 @@
         "colors": [
           "pink"
         ],
+        "primaryColor": "pink",
         "occasions": [],
         "fit": "",
         "styleTags": [],
         "seasons": []
       },
-      "inputTokens": 184,
-      "outputTokens": 52
+      "inputTokens": 374,
+      "outputTokens": 61
     },
     "Wool Winter Coat": {
       "output": {
@@ -212,6 +222,27 @@
         "colors": [
           "black"
         ],
+        "primaryColor": "black",
+        "occasions": [],
+        "fit": "",
+        "styleTags": [
+          "wool",
+          "winter"
+        ],
+        "seasons": [
+          "winter"
+        ]
+      },
+      "inputTokens": 372,
+      "outputTokens": 82
+    },
+    "מעיל צמר אפור": {
+      "output": {
+        "category": "coat",
+        "colors": [
+          "gray"
+        ],
+        "primaryColor": "gray",
         "occasions": [],
         "fit": "",
         "styleTags": [
@@ -221,34 +252,14 @@
           "winter"
         ]
       },
-      "inputTokens": 182,
-      "outputTokens": 50
-    },
-    "מעיל צמר אפור": {
-      "output": {
-        "category": "coat",
-        "colors": [
-          "gray"
-        ],
-        "occasions": [
-          "casual"
-        ],
-        "fit": "",
-        "styleTags": [
-          "warm",
-          "wool"
-        ],
-        "seasons": [
-          "winter"
-        ]
-      },
-      "inputTokens": 188,
-      "outputTokens": 81
+      "inputTokens": 378,
+      "outputTokens": 77
     },
     "Trench Coat Classic": {
       "output": {
         "category": "coat",
         "colors": [],
+        "primaryColor": "",
         "occasions": [],
         "fit": "",
         "styleTags": [
@@ -257,24 +268,23 @@
         ],
         "seasons": []
       },
-      "inputTokens": 179,
-      "outputTokens": 58
+      "inputTokens": 369,
+      "outputTokens": 65
     },
     "Puffer Jacket": {
       "output": {
         "category": "jacket",
         "colors": [],
+        "primaryColor": "",
         "occasions": [],
         "fit": "",
-        "styleTags": [
-          "puffer"
-        ],
+        "styleTags": [],
         "seasons": [
           "winter"
         ]
       },
-      "inputTokens": 182,
-      "outputTokens": 61
+      "inputTokens": 372,
+      "outputTokens": 59
     },
     "מעיל גשם צהוב": {
       "output": {
@@ -282,9 +292,8 @@
         "colors": [
           "yellow"
         ],
-        "occasions": [
-          "casual"
-        ],
+        "primaryColor": "yellow",
+        "occasions": [],
         "fit": "",
         "styleTags": [
           "rain"
@@ -293,13 +302,14 @@
           "rainy"
         ]
       },
-      "inputTokens": 186,
-      "outputTokens": 77
+      "inputTokens": 376,
+      "outputTokens": 78
     },
     "Leather Biker Jacket": {
       "output": {
         "category": "jacket",
         "colors": [],
+        "primaryColor": "",
         "occasions": [],
         "fit": "",
         "styleTags": [
@@ -308,8 +318,8 @@
         ],
         "seasons": []
       },
-      "inputTokens": 182,
-      "outputTokens": 58
+      "inputTokens": 372,
+      "outputTokens": 65
     },
     "Camel Overcoat": {
       "output": {
@@ -317,30 +327,29 @@
         "colors": [
           "camel"
         ],
+        "primaryColor": "camel",
         "occasions": [],
         "fit": "",
         "styleTags": [],
         "seasons": []
       },
-      "inputTokens": 179,
-      "outputTokens": 52
+      "inputTokens": 369,
+      "outputTokens": 61
     },
     "ג'קט ג'ינס": {
       "output": {
         "category": "jacket",
         "colors": [],
-        "occasions": [
-          "casual"
-        ],
+        "primaryColor": "",
+        "occasions": [],
         "fit": "",
         "styleTags": [
-          "classic",
-          "denim"
+          "classic"
         ],
         "seasons": []
       },
-      "inputTokens": 193,
-      "outputTokens": 52
+      "inputTokens": 383,
+      "outputTokens": 59
     },
     "White Sneakers Classic": {
       "output": {
@@ -348,18 +357,18 @@
         "colors": [
           "white"
         ],
+        "primaryColor": "white",
         "occasions": [
           "casual"
         ],
         "fit": "",
         "styleTags": [
-          "classic",
-          "everyday"
+          "classic"
         ],
         "seasons": []
       },
-      "inputTokens": 181,
-      "outputTokens": 75
+      "inputTokens": 371,
+      "outputTokens": 78
     },
     "נעלי עקב שחורות": {
       "output": {
@@ -367,13 +376,16 @@
         "colors": [
           "black"
         ],
+        "primaryColor": "black",
         "occasions": [],
         "fit": "",
-        "styleTags": [],
+        "styleTags": [
+          "heels"
+        ],
         "seasons": []
       },
-      "inputTokens": 185,
-      "outputTokens": 52
+      "inputTokens": 375,
+      "outputTokens": 70
     },
     "Strappy Sandals Gold": {
       "output": {
@@ -381,29 +393,36 @@
         "colors": [
           "gold"
         ],
+        "primaryColor": "gold",
         "occasions": [],
         "fit": "",
-        "styleTags": [],
+        "styleTags": [
+          "strappy"
+        ],
         "seasons": []
       },
-      "inputTokens": 182,
-      "outputTokens": 52
+      "inputTokens": 372,
+      "outputTokens": 70
     },
     "Running Shoes Neon": {
       "output": {
         "category": "sneakers",
-        "colors": [],
+        "colors": [
+          "neon"
+        ],
+        "primaryColor": "neon",
         "occasions": [
           "sport"
         ],
         "fit": "",
         "styleTags": [
-          "running"
+          "running",
+          "run"
         ],
         "seasons": []
       },
-      "inputTokens": 179,
-      "outputTokens": 49
+      "inputTokens": 369,
+      "outputTokens": 83
     },
     "Leather Loafers Brown": {
       "output": {
@@ -411,13 +430,18 @@
         "colors": [
           "brown"
         ],
+        "primaryColor": "brown",
         "occasions": [],
         "fit": "",
-        "styleTags": [],
+        "styleTags": [
+          "leather",
+          "slip-on",
+          "loafers"
+        ],
         "seasons": []
       },
-      "inputTokens": 185,
-      "outputTokens": 52
+      "inputTokens": 375,
+      "outputTokens": 82
     },
     "מגפי חורף שחורים": {
       "output": {
@@ -425,6 +449,7 @@
         "colors": [
           "black"
         ],
+        "primaryColor": "black",
         "occasions": [],
         "fit": "",
         "styleTags": [],
@@ -432,8 +457,8 @@
           "winter"
         ]
       },
-      "inputTokens": 184,
-      "outputTokens": 60
+      "inputTokens": 374,
+      "outputTokens": 69
     },
     "Ballet Flats Nude": {
       "output": {
@@ -441,18 +466,14 @@
         "colors": [
           "nude"
         ],
-        "occasions": [
-          "casual"
-        ],
-        "fit": "comfy",
-        "styleTags": [
-          "ballet flats",
-          "flats"
-        ],
+        "primaryColor": "nude",
+        "occasions": [],
+        "fit": "",
+        "styleTags": [],
         "seasons": []
       },
-      "inputTokens": 183,
-      "outputTokens": 80
+      "inputTokens": 373,
+      "outputTokens": 63
     },
     "סנדלי קיץ לבנים": {
       "output": {
@@ -460,29 +481,36 @@
         "colors": [
           "white"
         ],
+        "primaryColor": "white",
         "occasions": [
           "casual"
         ],
         "fit": "",
-        "styleTags": [],
+        "styleTags": [
+          "summer"
+        ],
         "seasons": [
           "summer"
         ]
       },
-      "inputTokens": 188,
-      "outputTokens": 25
+      "inputTokens": 378,
+      "outputTokens": 85
     },
     "Ankle Boots Suede": {
       "output": {
         "category": "boots",
         "colors": [],
+        "primaryColor": "",
         "occasions": [],
         "fit": "",
-        "styleTags": [],
+        "styleTags": [
+          "suede",
+          "ankle boots"
+        ],
         "seasons": []
       },
-      "inputTokens": 181,
-      "outputTokens": 44
+      "inputTokens": 371,
+      "outputTokens": 58
     },
     "Silver Party Heels": {
       "output": {
@@ -490,19 +518,19 @@
         "colors": [
           "silver"
         ],
+        "primaryColor": "silver",
         "occasions": [
           "evening"
         ],
         "fit": "",
         "styleTags": [
           "party",
-          "shiny",
-          "heels"
+          "shiny"
         ],
         "seasons": []
       },
-      "inputTokens": 181,
-      "outputTokens": 79
+      "inputTokens": 371,
+      "outputTokens": 32
     },
     "Silk Blouse Ivory": {
       "output": {
@@ -510,6 +538,7 @@
         "colors": [
           "ivory"
         ],
+        "primaryColor": "ivory",
         "occasions": [],
         "fit": "",
         "styleTags": [
@@ -517,8 +546,8 @@
         ],
         "seasons": []
       },
-      "inputTokens": 180,
-      "outputTokens": 61
+      "inputTokens": 370,
+      "outputTokens": 71
     },
     "חולצת פשתן לבנה": {
       "output": {
@@ -526,20 +555,22 @@
         "colors": [
           "white"
         ],
+        "primaryColor": "white",
         "occasions": [
           "casual"
         ],
         "fit": "relaxed",
         "styleTags": [
           "linen",
-          "lightweight"
+          "casual"
         ],
         "seasons": [
-          "summer"
+          "summer",
+          "spring"
         ]
       },
-      "inputTokens": 190,
-      "outputTokens": 84
+      "inputTokens": 380,
+      "outputTokens": 69
     },
     "Graphic Tee Black": {
       "output": {
@@ -547,17 +578,16 @@
         "colors": [
           "black"
         ],
-        "occasions": [
-          "casual"
-        ],
+        "primaryColor": "black",
+        "occasions": [],
         "fit": "",
         "styleTags": [
-          "graphic"
+          "graphic tee"
         ],
         "seasons": []
       },
-      "inputTokens": 179,
-      "outputTokens": 68
+      "inputTokens": 369,
+      "outputTokens": 70
     },
     "Cashmere Sweater Cream": {
       "output": {
@@ -565,13 +595,20 @@
         "colors": [
           "cream"
         ],
+        "primaryColor": "cream",
         "occasions": [],
         "fit": "",
-        "styleTags": [],
-        "seasons": []
+        "styleTags": [
+          "cashmere",
+          "soft"
+        ],
+        "seasons": [
+          "winter",
+          "fall"
+        ]
       },
-      "inputTokens": 183,
-      "outputTokens": 52
+      "inputTokens": 373,
+      "outputTokens": 88
     },
     "סוודר צמר אדום": {
       "output": {
@@ -579,9 +616,8 @@
         "colors": [
           "red"
         ],
-        "occasions": [
-          "casual"
-        ],
+        "primaryColor": "red",
+        "occasions": [],
         "fit": "",
         "styleTags": [
           "wool"
@@ -590,30 +626,30 @@
           "winter"
         ]
       },
-      "inputTokens": 186,
-      "outputTokens": 76
+      "inputTokens": 376,
+      "outputTokens": 77
     },
     "Denim Shirt": {
       "output": {
         "category": "top",
         "colors": [],
-        "occasions": [
-          "casual"
-        ],
+        "primaryColor": "",
+        "occasions": [],
         "fit": "",
         "styleTags": [
-          "denim",
-          "classic"
+          "classic",
+          "denim"
         ],
         "seasons": []
       },
-      "inputTokens": 180,
-      "outputTokens": 27
+      "inputTokens": 370,
+      "outputTokens": 65
     },
     "Striped Sailor Top": {
       "output": {
         "category": "top",
         "colors": [],
+        "primaryColor": "",
         "occasions": [],
         "fit": "",
         "styleTags": [
@@ -622,8 +658,8 @@
         ],
         "seasons": []
       },
-      "inputTokens": 180,
-      "outputTokens": 58
+      "inputTokens": 370,
+      "outputTokens": 65
     },
     "חולצת אוברסייז אפורה": {
       "output": {
@@ -631,32 +667,35 @@
         "colors": [
           "gray"
         ],
-        "occasions": [
-          "casual"
-        ],
-        "fit": "oversize",
+        "primaryColor": "gray",
+        "occasions": [],
+        "fit": "oversized",
         "styleTags": [
-          "oversize"
+          "oversized"
         ],
         "seasons": []
       },
-      "inputTokens": 187,
-      "outputTokens": 29
+      "inputTokens": 377,
+      "outputTokens": 73
     },
     "Satin Camisole Blush": {
       "output": {
         "category": "top",
-        "colors": [],
+        "colors": [
+          "blush"
+        ],
+        "primaryColor": "blush",
         "occasions": [],
         "fit": "",
         "styleTags": [
           "satin",
+          "camisole",
           "delicate"
         ],
         "seasons": []
       },
-      "inputTokens": 183,
-      "outputTokens": 59
+      "inputTokens": 373,
+      "outputTokens": 85
     },
     "Turtleneck Basic Black": {
       "output": {
@@ -664,17 +703,16 @@
         "colors": [
           "black"
         ],
-        "occasions": [
-          "casual"
-        ],
+        "primaryColor": "black",
+        "occasions": [],
         "fit": "",
         "styleTags": [
           "basic"
         ],
         "seasons": []
       },
-      "inputTokens": 180,
-      "outputTokens": 68
+      "inputTokens": 370,
+      "outputTokens": 69
     },
     "Tailored Trousers Black": {
       "output": {
@@ -682,48 +720,54 @@
         "colors": [
           "black"
         ],
-        "occasions": [],
+        "primaryColor": "black",
+        "occasions": [
+          "work"
+        ],
         "fit": "tailored",
-        "styleTags": [],
+        "styleTags": [
+          "sharp",
+          "tailoring"
+        ],
         "seasons": []
       },
-      "inputTokens": 184,
-      "outputTokens": 55
+      "inputTokens": 374,
+      "outputTokens": 86
     },
     "ג'ינס סקיני כחול": {
       "output": {
         "category": "pants",
         "colors": [
-          "כחול"
+          "blue"
         ],
-        "occasions": [
-          "casual"
-        ],
+        "primaryColor": "blue",
+        "occasions": [],
         "fit": "skinny",
         "styleTags": [
-          "ג'ינס"
+          "skinny"
         ],
         "seasons": []
       },
-      "inputTokens": 189,
-      "outputTokens": 44
+      "inputTokens": 379,
+      "outputTokens": 73
     },
     "Pleated Midi Skirt": {
       "output": {
         "category": "skirt",
         "colors": [],
+        "primaryColor": "",
         "occasions": [
           "work"
         ],
-        "fit": "",
+        "fit": "midi",
         "styleTags": [
           "pleated",
-          "midi"
+          "office-ready"
         ],
         "seasons": []
       },
-      "inputTokens": 187,
-      "outputTokens": 67
+      "inputTokens": 377,
+      "outputTokens": 78
     },
     "חצאית מיני שחורה": {
       "output": {
@@ -731,27 +775,32 @@
         "colors": [
           "black"
         ],
+        "primaryColor": "black",
         "occasions": [],
-        "fit": "mini",
+        "fit": "",
         "styleTags": [
           "mini"
         ],
         "seasons": []
       },
-      "inputTokens": 186,
-      "outputTokens": 63
+      "inputTokens": 376,
+      "outputTokens": 70
     },
     "Wide-Leg Linen Pants": {
       "output": {
         "category": "pants",
         "colors": [],
+        "primaryColor": "",
         "occasions": [],
         "fit": "wide-leg",
-        "styleTags": [],
+        "styleTags": [
+          "linen",
+          "airy"
+        ],
         "seasons": []
       },
-      "inputTokens": 183,
-      "outputTokens": 48
+      "inputTokens": 373,
+      "outputTokens": 60
     },
     "Cargo Pants Olive": {
       "output": {
@@ -759,32 +808,37 @@
         "colors": [
           "olive"
         ],
+        "primaryColor": "olive",
         "occasions": [
           "casual"
         ],
-        "fit": "",
+        "fit": "relaxed",
         "styleTags": [
           "cargo"
         ],
-        "seasons": []
+        "seasons": [
+          "spring",
+          "fall"
+        ]
       },
-      "inputTokens": 179,
-      "outputTokens": 68
+      "inputTokens": 369,
+      "outputTokens": 92
     },
     "חצאית מקסי פרחונית": {
       "output": {
         "category": "skirt",
         "colors": [],
+        "primaryColor": "",
         "occasions": [],
-        "fit": "",
+        "fit": "maxi",
         "styleTags": [
           "floral",
           "maxi"
         ],
         "seasons": []
       },
-      "inputTokens": 192,
-      "outputTokens": 51
+      "inputTokens": 382,
+      "outputTokens": 69
     },
     "Leather Pants Black": {
       "output": {
@@ -792,6 +846,7 @@
         "colors": [
           "black"
         ],
+        "primaryColor": "black",
         "occasions": [],
         "fit": "",
         "styleTags": [
@@ -799,25 +854,25 @@
         ],
         "seasons": []
       },
-      "inputTokens": 179,
-      "outputTokens": 60
+      "inputTokens": 369,
+      "outputTokens": 69
     },
     "Yoga Leggings": {
       "output": {
         "category": "pants",
         "colors": [],
+        "primaryColor": "",
         "occasions": [
           "sport"
         ],
         "fit": "stretch fit",
         "styleTags": [
-          "yoga",
-          "activewear"
+          "yoga"
         ],
         "seasons": []
       },
-      "inputTokens": 181,
-      "outputTokens": 69
+      "inputTokens": 371,
+      "outputTokens": 70
     },
     "מכנסי פשתן בז'": {
       "output": {
@@ -825,6 +880,7 @@
         "colors": [
           "beige"
         ],
+        "primaryColor": "beige",
         "occasions": [],
         "fit": "",
         "styleTags": [
@@ -832,13 +888,14 @@
         ],
         "seasons": []
       },
-      "inputTokens": 186,
-      "outputTokens": 60
+      "inputTokens": 376,
+      "outputTokens": 69
     },
     "Tote Bag Canvas": {
       "output": {
         "category": "bag",
         "colors": [],
+        "primaryColor": "",
         "occasions": [],
         "fit": "",
         "styleTags": [
@@ -847,24 +904,25 @@
         ],
         "seasons": []
       },
-      "inputTokens": 183,
-      "outputTokens": 58
+      "inputTokens": 373,
+      "outputTokens": 57
     },
     "תיק ערב מנצנץ": {
       "output": {
         "category": "bag",
         "colors": [],
+        "primaryColor": "",
         "occasions": [
           "evening"
         ],
         "fit": "",
         "styleTags": [
-          "מנצנץ"
+          "sparkly"
         ],
         "seasons": []
       },
-      "inputTokens": 186,
-      "outputTokens": 64
+      "inputTokens": 376,
+      "outputTokens": 68
     },
     "Crossbody Bag Tan": {
       "output": {
@@ -872,60 +930,58 @@
         "colors": [
           "tan"
         ],
+        "primaryColor": "tan",
         "occasions": [],
         "fit": "",
-        "styleTags": [],
+        "styleTags": [
+          "crossbody",
+          "compact"
+        ],
         "seasons": []
       },
-      "inputTokens": 182,
-      "outputTokens": 52
+      "inputTokens": 372,
+      "outputTokens": 75
     },
     "Silk Scarf Floral": {
       "output": {
         "category": "accessories",
         "colors": [],
+        "primaryColor": "",
         "occasions": [],
         "fit": "",
         "styleTags": [
-          "silk",
           "floral"
         ],
         "seasons": []
       },
-      "inputTokens": 180,
-      "outputTokens": 57
+      "inputTokens": 370,
+      "outputTokens": 59
     },
     "צעיף צמר אפור": {
       "output": {
         "category": "accessories",
         "colors": [
-          "grey"
+          "gray"
         ],
-        "occasions": [
-          "casual"
-        ],
+        "primaryColor": "gray",
+        "occasions": [],
         "fit": "",
-        "styleTags": [
-          "winter"
-        ],
+        "styleTags": [],
         "seasons": [
           "winter"
         ]
       },
-      "inputTokens": 188,
-      "outputTokens": 76
+      "inputTokens": 378,
+      "outputTokens": 69
     },
     "Straw Sun Hat": {
       "output": {
         "category": "accessories",
         "colors": [],
-        "occasions": [
-          "beach",
-          "casual"
-        ],
+        "primaryColor": "",
+        "occasions": [],
         "fit": "",
         "styleTags": [
-          "summer",
           "sun hat",
           "straw"
         ],
@@ -933,8 +989,8 @@
           "summer"
         ]
       },
-      "inputTokens": 179,
-      "outputTokens": 60
+      "inputTokens": 369,
+      "outputTokens": 73
     },
     "Leather Belt Brown": {
       "output": {
@@ -942,6 +998,7 @@
         "colors": [
           "brown"
         ],
+        "primaryColor": "brown",
         "occasions": [],
         "fit": "",
         "styleTags": [
@@ -949,8 +1006,8 @@
         ],
         "seasons": []
       },
-      "inputTokens": 183,
-      "outputTokens": 60
+      "inputTokens": 373,
+      "outputTokens": 69
     },
     "כובע צמר שחור": {
       "output": {
@@ -958,56 +1015,55 @@
         "colors": [
           "black"
         ],
-        "occasions": [
-          "casual"
-        ],
+        "primaryColor": "black",
+        "occasions": [],
         "fit": "",
         "styleTags": [
-          "wool hat",
-          "beanie"
+          "wool"
         ],
         "seasons": [
           "winter"
         ]
       },
-      "inputTokens": 184,
-      "outputTokens": 83
+      "inputTokens": 374,
+      "outputTokens": 77
     },
     "Pearl Necklace": {
       "output": {
         "category": "jewelry",
         "colors": [],
+        "primaryColor": "",
         "occasions": [],
         "fit": "",
-        "styleTags": [],
+        "styleTags": [
+          "pearl",
+          "freshwater"
+        ],
         "seasons": []
       },
-      "inputTokens": 180,
-      "outputTokens": 44
+      "inputTokens": 370,
+      "outputTokens": 65
     },
     "משקפי שמש רטרו": {
       "output": {
         "category": "accessories",
         "colors": [],
-        "occasions": [
-          "casual"
-        ],
+        "primaryColor": "",
+        "occasions": [],
         "fit": "",
         "styleTags": [
-          "retro",
-          "sunglasses"
+          "retro"
         ],
-        "seasons": [
-          "summer"
-        ]
+        "seasons": []
       },
-      "inputTokens": 185,
-      "outputTokens": 74
+      "inputTokens": 375,
+      "outputTokens": 59
     },
     "Air Zoom 90 Sneakers": {
       "output": {
         "category": "sneakers",
         "colors": [],
+        "primaryColor": "",
         "occasions": [
           "casual",
           "sport"
@@ -1015,13 +1071,56 @@
         "fit": "",
         "styleTags": [
           "runner",
-          "cushioned",
-          "everyday"
+          "cushioned"
         ],
         "seasons": []
       },
-      "inputTokens": 186,
-      "outputTokens": 79
+      "inputTokens": 376,
+      "outputTokens": 80
+    },
+    "Mesh Over Dress in Pink": {
+      "output": {
+        "category": "dress",
+        "colors": [
+          "pink",
+          "black",
+          "navy"
+        ],
+        "primaryColor": "pink",
+        "occasions": [],
+        "fit": "",
+        "styleTags": [
+          "mesh",
+          "sheer"
+        ],
+        "seasons": [
+          "summer"
+        ]
+      },
+      "inputTokens": 384,
+      "outputTokens": 93
+    },
+    "Tie Waist Dress in Black": {
+      "output": {
+        "category": "dress",
+        "colors": [
+          "black"
+        ],
+        "primaryColor": "black",
+        "occasions": [
+          "casual"
+        ],
+        "fit": "tie waist",
+        "styleTags": [
+          "summer",
+          "tie waist"
+        ],
+        "seasons": [
+          "summer"
+        ]
+      },
+      "inputTokens": 380,
+      "outputTokens": 68
     }
   }
 }

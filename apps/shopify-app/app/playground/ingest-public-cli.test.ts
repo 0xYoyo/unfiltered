@@ -44,6 +44,7 @@ const fixtureAi = (): { llm: LlmClient; embeddings: EmbeddingClient } => ({
       return {
         category: "dress",
         colors: [],
+        primaryColor: "",
         occasions: [],
         fit: "regular",
         styleTags: [],

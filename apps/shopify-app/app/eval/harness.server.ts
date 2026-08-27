@@ -307,20 +307,29 @@ export function refinementViolations(
   return violations;
 }
 
+/** The enrichment facts the violation scorer reads per product. */
+export interface ScoredEnrichment {
+  category: string | null;
+  colors: string[];
+  occasions: string[];
+  /** The primary/displayed colour (YOY-110); exclusions are judged on it. */
+  primaryColor: string | null;
+}
+
 /** Check one returned product against a golden's hard constraints. Exported
  * for the harness's own scoring tests (YOY-29 AC-11). Mirrors the retrieval
  * filter's semantics (YOY-35 AC-2): empty enrichment occasions/colors are
  * unknown, not violations of positive constraints — only stated-and-mismatched
  * values violate — and a category constraint admits its taxonomy group's
- * members (AC-5), the same expansion retrieval filters through. */
+ * members (AC-5), the same expansion retrieval filters through. An excluded
+ * colour is judged by the primary colour alone (YOY-110 AC-5): a product that
+ * also comes in the excluded colour is not a violation, and a null primary
+ * colour is unknown. */
 export function findViolations(
   golden: Golden,
   productId: string,
   products: Map<string, EvalProduct>,
-  enrichments: Map<
-    string,
-    { category: string | null; colors: string[]; occasions: string[] }
-  >,
+  enrichments: Map<string, ScoredEnrichment>,
 ): string[] {
   const constraints = golden.hardConstraints;
   const product = products.get(productId);
@@ -361,9 +370,12 @@ export function findViolations(
   const colors = new Set(
     (enrichment?.colors ?? []).map((color) => color.toLowerCase()),
   );
+  const primaryColor = enrichment?.primaryColor?.toLowerCase() ?? null;
   for (const excluded of constraints.colorsExclude) {
-    if (colors.has(excluded.toLowerCase())) {
-      violations.push(`${productId}: carries excluded color "${excluded}"`);
+    if (primaryColor !== null && primaryColor === excluded.toLowerCase()) {
+      violations.push(
+        `${productId}: primary color is the excluded color "${excluded}"`,
+      );
     }
   }
   if (
@@ -523,7 +535,12 @@ export async function runEval(db: PrismaClient): Promise<EvalRunResult> {
   const enrichments = new Map(
     enrichmentRows.map((row) => [
       row.productId,
-      { category: row.category, colors: row.colors, occasions: row.occasions },
+      {
+        category: row.category,
+        colors: row.colors,
+        occasions: row.occasions,
+        primaryColor: row.primaryColor,
+      },
     ]),
   );
 
