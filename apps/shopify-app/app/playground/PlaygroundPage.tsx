@@ -17,7 +17,11 @@ import {
   searchPlayground,
   sendPlaygroundClick,
 } from "./search-client";
-import { getPlaygroundStrings, type PlaygroundLocale } from "./strings";
+import {
+  closeMatchesHeadingText,
+  getPlaygroundStrings,
+  type PlaygroundLocale,
+} from "./strings";
 
 /**
  * The playground page (YOY-92, extended by YOY-93 with the AI states).
@@ -379,7 +383,7 @@ export function PlaygroundPage({
         {closeMatches.length === 0 ? null : (
           <section className="closeMatches">
             <h2 className="closeMatchesHeading">
-              {strings.closeMatchesHeading}
+              {closeMatchesHeadingText(strings, response?.closeMatchesRelaxed)}
             </h2>
             <ResultsGrid
               cards={closeMatches}

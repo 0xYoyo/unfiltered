@@ -13,6 +13,7 @@ import {
   type IntentTier,
   type QueryClassifier,
   type QueryRoute,
+  type RetrievalConstraints,
   type Retriever,
 } from "@unfiltered/engine";
 
@@ -81,6 +82,102 @@ export { SEARCH_STAGES, type SearchStage, type SearchStages } from "./stages";
  * so they keep a cap while primary hits no longer have one.
  */
 const CLOSE_MATCH_LIMIT = 10;
+
+/**
+ * A constraint the close-match ladder may relax (YOY-111 AC-1), named as
+ * the intent names it. `colorsExclude` is deliberately absent: an explicit
+ * exclusion is never relaxed, at any rung, keyword fallback included.
+ */
+export type RelaxedConstraint =
+  | "priceMax"
+  | "priceMin"
+  | "occasion"
+  | "availabilityRequired"
+  | "colorsInclude"
+  | "category";
+
+/**
+ * The fixed relaxation order (YOY-111 AC-1): price first — the founder's
+ * F-1 finding was ten over-budget black dresses — then occasion,
+ * availability, colour inclusions, and the category last. `priceMin` and
+ * `priceMax` relax together as the one "budget" constraint.
+ */
+const RELAXATION_ORDER: ReadonlyArray<ReadonlyArray<RelaxedConstraint>> = [
+  ["priceMin", "priceMax"],
+  ["occasion"],
+  ["availabilityRequired"],
+  ["colorsInclude"],
+  ["category"],
+];
+
+/** One rung: the constraints still applied and the names relaxed so far. */
+export interface RelaxationRung {
+  relaxed: RelaxedConstraint[];
+  constraints: RetrievalConstraints;
+}
+
+/**
+ * Build the close-match relaxation ladder for an intent (YOY-111 AC-1):
+ * each rung drops one more constraint group in RELAXATION_ORDER and keeps
+ * every constraint not yet relaxed — a strictly cumulative loosening, so
+ * the first rung with any hit is the closest set to what the shopper
+ * asked. Groups the intent never stated are skipped, not counted as
+ * relaxed. `colorsExclude` rides every rung untouched.
+ */
+export function relaxationLadder(intent: Intent): RelaxationRung[] {
+  const base = constraintsFromIntent(intent);
+  const present = (name: RelaxedConstraint): boolean => {
+    switch (name) {
+      case "priceMin":
+        return base.priceMin !== undefined && base.priceMin !== null;
+      case "priceMax":
+        return base.priceMax !== undefined && base.priceMax !== null;
+      case "occasion":
+        return base.occasion !== undefined && base.occasion !== null;
+      case "availabilityRequired":
+        return base.availableOnly;
+      case "colorsInclude":
+        return base.colorsInclude.length > 0;
+      case "category":
+        return base.category !== undefined && base.category !== null;
+    }
+  };
+  const rungs: RelaxationRung[] = [];
+  const relaxed: RelaxedConstraint[] = [];
+  let current: RetrievalConstraints = { ...base };
+  for (const group of RELAXATION_ORDER) {
+    const stated = group.filter(present);
+    if (stated.length === 0) {
+      continue;
+    }
+    relaxed.push(...stated);
+    current = { ...current };
+    for (const name of stated) {
+      switch (name) {
+        case "priceMin":
+          delete current.priceMin;
+          break;
+        case "priceMax":
+          delete current.priceMax;
+          break;
+        case "occasion":
+          delete current.occasion;
+          break;
+        case "availabilityRequired":
+          current.availableOnly = false;
+          break;
+        case "colorsInclude":
+          current.colorsInclude = [];
+          break;
+        case "category":
+          delete current.category;
+          break;
+      }
+    }
+    rungs.push({ relaxed: [...relaxed], constraints: current });
+  }
+  return rungs;
+}
 
 /**
  * One structured line per intent-extraction failure (YOY-109). The catch
@@ -243,6 +340,12 @@ export interface SearchResponse {
   degraded: boolean;
   /** Classic close matches, populated only on AI zero-hit responses. */
   closeMatches: ProductCard[];
+  /**
+   * Which constraints the close-match ladder relaxed to fill `closeMatches`
+   * (YOY-111 AC-2), in relaxation order; `[]` when nothing was relaxed —
+   * every non-zero-hit response, and a zero-hit with no close matches.
+   */
+  closeMatchesRelaxed: RelaxedConstraint[];
   /**
    * Which model tier produced `intent` (YOY-116): "lite" or "accuracy" from
    * a tier-aware extractor, null when no intent call ran (classic routes,
@@ -497,47 +600,58 @@ export function createSearchOrchestrator(
         chips: [],
         degraded,
         closeMatches: [],
+        closeMatchesRelaxed: [],
       };
     };
 
     /**
-     * Relaxed-constraint close matches (YOY-52 AC-16): re-query the vector
-     * store with the intent's cached embedding — the query text composes
-     * from the same intent, so no further embedding call happens — first
-     * keeping only the category constraint (the shopper's most defining
-     * ask), then fully unconstrained. Best-effort: any failure returns no
-     * close matches rather than degrading the zero-hit response.
+     * Close matches on an AI zero-hit (YOY-111 AC-1, superseding the
+     * YOY-52 AC-16 two-rung fallback): re-query the vector store with the
+     * intent's cached embedding — the query text composes from the same
+     * intent, so no further embedding call happens — down the relaxation
+     * ladder, one constraint group at a time, stopping at the first rung
+     * with hits. `colorsExclude` is applied on every rung. When even the
+     * last rung is empty, the raw-query keyword search that ran alongside
+     * retrieval is the final fallback — and it, too, carries the intent's
+     * exclusions in constraint mode. Best-effort: a rung's failure moves on
+     * to the next fallback rather than degrading the zero-hit response.
      */
-    const relaxedCloseMatches = async (
+    const closeMatchLadder = async (
       intent: Intent,
       limit: number,
-    ): Promise<Array<{ productId: string }>> => {
-      const unconstrained = {
-        colorsInclude: [],
-        colorsExclude: [],
-        availableOnly: false,
-      };
-      const ladders =
-        intent.category !== undefined
-          ? [{ ...unconstrained, category: intent.category }, unconstrained]
-          : [unconstrained];
-      for (const constraintsOverride of ladders) {
+      keyword: Promise<
+        | { ok: true; result: { hits: Array<{ productId: string }> } }
+        | { ok: false; error: unknown }
+      >,
+    ): Promise<{
+      hits: Array<{ productId: string }>;
+      relaxed: RelaxedConstraint[];
+    }> => {
+      let relaxed: RelaxedConstraint[] = [];
+      for (const rung of relaxationLadder(intent)) {
+        relaxed = rung.relaxed;
         try {
-          const relaxed = await retriever.retrieve({
+          const result = await retriever.retrieve({
             intent,
             storeId: shopDomain,
             limit,
             searchId,
-            constraintsOverride,
+            constraintsOverride: rung.constraints,
           });
-          if (relaxed.hits.length > 0) {
-            return relaxed.hits;
+          if (result.hits.length > 0) {
+            return { hits: result.hits, relaxed };
           }
         } catch {
-          return [];
+          break;
         }
       }
-      return [];
+      const speculated = await keyword;
+      if (!speculated.ok) {
+        throw speculated.error;
+      }
+      return speculated.result.hits.length > 0
+        ? { hits: speculated.result.hits, relaxed }
+        : { hits: [], relaxed: [] };
     };
 
     // Retrieval and everything below it on the ladder, shared by the
@@ -555,7 +669,18 @@ export function createSearchOrchestrator(
       // failure surfaces exactly as the sequential call's would — only when
       // the rescue is used.
       const speculativeClose = classicStore
-        .search({ storeId: shopDomain, query, limit: CLOSE_MATCH_LIMIT })
+        .search({
+          storeId: shopDomain,
+          query,
+          // The keyword fallback honours the intent's exclusions too
+          // (YOY-111 AC-1): "not black" is never relaxed, not even here.
+          constraints: {
+            colorsInclude: [],
+            colorsExclude: intent.colorsExclude,
+            availableOnly: false,
+          },
+          limit: CLOSE_MATCH_LIMIT,
+        })
         .then(
           (result) => ({ ok: true as const, result }),
           (error: unknown) => ({ ok: false as const, error }),
@@ -603,6 +728,7 @@ export function createSearchOrchestrator(
             chips: appliedConstraints(constraints),
             degraded: false,
             closeMatches: [],
+            closeMatchesRelaxed: [],
           };
         }
         return classicResponse(routeReason, true, intent);
@@ -610,22 +736,13 @@ export function createSearchOrchestrator(
 
       if (hits.length === 0) {
         // AC-6: retrieval worked, nothing satisfied every constraint. Keep
-        // the chips and offer classic keyword matches as close matches;
-        // when the keyword engine finds nothing either, relax the vector
-        // search instead (YOY-52 AC-16).
-        const closeHits = await stages.time("closeMatches", async () => {
-          // AC-5 (YOY-107): close matches stay a short curated list,
-          // whatever the primary set's size. The keyword search already ran
-          // alongside retrieval (YOY-64 AC-5).
-          const speculated = await speculativeClose;
-          if (!speculated.ok) {
-            throw speculated.error;
-          }
-          const close = speculated.result;
-          return close.hits.length > 0
-            ? close.hits
-            : relaxedCloseMatches(intent, CLOSE_MATCH_LIMIT);
-        });
+        // the chips and offer close matches down the relaxation ladder
+        // (YOY-111 AC-1) — AC-5 (YOY-107): a short curated list, whatever
+        // the primary set's size. The keyword fallback already ran
+        // alongside retrieval (YOY-64 AC-5).
+        const close = await stages.time("closeMatches", () =>
+          closeMatchLadder(intent, CLOSE_MATCH_LIMIT, speculativeClose),
+        );
         return {
           searchId,
           route: "ai",
@@ -636,7 +753,8 @@ export function createSearchOrchestrator(
           degraded: false,
           // Keyword close matches carry their cards; relaxed vector rescues
           // are bare ids and hydrate as before.
-          closeMatches: await classicCards(closeHits),
+          closeMatches: await classicCards(close.hits),
+          closeMatchesRelaxed: close.relaxed,
         };
       }
 
@@ -649,6 +767,7 @@ export function createSearchOrchestrator(
         chips,
         degraded: false,
         closeMatches: [],
+        closeMatchesRelaxed: [],
       };
     };
 

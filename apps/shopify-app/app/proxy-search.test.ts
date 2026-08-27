@@ -140,7 +140,7 @@ const CONTRACT_KEYS = [
   "route",
   "searchId",
 ];
-const CONTRACT_KEYS_WITH_CLOSE_MATCHES = [...CONTRACT_KEYS, "closeMatches"]
+const CONTRACT_KEYS_WITH_CLOSE_MATCHES = [...CONTRACT_KEYS, "closeMatches", "closeMatchesRelaxed"]
   .slice()
   .sort();
 

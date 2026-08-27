@@ -87,6 +87,15 @@ export interface Golden {
   expectedRoute?: "classic" | "ai";
   hardConstraints: GoldenConstraints;
   expectedProductIds: string[];
+  /**
+   * A zero-hit golden (YOY-111 AC-5): the constraints' intersection is
+   * empty on the fixture catalog by design, so the golden scores the
+   * close-match ladder instead of a rank — hits must be empty, close
+   * matches non-empty, none of them may carry the excluded primary colour,
+   * and the first relaxed constraint must be `relaxedFirst`. Such a golden
+   * lists no expected products.
+   */
+  zeroHit?: { relaxedFirst: string };
 }
 
 /**
@@ -142,11 +151,25 @@ export interface QueryScore {
   /** Which tier answered the intent call; null on classic routes (YOY-116). */
   intentTier: IntentTier | null;
   hits: ProductCard[];
+  /** The zero-hit rescue, when the response carried one (YOY-111). */
+  closeMatches: ProductCard[];
+  closeMatchesRelaxed: string[];
   /** 1-based rank of the first expected product in the top 10, or null. */
   firstExpectedRank: number | null;
+  /**
+   * For a `zeroHit` golden: whether the ladder answered as specified
+   * (YOY-111 AC-5). Null for every other golden. A satisfied zero-hit
+   * golden counts as a hit in `hitRate` and the baseline.
+   */
+  zeroHitSatisfied: boolean | null;
   /** Constraint violations found in the top 10 (empty means clean). */
   violations: string[];
   costUsd: number;
+}
+
+/** Whether a scored golden counts as a hit: a ranked expected product, or a satisfied zero-hit contract. */
+export function goldenHit(score: Pick<QueryScore, "firstExpectedRank" | "zeroHitSatisfied">): boolean {
+  return score.firstExpectedRank !== null || score.zeroHitSatisfied === true;
 }
 
 /** The outcome of one full eval run. */
@@ -569,6 +592,35 @@ export async function runEval(db: PrismaClient): Promise<EvalRunResult> {
     const violations = hits.flatMap((hit) =>
       findViolations(golden, hit.productId, products, enrichments),
     );
+    // Close matches may relax anything but an explicit exclusion (YOY-111
+    // AC-1): a close match carrying an excluded primary colour is a
+    // hard-constraint violation like any other.
+    const exclusionOnly: Golden = {
+      ...golden,
+      hardConstraints: {
+        category: null,
+        priceMin: null,
+        priceMax: null,
+        colorsInclude: [],
+        colorsExclude: golden.hardConstraints.colorsExclude,
+        occasion: null,
+        availabilityRequired: false,
+      },
+    };
+    violations.push(
+      ...response.closeMatches.flatMap((card) =>
+        findViolations(exclusionOnly, card.productId, products, enrichments).map(
+          (violation) => `close match ${violation}`,
+        ),
+      ),
+    );
+    const zeroHitSatisfied =
+      golden.zeroHit === undefined
+        ? null
+        : hits.length === 0 &&
+          response.closeMatches.length > 0 &&
+          response.closeMatchesRelaxed[0] === golden.zeroHit.relaxedFirst &&
+          !violations.some((violation) => violation.startsWith("close match "));
     const ledger = await db.aiCall.findMany({ where: { searchId } });
     perQuery.push({
       golden,
@@ -577,7 +629,10 @@ export async function runEval(db: PrismaClient): Promise<EvalRunResult> {
       intent: response.intent,
       intentTier: response.intentTier,
       hits,
+      closeMatches: response.closeMatches,
+      closeMatchesRelaxed: [...response.closeMatchesRelaxed],
       firstExpectedRank: rankIndex === -1 ? null : rankIndex + 1,
+      zeroHitSatisfied,
       violations,
       costUsd: ledger.reduce((sum, row) => sum + row.costUsd, 0),
     });
@@ -643,7 +698,7 @@ export async function runEval(db: PrismaClient): Promise<EvalRunResult> {
       ? 0
       : (refinementTotal / refinementGoldens.length) * 1000;
 
-  const hitCount = perQuery.filter((score) => score.firstExpectedRank !== null).length;
+  const hitCount = perQuery.filter(goldenHit).length;
   // Escalation metrics (YOY-116): over the goldens that ran an intent call.
   const aiScores = perQuery.filter((score) => score.intentTier !== null);
   const escalationRate =
@@ -713,7 +768,13 @@ function printScorecard(result: EvalRunResult): void {
         score.golden.language.padEnd(5),
         `${score.route}/${score.routeReason}`.padEnd(10),
         (score.intentTier ?? "-").padEnd(8),
-        String(score.firstExpectedRank ?? "MISS").padStart(4),
+        String(
+          score.zeroHitSatisfied === null
+            ? (score.firstExpectedRank ?? "MISS")
+            : score.zeroHitSatisfied
+              ? "0-ok"
+              : "0-XX",
+        ).padStart(4),
         String(score.violations.length).padStart(4),
         score.costUsd.toFixed(6),
       ].join(" | "),

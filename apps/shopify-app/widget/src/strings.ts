@@ -21,6 +21,17 @@ export interface WidgetStrings {
   /** The AI zero-hit message (YOY-49 AC-3). */
   zeroHit: string;
   closeMatchesHeading: string;
+  /**
+   * The close-matches heading when the server relaxed constraints to find
+   * them (YOY-111 AC-4): {list} is the relaxed constraints, comma-joined,
+   * each named by one of the `relaxed*` strings.
+   */
+  closeMatchesHeadingRelaxed: string;
+  relaxedBudget: string;
+  relaxedOccasion: string;
+  relaxedAvailability: string;
+  relaxedColors: string;
+  relaxedCategory: string;
   newSearch: string;
   /** aria-label of the close control. */
   closeSearch: string;
@@ -46,6 +57,12 @@ export const STRING_CATALOG: Record<WidgetLocale, WidgetStrings> = {
     noResults: "No results",
     zeroHit: "Nothing matches all of these",
     closeMatchesHeading: "Close matches",
+    closeMatchesHeadingRelaxed: "Close matches — {list}",
+    relaxedBudget: "over your budget",
+    relaxedOccasion: "other occasions",
+    relaxedAvailability: "including sold out",
+    relaxedColors: "other colours",
+    relaxedCategory: "other categories",
     newSearch: "New search",
     closeSearch: "Close search",
     searchResults: "Search results",
@@ -61,6 +78,12 @@ export const STRING_CATALOG: Record<WidgetLocale, WidgetStrings> = {
     noResults: "אין תוצאות",
     zeroHit: "שום פריט לא מתאים לכל הסינונים",
     closeMatchesHeading: "התאמות קרובות",
+    closeMatchesHeadingRelaxed: "התאמות קרובות — {list}",
+    relaxedBudget: "מעל התקציב",
+    relaxedOccasion: "אירועים אחרים",
+    relaxedAvailability: "כולל אזל מהמלאי",
+    relaxedColors: "צבעים אחרים",
+    relaxedCategory: "קטגוריות אחרות",
     newSearch: "חיפוש חדש",
     closeSearch: "סגירת החיפוש",
     searchResults: "תוצאות חיפוש",
@@ -73,6 +96,52 @@ export const STRING_CATALOG: Record<WidgetLocale, WidgetStrings> = {
 };
 
 /** Hebrew locale codes ("he", "he-IL") get Hebrew chrome; all else English. */
+/**
+ * The close-matches heading for a response (YOY-111 AC-4): plain when the
+ * server relaxed nothing, else "Close matches — <a>, <b>" naming each
+ * relaxed constraint from the catalog. `priceMin` and `priceMax` are one
+ * "budget" name, listed once; an unknown name (a newer server) is skipped
+ * rather than rendered raw.
+ */
+export function closeMatchesHeadingText(
+  strings: Pick<
+    WidgetStrings,
+    | "closeMatchesHeading"
+    | "closeMatchesHeadingRelaxed"
+    | "relaxedBudget"
+    | "relaxedOccasion"
+    | "relaxedAvailability"
+    | "relaxedColors"
+    | "relaxedCategory"
+  >,
+  relaxed: readonly string[] | undefined,
+): string {
+  const labels: string[] = [];
+  for (const name of relaxed ?? []) {
+    const label =
+      name === "priceMax" || name === "priceMin"
+        ? strings.relaxedBudget
+        : name === "occasion"
+          ? strings.relaxedOccasion
+          : name === "availabilityRequired"
+            ? strings.relaxedAvailability
+            : name === "colorsInclude"
+              ? strings.relaxedColors
+              : name === "category"
+                ? strings.relaxedCategory
+                : null;
+    if (label !== null && !labels.includes(label)) {
+      labels.push(label);
+    }
+  }
+  return labels.length === 0
+    ? strings.closeMatchesHeading
+    : strings.closeMatchesHeadingRelaxed.replace(
+        "{list}",
+        labels.join(", "),
+      );
+}
+
 export function resolveLocale(locale: string): WidgetLocale {
   const token = locale.toLowerCase();
   return token === "he" || token.startsWith("he-") ? "he" : "en";

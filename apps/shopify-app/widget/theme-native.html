@@ -429,6 +429,8 @@
         searchId: "harness-ai-zero-1",
         results: [],
         closeMatches: [RESULTS[0]],
+        // The server relaxed the budget cap to find them (YOY-111).
+        closeMatchesRelaxed: ["priceMax"],
       };
 
       const chipRemovalResponse = (request) => ({

@@ -23,11 +23,16 @@ zero network calls, identical ledger shape to a live run.
   p62 "Mesh Over Dress in Pink" (colourways pink, black, navy; primary pink)
   and p63 "Tie Waist Dress in Black" pin the primary-colour exclusion rule
   (YOY-110).
-- `fixtures/goldens.json` — 32 golden natural-language queries (EN, HE,
+- `fixtures/goldens.json` — 33 golden natural-language queries (EN, HE,
   mixed), each with expected product IDs and the hard constraints its results
   are checked against. g24 `summer dress, not black, under 200` expects the
   pink colourway dress: an excluded colour is judged by `primaryColor`, not
-  by any colourway.
+  by any colourway. g25 `summer dress, not black, under 100` is a **zero-hit
+  golden** (`zeroHit: { relaxedFirst: "priceMax" }`, no expected products;
+  YOY-111): its intersection is empty by design, and it scores the
+  close-match ladder — hits empty, close matches non-empty with no
+  black-primary product, the budget relaxed first. A satisfied zero-hit
+  golden counts as a hit.
 - `fixtures/refinement-goldens.json` — 6 follow-up queries (EN, HE, mixed),
   each with the previous query's intent and the constraint outcome the merged
   intent must produce (YOY-42). They run intent extraction only: a follow-up
@@ -81,6 +86,7 @@ never in CI, which holds no key (NG-2):
     LIVE_LLM_TESTS=1 GEMINI_API_KEY=... npm run regen:live
     LIVE_LLM_TESTS=1 GEMINI_API_KEY=... REGEN_SCOPE=lite npm run regen:live   # lite-tier intents only
     LIVE_LLM_TESTS=1 GEMINI_API_KEY=... REGEN_SCOPE=catalog npm run regen:live   # enrichment + missing entries only
+    LIVE_LLM_TESTS=1 GEMINI_API_KEY=... REGEN_SCOPE=goldens npm run regen:live   # missing entries only (new goldens)
 
 `REGEN_SCOPE=lite` re-records only `intent-lite.json` and
 `intent-lite-refinement.json` and leaves every accuracy-tier recording
@@ -95,6 +101,9 @@ product texts whose composed embedding text changed with the fresh
 attributes. Every existing intent recording stays byte-identical, so the
 baseline is scored against the same intents. Orphaned embedding vectors are
 dropped. The run prints its metered spend per operation from the ledger.
+`REGEN_SCOPE=goldens` (YOY-111) is the same missing-only pass without the
+enrichment re-record — for a new golden over an unchanged catalog, so the
+product vectors stay byte-identical too.
 
 The root `regen:live` script pins the run to the root `vitest.config.ts`,
 whose alias resolves `@unfiltered/*` to the TypeScript source. Invoking

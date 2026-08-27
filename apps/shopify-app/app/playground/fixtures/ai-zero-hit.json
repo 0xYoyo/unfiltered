@@ -57,6 +57,9 @@
       "colorUnknown": false
     }
   ],
+  "closeMatchesRelaxed": [
+    "priceMax"
+  ],
   "details": {
     "routeReason": "model",
     "latencyMs": 934,

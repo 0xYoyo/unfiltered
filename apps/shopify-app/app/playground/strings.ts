@@ -57,6 +57,17 @@ export interface PlaygroundStrings {
   /** AI zero-hit: nothing satisfied every applied constraint. */
   zeroHit: string;
   closeMatchesHeading: string;
+  /**
+   * The close-matches heading when the server relaxed constraints to find
+   * them (YOY-111 AC-4): {list} is the relaxed constraints, comma-joined,
+   * each named by one of the `relaxed*` strings.
+   */
+  closeMatchesHeadingRelaxed: string;
+  relaxedBudget: string;
+  relaxedOccasion: string;
+  relaxedAvailability: string;
+  relaxedColors: string;
+  relaxedCategory: string;
   /** The one secondary button, shown once an AI response is held. */
   newSearch: string;
   /** Label on a card that passed a colour filter without colour evidence. */
@@ -121,6 +132,12 @@ export const PLAYGROUND_STRING_CATALOG: Record<
     removeFilter: "Remove filter: {label}",
     zeroHit: "Nothing matches all of these",
     closeMatchesHeading: "Close matches",
+    closeMatchesHeadingRelaxed: "Close matches — {list}",
+    relaxedBudget: "over your budget",
+    relaxedOccasion: "other occasions",
+    relaxedAvailability: "including sold out",
+    relaxedColors: "other colours",
+    relaxedCategory: "other categories",
     newSearch: "New search",
     colorNotConfirmed: "Color not confirmed",
     engineDetailsToggle: "How it understood you",
@@ -165,6 +182,12 @@ export const PLAYGROUND_STRING_CATALOG: Record<
     removeFilter: "הסרת מסנן: {label}",
     zeroHit: "אין פריט שעונה על כל אלה",
     closeMatchesHeading: "התאמות קרובות",
+    closeMatchesHeadingRelaxed: "התאמות קרובות — {list}",
+    relaxedBudget: "מעל התקציב",
+    relaxedOccasion: "אירועים אחרים",
+    relaxedAvailability: "כולל אזל מהמלאי",
+    relaxedColors: "צבעים אחרים",
+    relaxedCategory: "קטגוריות אחרות",
     newSearch: "חיפוש חדש",
     colorNotConfirmed: "הצבע לא אומת",
     engineDetailsToggle: "איך זה הבין אתכם",
@@ -190,6 +213,52 @@ export const PLAYGROUND_STRING_CATALOG: Record<
 };
 
 /** Text direction of a chrome language (AC-3). */
+/**
+ * The close-matches heading for a response (YOY-111 AC-4), the widget's
+ * rule verbatim (`widget/src/strings.ts`): plain when nothing was relaxed,
+ * else "Close matches — <a>, <b>" naming each relaxed constraint. Budget
+ * (`priceMin`/`priceMax`) is one name, listed once; an unknown name is
+ * skipped rather than rendered raw.
+ */
+export function closeMatchesHeadingText(
+  strings: Pick<
+    PlaygroundStrings,
+    | "closeMatchesHeading"
+    | "closeMatchesHeadingRelaxed"
+    | "relaxedBudget"
+    | "relaxedOccasion"
+    | "relaxedAvailability"
+    | "relaxedColors"
+    | "relaxedCategory"
+  >,
+  relaxed: readonly string[] | undefined,
+): string {
+  const labels: string[] = [];
+  for (const name of relaxed ?? []) {
+    const label =
+      name === "priceMax" || name === "priceMin"
+        ? strings.relaxedBudget
+        : name === "occasion"
+          ? strings.relaxedOccasion
+          : name === "availabilityRequired"
+            ? strings.relaxedAvailability
+            : name === "colorsInclude"
+              ? strings.relaxedColors
+              : name === "category"
+                ? strings.relaxedCategory
+                : null;
+    if (label !== null && !labels.includes(label)) {
+      labels.push(label);
+    }
+  }
+  return labels.length === 0
+    ? strings.closeMatchesHeading
+    : strings.closeMatchesHeadingRelaxed.replace(
+        "{list}",
+        labels.join(", "),
+      );
+}
+
 export function localeDirection(locale: PlaygroundLocale): "ltr" | "rtl" {
   return locale === "he" ? "rtl" : "ltr";
 }

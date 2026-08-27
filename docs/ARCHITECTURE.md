@@ -548,13 +548,49 @@ evidence: a classic search reads `classify, classic, hydrate`; an AI search
 response has no `classify`; a chip removal starts at `embed`. `embed` and
 `retrieve` come from the retriever's own split (`RetrievalResult.timings`);
 `hydrate` accumulates every card hydration the response needed (hits and
-close matches both); `closeMatches` covers the zero-hit rescue — keyword
-backfill plus relaxed retrieval. Values are floored, so their sum never
+close matches both); `closeMatches` covers the zero-hit rescue — the
+relaxation ladder plus the keyword fallback. Values are floored, so their sum never
 exceeds the wall time around `runSearch` (`orchestrator.test.ts` pins both
 the key sets per route and the sum bound). `stages` is diagnostic: the
 playground shows it, the proxy route logs it, nothing persists it (no
 migration), and the storefront contract never carries it. The measurement
 method built on it is docs/LATENCY.md.
+
+### Close matches: the relaxation ladder (YOY-111)
+
+**Binding (PRD §3 amendment, founder decision 2026-08-22):** close matches
+never violate an explicit exclusion, constraints relax one at a time —
+price first — and the shopper is told which constraint was relaxed. On an
+AI zero-hit (`retrieve` ran and nothing satisfied every constraint) the
+orchestrator re-queries the vector store with the intent's cached
+embedding down a fixed ladder (`relaxationLadder` in
+`orchestrator.server.ts`): rung by rung it drops one more constraint group
+— `priceMin`/`priceMax` (together, as the budget) → `occasion` →
+`availabilityRequired` → `colorsInclude` → `category` — keeping every
+constraint not yet relaxed, skipping groups the intent never stated, and
+stopping at the first rung with hits. `colorsExclude` is never relaxed: it
+rides every rung, and the final fallback — the raw-query trigram search
+that already ran alongside retrieval (YOY-64 AC-5) — now runs in constraint
+mode with the same exclusions, so a "not black" close match can never be
+black-primary (the exclusion itself is judged by `primaryColor`, YOY-110).
+The response carries `closeMatchesRelaxed: RelaxedConstraint[]` — the names
+relaxed, in order; `[]` when nothing was (every non-zero-hit response, and
+a zero-hit with no close matches). Both APIs serialize it beside
+`closeMatches` (present exactly when `closeMatches` is); nothing else in the
+contracts changed. The playground and the widget (overlay and native view)
+render the close-matches heading from the string catalog as "Close matches
+— <a>, <b>" (`closeMatchesHeadingText`): budget → "over your budget" /
+"מעל התקציב", occasion → "other occasions" / "אירועים אחרים",
+availability → "including sold out" / "כולל אזל מהמלאי", colour
+inclusions → "other colours" / "צבעים אחרים", category → "other
+categories" / "קטגוריות אחרות"; plain "Close matches" when the list is
+empty. Chips, the zero-hit status line, `CLOSE_MATCH_LIMIT` (10), and card
+anatomy are unchanged. The constraint-only classic path (an intent with no
+descriptive text, `EmptyQueryTextError`) has no vector to relax and still
+answers `closeMatches: []`. The eval harness scores the ladder with a
+zero-hit golden (g25, `zeroHit: { relaxedFirst: "priceMax" }`) and counts
+an excluded primary colour among close matches as a hard-constraint
+violation.
 
 ## Storefront search API over the app proxy (YOY-46)
 
@@ -785,7 +821,8 @@ rather than restarts, and each response's echo replaces the held one. A
 next request carries no `previousIntent` field at all. AI zero-hits render
 a "Nothing matches all of these" message, the still-removable chip row, and
 the response's `closeMatches` as standard cards under a "Close matches"
-heading. Degraded responses (route classic, `degraded: true`) render as
+heading that names what the server relaxed to find them (YOY-111:
+"Close matches — over your budget"). Degraded responses (route classic, `degraded: true`) render as
 plain classic cards with no chips and no error messaging.
 
 UI tests are a separate lane from Vitest: Playwright

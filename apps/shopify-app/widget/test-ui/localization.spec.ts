@@ -200,6 +200,15 @@ for (const locale of ["en", "he"] as WidgetLocale[]) {
     await expect(
       page.getByTestId("unfiltered-widget-close-matches"),
     ).toBeVisible();
+    // The relaxed-constraint heading comes from the catalog in the page's
+    // language (YOY-111 AC-4).
+    await expect(
+      page.getByTestId("unfiltered-widget-close-matches").locator("h2"),
+    ).toHaveText(
+      locale === "he"
+        ? "התאמות קרובות — מעל התקציב"
+        : "Close matches — over your budget",
+    );
 
     await expect(overlay(page)).toHaveScreenshot(`zero-hit-${locale}.png`);
   });

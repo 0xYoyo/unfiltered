@@ -603,5 +603,25 @@
       "occasion": null,
       "availabilityRequired": false
     }
+  },
+  {
+    "id": "g25",
+    "language": "en",
+    "query": "summer dress, not black, under 100",
+    "expectedProductIds": [],
+    "zeroHit": {
+      "relaxedFirst": "priceMax"
+    },
+    "hardConstraints": {
+      "category": "dress",
+      "priceMin": null,
+      "priceMax": 100,
+      "colorsInclude": [],
+      "colorsExclude": [
+        "black"
+      ],
+      "occasion": null,
+      "availabilityRequired": false
+    }
   }
 ]

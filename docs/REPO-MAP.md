@@ -162,6 +162,7 @@ apps/
           ai-states.spec.ts
           evidence-ai.spec.ts
           evidence-classic-stages.spec.ts
+          evidence-close-matches.spec.ts
           evidence-hardening.spec.ts
           evidence-intent-reuse.spec.ts
           evidence-intent-tier.spec.ts
@@ -344,6 +345,7 @@ apps/
         widget.css
       test-ui/
         ai-results.spec.ts
+        evidence-close-matches.spec.ts
         evidence-hardening.spec.ts
         localization.spec.ts
         localization.spec.ts-snapshots/
@@ -483,6 +485,19 @@ docs/
       before-5-overlay-rescued-classic-results-desktop.png
       before-6-overlay-rescue-failed-quiet-no-results-desktop.png
       before-7-ordinary-ai-search-unchanged-desktop.png
+    YOY-111/
+      playground-desktop-en-zero-hit-relaxed-heading.png
+      playground-desktop-he-zero-hit-relaxed-heading.png
+      playground-mobile-en-zero-hit-relaxed-heading.png
+      playground-mobile-he-zero-hit-relaxed-heading.png
+      widget-native-desktop-en-zero-hit-relaxed-heading.png
+      widget-native-desktop-he-zero-hit-relaxed-heading.png
+      widget-native-mobile-en-zero-hit-relaxed-heading.png
+      widget-native-mobile-he-zero-hit-relaxed-heading.png
+      widget-overlay-desktop-en-zero-hit-relaxed-heading.png
+      widget-overlay-desktop-he-zero-hit-relaxed-heading.png
+      widget-overlay-mobile-en-zero-hit-relaxed-heading.png
+      widget-overlay-mobile-he-zero-hit-relaxed-heading.png
     YOY-114/
       desktop-en-1-ai-stages.png
       desktop-en-2-classic-stages.png

@@ -4,6 +4,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { createTestDb } from "../testing/helpers.server";
 import {
   findViolations,
+  goldenHit,
   loadBaselineHits,
   loadCatalog,
   loadGoldens,
@@ -30,7 +31,7 @@ describe("eval fixtures (AC-1)", () => {
     const goldens = loadGoldens();
 
     expect(catalog).toHaveLength(63);
-    expect(goldens).toHaveLength(32);
+    expect(goldens).toHaveLength(33);
 
     // Deliberately sparse: descriptions are one-liners or empty, tags minimal.
     for (const product of catalog) {
@@ -49,7 +50,12 @@ describe("eval fixtures (AC-1)", () => {
     // Every golden names expected products that exist in the catalog.
     const ids = new Set(catalog.map((product) => product.productId));
     for (const golden of goldens) {
-      expect(golden.expectedProductIds.length).toBeGreaterThan(0);
+      // A zero-hit golden (YOY-111 AC-5) expects no product by design.
+      if (golden.zeroHit === undefined) {
+        expect(golden.expectedProductIds.length, golden.id).toBeGreaterThan(0);
+      } else {
+        expect(golden.expectedProductIds, golden.id).toEqual([]);
+      }
       for (const id of golden.expectedProductIds) {
         expect(ids.has(id), `${golden.id} expects unknown product ${id}`).toBe(true);
       }
@@ -392,9 +398,22 @@ describe("eval run (AC-2, AC-3, AC-4, AC-6)", () => {
     }
   });
 
+  it("scores the zero-hit golden on the close-match ladder: empty hits, non-empty close matches, no black-primary product, budget relaxed first (YOY-111 AC-5)", () => {
+    const score = result.perQuery.find((entry) => entry.golden.id === "g25")!;
+    expect(score.golden.query).toBe("summer dress, not black, under 100");
+    expect(score.route).toBe("ai");
+    expect(score.hits).toEqual([]);
+    expect(score.closeMatches.length).toBeGreaterThan(0);
+    expect(score.closeMatchesRelaxed[0]).toBe("priceMax");
+    expect(score.violations).toEqual([]);
+    expect(score.zeroHitSatisfied).toBe(true);
+    // The fixture's black-primary dress (p63) is never a close match.
+    expect(score.closeMatches.map((card) => card.productId)).not.toContain("p63");
+  });
+
   it("meets the pass bar: ≥80% of goldens hit an expected product in the top 10 (AC-3)", () => {
     const misses = result.perQuery
-      .filter((score) => score.firstExpectedRank === null)
+      .filter((score) => !goldenHit(score))
       .map((score) => score.golden.id);
     expect(result.hitRate, `misses: ${misses.join(", ")}`).toBeGreaterThanOrEqual(0.8);
   });
@@ -486,7 +505,7 @@ describe("eval run (AC-2, AC-3, AC-4, AC-6)", () => {
     const baseline = loadBaselineHits();
     const regressions: string[] = [];
     for (const score of result.perQuery) {
-      if (baseline.goldens[score.golden.id] === true && score.firstExpectedRank === null) {
+      if (baseline.goldens[score.golden.id] === true && !goldenHit(score)) {
         regressions.push(`${score.golden.id} hit at baseline, misses now`);
       }
     }

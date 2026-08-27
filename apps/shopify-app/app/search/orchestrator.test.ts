@@ -4,9 +4,11 @@ import {
   createIntentExtractor,
   createQueryClassifier,
   createRetriever,
+  parseIntent,
   type CostRecorder,
   type EmbeddingClient,
   type LlmClient,
+  type RetrievalConstraints,
   type RetrievalStore,
   type StructuredCompletionRequest,
 } from "@unfiltered/engine";
@@ -28,6 +30,7 @@ import { createPgTrgmClassicStore } from "./classic-store.server";
 import {
   createSearchOrchestrator,
   type SearchOrchestrator,
+  relaxationLadder,
 } from "./orchestrator.server";
 import { createPgVectorRetrievalStore } from "./retrieval-store.server";
 
@@ -547,6 +550,196 @@ describe("AI zero-hits keep chips and offer close matches (AC-6)", () => {
     expect(response.closeMatches.map((hit) => hit.productId)).toEqual([
       "wedding-coat",
     ]);
+    // The ladder relaxed the occasion (still no dress), then the category
+    // (YOY-111 AC-1) — and says so (AC-2).
+    expect(response.closeMatchesRelaxed).toEqual(["occasion", "category"]);
+  });
+});
+
+describe("close-match relaxation ladder (YOY-111 AC-1, AC-2, AC-3)", () => {
+  /** Retriever over a fake store that only answers at a chosen rung. */
+  function rungStore(
+    fills: (constraints: RetrievalConstraints) => string[],
+  ): { store: RetrievalStore; calls: RetrievalConstraints[] } {
+    const calls: RetrievalConstraints[] = [];
+    return {
+      calls,
+      store: {
+        async query(request) {
+          calls.push(request.constraints);
+          return fills(request.constraints).map((productId, index) => ({
+            productId,
+            distance: index / 10,
+          }));
+        },
+      },
+    };
+  }
+  const FULL_INTENT = {
+    ...DRESS_INTENT,
+    priceMin: 100,
+    priceMax: 200,
+    colorsInclude: ["pink"],
+    colorsExclude: ["black"],
+    availabilityRequired: true,
+  };
+
+  it("builds the rungs in the fixed order, cumulatively, skipping constraints the intent never stated", () => {
+    const rungs = relaxationLadder(parseIntent(FULL_INTENT)!);
+    expect(rungs.map((rung) => rung.relaxed)).toEqual([
+      ["priceMin", "priceMax"],
+      ["priceMin", "priceMax", "occasion"],
+      ["priceMin", "priceMax", "occasion", "availabilityRequired"],
+      ["priceMin", "priceMax", "occasion", "availabilityRequired", "colorsInclude"],
+      ["priceMin", "priceMax", "occasion", "availabilityRequired", "colorsInclude", "category"],
+    ]);
+    // Each rung keeps everything not yet relaxed; the exclusion rides all.
+    expect(rungs[0]!.constraints).toEqual({
+      category: "dress",
+      colorsInclude: ["pink"],
+      colorsExclude: ["black"],
+      occasion: "wedding",
+      availableOnly: true,
+    });
+    expect(rungs[4]!.constraints).toEqual({
+      colorsInclude: [],
+      colorsExclude: ["black"],
+      availableOnly: false,
+    });
+    // A sparse intent yields only the rungs it can: budget, then category.
+    expect(
+      relaxationLadder(parseIntent({ ...DRESS_INTENT, occasion: null, priceMax: 50 })!).map(
+        (rung) => rung.relaxed,
+      ),
+    ).toEqual([["priceMax"], ["priceMax", "category"]]);
+    // Nothing relaxable (exclusion only): no rungs at all.
+    expect(
+      relaxationLadder(
+        parseIntent({ ...DRESS_INTENT, category: null, occasion: null, colorsExclude: ["black"] })!,
+      ),
+    ).toEqual([]);
+  });
+
+  it("stops at the first rung with hits and reports exactly what was relaxed (AC-1, AC-2)", async () => {
+    const db = await createTestDb();
+    await seed(db, [
+      { productId: "rescue", title: "plain fixture", enrichment: { category: "dress" } },
+    ]);
+    // Fills only once availability has been relaxed (rung three).
+    const fake = rungStore((constraints) =>
+      constraints.availableOnly ? [] : ["rescue"],
+    );
+    const orchestrator = createSearchOrchestrator({
+      db,
+      classifier: createQueryClassifier({
+        llm: fakeLlm({ classification: () => ({ route: "ai" }) }),
+      }),
+      extractor: createIntentExtractor({
+        llm: fakeLlm({ intent: () => FULL_INTENT }),
+      }),
+      retriever: createRetriever({ embeddings: fakeEmbeddings(), store: fake.store }),
+      classicStore: createPgTrgmClassicStore(db),
+    });
+
+    const response = await orchestrator.runSearch({ query: AI_QUERY, shopDomain: SHOP });
+
+    expect(response.hits).toEqual([]);
+    expect(response.closeMatches.map((card) => card.productId)).toEqual(["rescue"]);
+    expect(response.closeMatchesRelaxed).toEqual([
+      "priceMin",
+      "priceMax",
+      "occasion",
+      "availabilityRequired",
+    ]);
+    // The primary query plus exactly three rungs — never the rungs past the fill.
+    expect(fake.calls).toHaveLength(4);
+    // Every rung carried the exclusion untouched (AC-3).
+    for (const constraints of fake.calls) {
+      expect(constraints.colorsExclude).toEqual(["black"]);
+    }
+    // Rung one kept everything but the budget.
+    expect(fake.calls[1]).toMatchObject({
+      category: "dress",
+      occasion: "wedding",
+      colorsInclude: ["pink"],
+      availableOnly: true,
+    });
+    expect(fake.calls[1]).not.toHaveProperty("priceMax");
+  });
+
+  it("never relaxes colorsExclude: a black-primary product is absent from every rung and from the keyword fallback (AC-1, AC-3)", async () => {
+    const db = await createTestDb();
+    await seed(db, [
+      // Keyword-matches the raw query AND is the nearest vector, but its
+      // primary colour is the excluded one: never a close match.
+      {
+        productId: "black-dress",
+        title: AI_QUERY,
+        vector: [1, 0, 0],
+        enrichment: { category: "dress", colors: ["black"], primaryColor: "black" },
+      },
+      // A colourway that also comes in black, displayed pink: eligible.
+      {
+        productId: "pink-mesh",
+        title: `${AI_QUERY} mesh`,
+        vector: [0.8, 0.2, 0],
+        priceMin: 500,
+        enrichment: { category: "dress", colors: ["pink", "black"], primaryColor: "pink" },
+      },
+    ]);
+    const orchestrator = buildOrchestrator(db, {
+      llm: fakeLlm({
+        classification: () => ({ route: "ai" }),
+        // Under 100, not black: nothing satisfies the cap.
+        intent: () => ({ ...DRESS_INTENT, occasion: null, priceMax: 100, colorsExclude: ["black"] }),
+      }),
+    });
+
+    const response = await orchestrator.runSearch({ query: AI_QUERY, shopDomain: SHOP });
+
+    expect(response.hits).toEqual([]);
+    expect(response.closeMatches.map((card) => card.productId)).toEqual(["pink-mesh"]);
+    expect(response.closeMatchesRelaxed).toEqual(["priceMax"]);
+
+    // With the pink colourway gone, every rung is empty and the keyword
+    // fallback answers — still without the black-primary product.
+    await db.productEnrichment.deleteMany({ where: { productId: "pink-mesh" } });
+    await db.$executeRawUnsafe(`DELETE FROM "ProductEmbedding" WHERE "productId" = 'pink-mesh'`);
+    await db.catalogProduct.deleteMany({ where: { productId: "pink-mesh" } });
+    const again = await orchestrator.runSearch({ query: AI_QUERY, shopDomain: SHOP });
+    expect(again.hits).toEqual([]);
+    expect(again.closeMatches).toEqual([]);
+    expect(again.closeMatchesRelaxed).toEqual([]);
+  });
+
+  it("falls to the keyword search with the exclusion applied when every rung is empty", async () => {
+    const db = await createTestDb();
+    await seed(db, [
+      // No embeddings at all: only the keyword engine can find these.
+      {
+        productId: "black-match",
+        title: AI_QUERY,
+        enrichment: { category: "dress", colors: ["black"], primaryColor: "black" },
+      },
+      {
+        productId: "ivory-match",
+        title: `${AI_QUERY} ivory`,
+        enrichment: { category: "dress", colors: ["ivory"], primaryColor: "ivory" },
+      },
+    ]);
+    const orchestrator = buildOrchestrator(db, {
+      llm: fakeLlm({
+        classification: () => ({ route: "ai" }),
+        intent: () => ({ ...DRESS_INTENT, priceMax: 100, colorsExclude: ["black"] }),
+      }),
+    });
+
+    const response = await orchestrator.runSearch({ query: AI_QUERY, shopDomain: SHOP });
+
+    expect(response.hits).toEqual([]);
+    expect(response.closeMatches.map((card) => card.productId)).toEqual(["ivory-match"]);
+    // The ladder was exhausted before the keyword fallback answered.
+    expect(response.closeMatchesRelaxed).toEqual(["priceMax", "occasion", "category"]);
   });
 });
 
@@ -623,6 +816,9 @@ describe("zero-hit close matches fall back to relaxed vector retrieval (YOY-52 A
       "black-gown",
       "ivory-dress",
     ]);
+    // Occasion first (still nothing pink), then the colour inclusion — the
+    // category was kept (YOY-111 AC-1).
+    expect(response.closeMatchesRelaxed).toEqual(["occasion", "colorsInclude"]);
     // The relaxed re-query reused the cached query embedding.
     expect(counting.embedCalls()).toBe(1);
   });
@@ -655,6 +851,7 @@ describe("zero-hit close matches fall back to relaxed vector retrieval (YOY-52 A
     expect(response.closeMatches.map((hit) => hit.productId)).toEqual([
       "wool-coat",
     ]);
+    expect(response.closeMatchesRelaxed).toEqual(["occasion", "colorsInclude", "category"]);
   });
 
   it("leaves close matches empty — not degraded — when even relaxed retrieval finds nothing", async () => {
@@ -676,6 +873,7 @@ describe("zero-hit close matches fall back to relaxed vector retrieval (YOY-52 A
     expect(response.degraded).toBe(false);
     expect(response.hits).toEqual([]);
     expect(response.closeMatches).toEqual([]);
+    expect(response.closeMatchesRelaxed).toEqual([]);
   });
 });
 
@@ -1259,18 +1457,25 @@ describe("per-stage timing (YOY-114 AC-1)", () => {
   });
 
   it("an AI zero-hit rescued by keyword close matches books no hydrate: the cards ride the one statement (YOY-115 AC-3)", async () => {
+    // The ladder must be exhausted before the keyword fallback answers
+    // (YOY-111 AC-1): the one embedded product is black-primary and the
+    // intent excludes black, so no rung can find it; the keyword match has
+    // no embedding and only the trigram search can.
+    await db.productEnrichment.update({
+      where: { shopDomain_productId: { shopDomain: SHOP, productId: "silk-gown" } },
+      data: { colors: ["black"], primaryColor: "black" },
+    });
     await seed(db, [
       {
         productId: "wedding-dress",
         title: AI_QUERY,
-        vector: [0, 1, 0],
         enrichment: { category: "dress" },
       },
     ]);
     const orchestrator = buildOrchestrator(db, {
       llm: fakeLlm({
         classification: () => ({ route: "ai" }),
-        intent: () => ({ ...DRESS_INTENT, priceMax: 1 }),
+        intent: () => ({ ...DRESS_INTENT, priceMax: 1, colorsExclude: ["black"] }),
       }),
     });
     const response = await timed(orchestrator, { query: AI_QUERY, shopDomain: SHOP });
