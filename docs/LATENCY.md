@@ -84,7 +84,7 @@ Frankfurt, one-statement search, unpooled) — 26× under the bar, from
 that motivated it. The pooled-connection row (row 3) is the deployment's
 final form and is measured in YOY-124 AC-11; it is not what meets the bar.
 
-### AI bars — EN met, HE missed on p95 (YOY-64, 2026-08-26)
+### AI bars — first run: EN met, HE missed on p95 (YOY-64, 2026-08-26)
 
 First M5-method run on the YOY-64 code (PR #117: queued ledger, trimmed
 prompt, ladder deadline, exact-query reuse, overlapping stages), rows
@@ -118,7 +118,29 @@ runs alongside it and the first schema-valid answer wins (engine
 `createEscalatingIntentExtractor({ hedgeAfterMs })`, docs/ARCHITECTURE.md).
 On this run's numbers a hung accuracy call now lands a lite answer near
 3.1–3.9 s instead of a classic degrade at 8 s; whether that clears the
-3500 ms p95 is the next probe run's row, recorded below once deployed.
+3500 ms p95 is the next probe run's row — rows 11–14 below.
+
+### AI bars — met in both languages (YOY-64, 2026-08-27)
+
+Second M5-method run, on the hedge code (PR #119 deployed, `main` at
+787b8e8), rows 11–14 below: `--assert-ai-p50 2000 --assert-ai-p95 3500`
+exit 0, `assertions: all bars met`. **p50** 933 ms EN, 973 ms HE, 941 ms
+combined; **p95** 3391 ms EN, 3447 ms HE, 3447 ms combined — every AI bar
+met, each language and combined. **0 degraded, 0 limited, 0 reused** on
+all 200 AI samples (the amended AC-6 allows ≤ 2 of 200), against 13
+degraded on the previous run. Per-stage means: intent 1186 ms EN /
+1504 ms HE (was 1232 / 2377); classify ≈ 580 ms; everything after intent
+under 40 ms each.
+
+The tail is now the hedge, not a hang: the ten samples above 3500 ms
+(3522–3961 ms) are all three occasion-class queries — `something for a
+beach wedding that hides my arms` 1342–3961 ms, `שמלה אלגנטית לערב מתחת
+ל-400` 1456–3633 ms, `משהו לחתונה על החוף שמסתיר את הידיים` 1208–3522 ms —
+where the accuracy call passed `INTENT_HEDGE_AFTER_MS` (2500) and the lite
+tier's answer landed ≈ 1 s later, exactly the 3.1–3.9 s the mitigation
+predicted. HE p95 clears the bar by 53 ms, so the margin is one hedged
+answer's lite latency; lowering `INTENT_HEDGE_AFTER_MS` is the knob if a
+later run drifts over. Full probe output on YOY-64.
 
 ## Recorded measurements
 
@@ -138,3 +160,7 @@ links the issue comment carrying the probe's full output.
 | 2026-08-26 ~21:30 UTC | Frankfurt | `main` at PR #117 | ai-en | 100 | **908 ms** | **3354 ms** | Both bars met. 1 degraded (an 8043 ms accuracy-tier hang cut by the ladder deadline), 0 limited, 0 reused. Mean per stage: classify 623 · intent 1232 · embed 26 · retrieve 31 · hydrate 12 · closeMatches 20 ms. |
 | 2026-08-26 ~21:30 UTC | Frankfurt | `main` at PR #117 | ai-he | 100 | **976 ms** | 8021 ms | p50 met; **p95 missed**: 12 degraded (accuracy-tier hangs at the 8 s deadline, 9 on one occasion-class query), 0 limited, 0 reused. Mean per stage: classify 585 · intent 2377 · embed 41 · retrieve 36 · hydrate 9 · closeMatches 18 ms. |
 | 2026-08-26 ~21:30 UTC | Frankfurt | `main` at PR #117 | ai-combined | 200 | **933 ms** | 8016 ms | p50 met; p95 missed through the HE hang rate (13 degraded of 200). `--assert-ai-p50 2000 --assert-ai-p95 3500` exit 1: `ai-he p95=8021 ms >= 3500 ms`, `ai-combined p95=8016 ms >= 3500 ms`. |
+| 2026-08-27 ~09:45 UTC | Frankfurt | `main` at PR #119 (YOY-64 AC-6 hedge), unpooled | classic | 100 | **13 ms** | **22 ms** | YOY-64 AC-6 second run; full output on YOY-64. 0 degraded, 0 limited; mean per stage classify 11 ms · classic 14 ms. |
+| 2026-08-27 ~09:45 UTC | Frankfurt | `main` at PR #119 | ai-en | 100 | **933 ms** | **3391 ms** | Both bars met. 0 degraded, 0 limited, 0 reused. Mean per stage: classify 584 · intent 1186 · embed 25 · retrieve 34 · hydrate 14 · closeMatches 34 ms. |
+| 2026-08-27 ~09:45 UTC | Frankfurt | `main` at PR #119 | ai-he | 100 | **973 ms** | **3447 ms** | Both bars met (p95 by 53 ms). 0 degraded (was 12), 0 limited, 0 reused. Mean per stage: classify 572 · intent 1504 · embed 37 · retrieve 37 · hydrate 14 · closeMatches 16 ms. |
+| 2026-08-27 ~09:45 UTC | Frankfurt | `main` at PR #119 | ai-combined | 200 | **941 ms** | **3447 ms** | Both bars met; 0 degraded of 200 (AC-6 bar ≤ 2). `--assert-ai-p50 2000 --assert-ai-p95 3500` exit 0: `assertions: all bars met`. The 10 samples over 3500 ms are hedged occasion-class answers (3522–3961 ms). |
