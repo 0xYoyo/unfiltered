@@ -26,6 +26,8 @@ function noConstraints(): RetrievalConstraints {
     priceMax: undefined,
     colorsInclude: [],
     colorsExclude: [],
+    attributesExclude: [],
+    attributesInclude: [],
     occasion: undefined,
     availableOnly: false,
   };
@@ -35,6 +37,10 @@ interface SeedProduct {
   productId: string;
   vector: number[];
   shopDomain?: string;
+  /** Snapshot text the attribute filter reads (YOY-133); defaults to the id / none. */
+  title?: string;
+  tags?: string[];
+  description?: string;
   priceMin?: number;
   priceMax?: number;
   available?: boolean;
@@ -51,6 +57,9 @@ interface SeedProduct {
     /** Displayed colour (YOY-110); defaults to the first of `colors`. */
     primaryColor?: string | null;
     occasions?: string[];
+    /** Enrichment evidence the attribute filter reads (YOY-133). */
+    styleTags?: string[];
+    fit?: string | null;
   } | null;
 }
 
@@ -61,9 +70,9 @@ async function seed(db: PrismaClient, products: SeedProduct[]): Promise<void> {
       data: {
         shopDomain,
         productId: product.productId,
-        title: product.productId,
-        description: "",
-        tags: [],
+        title: product.title ?? product.productId,
+        description: product.description ?? "",
+        tags: product.tags ?? [],
         vendor: "fixture",
         productType: "",
         priceMin: product.priceMin ?? 100,
@@ -96,8 +105,8 @@ async function seed(db: PrismaClient, products: SeedProduct[]): Promise<void> {
             product.enrichment.primaryColor === undefined
               ? (product.enrichment.colors?.[0] ?? null)
               : product.enrichment.primaryColor,
-          fit: null,
-          styleTags: [],
+          fit: product.enrichment.fit ?? null,
+          styleTags: product.enrichment.styleTags ?? [],
           seasons: [],
         },
       });
@@ -215,6 +224,8 @@ describe("hard constraints are filters, never preferences (AC-2)", () => {
     const ids = await queryIds(db, {
       ...noConstraints(),
       colorsExclude: ["Black"],
+      attributesExclude: [],
+      attributesInclude: [],
     });
     expect(ids).toEqual(["ivory-dress"]);
   });
@@ -227,6 +238,8 @@ describe("hard constraints are filters, never preferences (AC-2)", () => {
     const ids = await queryIds(db, {
       ...noConstraints(),
       colorsExclude: ["black"],
+      attributesExclude: [],
+      attributesInclude: [],
     });
     expect(ids).toEqual(["unenriched"]);
   });
@@ -256,6 +269,8 @@ describe("hard constraints are filters, never preferences (AC-2)", () => {
     const ids = await queryIds(db, {
       ...noConstraints(),
       colorsExclude: ["Black"],
+      attributesExclude: [],
+      attributesInclude: [],
     });
     expect(ids).toEqual(["mesh-pink", "no-primary"]);
     expect(ids).not.toContain("tie-black");
@@ -658,6 +673,8 @@ describe("latency (AC-5)", () => {
         ...noConstraints(),
         priceMax: 500,
         colorsExclude: ["black"],
+        attributesExclude: [],
+        attributesInclude: [],
         availableOnly: true,
       },
       vector: [1, 0, 0],
@@ -701,6 +718,8 @@ describe("end to end through the engine API (AC-1)", () => {
       currency: undefined,
       colorsInclude: [],
       colorsExclude: ["black"],
+      attributesExclude: [],
+      attributesInclude: [],
       occasion: "wedding",
       size: undefined,
       availabilityRequired: true,
@@ -763,5 +782,118 @@ describe("the full match set, uncapped (YOY-107 AC-2)", () => {
         limit: 0,
       }),
     ).rejects.toThrow(RangeError);
+  });
+});
+
+describe("negated attributes are hard exclusions; category-like attributes hard inclusions (YOY-133 AC-2)", () => {
+  let db: PrismaClient;
+
+  beforeEach(async () => {
+    db = await createTestDb();
+    // Every product sits at the same, perfect similarity so only the
+    // attribute predicate decides membership.
+    const v = [1, 0, 0];
+    await seed(db, [
+      // Evidence of "wool" in three places, one per product.
+      { productId: "wool-title", vector: v, title: "Wool Winter Coat", enrichment: { category: "coat" } },
+      { productId: "wool-tag", vector: v, title: "Winter Coat", tags: ["wool"], enrichment: { category: "coat" } },
+      { productId: "wool-styletag", vector: v, title: "Winter Coat", enrichment: { category: "coat", styleTags: ["wool", "warm"] } },
+      { productId: "wool-fit", vector: v, title: "Winter Coat", enrichment: { category: "coat", fit: "woolen" } },
+      // Hebrew evidence, an attached preposition included (מצמר = of wool).
+      { productId: "wool-hebrew", vector: v, title: "מעיל צמר אפור", enrichment: { category: "coat" } },
+      { productId: "wool-hebrew-prefixed", vector: v, title: "מעיל חורף", description: "עשוי מצמר", enrichment: { category: "coat" } },
+      // A NEGATED mention is not evidence: "without wool", "wool-free".
+      { productId: "no-wool-hebrew", vector: v, title: "מעיל פוך ניילון", description: "מעיל פוך קל מניילון, ללא צמר.", enrichment: { category: "coat", styleTags: ["puffer"] } },
+      { productId: "wool-free", vector: v, title: "Wool-free Puffer Coat", enrichment: { category: "coat" } },
+      // No evidence at all: passes (unknown passes), enriched or not.
+      { productId: "plain-coat", vector: v, title: "Puffer Coat", enrichment: { category: "coat" } },
+      // Off the shared axis so it ranks first for its own query vector below.
+      { productId: "unenriched-coat", vector: [0, 1, 0], title: "Camel Overcoat", enrichment: null },
+      // Sleeves: "sleeveless" is NOT "sleeves"; "long sleeve" is.
+      { productId: "sleeveless", vector: v, title: "Sleeveless Linen Tank Top", tags: ["sleeveless"], enrichment: { category: "top", styleTags: ["sleeveless"], fit: "sleeveless" } },
+      { productId: "no-sleeves-hebrew", vector: v, title: "גופייה ללא שרוולים", description: "גופייה קלילה ללא שרוולים.", enrichment: { category: "top" } },
+      { productId: "long-sleeve", vector: v, title: "Long-Sleeve Cotton Top", enrichment: { category: "top", styleTags: ["long sleeve"] } },
+      { productId: "long-sleeve-hebrew", vector: v, title: "חולצה עם שרוולים ארוכים", enrichment: { category: "top", styleTags: [] } },
+      // Bridal (category-like): evidence in a styleTag, an EN tag, a HE tag.
+      { productId: "bridal-styletag", vector: v, title: "Ivory Lace Gown", enrichment: { category: "dress", styleTags: ["lace", "bridal"] } },
+      { productId: "bridal-hebrew", vector: v, title: "שמלת כלה שנהב", tags: ["כלה"], enrichment: { category: "dress" } },
+      { productId: "guest-dress", vector: v, title: "Sage Guest Midi Dress", description: "Flowy sage midi for a wedding guest.", enrichment: { category: "dress", occasions: ["wedding"] } },
+      // An unlisted word filters on its own forms.
+      { productId: "polyester", vector: v, title: "Polyester Shell", enrichment: { category: "jacket", styleTags: ["polyesters"] } },
+    ]);
+  });
+
+  const exclude = (...words: string[]): RetrievalConstraints => ({
+    ...noConstraints(),
+    attributesExclude: words,
+  });
+
+  it("excludes a product whose title, tags, styleTags, or fit carry the negated word — EN and HE, attached preposition included", async () => {
+    const ids = await queryIds(db, { ...exclude("wool"), category: "coat" });
+    expect(ids).not.toContain("wool-title");
+    expect(ids).not.toContain("wool-tag");
+    expect(ids).not.toContain("wool-styletag");
+    expect(ids).not.toContain("wool-fit");
+    expect(ids).not.toContain("wool-hebrew");
+    expect(ids).not.toContain("wool-hebrew-prefixed");
+  });
+
+  it("passes a product with no evidence of the word — enriched or not — and one whose only mention is negated", async () => {
+    const ids = await queryIds(db, { ...exclude("wool"), category: "coat" });
+    expect(ids).toContain("plain-coat");
+    expect(ids).toContain("no-wool-hebrew");
+    expect(ids).toContain("wool-free");
+    // No category constraint: the unenriched product passes too.
+    expect((await queryIds(db, exclude("wool"), [0, 1, 0]))[0]).toBe("unenriched-coat");
+  });
+
+  it('"sleeveless" is not excluded by "sleeves"; "long sleeve" and "שרוולים" are', async () => {
+    const ids = await queryIds(db, { ...exclude("sleeves"), category: "top" });
+    expect(ids.sort()).toEqual(["no-sleeves-hebrew", "sleeveless"]);
+  });
+
+  it("folds the model's word onto the lexicon: 'sleeve' and 'woollen' filter as 'sleeves' and 'wool'", async () => {
+    expect((await queryIds(db, { ...exclude("sleeve"), category: "top" })).sort()).toEqual([
+      "no-sleeves-hebrew",
+      "sleeveless",
+    ]);
+    const coats = await queryIds(db, { ...exclude("woollen"), category: "coat" });
+    expect(coats).not.toContain("wool-title");
+    expect(coats).toContain("plain-coat");
+  });
+
+  it("an unlisted word filters on its own singular and plural forms", async () => {
+    expect(await queryIds(db, exclude("polyester"))).not.toContain("polyester");
+    expect(await queryIds(db, exclude("polyesters"))).not.toContain("polyester");
+    // ...and matches as a whole word only.
+    expect(await queryIds(db, exclude("poly"))).toContain("polyester");
+  });
+
+  it("a category-like inclusion is evidence-required: bridal gowns only, EN and HE evidence alike", async () => {
+    const ids = await queryIds(db, {
+      ...noConstraints(),
+      category: "dress",
+      attributesInclude: ["bridal"],
+    });
+    expect(ids.sort()).toEqual(["bridal-hebrew", "bridal-styletag"]);
+  });
+
+  it("the guest's query excludes bridal and keeps the guest dress; a word with no term applies no filter", async () => {
+    expect(
+      (await queryIds(db, { ...exclude("bridal"), category: "dress" })).sort(),
+    ).toEqual(["guest-dress"]);
+    // An empty / multi-word value cannot become a term and is skipped, not
+    // applied as a filter that matches nothing.
+    expect(
+      (await queryIds(db, { ...exclude("", "long sleeve"), category: "dress" })).sort(),
+    ).toEqual(["bridal-hebrew", "bridal-styletag", "guest-dress"]);
+  });
+
+  it("several negations combine: every one must be clear", async () => {
+    const ids = await queryIds(db, { ...exclude("wool", "sleeves") });
+    expect(ids).not.toContain("wool-title");
+    expect(ids).not.toContain("long-sleeve");
+    expect(ids).toContain("plain-coat");
+    expect(ids).toContain("sleeveless");
   });
 });

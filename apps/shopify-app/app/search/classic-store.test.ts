@@ -24,6 +24,8 @@ function noConstraints(): RetrievalConstraints {
     priceMax: undefined,
     colorsInclude: [],
     colorsExclude: [],
+    attributesExclude: [],
+    attributesInclude: [],
     occasion: undefined,
     availableOnly: false,
   };
@@ -32,6 +34,8 @@ function noConstraints(): RetrievalConstraints {
 interface SeedProduct {
   productId: string;
   title: string;
+  /** Description text the attribute filter reads (YOY-133); no keyword index over it. */
+  description?: string;
   tags?: string[];
   vendor?: string;
   productType?: string;
@@ -53,6 +57,9 @@ interface SeedProduct {
     /** Displayed colour (YOY-110); defaults to the first of `colors`. */
     primaryColor?: string | null;
     occasions?: string[];
+    /** Enrichment evidence the attribute filter reads (YOY-133). */
+    styleTags?: string[];
+    fit?: string | null;
   };
 }
 
@@ -64,7 +71,7 @@ async function seed(db: PrismaClient, products: SeedProduct[]): Promise<void> {
         shopDomain,
         productId: product.productId,
         title: product.title,
-        description: "",
+        description: product.description ?? "",
         tags: product.tags ?? [],
         vendor: product.vendor ?? "fixture",
         productType: product.productType ?? "",
@@ -98,8 +105,8 @@ async function seed(db: PrismaClient, products: SeedProduct[]): Promise<void> {
             product.enrichment.primaryColor === undefined
               ? (product.enrichment.colors?.[0] ?? null)
               : product.enrichment.primaryColor,
-          fit: null,
-          styleTags: [],
+          fit: product.enrichment.fit ?? null,
+          styleTags: product.enrichment.styleTags ?? [],
           seasons: [],
         },
       });
@@ -408,6 +415,8 @@ describe("constraint-only mode mirrors pgvector predicate semantics (AC-4)", () 
         priceMax: undefined,
         colorsInclude: ["blue"],
         colorsExclude: [],
+        attributesExclude: [],
+        attributesInclude: [],
         occasion: undefined,
         availableOnly: false,
       },
@@ -450,6 +459,8 @@ describe("constraint-only mode mirrors pgvector predicate semantics (AC-4)", () 
         priceMax: undefined,
         colorsInclude: [],
         colorsExclude: ["black"],
+        attributesExclude: [],
+        attributesInclude: [],
         occasion: undefined,
         availableOnly: false,
       },
@@ -759,5 +770,85 @@ describe("one statement per classic search, cards included (YOY-115 AC-1)", () =
     expect(plan.slice(searchAt)).toContain("<%");
     // Exactly one statement: the plan tree has one root.
     expect(plan.split("\n").filter((line) => !line.startsWith(" "))).toHaveLength(1);
+  });
+});
+
+describe("negated and category-like attributes mirror the pgvector semantics, keyword mode included (YOY-133 AC-2)", () => {
+  let db: PrismaClient;
+
+  beforeAll(async () => {
+    db = await createTestDb();
+    await seed(db, [
+      { productId: "wool-title", title: "Wool Winter Coat", enrichment: { category: "coat" } },
+      { productId: "wool-tag", title: "Heavy Winter Coat", tags: ["wool"], enrichment: { category: "coat" } },
+      { productId: "wool-styletag", title: "Warm Winter Coat", enrichment: { category: "coat", styleTags: ["wool"] } },
+      { productId: "wool-hebrew", title: "מעיל צמר אפור", enrichment: { category: "coat" } },
+      { productId: "no-wool-hebrew", title: "מעיל פוך ניילון", description: "מעיל פוך קל, ללא צמר.", enrichment: { category: "coat" } },
+      { productId: "plain-coat", title: "Puffer Winter Coat", enrichment: { category: "coat" } },
+      { productId: "unenriched-coat", title: "Camel Winter Coat" },
+      { productId: "sleeveless", title: "Sleeveless Linen Top", enrichment: { category: "top", fit: "sleeveless" } },
+      { productId: "long-sleeve", title: "Long-Sleeve Cotton Top", enrichment: { category: "top", styleTags: ["long sleeve"] } },
+      { productId: "bridal", title: "Ivory Lace Wedding Dress", enrichment: { category: "dress", styleTags: ["bridal"] } },
+      { productId: "bridal-hebrew", title: "שמלת כלה שנהב", tags: ["כלה"], enrichment: { category: "dress" } },
+      { productId: "guest", title: "Sage Guest Midi Dress", enrichment: { category: "dress" } },
+    ]);
+  });
+
+  it("constraint-only mode excludes on title, tags, styleTags, and Hebrew evidence; passes unknowns and negated mentions", async () => {
+    const ids = await searchIds(db, {
+      constraints: { ...noConstraints(), category: "coat", attributesExclude: ["wool"] },
+    });
+    expect(ids.sort()).toEqual(["no-wool-hebrew", "plain-coat"]);
+    // Without the category the unenriched product passes as well.
+    expect(
+      await searchIds(db, { constraints: { ...noConstraints(), attributesExclude: ["wool"] } }),
+    ).toContain("unenriched-coat");
+  });
+
+  it("keyword mode honours the exclusion too: 'winter coat' with 'not wool' never ranks a wool coat", async () => {
+    const all = await searchIds(db, { query: "winter coat" });
+    expect(all).toContain("wool-title");
+    const ids = await searchIds(db, {
+      query: "winter coat",
+      constraints: { ...noConstraints(), attributesExclude: ["wool"] },
+    });
+    expect(ids.length).toBeGreaterThan(0);
+    expect(ids).not.toContain("wool-title");
+    expect(ids).not.toContain("wool-tag");
+    expect(ids).not.toContain("wool-styletag");
+    expect(ids).not.toContain("wool-hebrew");
+    expect(ids).toContain("plain-coat");
+  });
+
+  it('"sleeveless" survives "no sleeves"; "long sleeve" does not', async () => {
+    expect(
+      await searchIds(db, {
+        constraints: { ...noConstraints(), category: "top", attributesExclude: ["sleeves"] },
+      }),
+    ).toEqual(["sleeveless"]);
+  });
+
+  it("a category-like inclusion is evidence-required, EN and HE; the guest's exclusion is its mirror", async () => {
+    expect(
+      (
+        await searchIds(db, {
+          constraints: { ...noConstraints(), category: "dress", attributesInclude: ["bridal"] },
+        })
+      ).sort(),
+    ).toEqual(["bridal", "bridal-hebrew"]);
+    expect(
+      await searchIds(db, {
+        constraints: { ...noConstraints(), category: "dress", attributesExclude: ["bridal"] },
+      }),
+    ).toEqual(["guest"]);
+  });
+
+  it("is still exactly one statement and writes no AiCall rows", async () => {
+    const before = await db.aiCall.count();
+    await searchIds(db, {
+      query: "coat",
+      constraints: { ...noConstraints(), attributesExclude: ["wool"], attributesInclude: [] },
+    });
+    expect(await db.aiCall.count()).toBe(before);
   });
 });

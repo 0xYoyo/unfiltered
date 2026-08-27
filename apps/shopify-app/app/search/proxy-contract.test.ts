@@ -27,6 +27,8 @@ const WIRE_INTENT = {
   currency: "ILS",
   colorsInclude: [],
   colorsExclude: ["black"],
+  attributesExclude: [],
+  attributesInclude: [],
   occasion: null,
   size: null,
   availabilityRequired: false,
@@ -113,6 +115,8 @@ describe("search request: widget serialization → route parsing", () => {
       category: "dress",
       priceMax: 400,
       colorsExclude: ["black"],
+      attributesExclude: [],
+      attributesInclude: [],
       availabilityRequired: false,
     });
     expect(parsed?.previousIntent?.priceMin).toBeUndefined();

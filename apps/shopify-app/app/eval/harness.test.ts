@@ -119,6 +119,8 @@ describe("refinement fixtures (YOY-42 AC-3)", () => {
       priceMax: 250,
       colorsInclude: [],
       colorsExclude: ["black"],
+      attributesExclude: [],
+      attributesInclude: [],
       occasion: "wedding",
       availabilityRequired: false,
       softAttributes: ["elegant", "summer"],
@@ -142,6 +144,8 @@ describe("refinement fixtures (YOY-42 AC-3)", () => {
       priceMax: 250,
       colorsInclude: [],
       colorsExclude: ["black"],
+      attributesExclude: [],
+      attributesInclude: [],
       occasion: "wedding",
       availabilityRequired: false,
       softAttributes: ["elegant", "summer"],
@@ -164,6 +168,8 @@ describe("refinement fixtures (YOY-42 AC-3)", () => {
       priceMin: 375,
       colorsInclude: [],
       colorsExclude: ["black"],
+      attributesExclude: [],
+      attributesInclude: [],
       availabilityRequired: false,
       softAttributes: ["למסיבה"],
     };
@@ -253,6 +259,8 @@ describe("Constructor-bar fixtures (YOY-118 AC-1)", () => {
         priceMax: null,
         colorsInclude: [],
         colorsExclude: [],
+        attributesExclude: [],
+        attributesInclude: [],
         occasion: null,
         availabilityRequired: false,
       },
@@ -432,6 +440,8 @@ describe("violation scoring covers occasion (YOY-29 AC-11)", () => {
       priceMax: null,
       colorsInclude: [],
       colorsExclude: [],
+      attributesExclude: [],
+      attributesInclude: [],
       occasion: "wedding",
       availabilityRequired: false,
     },
@@ -483,6 +493,8 @@ describe("violation scoring mirrors unknown-passes filtering (YOY-35 AC-2, AC-5)
       priceMax: null,
       colorsInclude: [],
       colorsExclude: [],
+      attributesExclude: [],
+      attributesInclude: [],
       occasion: null,
       availabilityRequired: false,
       ...overrides,
@@ -607,6 +619,8 @@ describe("eval run (AC-2, AC-3, AC-4, AC-6)", () => {
         priceMax: score.golden.hardConstraints.priceMax ?? undefined,
         colorsInclude: score.golden.hardConstraints.colorsInclude,
         colorsExclude: score.golden.hardConstraints.colorsExclude,
+        attributesExclude: score.golden.hardConstraints.attributesExclude ?? [],
+        attributesInclude: score.golden.hardConstraints.attributesInclude ?? [],
         occasion: score.golden.hardConstraints.occasion ?? undefined,
         availableOnly: score.golden.hardConstraints.availabilityRequired,
       });
@@ -696,10 +710,11 @@ describe("eval run (AC-2, AC-3, AC-4, AC-6)", () => {
     const bar = result.constructorBar;
     const floor = loadConstructorFloor();
     expect(result.perConstructor.length).toBe(loadConstructorGoldens().length);
-    // mustNot (amended AC-3): the engine has no hard filter for the
-    // material/sleeve/bridal negations yet, so the floor records the
-    // measured leak and the harness holds the line there — never more
-    // appearances, never fewer clean goldens — until YOY-133 moves it to 0.
+    // mustNot (amended AC-3): the floor records the measured leak and the
+    // harness holds the line there — never more appearances, never fewer
+    // clean goldens. YOY-133 made negated attributes hard exclusions (18 →
+    // 1); the one appearance left is co09's classic route, where keyword
+    // search has no filter to apply.
     const mustNot = result.perConstructor.flatMap((score) => score.mustNotViolations);
     expect(
       mustNot.length,

@@ -53,6 +53,8 @@ describe("ClassicSearchStore port contract", () => {
       constraints: {
         colorsInclude: [],
         colorsExclude: [],
+        attributesExclude: [],
+        attributesInclude: [],
         availableOnly: false,
       },
     });

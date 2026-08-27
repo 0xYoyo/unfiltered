@@ -159,13 +159,16 @@ Constructor-bar pass bar (enforced as failing tests):
 - Hard-constraint violations 0 across the set's top 10s.
 - `mustNot` violations ≤ `mustNotViolationsMax` and the share of goldens
   with no `mustNot` appearance ≥ `mustNotCleanRatePercent`, both committed
-  in `fixtures/constructor-floor.json`. The reported target is 0; the floor
-  records the measured leak (19 appearances, 20/30 goldens clean on
-  2026-08-27) because the retriever hard-filters only category, price,
-  colour, occasion, and availability — a material, sleeve, or bridal
-  negation is ranking-only today, and a ~12-item filtered set fills its top
-  10 with the negated items. YOY-133 makes negated attributes hard
-  exclusions and moves this floor to 0.
+  in `fixtures/constructor-floor.json`. The reported target is 0. YOY-133
+  made negated attributes hard exclusions (`attributesExclude`) and the
+  bridal form a category-like inclusion (`attributesInclude`), taking the
+  measured leak from 18 appearances / 21 of 30 clean to **1 / 29 of 30**
+  (2026-08-27): every negation and wedding golden (cn05–cn10, co01, co03,
+  co04) is clean. The one remaining appearance is co09 `sneakers for
+  running`, a golden the live classifier routes classic (`expectedRoute:
+  "classic"`) where the keyword engine legitimately matches "White
+  Sneakers Classic" on "sneakers" — no filter exists on that route, so the
+  floor holds at 1 / 96 until the golden's routing is settled.
 - Overall hit rate ≥ `overallHitRatePercent` in the same file.
 
 ## Regenerating the recordings
@@ -196,7 +199,12 @@ baseline is scored against the same intents. Orphaned embedding vectors are
 dropped. The run prints its metered spend per operation from the ledger.
 `REGEN_SCOPE=goldens` (YOY-111) is the same missing-only pass without the
 enrichment re-record — for a new golden over an unchanged catalog, so the
-product vectors stay byte-identical too. A product with no enrichment
+product vectors stay byte-identical too. `REGEN_REQUERY=cn05,cn06,…`
+(YOY-133) narrows an intent prompt/schema change to the goldens it
+changes: under the goldens scope the named goldens' intent entries — both
+tiers — are dropped first and re-recorded at the current prompt, every
+other intent recording stays byte-identical, and the embedding step
+records the re-recorded query texts and drops the orphaned vectors. A product with no enrichment
 recording yet (added with the golden, YOY-117) is recorded and merged; every
 existing enrichment entry is reused as-is. Every scope records the
 Constructor-bar goldens alongside the main goldens (YOY-118): both sets
@@ -233,6 +241,11 @@ Provenance of what is committed today:
 - `vision.json` — live `gemini-3.5-flash-lite` output at thinking level
   `low` with the anchored anti-contamination prompt, recorded on YOY-122
   (2026-08-27) via `REGEN_SCOPE=goldens` over the 14 fixture images.
+- `intent.json` and `intent-lite.json` entries for the ten negation and
+  wedding goldens (cn05–cn10, co01–co04) — live output recorded on YOY-133
+  (2026-08-27) with the `attributesExclude` / `attributesInclude` prompt
+  via `REGEN_SCOPE=goldens REGEN_REQUERY=…`; every other intent entry is
+  byte-identical to its pre-YOY-133 recording (the arrays parse as empty).
 - `intent-lite.json`, `intent-lite-refinement.json` — live
   `gemini-3.5-flash-lite` output at thinking level `low`, recorded on
   YOY-116 (2026-08-26) with the confidence-bearing prompt. The accuracy

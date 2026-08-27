@@ -1,0 +1,70 @@
+{
+  "searchId": "fixture-ai-negation",
+  "route": "ai",
+  "degraded": false,
+  "results": [
+    {
+      "productId": "p-coat-1",
+      "title": "Puffer Winter Coat",
+      "url": "https://example.test/products/p-coat-1",
+      "imageUrl": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 4'><rect width='4' height='4' fill='%23d9d4cd'/></svg>",
+      "priceMin": 260,
+      "priceMax": 260,
+      "currencyCode": "ILS",
+      "available": true,
+      "colorUnknown": false
+    },
+    {
+      "productId": "p-coat-2",
+      "title": "Camel Overcoat",
+      "url": "https://example.test/products/p-coat-2",
+      "imageUrl": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 4'><rect width='4' height='4' fill='%23cfc9c1'/></svg>",
+      "priceMin": 540,
+      "priceMax": 540,
+      "currencyCode": "ILS",
+      "available": true,
+      "colorUnknown": false
+    }
+  ],
+  "chips": [
+    {
+      "field": "category",
+      "value": "coat"
+    },
+    {
+      "field": "attributesExclude",
+      "value": "wool"
+    }
+  ],
+  "intent": {
+    "category": "coat",
+    "priceMin": null,
+    "priceMax": null,
+    "currency": "ILS",
+    "colorsInclude": [],
+    "colorsExclude": [],
+    "attributesExclude": [
+      "wool"
+    ],
+    "attributesInclude": [],
+    "occasion": null,
+    "size": null,
+    "availabilityRequired": false,
+    "softAttributes": [
+      "winter"
+    ]
+  },
+  "details": {
+    "routeReason": "model",
+    "latencyMs": 804,
+    "limited": null,
+    "stages": {
+      "classify": 36,
+      "intent": 401,
+      "embed": 92,
+      "retrieve": 61,
+      "hydrate": 8
+    },
+    "intentTier": "lite"
+  }
+}

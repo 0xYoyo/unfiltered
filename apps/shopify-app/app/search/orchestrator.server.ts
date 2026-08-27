@@ -86,7 +86,10 @@ const CLOSE_MATCH_LIMIT = 10;
 /**
  * A constraint the close-match ladder may relax (YOY-111 AC-1), named as
  * the intent names it. `colorsExclude` is deliberately absent: an explicit
- * exclusion is never relaxed, at any rung, keyword fallback included.
+ * exclusion is never relaxed, at any rung, keyword fallback included — and
+ * so are `attributesExclude` (the same promise for "not wool", YOY-133) and
+ * `attributesInclude` (category-like: a bridal gown is what was asked for,
+ * and a rescue that is not one is a keyword close match, not a relaxation).
  */
 export type RelaxedConstraint =
   | "priceMax"
@@ -677,6 +680,8 @@ export function createSearchOrchestrator(
           constraints: {
             colorsInclude: [],
             colorsExclude: intent.colorsExclude,
+            attributesExclude: intent.attributesExclude,
+            attributesInclude: [],
             availableOnly: false,
           },
           limit: CLOSE_MATCH_LIMIT,

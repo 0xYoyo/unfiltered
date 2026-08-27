@@ -381,12 +381,45 @@ Query understanding (all LLM access through the `LlmClient` port):
   failing safe to `classic`.
 - `createIntentExtractor({ llm }): IntentExtractor` — turns free text into a
   vendor-free `Intent` (category, price bounds with currency, color
-  inclusions/exclusions, occasion, size, availability requirement, soft
-  attributes, and the model's own `confidence` 0–1 that the hard constraints
-  are complete and correct — required of every answer by `INTENT_SCHEMA`
-  since YOY-116; answers recorded before it parse with none) via the model
-  (operation `"intent"`), with one retry on schema violation and then a
-  typed `IntentExtractionError`.
+  inclusions/exclusions, **negated attributes** `attributesExclude` and
+  **category-like attributes** `attributesInclude` (YOY-133, below),
+  occasion, size, availability requirement, soft attributes, and the
+  model's own `confidence` 0–1 that the hard constraints are complete and
+  correct — required of every answer by `INTENT_SCHEMA` since YOY-116;
+  answers recorded before it parse with none) via the model (operation
+  `"intent"`), with one retry on schema violation and then a typed
+  `IntentExtractionError`.
+- **Negated attributes are hard exclusions (YOY-133; PRD §3 amendment
+  (d), binding).** "top, no sleeves", "winter coat, not wool", "ז'קט לא
+  מעור" return `attributesExclude: ["sleeves"]`, `["wool"]`, `["leather"]`
+  — lowercase English words, never colours (those stay `colorsExclude`)
+  and never soft attributes — and both stores apply each as a WHERE
+  filter, never a preference (NG-1). `parseIntent` folds each word onto
+  the engine's evidence lexicon (`ATTRIBUTE_EVIDENCE_TERMS` in
+  `taxonomy.ts`: "sleeve", "woollen", "שרוולים" → `sleeves`, `wool`,
+  `sleeves`), de-duplicates, and reads an absent array — every recording
+  and stored intent from before the field — as none. Chips carry the
+  negation (`{ field: "attributesExclude", value: "wool" }`, rendered
+  "Not wool" / "לא צמר" by the widget's `chipLabel`), chip removal drops
+  it with the same LLM-free surgery as a colour chip, refinement carry-over
+  keeps it like every other constraint, and the close-match ladder never
+  relaxes it (like `colorsExclude`, keyword fallback included). The
+  negation rides the existing intent call — no new LLM call per search
+  (NG-2); the prompt grew by the two field rules.
+- **Occasion vs. category (YOY-133 AC-3).** "dress for a wedding" /
+  "שמלה לחתונה" is the guest's query — `category: dress, occasion:
+  wedding, attributesExclude: ["bridal"]` — while "wedding dress" /
+  "שמלת כלה" is the bridal category-like intent: `attributesInclude:
+  ["bridal"]`, a hard, evidence-required inclusion. `attributesInclude` is
+  pinned by the schema to the closed `CATEGORY_LIKE_ATTRIBUTES` set (today
+  `["bridal"]`) — a positive evidence filter the model could invent
+  ("linen shirt" → require linen) would kill recall on a sparse catalog,
+  so only attributes that behave like a category may be required; the
+  exclusion side stays open. Required category-like words also embed in
+  `composeQueryText` (after the wanted colours), exclusions never do. The
+  ladder never relaxes the include either: a "wedding dress" zero-hit's
+  rescues are the keyword close matches, not non-bridal dresses served as
+  a relaxation.
 - `createEscalatingIntentExtractor({ lite, accuracy, threshold?, classes? })`
   — the lite-first ladder (YOY-116): an `IntentExtractor` over two tier
   extractors that asks the lite tier first and escalates to the accuracy
@@ -509,6 +542,34 @@ family, and two products sharing vendor and title but not product type
 never collapse, so the rule can never hide a different product. The
 result shape is unchanged. The eval golden g26 `pink rib knit top` pins
 it (pink member first, navy and black never in the top 10).
+
+**Attribute evidence rule (YOY-133, binding — PRD §3 amendment (d)):**
+both stores judge `attributesExclude` and `attributesInclude` on the same
+evidence text — `attributeConstraintSql` in `retrieval-store.server.ts`,
+shared by the classic store — the product's platform-free snapshot text
+(title, tags, description) plus the enrichment evidence (`fit`,
+`styleTags`, and the five vision attribute values), concatenated with
+`concat_ws` so an unenriched product is judged on its snapshot alone. One
+predicate per word: `NOT (evidence ~* pattern)` for an exclusion (absent
+evidence passes, as for every enrichment constraint) and `(evidence ~*
+pattern)` for a category-like inclusion (evidence-required, as a category
+is). The pattern (`attributeEvidencePattern`) is every surface form of the
+word from the engine's lexicon — EN and HE; the word itself with its
+singular/plural when unlisted, so "not polyester" still filters — matched
+as a WHOLE word in either script ("sleeveless" is not "sleeves"; "long
+sleeve" is), optionally behind one attached Hebrew preposition/article
+(מצמר, העור), case-insensitively, and NEVER when the mention is negated:
+a term right after "no", "not", "without", "non", "ללא", "בלי", "לא", or
+read as "<term>-free", is a statement of absence — the nylon coat whose
+description says "ללא צמר" survives "not wool", the tank top described
+"ללא שרוולים" survives "no sleeves". A word the lexicon cannot turn into a
+term (an empty or multi-word value) applies no predicate: a filter that
+can match nothing is never applied. The eval's Constructor-bar set pins
+the rule end to end (cn05–cn10, co01, co03, co04: 0 mustNot leaks). The
+generic-store analog (PRD portability rule) is the rule itself: every
+evidence column is the platform-free snapshot or the enrichment row every
+ingestion adapter fills, and the lexicon is the engine's; a Door 2 store
+gets the identical predicate with no adapter work.
 
 **Colour exclusion rule (YOY-110, binding — PRD §3 amendment, founder
 decision 2026-08-22):** `colorsExclude` is applied by both stores against
@@ -714,6 +775,9 @@ rides every rung, and the final fallback — the raw-query trigram search
 that already ran alongside retrieval (YOY-64 AC-5) — now runs in constraint
 mode with the same exclusions, so a "not black" close match can never be
 black-primary (the exclusion itself is judged by `primaryColor`, YOY-110).
+`attributesExclude` rides every rung and the keyword fallback the same way
+(YOY-133: a "not wool" close match is never a wool coat), and
+`attributesInclude` rides every rung too — neither is a `RelaxedConstraint`.
 The response carries `closeMatchesRelaxed: RelaxedConstraint[]` — the names
 relaxed, in order; `[]` when nothing was (every non-zero-hit response, and
 a zero-hit with no close matches). Both APIs serialize it beside

@@ -52,6 +52,8 @@ const DRESS_INTENT = {
   currency: null,
   colorsInclude: [],
   colorsExclude: [],
+  attributesExclude: [],
+  attributesInclude: [],
   occasion: "wedding",
   size: null,
   availabilityRequired: false,
@@ -491,6 +493,8 @@ describe("constraint-only fallback keeps the chips (AC-5)", () => {
           category: null,
           occasion: null,
           colorsExclude: ["black"],
+          attributesExclude: [],
+          attributesInclude: [],
           priceMax: 400,
           softAttributes: [],
         }),
@@ -581,6 +585,8 @@ describe("close-match relaxation ladder (YOY-111 AC-1, AC-2, AC-3)", () => {
     priceMax: 200,
     colorsInclude: ["pink"],
     colorsExclude: ["black"],
+    attributesExclude: [],
+    attributesInclude: [],
     availabilityRequired: true,
   };
 
@@ -598,12 +604,16 @@ describe("close-match relaxation ladder (YOY-111 AC-1, AC-2, AC-3)", () => {
       category: "dress",
       colorsInclude: ["pink"],
       colorsExclude: ["black"],
+      attributesExclude: [],
+      attributesInclude: [],
       occasion: "wedding",
       availableOnly: true,
     });
     expect(rungs[4]!.constraints).toEqual({
       colorsInclude: [],
       colorsExclude: ["black"],
+      attributesExclude: [],
+      attributesInclude: [],
       availableOnly: false,
     });
     // A sparse intent yields only the rungs it can: budget, then category.
@@ -1310,6 +1320,8 @@ describe("the full match set on both routes, uncapped (YOY-107)", () => {
         category: "dress",
         colorsInclude: [],
         colorsExclude: [],
+        attributesExclude: [],
+        attributesInclude: [],
         availabilityRequired: false,
         softAttributes: ["dress"],
       },
@@ -1554,6 +1566,8 @@ describe("per-stage timing (YOY-114 AC-1)", () => {
         category: "dress",
         colorsInclude: [],
         colorsExclude: [],
+        attributesExclude: [],
+        attributesInclude: [],
         availabilityRequired: false,
         softAttributes: ["elegant"],
       },
@@ -1683,7 +1697,7 @@ describe("intent tier and per-tier ledger rows (YOY-116 AC-2, AC-3)", () => {
       query: AI_QUERY,
       shopDomain: SHOP,
       searchId: "s-removal",
-      resolvedIntent: { category: "dress", colorsInclude: [], colorsExclude: [], availabilityRequired: false, softAttributes: ["elegant"] },
+      resolvedIntent: { category: "dress", colorsInclude: [], colorsExclude: [], attributesExclude: [], attributesInclude: [], availabilityRequired: false, softAttributes: ["elegant"] },
     });
     expect(removal.route).toBe("ai");
     expect(removal.intentTier).toBeNull();
@@ -1815,7 +1829,7 @@ describe("exact-query intent reuse (YOY-64 AC-4)", () => {
       const refinement = await orchestrator.runSearch({
         query: AI_QUERY,
         shopDomain: SHOP,
-        previousIntent: { category: "dress", colorsInclude: [], colorsExclude: [], availabilityRequired: false, softAttributes: [] },
+        previousIntent: { category: "dress", colorsInclude: [], colorsExclude: [], attributesExclude: [], attributesInclude: [], availabilityRequired: false, softAttributes: [] },
       });
       expect(refinement.routeReason).not.toBe("intent-reuse");
     } finally {
@@ -1831,7 +1845,7 @@ describe("exact-query intent reuse (YOY-64 AC-4)", () => {
     const response = await reuseOnlyOrchestrator().runSearch({
       query: AI_QUERY,
       shopDomain: SHOP,
-      resolvedIntent: { category: "dress", colorsInclude: [], colorsExclude: [], availabilityRequired: false, softAttributes: ["elegant"] },
+      resolvedIntent: { category: "dress", colorsInclude: [], colorsExclude: [], attributesExclude: [], attributesInclude: [], availabilityRequired: false, softAttributes: ["elegant"] },
     });
     expect(response.routeReason).toBe("resolved-intent");
     expect(await db.aiCall.count()).toBe(0);
@@ -2085,5 +2099,99 @@ describe("per-operation intent abort (YOY-64 AC-3)", () => {
     // And the lite tier's own timeout never exceeds the ladder's budget, so
     // the budget — not the lite timeout — is what a hung lite call costs.
     expect(DEFAULT_INTENT_LITE_TIMEOUT_MS).toBeLessThanOrEqual(ladderDeadlineMs);
+  });
+});
+
+describe("negated and category-like attributes ride every rung and the keyword fallback (YOY-133)", () => {
+  const WOOL_QUERY = "winter coat, not wool";
+
+  it("an AI response carries the negation as a chip beside the category", async () => {
+    const db = await createTestDb();
+    await seed(db, [
+      { productId: "puffer", title: "Puffer Coat", vector: [1, 0, 0], enrichment: { category: "coat" } },
+      { productId: "wool", title: "Wool Winter Coat", vector: [1, 0, 0], enrichment: { category: "coat" } },
+    ]);
+    const orchestrator = buildOrchestrator(db, {
+      llm: fakeLlm({
+        classification: () => ({ route: "ai" }),
+        intent: () => ({
+          ...DRESS_INTENT,
+          category: "coat",
+          occasion: null,
+          softAttributes: ["winter"],
+          attributesExclude: ["wool"],
+        }),
+      }),
+    });
+
+    const response = await orchestrator.runSearch({ query: WOOL_QUERY, shopDomain: SHOP });
+
+    expect(response.route).toBe("ai");
+    expect(response.hits.map((card) => card.productId)).toEqual(["puffer"]);
+    expect(response.chips).toEqual([
+      { field: "category", value: "coat" },
+      { field: "attributesExclude", value: "wool" },
+    ]);
+    expect(response.intent?.attributesExclude).toEqual(["wool"]);
+  });
+
+  it("relaxationLadder keeps attributesExclude and attributesInclude on every rung", () => {
+    const rungs = relaxationLadder(
+      parseIntent({
+        ...DRESS_INTENT,
+        priceMax: 100,
+        attributesExclude: ["wool"],
+        attributesInclude: ["bridal"],
+      })!,
+    );
+    expect(rungs.map((rung) => rung.relaxed)).toEqual([
+      ["priceMax"],
+      ["priceMax", "occasion"],
+      ["priceMax", "occasion", "category"],
+    ]);
+    for (const rung of rungs) {
+      expect(rung.constraints.attributesExclude).toEqual(["wool"]);
+      expect(rung.constraints.attributesInclude).toEqual(["bridal"]);
+    }
+  });
+
+  it("never relaxes attributesExclude: a wool coat is absent from every rung and from the keyword fallback", async () => {
+    const db = await createTestDb();
+    await seed(db, [
+      // Keyword-matches the raw query AND is the nearest vector, but it is
+      // wool: never a close match. (Its title must state wool, not negate
+      // it — "not wool" in a title is a statement of absence and passes.)
+      { productId: "wool-coat", title: "Wool Winter Coat", vector: [1, 0, 0], enrichment: { category: "coat" } },
+      // Over budget, not wool: the rescue once the budget is relaxed.
+      { productId: "puffer", title: "Puffer Winter Coat", vector: [0.8, 0.2, 0], priceMin: 500, enrichment: { category: "coat" } },
+    ]);
+    const orchestrator = buildOrchestrator(db, {
+      llm: fakeLlm({
+        classification: () => ({ route: "ai" }),
+        intent: () => ({
+          ...DRESS_INTENT,
+          category: "coat",
+          occasion: null,
+          priceMax: 100,
+          softAttributes: ["winter"],
+          attributesExclude: ["wool"],
+        }),
+      }),
+    });
+
+    const response = await orchestrator.runSearch({ query: WOOL_QUERY, shopDomain: SHOP });
+    expect(response.hits).toEqual([]);
+    expect(response.closeMatches.map((card) => card.productId)).toEqual(["puffer"]);
+    expect(response.closeMatchesRelaxed).toEqual(["priceMax"]);
+
+    // With the puffer gone every rung is empty and the keyword fallback
+    // answers — still without the wool coat.
+    await db.productEnrichment.deleteMany({ where: { productId: "puffer" } });
+    await db.$executeRawUnsafe(`DELETE FROM "ProductEmbedding" WHERE "productId" = 'puffer'`);
+    await db.catalogProduct.deleteMany({ where: { productId: "puffer" } });
+    const again = await orchestrator.runSearch({ query: WOOL_QUERY, shopDomain: SHOP });
+    expect(again.hits).toEqual([]);
+    expect(again.closeMatches).toEqual([]);
+    expect(again.closeMatchesRelaxed).toEqual([]);
   });
 });

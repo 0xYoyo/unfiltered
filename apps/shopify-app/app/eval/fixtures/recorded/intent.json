@@ -789,122 +789,6 @@
       "inputTokens": 266,
       "outputTokens": 89
     },
-    "top, no sleeves": {
-      "output": {
-        "colorsInclude": [],
-        "colorsExclude": [],
-        "availabilityRequired": false,
-        "softAttributes": [
-          "no sleeves"
-        ],
-        "confidence": 0.95,
-        "category": "top",
-        "currency": null,
-        "occasion": null,
-        "priceMax": null,
-        "priceMin": null,
-        "size": null
-      },
-      "inputTokens": 262,
-      "outputTokens": 53
-    },
-    "חולצה בלי שרוולים": {
-      "output": {
-        "colorsInclude": [],
-        "colorsExclude": [],
-        "availabilityRequired": false,
-        "softAttributes": [
-          "בלי שרוולים"
-        ],
-        "confidence": 0.95,
-        "category": "top",
-        "currency": null,
-        "occasion": null,
-        "priceMax": null,
-        "priceMin": null,
-        "size": null
-      },
-      "inputTokens": 265,
-      "outputTokens": 93
-    },
-    "winter coat, not wool": {
-      "output": {
-        "colorsInclude": [],
-        "colorsExclude": [],
-        "availabilityRequired": false,
-        "softAttributes": [
-          "winter",
-          "not wool"
-        ],
-        "confidence": 0.95,
-        "category": "coat",
-        "currency": null,
-        "occasion": null,
-        "priceMax": null,
-        "priceMin": null,
-        "size": null
-      },
-      "inputTokens": 263,
-      "outputTokens": 93
-    },
-    "מעיל חורף לא מצמר": {
-      "output": {
-        "colorsInclude": [],
-        "colorsExclude": [],
-        "availabilityRequired": false,
-        "softAttributes": [
-          "חורף",
-          "לא מצמר"
-        ],
-        "confidence": 1,
-        "category": "coat",
-        "currency": null,
-        "occasion": null,
-        "priceMax": null,
-        "priceMin": null,
-        "size": null
-      },
-      "inputTokens": 266,
-      "outputTokens": 57
-    },
-    "jacket, not leather": {
-      "output": {
-        "colorsInclude": [],
-        "colorsExclude": [],
-        "availabilityRequired": false,
-        "softAttributes": [
-          "not leather"
-        ],
-        "confidence": 0.95,
-        "category": "jacket",
-        "currency": null,
-        "occasion": null,
-        "priceMax": null,
-        "priceMin": null,
-        "size": null
-      },
-      "inputTokens": 262,
-      "outputTokens": 53
-    },
-    "ז'קט לא מעור": {
-      "output": {
-        "colorsInclude": [],
-        "colorsExclude": [],
-        "availabilityRequired": false,
-        "softAttributes": [
-          "לא מעור"
-        ],
-        "confidence": 0.9,
-        "category": "jacket",
-        "currency": null,
-        "occasion": null,
-        "priceMax": null,
-        "priceMin": null,
-        "size": null
-      },
-      "inputTokens": 264,
-      "outputTokens": 53
-    },
     "dress under 150": {
       "output": {
         "colorsInclude": [],
@@ -1042,74 +926,6 @@
       },
       "inputTokens": 268,
       "outputTokens": 53
-    },
-    "dress for a wedding": {
-      "output": {
-        "colorsInclude": [],
-        "colorsExclude": [],
-        "availabilityRequired": false,
-        "softAttributes": [],
-        "confidence": 1,
-        "category": "dress",
-        "currency": null,
-        "occasion": "wedding",
-        "priceMax": null,
-        "priceMin": null,
-        "size": null
-      },
-      "inputTokens": 262,
-      "outputTokens": 87
-    },
-    "wedding dress": {
-      "output": {
-        "colorsInclude": [],
-        "colorsExclude": [],
-        "availabilityRequired": false,
-        "softAttributes": [],
-        "confidence": 1,
-        "category": "dress",
-        "currency": null,
-        "occasion": "wedding",
-        "priceMax": null,
-        "priceMin": null,
-        "size": null
-      },
-      "inputTokens": 260,
-      "outputTokens": 48
-    },
-    "שמלה לחתונה": {
-      "output": {
-        "colorsInclude": [],
-        "colorsExclude": [],
-        "availabilityRequired": false,
-        "softAttributes": [],
-        "confidence": 1,
-        "category": "dress",
-        "currency": null,
-        "occasion": "wedding",
-        "priceMax": null,
-        "priceMin": null,
-        "size": null
-      },
-      "inputTokens": 263,
-      "outputTokens": 48
-    },
-    "שמלת כלה": {
-      "output": {
-        "colorsInclude": [],
-        "colorsExclude": [],
-        "availabilityRequired": false,
-        "softAttributes": [],
-        "confidence": 1,
-        "category": "dress",
-        "currency": null,
-        "occasion": "wedding",
-        "priceMax": null,
-        "priceMin": null,
-        "size": null
-      },
-      "inputTokens": 262,
-      "outputTokens": 48
     },
     "shoes for a wedding": {
       "output": {
@@ -1493,6 +1309,220 @@
       },
       "inputTokens": 266,
       "outputTokens": 97
+    },
+    "top, no sleeves": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "attributesExclude": [
+          "sleeves"
+        ],
+        "attributesInclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [],
+        "confidence": 1,
+        "category": "top",
+        "currency": null,
+        "occasion": null,
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 392,
+      "outputTokens": 103
+    },
+    "חולצה בלי שרוולים": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "attributesExclude": [
+          "sleeves"
+        ],
+        "attributesInclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [],
+        "confidence": 1,
+        "category": "top",
+        "currency": null,
+        "occasion": null,
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 395,
+      "outputTokens": 60
+    },
+    "winter coat, not wool": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "attributesExclude": [
+          "wool"
+        ],
+        "attributesInclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "winter"
+        ],
+        "confidence": 1,
+        "category": "coat",
+        "currency": null,
+        "occasion": null,
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 393,
+      "outputTokens": 104
+    },
+    "מעיל חורף לא מצמר": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "attributesExclude": [
+          "wool"
+        ],
+        "attributesInclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "חורף"
+        ],
+        "confidence": 1,
+        "category": "coat",
+        "currency": null,
+        "occasion": null,
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 396,
+      "outputTokens": 62
+    },
+    "jacket, not leather": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "attributesExclude": [
+          "leather"
+        ],
+        "attributesInclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [],
+        "confidence": 1,
+        "category": "jacket",
+        "currency": null,
+        "occasion": null,
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 392,
+      "outputTokens": 59
+    },
+    "ז'קט לא מעור": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "attributesExclude": [
+          "leather"
+        ],
+        "attributesInclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [],
+        "confidence": 1,
+        "category": "jacket",
+        "currency": null,
+        "occasion": null,
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 394,
+      "outputTokens": 59
+    },
+    "dress for a wedding": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "attributesExclude": [
+          "bridal"
+        ],
+        "attributesInclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [],
+        "confidence": 1,
+        "category": "dress",
+        "currency": null,
+        "occasion": "wedding",
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 392,
+      "outputTokens": 103
+    },
+    "wedding dress": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "attributesExclude": [],
+        "attributesInclude": [
+          "bridal"
+        ],
+        "availabilityRequired": false,
+        "softAttributes": [],
+        "confidence": 1,
+        "category": "dress",
+        "currency": null,
+        "occasion": "wedding",
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 390,
+      "outputTokens": 109
+    },
+    "שמלה לחתונה": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "attributesExclude": [
+          "bridal"
+        ],
+        "attributesInclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [],
+        "confidence": 1,
+        "category": "dress",
+        "currency": null,
+        "occasion": "wedding",
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 393,
+      "outputTokens": 59
+    },
+    "שמלת כלה": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "attributesExclude": [],
+        "attributesInclude": [
+          "bridal"
+        ],
+        "availabilityRequired": false,
+        "softAttributes": [],
+        "confidence": 1,
+        "category": "dress",
+        "currency": null,
+        "occasion": "wedding",
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 392,
+      "outputTokens": 57
     }
   }
 }

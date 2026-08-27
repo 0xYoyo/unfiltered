@@ -25,6 +25,18 @@ export interface RetrievalConstraints {
   colorsInclude: string[];
   /** Results must carry none of these colors. */
   colorsExclude: string[];
+  /**
+   * Results must carry no evidence of these attribute words (YOY-133): a
+   * hard exclusion judged on the product's text and enrichment evidence,
+   * where absent evidence passes. Never relaxed by any fallback.
+   */
+  attributesExclude: string[];
+  /**
+   * Results must carry evidence of these category-like attributes
+   * (YOY-133 AC-3, the closed `CATEGORY_LIKE_ATTRIBUTES` set): evidence-
+   * required, as a category is. Never relaxed by any fallback.
+   */
+  attributesInclude: string[];
   /** Results must suit this occasion. */
   occasion?: string;
   /** Results must be available (in stock). */
@@ -82,6 +94,8 @@ export interface AppliedConstraint {
     | "priceMax"
     | "colorsInclude"
     | "colorsExclude"
+    | "attributesExclude"
+    | "attributesInclude"
     | "occasion"
     | "availability";
   value: string;
@@ -186,6 +200,8 @@ export function constraintsFromIntent(intent: Intent): RetrievalConstraints {
     priceMax: intent.priceMax,
     colorsInclude: intent.colorsInclude,
     colorsExclude: intent.colorsExclude,
+    attributesExclude: intent.attributesExclude,
+    attributesInclude: intent.attributesInclude,
     occasion: intent.occasion,
     availableOnly: intent.availabilityRequired,
   };
@@ -211,6 +227,12 @@ export function appliedConstraints(
   for (const color of constraints.colorsExclude) {
     applied.push({ field: "colorsExclude", value: color });
   }
+  for (const word of constraints.attributesInclude) {
+    applied.push({ field: "attributesInclude", value: word });
+  }
+  for (const word of constraints.attributesExclude) {
+    applied.push({ field: "attributesExclude", value: word });
+  }
   if (constraints.occasion !== undefined) {
     applied.push({ field: "occasion", value: constraints.occasion });
   }
@@ -222,15 +244,19 @@ export function appliedConstraints(
 
 /**
  * Deterministic query text embedded for similarity ranking: the intent's
- * descriptive signal in fixed order — category, occasion, wanted colors, then
- * soft attributes — empty parts dropped, mirroring the catalog side's
- * composed embedding text so query and product vectors share a vocabulary.
+ * descriptive signal in fixed order — category, occasion, wanted colors,
+ * required category-like attributes (YOY-133: "bridal" describes the item
+ * as much as its category does), then soft attributes — empty parts
+ * dropped, mirroring the catalog side's composed embedding text so query
+ * and product vectors share a vocabulary. Exclusions never embed: a
+ * negated word in the query text would pull the negated items closer.
  */
 export function composeQueryText(intent: Intent): string {
   const parts = [
     intent.category ?? "",
     intent.occasion ?? "",
     ...intent.colorsInclude,
+    ...intent.attributesInclude,
     ...intent.softAttributes,
   ];
   return parts.filter((part) => part !== "").join("\n");

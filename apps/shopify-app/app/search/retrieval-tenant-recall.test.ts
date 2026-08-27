@@ -52,6 +52,8 @@ function noConstraints(): RetrievalConstraints {
     priceMax: undefined,
     colorsInclude: [],
     colorsExclude: [],
+    attributesExclude: [],
+    attributesInclude: [],
     occasion: undefined,
     availableOnly: false,
   };

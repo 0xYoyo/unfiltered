@@ -125,6 +125,8 @@ const DRESS_INTENT = {
   currency: null,
   colorsInclude: [],
   colorsExclude: [],
+  attributesExclude: [],
+  attributesInclude: [],
   occasion: "wedding",
   size: null,
   availabilityRequired: false,
@@ -758,6 +760,94 @@ describe("cache suppression (YOY-52 AC-9)", () => {
     );
     expect(unsigned.status).toBe(401);
     expect(unsigned.headers.get("Cache-Control")).toBe("no-store");
+  });
+});
+
+describe("negated-attribute chips (YOY-133 AC-5)", () => {
+  it("removing a 'Not wool' chip recomputes without it, drops the chip, and echoes the intent without the word", async () => {
+    await seed([
+      { productId: "wool-dress", title: "wool dress", vector: [0.9, 0.1, 0], category: "dress", occasions: ["wedding"] },
+      { productId: "silk-dress", title: "silk dress", vector: [0.8, 0.2, 0], category: "dress", occasions: ["wedding"] },
+    ]);
+    const costRecorder = createPrismaCostRecorder(db);
+    installOrchestrator({
+      llm: fakeLlm({ costRecorder }),
+      embeddings: fakeEmbeddings({ costRecorder }),
+    });
+    const withWool = { ...DRESS_INTENT, attributesExclude: ["wool"] };
+
+    // The held intent alone (a follow-up echo with no removal) still excludes.
+    const kept = await action(
+      actionArgs(
+        proxyRequest({
+          payload: {
+            query: AI_QUERY,
+            sessionId: "s1",
+            previousIntent: withWool,
+            removeChip: { field: "occasion", value: "wedding" },
+          },
+        }),
+      ),
+    );
+    const keptBody = await kept.json();
+    expect(keptBody.results.map((r: { productId: string }) => r.productId)).toEqual(["silk-dress"]);
+    expect(keptBody.chips).toEqual([
+      { field: "category", value: "dress" },
+      { field: "attributesExclude", value: "wool" },
+    ]);
+    expect(keptBody.intent.attributesExclude).toEqual(["wool"]);
+    expect(keptBody.intent.attributesInclude).toEqual([]);
+
+    const response = await action(
+      actionArgs(
+        proxyRequest({
+          payload: {
+            query: AI_QUERY,
+            sessionId: "s1",
+            previousIntent: withWool,
+            removeChip: { field: "attributesExclude", value: "wool" },
+          },
+        }),
+      ),
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.route).toBe("ai");
+    expect(
+      body.results.map((r: { productId: string }) => r.productId).sort(),
+    ).toEqual(["silk-dress", "wool-dress"]);
+    expect(body.chips).toEqual([
+      { field: "category", value: "dress" },
+      { field: "occasion", value: "wedding" },
+    ]);
+    expect(body.intent.attributesExclude).toEqual([]);
+    // Zero LLM calls on either removal.
+    const calls = await db.aiCall.findMany();
+    expect(calls.filter((row) => row.operation !== "embedding")).toEqual([]);
+  });
+
+  it("a previous intent recorded before the arrays existed still parses (absent reads as none)", async () => {
+    await seed([{ productId: "dress", title: "dress", vector: [1, 0, 0], category: "dress" }]);
+    installOrchestrator({ llm: fakeLlm({}) });
+    const { attributesExclude: _x, attributesInclude: _i, ...legacy } = DRESS_INTENT;
+    void _x;
+    void _i;
+    const response = await action(
+      actionArgs(
+        proxyRequest({
+          payload: {
+            query: AI_QUERY,
+            sessionId: "s1",
+            previousIntent: legacy,
+            removeChip: { field: "occasion", value: "wedding" },
+          },
+        }),
+      ),
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.intent.attributesExclude).toEqual([]);
+    expect(body.intent.attributesInclude).toEqual([]);
   });
 });
 

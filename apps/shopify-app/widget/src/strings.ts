@@ -205,3 +205,39 @@ export const HEBREW_COLOR_DISPLAY: Record<string, string> = {
 };
 
 export const HEBREW_AVAILABILITY_DISPLAY = "במלאי";
+
+/**
+ * Hebrew display for the attribute words a negation chip carries (YOY-133):
+ * the keys are the lexicon keys of `ATTRIBUTE_EVIDENCE_TERMS` in
+ * packages/engine/src/taxonomy.ts (the engine owns the words and their
+ * evidence, this map owns only their display). "Not wool" renders
+ * "לא צמר"; an unlisted word renders as extracted, after "לא".
+ */
+export const HEBREW_ATTRIBUTE_DISPLAY: Record<string, string> = {
+  wool: "צמר",
+  cashmere: "קשמיר",
+  leather: "עור",
+  suede: "זמש",
+  fur: "פרווה",
+  cotton: "כותנה",
+  linen: "פשתן",
+  silk: "משי",
+  satin: "סאטן",
+  velvet: "קטיפה",
+  lace: "תחרה",
+  denim: "ג'ינס",
+  polyester: "פוליאסטר",
+  nylon: "ניילון",
+  sleeves: "שרוולים",
+  hood: "קפוצ'ון",
+  pockets: "כיסים",
+  zipper: "רוכסן",
+  buttons: "כפתורים",
+  collar: "צווארון",
+  heels: "עקבים",
+  print: "הדפס",
+  stripes: "פסים",
+  sequins: "פאייטים",
+  logo: "לוגו",
+  bridal: "כלה",
+};

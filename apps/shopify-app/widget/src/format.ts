@@ -1,4 +1,5 @@
 import {
+  HEBREW_ATTRIBUTE_DISPLAY,
   HEBREW_AVAILABILITY_DISPLAY,
   HEBREW_CATEGORY_DISPLAY,
   HEBREW_COLOR_DISPLAY,
@@ -38,6 +39,9 @@ export interface ChipDisplayContext {
  * taxonomy values (categories, occasions, availability, common colors) get
  * Hebrew display strings, and anything outside those sets renders as
  * extracted — display-only; the chip's wire value is untouched (NG-3).
+ * A negated attribute (YOY-133) reads "Not wool" / "לא צמר", exactly the
+ * colour-exclusion shape; a required category-like attribute reads its
+ * word ("bridal" / "כלה").
  */
 export function chipLabel(
   chip: { field: string; value: string },
@@ -57,6 +61,10 @@ export function chipLabel(
         return `לא ${HEBREW_COLOR_DISPLAY[chip.value] ?? chip.value}`;
       case "colorsInclude":
         return HEBREW_COLOR_DISPLAY[chip.value] ?? chip.value;
+      case "attributesExclude":
+        return `לא ${HEBREW_ATTRIBUTE_DISPLAY[chip.value] ?? chip.value}`;
+      case "attributesInclude":
+        return HEBREW_ATTRIBUTE_DISPLAY[chip.value] ?? chip.value;
       case "availability":
         return HEBREW_AVAILABILITY_DISPLAY;
       case "category":
@@ -73,11 +81,13 @@ export function chipLabel(
     case "priceMax":
       return `Under ${chip.value}`;
     case "colorsExclude":
+    case "attributesExclude":
       return `Not ${chip.value}`;
     case "availability":
       return "In stock";
     default:
-      // category, colorsInclude, occasion: the value speaks for itself.
+      // category, colorsInclude, attributesInclude, occasion: the value
+      // speaks for itself.
       return chip.value;
   }
 }
