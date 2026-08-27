@@ -94,7 +94,7 @@ describe("catalog ingestion", () => {
 
     const result = await ingestCatalog({ db, shopDomain: SHOP, graphql });
 
-    expect(result).toEqual({ created: 3, updated: 0, unchanged: 0, deleted: 0 });
+    expect(result).toEqual({ created: 3, updated: 0, unchanged: 0, deleted: 0, images: { fetched: 0, unchanged: 0, failed: 0 } });
     // 3 nodes at page size 2 → exactly two requests, cursor threaded through.
     expect(calls).toHaveLength(2);
     expect(calls[1]?.after).toBe("2");
@@ -192,7 +192,7 @@ describe("catalog ingestion", () => {
       ]).graphql,
     });
 
-    expect(rerun).toEqual({ created: 0, updated: 0, unchanged: 1, deleted: 0 });
+    expect(rerun).toEqual({ created: 0, updated: 0, unchanged: 1, deleted: 0, images: { fetched: 0, unchanged: 0, failed: 0 } });
     const after = (await db.catalogProduct.findMany())[0]!;
     expect(after.id).toBe(before.id);
     expect(after.url).toBe("https://shop.example/products/linen-summer-dress");
@@ -303,7 +303,7 @@ describe("catalog ingestion", () => {
     });
 
     // Searchable content unchanged: no update/create counted, no duplicates.
-    expect(rerun).toEqual({ created: 0, updated: 0, unchanged: 1, deleted: 0 });
+    expect(rerun).toEqual({ created: 0, updated: 0, unchanged: 1, deleted: 0, images: { fetched: 0, unchanged: 0, failed: 0 } });
     const after = await db.catalogProduct.findMany();
     expect(after).toHaveLength(1);
     expect(after[0]?.id).toBe(before.id);
@@ -329,7 +329,7 @@ describe("catalog ingestion", () => {
       graphql: graphqlStub(fixtureCatalog()).graphql,
     });
 
-    expect(rerun).toEqual({ created: 0, updated: 0, unchanged: 3, deleted: 0 });
+    expect(rerun).toEqual({ created: 0, updated: 0, unchanged: 3, deleted: 0, images: { fetched: 0, unchanged: 0, failed: 0 } });
     const after = await db.catalogProduct.findMany({ orderBy: { productId: "asc" } });
     // Untouched means untouched: same row identity and same updatedAt.
     expect(after.map((row) => row.id)).toEqual(before.map((row) => row.id));
@@ -363,7 +363,7 @@ describe("catalog ingestion", () => {
       graphql: graphqlStub(mutated).graphql,
     });
 
-    expect(result).toEqual({ created: 1, updated: 1, unchanged: 1, deleted: 1 });
+    expect(result).toEqual({ created: 1, updated: 1, unchanged: 1, deleted: 1, images: { fetched: 0, unchanged: 0, failed: 0 } });
     const rows = await db.catalogProduct.findMany({ orderBy: { productId: "asc" } });
     expect(rows.map((row) => [row.productId, row.title])).toEqual([
       ["gid://shopify/Product/1", "Renamed dress"],
@@ -594,8 +594,97 @@ describe("catalog ingestion", () => {
       shopDomain: SHOP,
       graphql: graphqlStub([]).graphql,
     });
-    expect(wipe).toEqual({ created: 0, updated: 0, unchanged: 0, deleted: 3 });
+    expect(wipe).toEqual({ created: 0, updated: 0, unchanged: 0, deleted: 3, images: { fetched: 0, unchanged: 0, failed: 0 } });
     expect(await db.catalogProduct.findMany({ where: { shopDomain: OTHER_SHOP } })).toHaveLength(1);
+  });
+
+  describe("image capture (YOY-120 AC-1, AC-2)", () => {
+    const imageNodes = (product: number, count: number) => ({
+      nodes: Array.from({ length: count }, (_, i) => ({
+        url: `https://cdn.example.com/p${product}-${i}.jpg`,
+        altText: null,
+      })),
+    });
+    const catalogWithImages = () => [
+      productNode({ id: "gid://shopify/Product/1", images: imageNodes(1, 3) }),
+      productNode({ id: "gid://shopify/Product/2", images: imageNodes(2, 3) }),
+      productNode({ id: "gid://shopify/Product/3", images: imageNodes(3, 3) }),
+    ];
+    /** Offline byte server: every URL answers bytes except the one that 404s. */
+    const imageServer = (failing: string) => {
+      const calls: string[] = [];
+      const fetchImage = async (url: string) => {
+        calls.push(url);
+        return failing === url
+          ? new Response("gone", { status: 404 })
+          : new Response(new TextEncoder().encode(`bytes:${url}`));
+      };
+      return { fetchImage, calls };
+    };
+
+    it("requests image urls in the products query, capped at four", () => {
+      expect(PRODUCTS_QUERY).toContain("images(first: 4)");
+      expect(PRODUCTS_QUERY).toContain("nodes { url altText }");
+    });
+
+    it("reports images: fetched 8, unchanged 0, failed 1 on the first run and fetched 0, unchanged 8 on the second (verify step 2)", async () => {
+      const server = imageServer("https://cdn.example.com/p2-1.jpg");
+      const first = await ingestCatalog({
+        db,
+        shopDomain: SHOP,
+        graphql: graphqlStub(catalogWithImages()).graphql,
+        fetchImage: server.fetchImage,
+      });
+      expect(first.images).toEqual({ fetched: 8, unchanged: 0, failed: 1 });
+      expect(server.calls).toHaveLength(9);
+
+      const stored = await db.productImage.findMany({ where: { shopDomain: SHOP }, orderBy: [{ productId: "asc" }, { position: "asc" }] });
+      expect(stored).toHaveLength(8);
+      for (const row of stored) {
+        expect(row.contentHash).toMatch(/^[0-9a-f]{64}$/);
+        expect(row.position).toBeLessThan(4);
+      }
+      // The failed image kept no row; the product itself still landed.
+      expect(stored.filter((row) => row.productId === "gid://shopify/Product/2").map((row) => row.position)).toEqual([0, 2]);
+      expect(await db.catalogProduct.count({ where: { shopDomain: SHOP } })).toBe(3);
+
+      server.calls.length = 0;
+      const second = await ingestCatalog({
+        db,
+        shopDomain: SHOP,
+        graphql: graphqlStub(catalogWithImages()).graphql,
+        fetchImage: server.fetchImage,
+      });
+      // Only the previously failed URL is retried; every stored URL makes no fetch.
+      expect(second.images).toEqual({ fetched: 0, unchanged: 8, failed: 1 });
+      expect(second.unchanged).toBe(3);
+      expect(server.calls).toEqual(["https://cdn.example.com/p2-1.jpg"]);
+    });
+
+    it("keeps the product contentHash unchanged by image changes, and deletes image rows with a stale product (AC-1, AC-2)", async () => {
+      const server = imageServer("");
+      await ingestCatalog({ db, shopDomain: SHOP, graphql: graphqlStub(catalogWithImages()).graphql, fetchImage: server.fetchImage });
+      const before = await db.catalogProduct.findMany({ where: { shopDomain: SHOP }, orderBy: { productId: "asc" } });
+
+      // Product 1 swaps one image; product 3 disappears.
+      const mutated = [
+        productNode({
+          id: "gid://shopify/Product/1",
+          images: { nodes: [{ url: "https://cdn.example.com/p1-0-v2.jpg", altText: null }, ...imageNodes(1, 3).nodes.slice(1)] },
+        }),
+        productNode({ id: "gid://shopify/Product/2", images: imageNodes(2, 3) }),
+      ];
+      server.calls.length = 0;
+      const result = await ingestCatalog({ db, shopDomain: SHOP, graphql: graphqlStub(mutated).graphql, fetchImage: server.fetchImage });
+      expect(result).toMatchObject({ created: 0, updated: 0, unchanged: 2, deleted: 1 });
+      expect(result.images).toEqual({ fetched: 1, unchanged: 5, failed: 0 });
+      expect(server.calls).toEqual(["https://cdn.example.com/p1-0-v2.jpg"]);
+
+      const after = await db.catalogProduct.findMany({ where: { shopDomain: SHOP }, orderBy: { productId: "asc" } });
+      expect(after.map((row) => row.contentHash)).toEqual(before.slice(0, 2).map((row) => row.contentHash));
+      expect(await db.productImage.count({ where: { shopDomain: SHOP, productId: "gid://shopify/Product/3" } })).toBe(0);
+      expect(await db.productImage.count({ where: { shopDomain: SHOP } })).toBe(6);
+    });
   });
 
   it("fails loudly when the products query returns errors instead of data", async () => {

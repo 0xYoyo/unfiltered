@@ -58,6 +58,11 @@ describe("mapping (AC-4)", () => {
       available: true,
       imageAltTexts: ["Front view", "Silk detail"],
       imageUrl: `${FIXTURE_ORIGIN}/cdn/black-dress-front.jpg`,
+      imageUrls: [
+        `${FIXTURE_ORIGIN}/cdn/black-dress-front.jpg`,
+        `${FIXTURE_ORIGIN}/cdn/black-dress-back.jpg`,
+        `${FIXTURE_ORIGIN}/cdn/black-dress-detail.jpg`,
+      ],
       url: `${FIXTURE_ORIGIN}/products/black-evening-dress`,
       sourceUpdatedAt: new Date("2026-08-01T10:00:00Z"),
     });

@@ -1,7 +1,14 @@
 import type { PrismaClient } from "@prisma/client";
 
+import type { ImageFetch, ImageSyncCounts } from "./images.server";
+import {
+  addImageSyncCounts,
+  emptyImageSyncCounts,
+  globalImageFetch,
+  syncProductImages,
+} from "./images.server";
 import type { ShopifyProductNode } from "./mapping.server";
-import { mapProductNode } from "./mapping.server";
+import { mapProductNode, MAX_PRODUCT_IMAGES, snapshotImageUrls } from "./mapping.server";
 
 /**
  * The slice of the Admin GraphQL client the ingestion needs — matches the
@@ -53,8 +60,8 @@ export const PRODUCTS_QUERY = `#graphql
         variants(first: ${VARIANTS_SAMPLE_SIZE}) {
           nodes { availableForSale }
         }
-        images(first: 20) {
-          nodes { altText }
+        images(first: ${MAX_PRODUCT_IMAGES}) {
+          nodes { url altText }
         }
         featuredImage { url }
         onlineStoreUrl
@@ -79,6 +86,8 @@ export interface IngestResult {
   updated: number;
   unchanged: number;
   deleted: number;
+  /** Image capture over every snapshotted product (YOY-120 AC-2). */
+  images: ImageSyncCounts;
 }
 
 async function fetchAllProducts(graphql: AdminGraphql): Promise<ShopifyProductNode[]> {
@@ -120,10 +129,13 @@ export async function ingestCatalog({
   db,
   shopDomain,
   graphql,
+  fetchImage = globalImageFetch,
 }: {
   db: PrismaClient;
   shopDomain: string;
   graphql: AdminGraphql;
+  /** Image-byte fetcher for `ProductImage` hashing (YOY-120); the platform fetch by default, a stub in tests. */
+  fetchImage?: ImageFetch;
 }): Promise<IngestResult> {
   const snapshot = (await fetchAllProducts(graphql))
     .filter(
@@ -134,7 +146,10 @@ export async function ingestCatalog({
         // a legacy fixture, treated as published.
         node.publishedAt !== null,
     )
-    .map((node) => mapProductNode(node, { shopDomain }));
+    .map((node) => ({
+      product: mapProductNode(node, { shopDomain }),
+      imageUrls: snapshotImageUrls(node),
+    }));
 
   const existing = await db.catalogProduct.findMany({
     where: { shopDomain },
@@ -150,9 +165,15 @@ export async function ingestCatalog({
   });
   const existingRows = new Map(existing.map((row) => [row.productId, row]));
 
-  const result: IngestResult = { created: 0, updated: 0, unchanged: 0, deleted: 0 };
+  const result: IngestResult = {
+    created: 0,
+    updated: 0,
+    unchanged: 0,
+    deleted: 0,
+    images: emptyImageSyncCounts(),
+  };
 
-  for (const product of snapshot) {
+  for (const { product, imageUrls } of snapshot) {
     const known = existingRows.get(product.productId);
     if (known === undefined) {
       await db.catalogProduct.create({ data: { shopDomain, ...product } });
@@ -196,9 +217,22 @@ export async function ingestCatalog({
       }
       result.unchanged += 1;
     }
+    // Image capture rides outside the content hash (YOY-120 AC-2): an
+    // unchanged product may still have new images, and an unchanged image
+    // URL makes zero fetches, so this is cheap on every path.
+    addImageSyncCounts(
+      result.images,
+      await syncProductImages({
+        db,
+        shopDomain,
+        productId: product.productId,
+        imageUrls,
+        fetchImage,
+      }),
+    );
   }
 
-  const seen = new Set(snapshot.map((product) => product.productId));
+  const seen = new Set(snapshot.map(({ product }) => product.productId));
   const stale = existing
     .map((row) => row.productId)
     .filter((productId) => !seen.has(productId));
@@ -207,11 +241,14 @@ export async function ingestCatalog({
     // FK cascade, so they must go in the same operation as the product
     // (YOY-29 AC-5, YOY-61 AC-2 — a leftover embedding row would keep a
     // deleted or non-active product retrievable).
-    const [, , { count }] = await db.$transaction([
+    const [, , , { count }] = await db.$transaction([
       db.productEnrichment.deleteMany({
         where: { shopDomain, productId: { in: stale } },
       }),
       db.productEmbedding.deleteMany({
+        where: { shopDomain, productId: { in: stale } },
+      }),
+      db.productImage.deleteMany({
         where: { shopDomain, productId: { in: stale } },
       }),
       db.catalogProduct.deleteMany({

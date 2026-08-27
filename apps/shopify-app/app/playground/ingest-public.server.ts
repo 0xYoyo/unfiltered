@@ -5,8 +5,18 @@ import type { EmbedResult } from "../catalog/embed.server";
 import { embedCatalog } from "../catalog/embed.server";
 import type { EnrichResult } from "../catalog/enrich.server";
 import { enrichCatalog } from "../catalog/enrich.server";
+import type { ImageFetch, ImageSyncCounts } from "../catalog/images.server";
+import {
+  addImageSyncCounts,
+  emptyImageSyncCounts,
+  syncProductImages,
+} from "../catalog/images.server";
 import type { SnapshotProduct } from "../catalog/mapping.server";
-import { computeContentHash, computeFamilyKey } from "../catalog/mapping.server";
+import {
+  capImageUrls,
+  computeContentHash,
+  computeFamilyKey,
+} from "../catalog/mapping.server";
 import type {
   CatalogSource,
   SourceProduct,
@@ -57,6 +67,8 @@ export interface PublicIngestCounts {
    * which the unique row key could not hold — not ingested (AC-7).
    */
   skippedInvalid: number;
+  /** Image capture over every snapshotted product (YOY-120 AC-2). */
+  images: ImageSyncCounts;
 }
 
 export interface PublicIngestResult {
@@ -125,12 +137,20 @@ export async function snapshotPublicCatalog({
   storeKey,
   products,
   maxProducts,
+  imageFetch,
   now = new Date(),
 }: {
   db: PrismaClient;
   storeKey: string;
   products: SourceProduct[];
   maxProducts: number;
+  /**
+   * Image-byte fetcher for `ProductImage` hashing (YOY-120 AC-1) — the
+   * polite fetcher's `.fetch`, so image requests obey robots and pacing
+   * like every other public read. Absent means no image capture (the
+   * snapshot-only unit tests).
+   */
+  imageFetch?: ImageFetch;
   now?: Date;
 }): Promise<PublicIngestCounts> {
   const result: PublicIngestCounts = {
@@ -140,9 +160,10 @@ export async function snapshotPublicCatalog({
     deleted: 0,
     skippedOverMax: Math.max(0, products.length - maxProducts),
     skippedInvalid: 0,
+    images: emptyImageSyncCounts(),
   };
   const bounded = products.slice(0, maxProducts);
-  const snapshot: SnapshotProduct[] = [];
+  const snapshot: Array<{ product: SnapshotProduct; imageUrls: string[] }> = [];
   const seenIds = new Set<string>();
   for (const product of bounded) {
     if (!isIngestableSourceProduct(product) || seenIds.has(product.sourceId)) {
@@ -150,7 +171,11 @@ export async function snapshotPublicCatalog({
       continue;
     }
     seenIds.add(product.sourceId);
-    snapshot.push(mapSourceProduct(product, now));
+    snapshot.push({
+      product: mapSourceProduct(product, now),
+      // Beside the row, outside contentHash (YOY-120 AC-2), capped once.
+      imageUrls: capImageUrls(product.imageUrls),
+    });
   }
 
   const existing = await db.catalogProduct.findMany({
@@ -165,7 +190,7 @@ export async function snapshotPublicCatalog({
   });
   const existingRows = new Map(existing.map((row) => [row.productId, row]));
 
-  for (const product of snapshot) {
+  for (const { product, imageUrls } of snapshot) {
     const known = existingRows.get(product.productId);
     if (known === undefined) {
       await db.catalogProduct.create({
@@ -208,20 +233,39 @@ export async function snapshotPublicCatalog({
       }
       result.unchanged += 1;
     }
+    if (imageFetch !== undefined) {
+      // Outside the content hash (YOY-120 AC-2): an unchanged URL makes no
+      // fetch, so this is cheap on every re-run.
+      addImageSyncCounts(
+        result.images,
+        await syncProductImages({
+          db,
+          shopDomain: storeKey,
+          productId: product.productId,
+          imageUrls,
+          fetchImage: imageFetch,
+          now,
+        }),
+      );
+    }
   }
 
   const stale = existing
     .map((row) => row.productId)
     .filter((productId) => !seenIds.has(productId));
   if (stale.length > 0) {
-    // Enrichment and embedding rows are keyed by tenant+productId with no FK
-    // cascade: they go in the same transaction as the product, exactly like
-    // the Shopify ingest, so no orphan vector keeps a gone product retrievable.
-    const [, , { count }] = await db.$transaction([
+    // Enrichment, embedding, and image rows are keyed by tenant+productId
+    // with no FK cascade: they go in the same transaction as the product,
+    // exactly like the Shopify ingest, so no orphan vector keeps a gone
+    // product retrievable.
+    const [, , , { count }] = await db.$transaction([
       db.productEnrichment.deleteMany({
         where: { shopDomain: storeKey, productId: { in: stale } },
       }),
       db.productEmbedding.deleteMany({
+        where: { shopDomain: storeKey, productId: { in: stale } },
+      }),
+      db.productImage.deleteMany({
         where: { shopDomain: storeKey, productId: { in: stale } },
       }),
       db.catalogProduct.deleteMany({
@@ -248,6 +292,7 @@ export async function ingestPublicCatalog({
   maxProducts = DEFAULT_MAX_PRODUCTS,
   llm,
   embeddings,
+  imageFetch,
   onProgress,
   now = new Date(),
 }: {
@@ -259,6 +304,8 @@ export async function ingestPublicCatalog({
   maxProducts?: number;
   llm: LlmClient;
   embeddings: EmbeddingClient;
+  /** The polite fetcher's `.fetch` (YOY-120 AC-1): image bytes are read through it and hashed. */
+  imageFetch: ImageFetch;
   onProgress?: SourceProgress;
   now?: Date;
 }): Promise<PublicIngestResult> {
@@ -269,6 +316,7 @@ export async function ingestPublicCatalog({
     storeKey,
     products,
     maxProducts,
+    imageFetch,
     now,
   });
   const enrich = await enrichCatalog({ db, shopDomain: storeKey, llm });
@@ -304,6 +352,7 @@ export interface PublicCatalogDeletion {
   products: number;
   enrichments: number;
   embeddings: number;
+  images: number;
   registry: number;
 }
 
@@ -320,9 +369,10 @@ export async function deletePublicCatalog({
   slug: string;
 }): Promise<PublicCatalogDeletion> {
   const storeKey = playgroundStoreKey(slug);
-  const [enrichments, embeddings, products, registry] = await db.$transaction([
+  const [enrichments, embeddings, images, products, registry] = await db.$transaction([
     db.productEnrichment.deleteMany({ where: { shopDomain: storeKey } }),
     db.productEmbedding.deleteMany({ where: { shopDomain: storeKey } }),
+    db.productImage.deleteMany({ where: { shopDomain: storeKey } }),
     db.catalogProduct.deleteMany({ where: { shopDomain: storeKey } }),
     db.playgroundCatalog.deleteMany({ where: { slug } }),
   ]);
@@ -331,6 +381,7 @@ export async function deletePublicCatalog({
     products: products.count,
     enrichments: enrichments.count,
     embeddings: embeddings.count,
+    images: images.count,
     registry: registry.count,
   };
 }

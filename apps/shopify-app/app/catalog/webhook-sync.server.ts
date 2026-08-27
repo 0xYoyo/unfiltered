@@ -1,8 +1,10 @@
 import { Prisma } from "@prisma/client";
 import type { PrismaClient } from "@prisma/client";
 
+import type { ImageFetch } from "./images.server";
+import { globalImageFetch, syncProductImages } from "./images.server";
 import type { ShopifyProductNode, SnapshotProduct } from "./mapping.server";
-import { mapProductNode } from "./mapping.server";
+import { capImageUrls, mapProductNode } from "./mapping.server";
 
 /**
  * Shape of a product webhook payload (`products/create` / `products/update`)
@@ -40,7 +42,8 @@ export interface ProductWebhookPayload {
     inventory_policy: string | null;
     inventory_management: string | null;
   }>;
-  images: Array<{ alt: string | null }>;
+  /** `src` feeds image capture (YOY-120 AC-1); absent in older payloads. */
+  images: Array<{ src?: string | null; alt: string | null }>;
   /** The product's featured image, when it has one. */
   image: { src: string | null } | null;
 }
@@ -254,13 +257,26 @@ export function mapWebhookProduct(
         availableForSale: variantAvailable(variant),
       })),
     },
-    images: { nodes: payload.images.map((image) => ({ altText: image.alt })) },
+    images: {
+      nodes: payload.images.map((image) => ({ url: image.src, altText: image.alt })),
+    },
     featuredImage:
       payload.image?.src != null && payload.image.src !== ""
         ? { url: payload.image.src }
         : null,
   };
   return mapProductNode(node, { shopDomain });
+}
+
+/**
+ * The image URLs a product webhook carries (YOY-120 AC-1): the first four
+ * `images[].src`, in order. Kept beside the snapshot row, like
+ * `snapshotImageUrls` for the Admin ingest.
+ */
+export function webhookImageUrls(
+  payload: Pick<ProductWebhookPayload, "images">,
+): string[] {
+  return capImageUrls(payload.images.map((image) => image.src));
 }
 
 /**
@@ -275,12 +291,29 @@ export async function syncProductFromWebhook({
   db,
   shopDomain,
   payload,
+  fetchImage = globalImageFetch,
 }: {
   db: PrismaClient;
   shopDomain: string;
   payload: ProductWebhookPayload;
+  /** Image-byte fetcher for `ProductImage` hashing (YOY-120); the platform fetch by default, a stub in tests. */
+  fetchImage?: ImageFetch;
 }): Promise<WebhookSyncOutcome> {
   const productId = productGid(payload);
+  // Image capture (YOY-120) runs after every outcome that leaves the
+  // product in the snapshot — created, updated, unchanged — because images
+  // sit outside the content hash; a stale or deleted product captures
+  // nothing.
+  const withImages = async (outcome: WebhookSyncOutcome): Promise<WebhookSyncOutcome> => {
+    await syncProductImages({
+      db,
+      shopDomain,
+      productId,
+      imageUrls: webhookImageUrls(payload),
+      fetchImage,
+    });
+    return outcome;
+  };
 
   // Non-active products leave the snapshot (YOY-61 AC-2), and so do
   // products unpublished from the Online Store (YOY-67 AC-4 — status and
@@ -292,9 +325,10 @@ export async function syncProductFromWebhook({
     (payload.status !== undefined && payload.status !== "active") ||
     payload.published_at === null
   ) {
-    const [, , { count }] = await db.$transaction([
+    const [, , , { count }] = await db.$transaction([
       db.productEnrichment.deleteMany({ where: { shopDomain, productId } }),
       db.productEmbedding.deleteMany({ where: { shopDomain, productId } }),
+      db.productImage.deleteMany({ where: { shopDomain, productId } }),
       db.catalogProduct.deleteMany({ where: { shopDomain, productId } }),
     ]);
     return count > 0 ? "deleted" : "not_found";
@@ -322,7 +356,7 @@ export async function syncProductFromWebhook({
       await db.catalogProduct.create({
         data: { shopDomain, ...mapWebhookProduct(payload, "", shopDomain) },
       });
-      return "created";
+      return withImages("created");
     } catch (error) {
       if (
         !(error instanceof Prisma.PrismaClientKnownRequestError) ||
@@ -373,7 +407,7 @@ export async function syncProductFromWebhook({
           sourceUpdatedAt: product.sourceUpdatedAt,
         },
       });
-      return "updated";
+      return withImages("updated");
     }
     if (product.sourceUpdatedAt > existing.sourceUpdatedAt) {
       await db.catalogProduct.update({
@@ -381,13 +415,13 @@ export async function syncProductFromWebhook({
         data: { sourceUpdatedAt: product.sourceUpdatedAt },
       });
     }
-    return "unchanged";
+    return withImages("unchanged");
   }
   await db.catalogProduct.update({
     where: { shopDomain_productId: { shopDomain, productId } },
     data: product,
   });
-  return "updated";
+  return withImages("updated");
 }
 
 /**
@@ -407,9 +441,10 @@ export async function deleteProductFromWebhook({
   // FK cascade, so they must go in the same operation as the product
   // (YOY-29 AC-5, YOY-61 AC-2).
   const productId = productGid(payload);
-  const [, , { count }] = await db.$transaction([
+  const [, , , { count }] = await db.$transaction([
     db.productEnrichment.deleteMany({ where: { shopDomain, productId } }),
     db.productEmbedding.deleteMany({ where: { shopDomain, productId } }),
+    db.productImage.deleteMany({ where: { shopDomain, productId } }),
     db.catalogProduct.deleteMany({ where: { shopDomain, productId } }),
   ]);
   return count > 0 ? "deleted" : "not_found";

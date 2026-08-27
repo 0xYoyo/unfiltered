@@ -398,7 +398,24 @@ export function createGeminiLlmClient(options: GeminiClientOptions): LlmClient {
         resolved,
         `models/${resolved.modelId}:generateContent`,
         {
-          contents: [{ role: "user", parts: [{ text: request.prompt }] }],
+          contents: [
+            {
+              role: "user",
+              parts: [
+                // Images first, text last (YOY-120 AC-3): each image is an
+                // inlineData part carrying its MIME type and base64 bytes.
+                // A text-only request sends exactly the single text part it
+                // always did.
+                ...(request.images ?? []).map((image) => ({
+                  inlineData: {
+                    mimeType: image.mimeType,
+                    data: Buffer.from(image.data).toString("base64"),
+                  },
+                })),
+                { text: request.prompt },
+              ],
+            },
+          ],
           generationConfig: {
             responseMimeType: "application/json",
             responseSchema: toGeminiResponseSchema(request.schema),

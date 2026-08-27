@@ -76,9 +76,12 @@ try {
     }).then((response) => rejectUnauthenticated(shop, response));
 
   console.log(`shop: ${shop}`);
+  const ingest = await ingestCatalog({ db, shopDomain: shop, graphql });
   console.log(
-    "ingest:",
-    await ingestCatalog({ db, shopDomain: shop, graphql }),
+    `ingest: created ${ingest.created}, updated ${ingest.updated}, unchanged ${ingest.unchanged}, deleted ${ingest.deleted}`,
+  );
+  console.log(
+    `images: fetched ${ingest.images.fetched}, unchanged ${ingest.images.unchanged}, failed ${ingest.images.failed}`,
   );
   console.log(
     "enrich:",

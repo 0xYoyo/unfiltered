@@ -3,6 +3,12 @@ import { createHash } from "node:crypto";
 import { isColorwayWord } from "@unfiltered/engine";
 
 /**
+ * Image cap per product (YOY-120 AC-1; PRD capability 14): every ingestion
+ * path keeps at most this many image URLs, in source order.
+ */
+export const MAX_PRODUCT_IMAGES = 4;
+
+/**
  * Shape of one product node as returned by the Admin GraphQL products query
  * in ingest.server.ts. Only the fields the snapshot consumes.
  */
@@ -35,7 +41,12 @@ export interface ShopifyProductNode {
     maxVariantPrice: { amount: string; currencyCode: string };
   };
   variants: { nodes: Array<{ availableForSale: boolean }> };
-  images: { nodes: Array<{ altText: string | null }> };
+  /**
+   * `url` is absent in fixtures that predate image capture (YOY-120) and
+   * in webhook-derived nodes without `images[].src`; only nodes carrying it
+   * contribute to `imageUrls`.
+   */
+  images: { nodes: Array<{ url?: string | null; altText: string | null }> };
   featuredImage: { url: string } | null;
   /**
    * The product's Online Store URL as the Admin API resolves it (YOY-87);
@@ -126,6 +137,29 @@ export function computeContentHash(
       ]),
     )
     .digest("hex");
+}
+
+/**
+ * The first MAX_PRODUCT_IMAGES non-empty URLs, in order (YOY-120 AC-1).
+ * Shared by every ingestion path so the cap is applied once, identically.
+ */
+export function capImageUrls(urls: Array<string | null | undefined>): string[] {
+  return urls
+    .filter((url): url is string => typeof url === "string" && url !== "")
+    .slice(0, MAX_PRODUCT_IMAGES);
+}
+
+/**
+ * The image URLs of one Admin product node (YOY-120 AC-1): the first
+ * MAX_PRODUCT_IMAGES `images.nodes[].url`, in order — the input of image
+ * capture (`images.server.ts`), which hashes the bytes into `ProductImage`
+ * rows. Kept beside the snapshot row rather than on it: `SnapshotProduct`
+ * is exactly the `CatalogProduct` row, and image URLs sit outside
+ * contentHash (AC-2) — an image change is tracked by its own hash, never
+ * by re-enriching the text.
+ */
+export function snapshotImageUrls(node: Pick<ShopifyProductNode, "images">): string[] {
+  return capImageUrls(node.images.nodes.map((image) => image.url));
 }
 
 /**

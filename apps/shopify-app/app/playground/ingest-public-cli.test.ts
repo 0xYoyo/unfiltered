@@ -70,6 +70,7 @@ beforeEach(async () => {
   await db.aiCall.deleteMany();
   await db.$executeRawUnsafe(`DELETE FROM "ProductEmbedding"`);
   await db.productEnrichment.deleteMany();
+  await db.productImage.deleteMany();
   await db.catalogProduct.deleteMany();
   await db.playgroundCatalog.deleteMany();
 });
@@ -240,6 +241,10 @@ describe("runIngestPublicCli", () => {
         `source: shopify-public at ${FIXTURE_ORIGIN}`,
         "name: Demo Store",
         "ingest: created 3, updated 0, unchanged 0, deleted 0",
+        // Image capture reads through the polite fetcher (YOY-120 AC-2);
+        // the fixture store routes no /cdn/ path, so every fetch fails —
+        // counted, never fatal.
+        expect.stringMatching(/^images: fetched \d+, unchanged \d+, failed \d+$/),
         expect.stringMatching(/^skipped 1 product\(s\) beyond --max 4/),
         "skipped 1 product(s) with no title or no price",
         "enrich: enriched 3, cached 0, failed 0",

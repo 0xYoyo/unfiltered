@@ -168,6 +168,21 @@ export interface StructuredCompletionRequest {
    * per-request timeout.
    */
   signal?: AbortSignal;
+  /**
+   * Images the model must read alongside the prompt (YOY-120 AC-3; PRD
+   * capability 14): raw bytes with their MIME type, in the order they
+   * should precede the text. Vendor-free — an adapter encodes them in its
+   * own wire form. Absent or empty means a text-only call, byte-for-byte
+   * what it was before images existed.
+   */
+  images?: InlineImage[];
+}
+
+/** One image handed to the LLM port: bytes plus their MIME type. */
+export interface InlineImage {
+  /** e.g. "image/jpeg", "image/png", "image/webp". */
+  mimeType: string;
+  data: Uint8Array;
 }
 
 /**
