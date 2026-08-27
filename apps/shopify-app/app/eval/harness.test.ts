@@ -1,3 +1,6 @@
+import { existsSync, readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
+
 import { constraintsFromIntent } from "@unfiltered/engine";
 import { beforeAll, describe, expect, it } from "vitest";
 
@@ -5,17 +8,24 @@ import { createTestDb } from "../testing/helpers.server";
 import {
   CONSTRUCTOR_GROUPS,
   CONSTRUCTOR_SET_MINIMUMS,
+  CONTAMINATION_TERMS,
   computeConstructorBar,
+  contaminationViolations,
   findViolations,
   goldenHit,
   loadBaselineHits,
   loadCatalog,
   loadConstructorFloor,
   loadConstructorGoldens,
+  loadContaminationCases,
   loadGoldens,
   loadRefinementGoldens,
+  loadVisionGoldens,
   refinementViolations,
   runEval,
+  VISION_FIXTURES_DIR,
+  VISION_IMAGE_MAX_BYTES,
+  type ContaminationCase,
   type EvalRunResult,
   type Golden,
   type QueryScore,
@@ -36,7 +46,7 @@ describe("eval fixtures (AC-1)", () => {
     const catalog = loadCatalog();
     const goldens = loadGoldens();
 
-    expect(catalog).toHaveLength(78);
+    expect(catalog).toHaveLength(92);
     expect(goldens).toHaveLength(35);
 
     // Deliberately sparse: descriptions are one-liners or empty, tags minimal.
@@ -296,6 +306,116 @@ describe("Constructor-bar fixtures (YOY-118 AC-1)", () => {
     expect(bar.escalationRate).toBeCloseTo(1 / 3);
     expect(bar.aiSearchCount).toBe(3);
     expect(bar.costPer1000Usd).toBeCloseTo((0.003 / 3) * 1000);
+  });
+});
+
+describe("vision fixtures (YOY-122 AC-1, AC-2)", () => {
+  const catalog = loadCatalog();
+  const byId = new Map(catalog.map((product) => [product.productId, product]));
+  const withImages = catalog.filter((product) => (product.images ?? []).length > 0);
+
+  it("ships ≥ 6 contamination cases, each on a catalog product with images, with a sold category and colours and ≥ 1 other item", () => {
+    const cases = loadContaminationCases();
+    expect(cases.length).toBeGreaterThanOrEqual(6);
+    expect(new Set(cases.map((kase) => kase.productId)).size).toBe(cases.length);
+    for (const kase of cases) {
+      const product = byId.get(kase.productId);
+      expect(product, kase.productId).toBeDefined();
+      expect((product!.images ?? []).length, kase.productId).toBeGreaterThan(0);
+      expect(kase.sold.categories.length, kase.productId).toBeGreaterThan(0);
+      expect(kase.sold.colors.length, kase.productId).toBeGreaterThan(0);
+      expect(kase.otherItems.length, kase.productId).toBeGreaterThan(0);
+    }
+  });
+
+  it("every fixture image exists, is ≤ 200 KB, and is listed with a licence in SOURCES.md", () => {
+    const sources = readFileSync(join(VISION_FIXTURES_DIR, "SOURCES.md"), "utf8");
+    const files = new Set(withImages.flatMap((product) => product.images ?? []));
+    expect(files.size).toBeGreaterThanOrEqual(6);
+    for (const file of files) {
+      const path = join(VISION_FIXTURES_DIR, file);
+      expect(existsSync(path), file).toBe(true);
+      expect(statSync(path).size, `${file} exceeds ${VISION_IMAGE_MAX_BYTES} bytes`).toBeLessThanOrEqual(
+        VISION_IMAGE_MAX_BYTES,
+      );
+      const row = sources.split("\n").find((line) => line.includes(`\`${file}\``));
+      expect(row, `${file} has no SOURCES.md row`).toBeDefined();
+      expect(row, `${file} row carries no licence`).toMatch(/CC0|CC BY|Public domain/);
+    }
+  });
+
+  it("ships ≥ 6 text-sparse products with images: title of ≤ 5 words, no description", () => {
+    const sparse = withImages.filter(
+      (product) => product.description === "" && product.title.trim().split(/\s+/).length <= 5,
+    );
+    expect(sparse.length).toBeGreaterThanOrEqual(6);
+  });
+
+  it("ships ≥ 6 sparse goldens, unique ids apart from the other sets, each expecting products with images", () => {
+    const goldens = loadVisionGoldens();
+    expect(goldens.length).toBeGreaterThanOrEqual(6);
+    const otherIds = new Set([...loadGoldens(), ...loadConstructorGoldens()].map((golden) => golden.id));
+    expect(new Set(goldens.map((golden) => golden.id)).size).toBe(goldens.length);
+    for (const golden of goldens) {
+      expect(otherIds.has(golden.id), golden.id).toBe(false);
+      expect(golden.expectedProductIds.length, golden.id).toBeGreaterThan(0);
+      for (const id of golden.expectedProductIds) {
+        expect((byId.get(id)?.images ?? []).length, `${golden.id} expects ${id} without images`).toBeGreaterThan(0);
+      }
+    }
+    expect(goldens.some((golden) => golden.language === "he")).toBe(true);
+  });
+});
+
+describe("contamination scoring (YOY-122 AC-1)", () => {
+  const kase: ContaminationCase = {
+    productId: "px",
+    sold: { item: "grey hoodie", categories: ["top"], colors: ["grey", "black"] },
+    otherItems: [
+      { item: "black jeans", colors: ["black"] },
+      { item: "white sneakers", colors: ["white"] },
+      { item: "silver necklace", colors: ["silver"] },
+    ],
+  };
+  const answer = (overrides: Partial<Parameters<typeof contaminationViolations>[1] & object> = {}) => ({
+    category: "top",
+    colors: ["grey", "black"],
+    primaryColor: "grey",
+    occasions: [],
+    fit: "relaxed",
+    styleTags: ["casual", "streetwear"],
+    sleeveLength: "long",
+    neckline: "hooded",
+    garmentLength: "hip",
+    pattern: "solid",
+    materialAppearance: "fleece",
+    ...overrides,
+  });
+
+  it("passes a clean answer: sold category, sold colours only (shared colours included), no footwear/jewellery/bag tag", () => {
+    expect(contaminationViolations(kase, answer())).toEqual([]);
+    // gray and grey are one colour; black is shared with the jeans, so it is not foreign.
+    expect(contaminationViolations(kase, answer({ colors: ["Gray"], primaryColor: "gray" }))).toEqual([]);
+  });
+
+  it("flags the other items' category, their unique colours, and their terms in styleTags; a missing answer is a violation", () => {
+    expect(contaminationViolations(kase, answer({ category: "sneakers" }))).toEqual([
+      expect.stringContaining("category \"sneakers\" is not the sold item's"),
+    ]);
+    expect(contaminationViolations(kase, answer({ colors: ["grey", "white"] }))).toEqual([
+      expect.stringContaining("colour \"white\" belongs to the white sneakers"),
+    ]);
+    expect(contaminationViolations(kase, answer({ primaryColor: "silver" }))).toEqual([
+      expect.stringContaining("colour \"silver\" belongs to the silver necklace"),
+    ]);
+    expect(contaminationViolations(kase, answer({ styleTags: ["casual", "white sneakers"] }))).toEqual([
+      expect.stringContaining("styleTag \"white sneakers\" names sneakers"),
+    ]);
+    expect(contaminationViolations(kase, answer({ styleTags: ["Necklace"] }))).toHaveLength(1);
+    expect(contaminationViolations(kase, null)).toEqual(["px: no vision answer recorded"]);
+    for (const term of ["sneakers", "heels", "necklace", "handbag", "watch"]) {
+      expect(CONTAMINATION_TERMS).toContain(term);
+    }
   });
 });
 
@@ -613,6 +733,35 @@ describe("eval run (AC-2, AC-3, AC-4, AC-6)", () => {
       }
     }
     // The set's spend is its own line, never blended into the main bar.
+    expect(result.blendedAiSearchCount).toBe(
+      result.perQuery.filter((score) => score.route === "ai").length,
+    );
+  });
+
+  it("scores every contamination case on the vision answer with zero violations (YOY-122 AC-1)", () => {
+    expect(result.contaminationCases).toBe(loadContaminationCases().length);
+    expect(result.contaminationCases).toBeGreaterThanOrEqual(6);
+    expect(result.contaminationViolations, result.contaminationViolations.join("; ")).toEqual([]);
+  });
+
+  it("hits ≥ 80 % of the sparse-product goldens — attributes only the images supply (YOY-122 AC-2)", () => {
+    expect(result.perSparse.length).toBe(loadVisionGoldens().length);
+    const misses = result.perSparse.filter((score) => !goldenHit(score)).map((score) => score.golden.id);
+    expect(result.sparseHitRate, `misses: ${misses.join(", ")}`).toBeGreaterThanOrEqual(0.8);
+    // Every sparse golden ran end to end on the AI path: a tier answered it.
+    for (const score of result.perSparse) {
+      expect(score.route, score.golden.id).toBe("ai");
+      expect(score.intentTier, score.golden.id).toMatch(/^(lite|accuracy)$/);
+    }
+    // Hard constraints hold on this set too.
+    expect(result.perSparse.flatMap((score) => score.violations)).toEqual([]);
+  });
+
+  it("reports the vision pass as one-time indexing cost on its own line, outside the per-search blend (YOY-122 AC-3)", () => {
+    expect(result.visionProducts).toBeGreaterThanOrEqual(6);
+    expect(result.visionCostUsd).toBeGreaterThan(0);
+    expect(result.oneTimeCostUsd).toBeGreaterThanOrEqual(result.visionCostUsd);
+    // The sparse set's searches are not in the blended denominator.
     expect(result.blendedAiSearchCount).toBe(
       result.perQuery.filter((score) => score.route === "ai").length,
     );

@@ -1390,6 +1390,196 @@
       },
       "inputTokens": 375,
       "outputTokens": 64
+    },
+    "Hoodie": {
+      "output": {
+        "category": "top",
+        "colors": [],
+        "primaryColor": "",
+        "occasions": [],
+        "fit": "",
+        "styleTags": [],
+        "seasons": []
+      },
+      "inputTokens": 367,
+      "outputTokens": 51
+    },
+    "Wrap Dress": {
+      "output": {
+        "category": "dress",
+        "colors": [],
+        "primaryColor": "",
+        "occasions": [],
+        "fit": "",
+        "styleTags": [],
+        "seasons": []
+      },
+      "inputTokens": 368,
+      "outputTokens": 51
+    },
+    "Biker Jacket": {
+      "output": {
+        "category": "jacket",
+        "colors": [],
+        "primaryColor": "",
+        "occasions": [],
+        "fit": "",
+        "styleTags": [
+          "biker"
+        ],
+        "seasons": []
+      },
+      "inputTokens": 369,
+      "outputTokens": 54
+    },
+    "Striped Tee": {
+      "output": {
+        "category": "top",
+        "colors": [],
+        "primaryColor": "",
+        "occasions": [],
+        "fit": "",
+        "styleTags": [],
+        "seasons": []
+      },
+      "inputTokens": 369,
+      "outputTokens": 51
+    },
+    "Sun Dress": {
+      "output": {
+        "category": "dress",
+        "colors": [],
+        "primaryColor": "",
+        "occasions": [],
+        "fit": "",
+        "styleTags": [],
+        "seasons": []
+      },
+      "inputTokens": 368,
+      "outputTokens": 51
+    },
+    "Moto Jacket": {
+      "output": {
+        "category": "jacket",
+        "colors": [],
+        "primaryColor": "",
+        "occasions": [],
+        "fit": "",
+        "styleTags": [],
+        "seasons": []
+      },
+      "inputTokens": 368,
+      "outputTokens": 51
+    },
+    "Chinos": {
+      "output": {
+        "category": "pants",
+        "colors": [],
+        "primaryColor": "",
+        "occasions": [],
+        "fit": "",
+        "styleTags": [],
+        "seasons": []
+      },
+      "inputTokens": 368,
+      "outputTokens": 51
+    },
+    "Track Pants": {
+      "output": {
+        "category": "pants",
+        "colors": [],
+        "primaryColor": "",
+        "occasions": [],
+        "fit": "",
+        "styleTags": [],
+        "seasons": []
+      },
+      "inputTokens": 368,
+      "outputTokens": 51
+    },
+    "Sandals": {
+      "output": {
+        "category": "shoes",
+        "colors": [],
+        "primaryColor": "",
+        "occasions": [],
+        "fit": "",
+        "styleTags": [],
+        "seasons": []
+      },
+      "inputTokens": 367,
+      "outputTokens": 51
+    },
+    "Jacket": {
+      "output": {
+        "category": "jacket",
+        "colors": [],
+        "primaryColor": "",
+        "occasions": [],
+        "fit": "",
+        "styleTags": [],
+        "seasons": []
+      },
+      "inputTokens": 367,
+      "outputTokens": 51
+    },
+    "Party Dress": {
+      "output": {
+        "category": "dress",
+        "colors": [],
+        "primaryColor": "",
+        "occasions": [],
+        "fit": "",
+        "styleTags": [],
+        "seasons": []
+      },
+      "inputTokens": 368,
+      "outputTokens": 51
+    },
+    "Day Dress": {
+      "output": {
+        "category": "dress",
+        "colors": [],
+        "primaryColor": "",
+        "occasions": [],
+        "fit": "",
+        "styleTags": [],
+        "seasons": []
+      },
+      "inputTokens": 368,
+      "outputTokens": 51
+    },
+    "Western Shirt": {
+      "output": {
+        "category": "top",
+        "colors": [],
+        "primaryColor": "",
+        "occasions": [],
+        "fit": "",
+        "styleTags": [
+          "western"
+        ],
+        "seasons": []
+      },
+      "inputTokens": 368,
+      "outputTokens": 59
+    },
+    "Winter Jacket": {
+      "output": {
+        "category": "jacket",
+        "colors": [],
+        "primaryColor": "",
+        "occasions": [],
+        "fit": "",
+        "styleTags": [
+          "winter"
+        ],
+        "seasons": [
+          "winter"
+        ]
+      },
+      "inputTokens": 368,
+      "outputTokens": 67
     }
   }
 }

@@ -1,0 +1,399 @@
+{
+  "$comment": "Contamination cases (YOY-122 AC-1): listing photos where a model wears other garments, footwear, jewellery, or bags beside the sold item. The harness scores the recorded VISION answer (visionAttributes) of each product: its category must be one of `sold.categories`; no answered colour (colors or primaryColor) may be a colour that appears ONLY on the other items (`otherItems[].colors` minus `sold.colors`); no styleTag may name a footwear, jewellery, or bag term. Colours are lowercase English; grey/gray are one colour.",
+  "cases": [
+    {
+      "productId": "p79",
+      "sold": {
+        "item": "grey hoodie",
+        "categories": [
+          "top"
+        ],
+        "colors": [
+          "grey",
+          "black"
+        ]
+      },
+      "otherItems": [
+        {
+          "item": "black skinny jeans",
+          "colors": [
+            "black"
+          ]
+        },
+        {
+          "item": "white canvas sneakers",
+          "colors": [
+            "white"
+          ]
+        }
+      ]
+    },
+    {
+      "productId": "p80",
+      "sold": {
+        "item": "black floral wrap dress",
+        "categories": [
+          "dress"
+        ],
+        "colors": [
+          "black",
+          "red",
+          "pink",
+          "blue",
+          "green",
+          "white",
+          "multi"
+        ]
+      },
+      "otherItems": [
+        {
+          "item": "burgundy shoulder bag",
+          "colors": [
+            "burgundy",
+            "maroon"
+          ]
+        },
+        {
+          "item": "brown platform sandals",
+          "colors": [
+            "brown",
+            "tan"
+          ]
+        },
+        {
+          "item": "choker necklace",
+          "colors": [
+            "black"
+          ]
+        },
+        {
+          "item": "sunglasses",
+          "colors": [
+            "black"
+          ]
+        }
+      ]
+    },
+    {
+      "productId": "p81",
+      "sold": {
+        "item": "black leather biker jacket",
+        "categories": [
+          "jacket",
+          "coat"
+        ],
+        "colors": [
+          "black",
+          "silver"
+        ]
+      },
+      "otherItems": [
+        {
+          "item": "silver wristwatch",
+          "colors": [
+            "silver"
+          ]
+        },
+        {
+          "item": "black and white spotted dress",
+          "colors": [
+            "white",
+            "black"
+          ]
+        }
+      ]
+    },
+    {
+      "productId": "p82",
+      "sold": {
+        "item": "navy and white striped breton top",
+        "categories": [
+          "top"
+        ],
+        "colors": [
+          "white",
+          "navy",
+          "black",
+          "blue"
+        ]
+      },
+      "otherItems": [
+        {
+          "item": "black leather vest",
+          "colors": [
+            "black"
+          ]
+        },
+        {
+          "item": "blue jeans",
+          "colors": [
+            "blue",
+            "denim"
+          ]
+        },
+        {
+          "item": "red high-top sneakers",
+          "colors": [
+            "red"
+          ]
+        },
+        {
+          "item": "silver chain necklace",
+          "colors": [
+            "silver"
+          ]
+        },
+        {
+          "item": "black cuff bracelet",
+          "colors": [
+            "black"
+          ]
+        }
+      ]
+    },
+    {
+      "productId": "p83",
+      "sold": {
+        "item": "white and blue floral sleeveless sun dress",
+        "categories": [
+          "dress"
+        ],
+        "colors": [
+          "white",
+          "blue",
+          "green"
+        ]
+      },
+      "otherItems": [
+        {
+          "item": "white sandals",
+          "colors": [
+            "white"
+          ]
+        },
+        {
+          "item": "pink dog leash",
+          "colors": [
+            "pink"
+          ]
+        }
+      ]
+    },
+    {
+      "productId": "p84",
+      "sold": {
+        "item": "black leather moto jacket",
+        "categories": [
+          "jacket",
+          "coat"
+        ],
+        "colors": [
+          "black",
+          "silver"
+        ]
+      },
+      "otherItems": [
+        {
+          "item": "white t-shirt",
+          "colors": [
+            "white"
+          ]
+        },
+        {
+          "item": "light blue flared jeans",
+          "colors": [
+            "blue",
+            "denim"
+          ]
+        },
+        {
+          "item": "black studded heels",
+          "colors": [
+            "black",
+            "silver"
+          ]
+        },
+        {
+          "item": "black watch",
+          "colors": [
+            "black"
+          ]
+        }
+      ]
+    },
+    {
+      "productId": "p85",
+      "sold": {
+        "item": "khaki chinos",
+        "categories": [
+          "pants"
+        ],
+        "colors": [
+          "khaki",
+          "beige",
+          "tan",
+          "brown",
+          "camel"
+        ]
+      },
+      "otherItems": [
+        {
+          "item": "blue denim jacket",
+          "colors": [
+            "blue",
+            "denim"
+          ]
+        },
+        {
+          "item": "white t-shirt",
+          "colors": [
+            "white"
+          ]
+        },
+        {
+          "item": "white sneakers",
+          "colors": [
+            "white",
+            "green"
+          ]
+        }
+      ]
+    },
+    {
+      "productId": "p86",
+      "sold": {
+        "item": "blue denim shirt",
+        "categories": [
+          "top"
+        ],
+        "colors": [
+          "blue",
+          "denim"
+        ]
+      },
+      "otherItems": [
+        {
+          "item": "grey longline t-shirt",
+          "colors": [
+            "grey"
+          ]
+        },
+        {
+          "item": "light blue jeans",
+          "colors": [
+            "blue"
+          ]
+        },
+        {
+          "item": "white high-top sneakers",
+          "colors": [
+            "white"
+          ]
+        }
+      ]
+    },
+    {
+      "productId": "p87",
+      "sold": {
+        "item": "metallic navy puffer jacket",
+        "categories": [
+          "jacket",
+          "coat"
+        ],
+        "colors": [
+          "navy",
+          "blue",
+          "red",
+          "white"
+        ]
+      },
+      "otherItems": [
+        {
+          "item": "blue denim shirt",
+          "colors": [
+            "blue"
+          ]
+        },
+        {
+          "item": "grey longline t-shirt",
+          "colors": [
+            "grey"
+          ]
+        },
+        {
+          "item": "light blue jeans",
+          "colors": [
+            "blue"
+          ]
+        },
+        {
+          "item": "white high-top sneakers",
+          "colors": [
+            "white"
+          ]
+        }
+      ]
+    },
+    {
+      "productId": "p88",
+      "sold": {
+        "item": "black track pants",
+        "categories": [
+          "pants"
+        ],
+        "colors": [
+          "black",
+          "grey"
+        ]
+      },
+      "otherItems": [
+        {
+          "item": "red hoodie",
+          "colors": [
+            "red"
+          ]
+        },
+        {
+          "item": "red and black sneakers",
+          "colors": [
+            "red",
+            "black",
+            "white"
+          ]
+        }
+      ]
+    },
+    {
+      "productId": "p90",
+      "sold": {
+        "item": "tan leather jacket",
+        "categories": [
+          "jacket",
+          "coat"
+        ],
+        "colors": [
+          "tan",
+          "brown",
+          "camel",
+          "cognac",
+          "orange"
+        ]
+      },
+      "otherItems": [
+        {
+          "item": "green jeans",
+          "colors": [
+            "green"
+          ]
+        },
+        {
+          "item": "tan knee-high boots",
+          "colors": [
+            "tan",
+            "brown"
+          ]
+        }
+      ]
+    }
+  ]
+}

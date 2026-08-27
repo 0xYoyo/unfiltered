@@ -1210,6 +1210,247 @@
       },
       "inputTokens": 265,
       "outputTokens": 97
+    },
+    "gold strappy heels under 400": {
+      "output": {
+        "colorsInclude": [
+          "gold"
+        ],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "strappy"
+        ],
+        "confidence": 0.9,
+        "category": "shoes",
+        "currency": "USD",
+        "priceMax": 400
+      },
+      "inputTokens": 267,
+      "outputTokens": 42
+    },
+    "נעלי עקב זהב עד 400": {
+      "output": {
+        "colorsInclude": [
+          "gold"
+        ],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "heels"
+        ],
+        "confidence": 0.9,
+        "category": "shoes",
+        "currency": "ILS",
+        "occasion": null,
+        "priceMax": 400,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 269,
+      "outputTokens": 55
+    },
+    "long sleeve dress under 300": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "long sleeve"
+        ],
+        "confidence": 0.9,
+        "category": "dress",
+        "currency": null,
+        "occasion": null,
+        "priceMax": 300,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 266,
+      "outputTokens": 98
+    },
+    "שמלה עם שרוולים ארוכים עד 300": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "שרוולים ארוכים"
+        ],
+        "confidence": 0.9,
+        "category": "dress",
+        "currency": "ILS",
+        "occasion": null,
+        "priceMax": 300,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 272,
+      "outputTokens": 103
+    },
+    "hooded sweatshirt under 200": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "hooded"
+        ],
+        "confidence": 0.9,
+        "category": "top",
+        "currency": null,
+        "occasion": null,
+        "priceMax": 200,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 265,
+      "outputTokens": 98
+    },
+    "black leather biker jacket under 500": {
+      "output": {
+        "colorsInclude": [
+          "black"
+        ],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "leather",
+          "biker"
+        ],
+        "confidence": 1,
+        "category": "jacket",
+        "currency": null,
+        "occasion": null,
+        "priceMax": 500,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 267,
+      "outputTokens": 113
+    },
+    "ז'קט עור שחור עד 500": {
+      "output": {
+        "colorsInclude": [
+          "black"
+        ],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "leather",
+          "winter"
+        ],
+        "confidence": 0.9,
+        "category": "jacket",
+        "currency": "ILS",
+        "occasion": null,
+        "priceMax": 500,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 271,
+      "outputTokens": 56
+    },
+    "striped breton top under 200": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "striped",
+          "breton"
+        ],
+        "confidence": 0.9,
+        "category": "top",
+        "currency": null,
+        "occasion": null,
+        "priceMax": 200,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 267,
+      "outputTokens": 103
+    },
+    "floral sleeveless summer dress under 300": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "floral",
+          "sleeveless",
+          "summer"
+        ],
+        "confidence": 0.9,
+        "category": "dress",
+        "currency": null,
+        "occasion": null,
+        "priceMax": 300,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 267,
+      "outputTokens": 58
+    },
+    "blue denim shirt under 200": {
+      "output": {
+        "colorsInclude": [
+          "blue"
+        ],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "denim"
+        ],
+        "confidence": 0.9,
+        "category": "top",
+        "currency": null,
+        "occasion": null,
+        "priceMax": 200,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 266,
+      "outputTokens": 106
+    },
+    "shiny puffer jacket under 600": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "shiny",
+          "puffer"
+        ],
+        "confidence": 0.9,
+        "category": "jacket",
+        "currency": null,
+        "occasion": null,
+        "priceMax": 600,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 266,
+      "outputTokens": 103
+    },
+    "חולצה עם פסים עד 200": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "פסים"
+        ],
+        "confidence": 0.9,
+        "category": "top",
+        "currency": "ILS",
+        "occasion": null,
+        "priceMax": 200,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 269,
+      "outputTokens": 99
     }
   }
 }
