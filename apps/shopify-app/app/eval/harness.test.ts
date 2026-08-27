@@ -30,8 +30,8 @@ describe("eval fixtures (AC-1)", () => {
     const catalog = loadCatalog();
     const goldens = loadGoldens();
 
-    expect(catalog).toHaveLength(63);
-    expect(goldens).toHaveLength(33);
+    expect(catalog).toHaveLength(66);
+    expect(goldens).toHaveLength(35);
 
     // Deliberately sparse: descriptions are one-liners or empty, tags minimal.
     for (const product of catalog) {
@@ -58,6 +58,9 @@ describe("eval fixtures (AC-1)", () => {
       }
       for (const id of golden.expectedProductIds) {
         expect(ids.has(id), `${golden.id} expects unknown product ${id}`).toBe(true);
+      }
+      for (const id of golden.mustNotProductIds ?? []) {
+        expect(ids.has(id), `${golden.id} forbids unknown product ${id}`).toBe(true);
       }
     }
   });
@@ -409,6 +412,26 @@ describe("eval run (AC-2, AC-3, AC-4, AC-6)", () => {
     expect(score.zeroHitSatisfied).toBe(true);
     // The fixture's black-primary dress (p63) is never a close match.
     expect(score.closeMatches.map((card) => card.productId)).not.toContain("p63");
+  });
+
+  it("collapses a colourway family to the query-colour member on both routes: pink rib knit top → the pink member first, no sibling in the top 10; `black dress` still hits (YOY-117 AC-3)", () => {
+    // g26 is what the live classifier makes of the bare query — a classic
+    // route, where the title match picks the pink member; g27 adds a price
+    // cap so the query escalates to the AI path, where `colorsInclude`
+    // picks the representative inside the vector query.
+    for (const [id, route] of [["g26", "classic"], ["g27", "ai"]] as const) {
+      const score = result.perQuery.find((entry) => entry.golden.id === id)!;
+      expect(score.route, id).toBe(route);
+      expect(score.hits[0]?.productId, id).toBe("p64");
+      const top = score.hits.slice(0, 10).map((card) => card.productId);
+      expect(top, id).not.toContain("p65");
+      expect(top, id).not.toContain("p66");
+      expect(score.violations, id).toEqual([]);
+    }
+    // Families never hide a different product: the classic `black dress`
+    // golden (g22) keeps its expected hits.
+    const classic = result.perQuery.find((entry) => entry.golden.id === "g22")!;
+    expect(classic.firstExpectedRank).not.toBeNull();
   });
 
   it("meets the pass bar: ≥80% of goldens hit an expected product in the top 10 (AC-3)", () => {

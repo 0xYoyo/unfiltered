@@ -43,6 +43,8 @@ interface SeedProduct {
   status?: string;
   /** Online Store publication; null seeds an unpublished row (YOY-67 AC-4). */
   publishedAt?: Date | null;
+  /** Product-family key (YOY-117); "" (the default) is its own family. */
+  familyKey?: string;
   shopDomain?: string;
   /** undefined seeds no enrichment row (an unenriched product). */
   enrichment?: {
@@ -72,6 +74,7 @@ async function seed(db: PrismaClient, products: SeedProduct[]): Promise<void> {
         available: product.available ?? true,
         status: product.status ?? "ACTIVE",
         publishedAt: product.publishedAt,
+        familyKey: product.familyKey ?? "",
         imageAltTexts: product.imageAltTexts ?? [],
         sourceUpdatedAt: new Date("2026-01-01T00:00:00Z"),
         contentHash: `hash-${product.productId}`,
@@ -484,6 +487,66 @@ describe("constraint-only mode mirrors pgvector predicate semantics (AC-4)", () 
     });
     expect(ids).toContain("cheap-dress");
     expect(ids).not.toContain("pricey-dress");
+  });
+});
+
+describe("one hit per product family (YOY-117 AC-2)", () => {
+  let db: PrismaClient;
+  const FAMILY = "eval|rib knit top|tops";
+
+  beforeAll(async () => {
+    db = await createTestDb();
+    await seed(db, [
+      { productId: "rib-black", title: "Rib Knit Top in Black", familyKey: FAMILY, enrichment: { category: "top", colors: ["black"], primaryColor: "black" } },
+      { productId: "rib-navy", title: "Rib Knit Top in Navy", familyKey: FAMILY, enrichment: { category: "top", colors: ["navy"], primaryColor: "navy" } },
+      { productId: "rib-pink", title: "Rib Knit Top in Pink", familyKey: FAMILY, enrichment: { category: "top", colors: ["pink"], primaryColor: "pink" } },
+      { productId: "knit-dress", title: "Rib Knit Dress", familyKey: "eval|rib knit dress|dresses", enrichment: { category: "dress", colors: ["black"], primaryColor: "black" } },
+      // Empty keys: own families, never collapsed together.
+      { productId: "legacy-a", title: "Knit Scarf", enrichment: { colors: [] } },
+      { productId: "legacy-b", title: "Knit Beanie", enrichment: { colors: [] } },
+    ]);
+  });
+
+  it("keyword mode returns one member per family — the best-ranked when no colour is asked", async () => {
+    const ids = await searchIds(db, { query: "rib knit top" });
+    const family = ids.filter((id) => id.startsWith("rib-"));
+    expect(family).toHaveLength(1);
+    expect(ids).toContain("knit-dress");
+  });
+
+  it("keyword mode prefers the member whose primary colour is in colorsInclude", async () => {
+    const ids = await searchIds(db, {
+      query: "rib knit top",
+      constraints: { ...noConstraints(), colorsInclude: ["pink"] },
+    });
+    expect(ids[0]).toBe("rib-pink");
+    expect(ids).not.toContain("rib-black");
+    expect(ids).not.toContain("rib-navy");
+  });
+
+  it("constraint-only mode collapses too, counts families in a limited page, and keeps empty keys apart", async () => {
+    const all = await searchIds(db, { constraints: noConstraints() });
+    expect(all.filter((id) => id.startsWith("rib-"))).toHaveLength(1);
+    expect(all).toContain("legacy-a");
+    expect(all).toContain("legacy-b");
+    // Constraint-only order is by productId, so the family's representative
+    // (its best-ranked member, "rib-black") is the fourth family: a page of
+    // four holds it exactly once and no sibling.
+    const page = await searchIds(db, { constraints: noConstraints(), limit: 4 });
+    expect(page).toEqual(["knit-dress", "legacy-a", "legacy-b", "rib-black"]);
+  });
+
+  it("keeps the card shape on every hit", async () => {
+    const result = await createPgTrgmClassicStore(db).search({
+      storeId: SHOP,
+      query: "rib knit top",
+      constraints: { ...noConstraints(), colorsInclude: ["pink"] },
+    });
+    expect(result.hits[0]).toMatchObject({ productId: "rib-pink", colorUnknown: false });
+    expect(Object.keys(result.hits[0]!).sort()).toEqual(["card", "colorUnknown", "productId", "score"]);
+    expect(Object.keys(result.hits[0]!.card).sort()).toEqual(
+      ["available", "currencyCode", "imageUrl", "priceMax", "priceMin", "title", "url"],
+    );
   });
 });
 

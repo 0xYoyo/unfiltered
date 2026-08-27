@@ -73,6 +73,13 @@ model CatalogProduct {
   // must not dirty the searchable content or trigger re-enrichment.
   handle          String   @default("")
   featuredImageUrl String?
+  // Product-family key (YOY-117 AC-1): lower(vendor) + "|" + the title with
+  // one trailing colourway designator stripped [+ "|" + lower(productType)
+  // when present]. Colourways of one product share it, so both stores return
+  // one card per family. Display-only like `handle`: outside contentHash,
+  // refreshed on every sync. "" (the backfill for pre-migration rows) means
+  // "own family" — an empty key never collapses with another row.
+  familyKey       String   @default("")
   // Server-resolved product link for result cards (YOY-87, LEAK-2): the
   // ingestion adapter that knows the storefront resolves it once; no
   // renderer composes a URL. Display-only, outside contentHash like the
@@ -86,6 +93,7 @@ model CatalogProduct {
   updatedAt       DateTime @updatedAt
 
   @@unique([shopDomain, productId])
+  @@index([shopDomain, familyKey])
   @@index([shopDomain])
 }
 

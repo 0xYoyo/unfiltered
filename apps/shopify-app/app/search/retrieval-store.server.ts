@@ -48,6 +48,15 @@ export function colorUnknownSql(constraints: {
  * enrichment's `primaryColor` only (YOY-110): a pink dress that also comes
  * in black is not "black"; a null primary colour passes.
  *
+ * One hit per product family (YOY-117 AC-2): colourways of one product share
+ * `CatalogProduct.familyKey`, and the query collapses each family to one
+ * representative INSIDE the SQL — `DISTINCT ON (family)` over the ranked
+ * candidates — so `limit` and any pagination count families, never
+ * colourways. The representative is the best-ranked member whose primary
+ * colour is one of `colorsInclude` when the query names colours, else the
+ * best-ranked member. A row with an empty `familyKey` (pre-YOY-117) is its
+ * own family; the collapse never hides a different product.
+ *
  * Vector comparisons cast both sides through the query vector's dimension, so
  * stored vectors of a different dimension fail loudly instead of comparing
  * garbage — same rule as app/catalog/embed.server.ts.
@@ -144,18 +153,31 @@ export function createPgVectorRetrievalStore(db: PrismaClient): RetrievalStore {
         : null;
       // Ranking keys, shared by the candidate scan and the re-rank below.
       const orderBy = `${colorUnknownExpr === null ? "" : `"colorUnknown" ASC, `}distance ASC`;
+      // Family representative (YOY-117 AC-2): the member matching a
+      // requested colour ranks first inside its family; a query without
+      // colour inclusions keeps the best-ranked member.
+      const preferredExpr =
+        constraints.colorsInclude.length > 0
+          ? `(lower(en."primaryColor") IN (SELECT lower(v)
+                 FROM json_array_elements_text(${param(JSON.stringify(constraints.colorsInclude))}::json) v))`
+          : `false`;
       // The candidate scan runs inside a MATERIALIZED CTE so its rows are
       // produced once and then re-sorted: iterative HNSW scans use
       // `relaxed_order` (YOY-105), which may emit candidates slightly out of
       // distance order, and the outer ORDER BY restores exact ordering
-      // without changing which rows are selected.
+      // without changing which rows are selected. The family collapse and
+      // the limit sit OUTSIDE the scan (YOY-117): the scan must see every
+      // colourway to pick the right representative, and a limit applied
+      // before collapsing would count colourways, not families.
       const rows = await withTenantVectorScan(db, (tx) =>
         tx.$queryRawUnsafe<
           Array<{ productId: string; distance: number; colorUnknown?: boolean }>
         >(
           `WITH candidates AS MATERIALIZED (
            SELECT e."productId",
-                ((e."embedding")::vector(${dimension}) <=> $2::vector(${dimension}))::float8 AS distance${
+                ((e."embedding")::vector(${dimension}) <=> $2::vector(${dimension}))::float8 AS distance,
+                COALESCE(NULLIF(p."familyKey", ''), p."productId") AS "family",
+                COALESCE(${preferredExpr}, false) AS "preferred"${
                   colorUnknownExpr === null
                     ? ""
                     : `,\n                ${colorUnknownExpr} AS "colorUnknown"`
@@ -167,14 +189,20 @@ export function createPgVectorRetrievalStore(db: PrismaClient): RetrievalStore {
            ON en."shopDomain" = e."shopDomain" AND en."productId" = e."productId"
           AND en."status" = 'enriched'
          WHERE ${where.join("\n           AND ")}
-         ORDER BY ${orderBy}${
+         ORDER BY ${orderBy}
+         ),
+         families AS (
+           SELECT DISTINCT ON ("family") *
+           FROM candidates
+           ORDER BY "family", "preferred" DESC, ${orderBy}
+         )
+         SELECT "productId", distance${colorUnknownExpr === null ? "" : `, "colorUnknown"`}
+         FROM families ORDER BY ${orderBy}${
            limit === undefined
              ? ""
              : `
          LIMIT ${limit}`
-         }
-         )
-         SELECT * FROM candidates ORDER BY ${orderBy}`,
+         }`,
           ...params,
         ),
       );

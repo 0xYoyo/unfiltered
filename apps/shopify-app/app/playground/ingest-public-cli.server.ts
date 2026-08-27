@@ -33,7 +33,7 @@ import {
  */
 
 export const INGEST_PUBLIC_USAGE = [
-  "usage: npm run ingest:public -- --url <store URL> --slug <slug> [--name \"<Store>\"] [--max <N>] [--source shopify-public|jsonld-crawl] [--pages <N>]",
+  "usage: npm run ingest:public -- --url <store URL> --slug <slug> [--name \"<Store>\"] [--max <N>] [--source shopify-public|jsonld-crawl] [--pages <N>] [--path-prefix </locale/>]",
   "       npm run ingest:public -- --delete --slug <slug>",
 ].join("\n");
 
@@ -51,6 +51,13 @@ export interface IngestPublicArgs {
   source: SourceKind | null;
   /** Page-fetch budget for the crawler (`--pages`, YOY-89 AC-1). */
   pages: number;
+  /**
+   * Locale/path hint (`--path-prefix`, YOY-117 AC-4): the crawler fetches
+   * only page URLs under it (sitemap discovery unchanged); the Shopify feed
+   * and product URLs are read under `<origin><prefix>`. Normalised to a
+   * leading slash and no trailing slash; null when not given.
+   */
+  pathPrefix: string | null;
 }
 
 /** Thrown for a malformed command line; the message is the whole report. */
@@ -71,6 +78,7 @@ export function parseIngestPublicArgs(argv: string[]): IngestPublicArgs {
     delete: false,
     source: null,
     pages: DEFAULT_CRAWL_PAGE_BUDGET,
+    pathPrefix: null,
   };
   for (let index = 0; index < argv.length; index += 1) {
     const flag = argv[index];
@@ -120,6 +128,16 @@ export function parseIngestPublicArgs(argv: string[]): IngestPublicArgs {
         args.pages = pages;
         break;
       }
+      case "--path-prefix": {
+        const raw = takeValue();
+        args.pathPrefix = normalizePathPrefix(raw);
+        if (args.pathPrefix === null) {
+          throw new IngestPublicUsageError(
+            `--path-prefix must be a path starting with "/", got "${raw}"`,
+          );
+        }
+        break;
+      }
       case "--delete":
         args.delete = true;
         break;
@@ -142,6 +160,20 @@ export function parseIngestPublicArgs(argv: string[]): IngestPublicArgs {
 }
 
 /**
+ * Normalise a `--path-prefix` value (YOY-117 AC-4): a leading slash, no
+ * trailing slash, no query or fragment. Returns null for anything that is
+ * not a plain path ("uk", "", "/uk?x", "https://…").
+ */
+export function normalizePathPrefix(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed.startsWith("/") || /[?#\s]/.test(trimmed) || trimmed.includes("://")) {
+    return null;
+  }
+  const collapsed = trimmed.replace(/\/+/g, "/").replace(/\/+$/, "");
+  return collapsed === "" ? null : collapsed;
+}
+
+/**
  * Detect which source reads `url` (YOY-88 AC-6, extended by YOY-89 AC-5):
  * a Shopify storefront (public feed answers) uses the Shopify adapter; any
  * other URL uses the generic JSON-LD crawler. `force` picks one regardless
@@ -156,19 +188,24 @@ export async function detectCatalogSource({
   name,
   force = null,
   pages = DEFAULT_CRAWL_PAGE_BUDGET,
+  pathPrefix = null,
 }: {
   url: string;
   fetch: PoliteFetch;
   name: string | null;
   force?: SourceKind | null;
   pages?: number;
+  /** `--path-prefix` (YOY-117 AC-4), already normalised. */
+  pathPrefix?: string | null;
 }): Promise<{ source: CatalogSource; name: string } | null> {
   const isShopify =
-    force === JSONLD_CRAWL_SOURCE_KIND ? false : await detectShopifyPublicStore(url, fetch);
+    force === JSONLD_CRAWL_SOURCE_KIND
+      ? false
+      : await detectShopifyPublicStore(url, fetch, { pathPrefix });
   if (isShopify) {
     const meta = await fetchShopifyPublicStoreMeta(url, fetch);
     return {
-      source: createShopifyPublicSource({ storeUrl: url, fetch, meta }),
+      source: createShopifyPublicSource({ storeUrl: url, fetch, meta, pathPrefix }),
       name: name ?? meta.name ?? new URL(url).host,
     };
   }
@@ -176,7 +213,7 @@ export async function detectCatalogSource({
     return null;
   }
   return {
-    source: createJsonLdCrawlSource({ storeUrl: url, fetch, pageBudget: pages }),
+    source: createJsonLdCrawlSource({ storeUrl: url, fetch, pageBudget: pages, pathPrefix }),
     name: name ?? new URL(url.includes("://") ? url : `https://${url}`).host,
   };
 }
@@ -236,6 +273,7 @@ export async function runIngestPublicCli({
       name: args.name,
       force: args.source,
       pages: args.pages,
+      pathPrefix: args.pathPrefix,
     });
     if (detected === null) {
       error(`no supported catalog source for ${url}`);
@@ -271,7 +309,7 @@ export async function runIngestPublicCli({
     if (detected.source.kind === JSONLD_CRAWL_SOURCE_KIND) {
       const { stats } = detected.source as JsonLdCrawlSource;
       log(
-        `crawl: sitemaps ${stats.sitemapsRead}, urls ${stats.urlsDiscovered}, pages fetched ${stats.pagesFetched} (budget ${args.pages}), products found ${stats.productsFound}, skipped no-price ${stats.skippedNoPrice}, non-html ${stats.skippedNonHtml}, robots ${stats.skippedRobots}, fetch errors ${stats.fetchErrors}, extract errors ${stats.extractErrors}${
+        `crawl: sitemaps ${stats.sitemapsRead}, urls ${stats.urlsDiscovered}, pages fetched ${stats.pagesFetched} (budget ${args.pages}), products found ${stats.productsFound}, skipped no-price ${stats.skippedNoPrice}, non-html ${stats.skippedNonHtml}, robots ${stats.skippedRobots}, outside prefix ${stats.skippedOutsidePrefix}, fetch errors ${stats.fetchErrors}, extract errors ${stats.extractErrors}${
           stats.budgetExhausted ? " — page budget exhausted, more pages remain" : ""
         }`,
       );

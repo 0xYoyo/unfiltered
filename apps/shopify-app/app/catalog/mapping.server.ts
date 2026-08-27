@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
 
+import { isColorwayWord } from "@unfiltered/engine";
+
 /**
  * Shape of one product node as returned by the Admin GraphQL products query
  * in ingest.server.ts. Only the fields the snapshot consumes.
@@ -62,6 +64,12 @@ export interface SnapshotProduct {
   /** Featured-image URL for result cards (display-only, YOY-44). */
   featuredImageUrl: string | null;
   /**
+   * Product-family key (YOY-117 AC-1): colourways of one product share it
+   * (see `computeFamilyKey`). Display-only like `handle` — outside
+   * contentHash, refreshed on every sync.
+   */
+  familyKey: string;
+  /**
    * Server-resolved product link for result cards (YOY-87, LEAK-2):
    * `onlineStoreUrl` when the source carries one, else the storefront form
    * `https://<shopDomain>/products/<handle>` when a shop domain is known,
@@ -96,6 +104,7 @@ export function computeContentHash(
     | "sourceUpdatedAt"
     | "handle"
     | "featuredImageUrl"
+    | "familyKey"
     | "url"
     | "publishedAt"
   >,
@@ -117,6 +126,65 @@ export function computeContentHash(
       ]),
     )
     .digest("hex");
+}
+
+/**
+ * A trailing colourway designator (YOY-117 AC-1): `in <Colour>`,
+ * `- <Colour>` (any dash), `/ <Colour>`, or `(<Colour>)` at the end of a
+ * title, where `<Colour>` is one or two words whose LAST word is in the
+ * committed colourway list ("Pink", "Meteorite Black", "dusty rose"). The
+ * marker-less form ("Black Evening Gown") is deliberately not a designator:
+ * the colour is part of the name, not a variant of it.
+ */
+const DESIGNATOR_PATTERNS: RegExp[] = [
+  /\s+in\s+([^\s\-–—/()]+(?:\s+[^\s\-–—/()]+)?)\s*$/iu,
+  /\s*[-–—]\s*([^\s\-–—/()]+(?:\s+[^\s\-–—/()]+)?)\s*$/u,
+  /\s*\/\s*([^\s\-–—/()]+(?:\s+[^\s\-–—/()]+)?)\s*$/u,
+  /\s*\(([^()]+)\)\s*$/u,
+];
+
+/**
+ * The title with ONE trailing colourway designator stripped, whitespace
+ * collapsed, lowercased (YOY-117 AC-1). A designator whose last word is not
+ * a colourway word ("Shirt Dress in Linen", "Jacket (Limited Edition)") is
+ * kept: it names the product, not its colour.
+ */
+export function normalizeFamilyTitle(title: string): string {
+  const collapsed = title.replace(/\s+/g, " ").trim();
+  for (const pattern of DESIGNATOR_PATTERNS) {
+    const match = pattern.exec(collapsed);
+    if (match === null) {
+      continue;
+    }
+    const words = match[1]!.trim().split(/\s+/);
+    const last = words[words.length - 1]!.replace(/[.,!?'"]+$/u, "");
+    if (words.length <= 2 && isColorwayWord(last)) {
+      const stripped = collapsed.slice(0, match.index).trim();
+      if (stripped !== "") {
+        return stripped.toLowerCase();
+      }
+    }
+  }
+  return collapsed.toLowerCase();
+}
+
+/**
+ * Product-family key (YOY-117 AC-1): `lower(vendor) + "|" + normalizedTitle`,
+ * plus `"|" + lower(productType)` when the product carries a type — two
+ * products sharing vendor and title but not type are different products,
+ * never colourways of one (co-manager parity note). Computed identically on
+ * every ingestion path; rows from before the column carry "" and never
+ * collapse.
+ */
+export function computeFamilyKey(product: {
+  vendor: string;
+  title: string;
+  productType: string;
+}): string {
+  const vendor = product.vendor.trim().toLowerCase();
+  const productType = product.productType.trim().toLowerCase();
+  const key = `${vendor}|${normalizeFamilyTitle(product.title)}`;
+  return productType === "" ? key : `${key}|${productType}`;
 }
 
 /**
@@ -168,6 +236,7 @@ export function mapProductNode(
     ...withoutHash,
     handle: node.handle,
     featuredImageUrl: node.featuredImage?.url ?? null,
+    familyKey: computeFamilyKey(withoutHash),
     url: resolveProductUrl(node, options.shopDomain),
     // Absent (legacy fixture) means published, as of the node's own
     // timestamp; explicit null means never published (YOY-67 AC-4) — the

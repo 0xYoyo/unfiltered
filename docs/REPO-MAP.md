@@ -297,6 +297,8 @@ apps/
           migration.sql
         20260827100000_product_enrichment_primary_color/
           migration.sql
+        20260827120000_catalog_product_family_key/
+          migration.sql
         migration_lock.toml
       schema.prisma
     public/
@@ -703,6 +705,7 @@ packages/
     src/
       classic.ts
       classify.ts
+      colors.ts
       index.ts
       intent-escalation.ts
       intent.ts
@@ -742,7 +745,7 @@ vitest.setup.ts
 - **Entrypoints**: apps/shopify-app/app/routes/app.tsx, apps/shopify-app/widget/src/main.ts, packages/engine/src/index.ts, packages/provider-gemini/src/index.ts
 - **Scripts**: scripts/repo-map.mjs
 - **Fixtures**: apps/shopify-app/app/eval/fixtures/baseline-hits.json, apps/shopify-app/app/eval/fixtures/catalog.json, apps/shopify-app/app/eval/fixtures/goldens.json, apps/shopify-app/app/eval/fixtures/intent-token-baseline.json, apps/shopify-app/app/eval/fixtures/recorded/classification-synthesized.json, apps/shopify-app/app/eval/fixtures/recorded/classification.json, apps/shopify-app/app/eval/fixtures/recorded/embeddings.json, apps/shopify-app/app/eval/fixtures/recorded/enrichment.json, apps/shopify-app/app/eval/fixtures/recorded/intent-lite-refinement.json, apps/shopify-app/app/eval/fixtures/recorded/intent-lite.json, apps/shopify-app/app/eval/fixtures/recorded/intent-refinement.json, apps/shopify-app/app/eval/fixtures/recorded/intent.json, apps/shopify-app/app/eval/fixtures/refinement-goldens.json, apps/shopify-app/app/playground/fixtures/ai-chip-removed.json, apps/shopify-app/app/playground/fixtures/ai-reuse.json, apps/shopify-app/app/playground/fixtures/ai-zero-hit.json, apps/shopify-app/app/playground/fixtures/ai.json, apps/shopify-app/app/playground/fixtures/color-unknown.json, apps/shopify-app/app/playground/fixtures/crawl/about.html, apps/shopify-app/app/playground/fixtures/crawl/crawl-store.ts, apps/shopify-app/app/playground/fixtures/crawl/dupe-page.html, apps/shopify-app/app/playground/fixtures/crawl/group-sneaker.html, apps/shopify-app/app/playground/fixtures/crawl/magento-shirt.html, apps/shopify-app/app/playground/fixtures/crawl/priceless-scarf.html, apps/shopify-app/app/playground/fixtures/crawl/sitemap-index.xml, apps/shopify-app/app/playground/fixtures/crawl/sitemap-pages.xml, apps/shopify-app/app/playground/fixtures/crawl/sitemap-products.xml, apps/shopify-app/app/playground/fixtures/crawl/woo-dress.html, apps/shopify-app/app/playground/fixtures/degraded.json, apps/shopify-app/app/playground/fixtures/empty.json, apps/shopify-app/app/playground/fixtures/preview.json, apps/shopify-app/app/playground/fixtures/results.json, apps/shopify-app/app/playground/fixtures/shopify-public-products.ts
-- **Migrations**: apps/shopify-app/prisma/migrations/20260803000000_init_postgres/migration.sql, apps/shopify-app/prisma/migrations/20260803134500_ai_call_ledger/migration.sql, apps/shopify-app/prisma/migrations/20260803150800_catalog_product/migration.sql, apps/shopify-app/prisma/migrations/20260804152800_product_enrichment/migration.sql, apps/shopify-app/prisma/migrations/20260805131800_product_embedding/migration.sql, apps/shopify-app/prisma/migrations/20260808160000_pg_trgm_classic_search/migration.sql, apps/shopify-app/prisma/migrations/20260808170000_product_display_snapshot/migration.sql, apps/shopify-app/prisma/migrations/20260808190000_search_click_events/migration.sql, apps/shopify-app/prisma/migrations/20260809190000_catalog_product_status/migration.sql, apps/shopify-app/prisma/migrations/20260810210000_catalog_product_published_at/migration.sql, apps/shopify-app/prisma/migrations/20260816200000_catalog_product_url/migration.sql, apps/shopify-app/prisma/migrations/20260817130000_playground_catalog/migration.sql, apps/shopify-app/prisma/migrations/20260824190000_search_event_route_reason/migration.sql, apps/shopify-app/prisma/migrations/20260826150000_search_event_intent_reuse/migration.sql, apps/shopify-app/prisma/migrations/20260827100000_product_enrichment_primary_color/migration.sql, apps/shopify-app/prisma/migrations/migration_lock.toml
+- **Migrations**: apps/shopify-app/prisma/migrations/20260803000000_init_postgres/migration.sql, apps/shopify-app/prisma/migrations/20260803134500_ai_call_ledger/migration.sql, apps/shopify-app/prisma/migrations/20260803150800_catalog_product/migration.sql, apps/shopify-app/prisma/migrations/20260804152800_product_enrichment/migration.sql, apps/shopify-app/prisma/migrations/20260805131800_product_embedding/migration.sql, apps/shopify-app/prisma/migrations/20260808160000_pg_trgm_classic_search/migration.sql, apps/shopify-app/prisma/migrations/20260808170000_product_display_snapshot/migration.sql, apps/shopify-app/prisma/migrations/20260808190000_search_click_events/migration.sql, apps/shopify-app/prisma/migrations/20260809190000_catalog_product_status/migration.sql, apps/shopify-app/prisma/migrations/20260810210000_catalog_product_published_at/migration.sql, apps/shopify-app/prisma/migrations/20260816200000_catalog_product_url/migration.sql, apps/shopify-app/prisma/migrations/20260817130000_playground_catalog/migration.sql, apps/shopify-app/prisma/migrations/20260824190000_search_event_route_reason/migration.sql, apps/shopify-app/prisma/migrations/20260826150000_search_event_intent_reuse/migration.sql, apps/shopify-app/prisma/migrations/20260827100000_product_enrichment_primary_color/migration.sql, apps/shopify-app/prisma/migrations/20260827120000_catalog_product_family_key/migration.sql, apps/shopify-app/prisma/migrations/migration_lock.toml
 
 ## Module dependency map
 
@@ -863,7 +866,7 @@ vitest.setup.ts
 - apps/shopify-app/widget/test-ui/localization.spec.ts → apps/shopify-app/widget/src/strings.ts
 - docs/vision/compare.mts → apps/shopify-app/app/playground/polite-fetch.server.ts, packages/engine/src/taxonomy.ts
 - packages/engine/src/classic.ts → packages/engine/src/retrieve.ts
-- packages/engine/src/classify.ts → packages/engine/src/index.ts
+- packages/engine/src/classify.ts → packages/engine/src/colors.ts, packages/engine/src/index.ts
 - packages/engine/src/intent-escalation.ts → packages/engine/src/intent.ts
 - packages/engine/src/intent.ts → packages/engine/src/index.ts, packages/engine/src/taxonomy.ts
 - packages/engine/src/retrieve.ts → packages/engine/src/index.ts, packages/engine/src/intent.ts

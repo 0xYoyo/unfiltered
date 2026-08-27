@@ -623,5 +623,52 @@
       "occasion": null,
       "availabilityRequired": false
     }
+  },
+  {
+    "id": "g26",
+    "language": "en",
+    "query": "pink rib knit top",
+    "expectedProductIds": [
+      "p64"
+    ],
+    "mustNotProductIds": [
+      "p65",
+      "p66"
+    ],
+    "hardConstraints": {
+      "category": "top",
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [
+        "pink"
+      ],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    },
+    "expectedRoute": "classic"
+  },
+  {
+    "id": "g27",
+    "language": "en",
+    "query": "pink rib knit top under 200",
+    "expectedProductIds": [
+      "p64"
+    ],
+    "mustNotProductIds": [
+      "p65",
+      "p66"
+    ],
+    "hardConstraints": {
+      "category": "top",
+      "priceMin": null,
+      "priceMax": 200,
+      "colorsInclude": [
+        "pink"
+      ],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    }
   }
 ]

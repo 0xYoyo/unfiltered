@@ -18,12 +18,15 @@ zero network calls, identical ledger shape to a live run.
 
 ## Fixtures
 
-- `fixtures/catalog.json` — 63 sparse fashion products (EN + HE): one-line or
+- `fixtures/catalog.json` — 66 sparse fashion products (EN + HE): one-line or
   empty descriptions, ≤2 tags. Deliberately low-quality by design (NG-3).
+  p64–p66 "Rib Knit Top in Pink / in Navy / in Black" are one colourway
+  family (YOY-117): the harness seeds them with the same `familyKey` every
+  ingestion path computes, and the stores return one card per family.
   p62 "Mesh Over Dress in Pink" (colourways pink, black, navy; primary pink)
   and p63 "Tie Waist Dress in Black" pin the primary-colour exclusion rule
   (YOY-110).
-- `fixtures/goldens.json` — 33 golden natural-language queries (EN, HE,
+- `fixtures/goldens.json` — 35 golden natural-language queries (EN, HE,
   mixed), each with expected product IDs and the hard constraints its results
   are checked against. g24 `summer dress, not black, under 200` expects the
   pink colourway dress: an excluded colour is judged by `primaryColor`, not
@@ -32,7 +35,11 @@ zero network calls, identical ledger shape to a live run.
   YOY-111): its intersection is empty by design, and it scores the
   close-match ladder — hits empty, close matches non-empty with no
   black-primary product, the budget relaxed first. A satisfied zero-hit
-  golden counts as a hit.
+  golden counts as a hit. g26 `pink rib knit top` (classic, as the live
+  classifier routes it) and g27 `pink rib knit top under 200` (AI) expect
+  the pink family member first and carry `mustNotProductIds` (the navy and
+  black colourways): any of them in the top 10 is a violation (YOY-117
+  AC-3).
 - `fixtures/refinement-goldens.json` — 6 follow-up queries (EN, HE, mixed),
   each with the previous query's intent and the constraint outcome the merged
   intent must produce (YOY-42). They run intent extraction only: a follow-up
@@ -103,7 +110,9 @@ baseline is scored against the same intents. Orphaned embedding vectors are
 dropped. The run prints its metered spend per operation from the ledger.
 `REGEN_SCOPE=goldens` (YOY-111) is the same missing-only pass without the
 enrichment re-record — for a new golden over an unchanged catalog, so the
-product vectors stay byte-identical too.
+product vectors stay byte-identical too. A product with no enrichment
+recording yet (added with the golden, YOY-117) is recorded and merged; every
+existing enrichment entry is reused as-is.
 
 The root `regen:live` script pins the run to the root `vitest.config.ts`,
 whose alias resolves `@unfiltered/*` to the TypeScript source. Invoking

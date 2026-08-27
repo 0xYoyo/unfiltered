@@ -1121,6 +1121,65 @@
       },
       "inputTokens": 380,
       "outputTokens": 68
+    },
+    "Rib Knit Top in Pink": {
+      "output": {
+        "category": "top",
+        "colors": [
+          "pink",
+          "navy",
+          "black"
+        ],
+        "primaryColor": "pink",
+        "occasions": [],
+        "fit": "",
+        "styleTags": [
+          "ribbed",
+          "knit"
+        ],
+        "seasons": []
+      },
+      "inputTokens": 383,
+      "outputTokens": 85
+    },
+    "Rib Knit Top in Navy": {
+      "output": {
+        "category": "top",
+        "colors": [
+          "navy",
+          "pink",
+          "black"
+        ],
+        "primaryColor": "navy",
+        "occasions": [],
+        "fit": "",
+        "styleTags": [
+          "knit",
+          "ribbed"
+        ],
+        "seasons": []
+      },
+      "inputTokens": 383,
+      "outputTokens": 85
+    },
+    "Rib Knit Top in Black": {
+      "output": {
+        "category": "top",
+        "colors": [
+          "black",
+          "pink",
+          "navy"
+        ],
+        "primaryColor": "black",
+        "occasions": [],
+        "fit": "",
+        "styleTags": [
+          "rib knit"
+        ],
+        "seasons": []
+      },
+      "inputTokens": 383,
+      "outputTokens": 80
     }
   }
 }

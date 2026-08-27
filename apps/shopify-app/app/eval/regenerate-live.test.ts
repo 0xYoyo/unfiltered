@@ -850,15 +850,42 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
         `coverage: ${Object.keys(enrichmentEntries).length}/${catalog.length} enrichments recorded`,
       );
     } else {
+      // Missing-only (YOY-117): a product added with a new golden gets its
+      // enrichment recorded live and merged; every existing entry is reused.
       const onDisk = readRecording("enrichment.json");
-      for (const product of catalog) {
+      check(
+        onDisk.modelId === models.classificationModel,
+        `enrichment.json is ${onDisk.modelId}, env says ${models.classificationModel}; regenerate with REGEN_SCOPE=catalog`,
+      );
+      const enrichmentLlm = captureCompletions(
+        createGeminiLlmClient({
+          modelId: models.classificationModel,
+          costRecorder: usage.recorder,
+        }),
+        usage.last,
+        onDisk.entries,
+      );
+      let recorded = 0;
+      for (const { sourceUpdatedAt, ...product } of catalog) {
+        void sourceUpdatedAt;
+        if (onDisk.entries[product.title] === undefined) {
+          await enrichmentLlm.completeStructured({
+            prompt: buildEnrichmentPrompt({ ...product, contentHash: computeContentHash(product) }),
+            schema: ENRICHMENT_SCHEMA,
+            operation: "enrichment",
+          });
+          recorded += 1;
+        }
         const entry = onDisk.entries[product.title];
-        check(entry !== undefined, `enrichment: ${product.productId} has no recording; run REGEN_SCOPE=catalog`);
-        attributesByProduct.set(
-          product.productId,
-          entry === undefined ? null : parseEnrichment(entry.output, product),
-        );
+        check(entry !== undefined, `enrichment: ${product.productId} recorded no completion`);
+        const attributes = entry === undefined ? null : parseEnrichment(entry.output, product);
+        check(attributes !== null, `enrichment: ${product.productId} answered outside the schema`);
+        attributesByProduct.set(product.productId, attributes);
       }
+      if (recorded > 0) {
+        writeRecording("enrichment.json", onDisk.modelId, onDisk.entries);
+      }
+      console.log(`[regenerate-live] scope=goldens: ${recorded} missing enrichment(s) recorded`);
     }
 
     // 2. Classification: only model-answered goldens with no live entry yet.
