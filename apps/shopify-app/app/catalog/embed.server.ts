@@ -40,11 +40,56 @@ export interface EmbeddableAttributes {
   fit: string | null;
   styleTags: string[];
   seasons: string[];
+  /**
+   * The vision-only coverage attributes (YOY-121 AC-4), null or absent
+   * when vision never ran or the attribute does not apply. Folded into the
+   * composed text as short phrases, so a vision change moves the freshness
+   * hash and re-embeds exactly the products it touched.
+   */
+  sleeveLength?: string | null;
+  neckline?: string | null;
+  garmentLength?: string | null;
+  pattern?: string | null;
+  materialAppearance?: string | null;
+}
+
+/**
+ * The vision attributes as embedding-text phrases (YOY-121 AC-4): a bare
+ * vocabulary token ("hip", "solid", "long") carries little meaning on its
+ * own, so each is phrased the way a shopper would write it — "long
+ * sleeves", "v-neck neckline", "midi length", "floral pattern" — except
+ * `materialAppearance`, whose tokens ("knit", "leather") already read as
+ * words. Fixed order; null/absent attributes contribute nothing.
+ */
+export function visionAttributeTerms(attributes: EmbeddableAttributes): string[] {
+  const terms: string[] = [];
+  const sleeve = attributes.sleeveLength ?? null;
+  if (sleeve !== null) {
+    terms.push(sleeve === "sleeveless" ? "sleeveless" : `${sleeve} sleeves`);
+  }
+  const neckline = attributes.neckline ?? null;
+  if (neckline !== null) {
+    terms.push(`${neckline} neckline`);
+  }
+  const length = attributes.garmentLength ?? null;
+  if (length !== null) {
+    terms.push(`${length} length`);
+  }
+  const pattern = attributes.pattern ?? null;
+  if (pattern !== null) {
+    terms.push(`${pattern} pattern`);
+  }
+  const material = attributes.materialAppearance ?? null;
+  if (material !== null) {
+    terms.push(material);
+  }
+  return terms;
 }
 
 /**
  * Deterministic composed text for one product (AC-1): title, then enriched
- * attribute values (when the product has a successful enrichment row), then a
+ * attribute values (when the product has a successful enrichment row) —
+ * the text-schema fields, then the vision phrases (YOY-121 AC-4) — then a
  * description excerpt, then tags — fixed order, empty parts dropped, so the
  * same snapshot and enrichment always embed the same text.
  */
@@ -62,6 +107,7 @@ export function composeEmbeddingText(
           ...attributes.occasions,
           ...attributes.styleTags,
           ...attributes.seasons,
+          ...visionAttributeTerms(attributes),
         ]
       : []),
     product.description.slice(0, DESCRIPTION_EXCERPT_CHARS),

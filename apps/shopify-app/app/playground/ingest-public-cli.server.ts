@@ -1,6 +1,8 @@
 import type { PrismaClient } from "@prisma/client";
 import type { EmbeddingClient, LlmClient } from "@unfiltered/engine";
 
+import { formatVisionReport } from "../catalog/enrich.server";
+
 import type { CatalogSource } from "./catalog-source.server";
 import {
   DEFAULT_MAX_PRODUCTS,
@@ -237,11 +239,12 @@ export async function runIngestPublicCli({
   db: PrismaClient;
   fetch: PoliteFetch;
   /**
-   * The engine ports the enrichment and embedding steps run through, built
-   * lazily: the metered Gemini clients need GEMINI_API_KEY at construction,
-   * which `--delete` and a failed detection must not require.
+   * The engine ports the enrichment (text and vision, YOY-121) and
+   * embedding steps run through, built lazily: the metered Gemini clients
+   * need GEMINI_API_KEY at construction, which `--delete` and a failed
+   * detection must not require.
    */
-  aiClients: () => { llm: LlmClient; embeddings: EmbeddingClient };
+  aiClients: () => { llm: LlmClient; vision: LlmClient; embeddings: EmbeddingClient };
   log?: (line: string) => void;
   error?: (line: string) => void;
   now?: Date;
@@ -282,7 +285,7 @@ export async function runIngestPublicCli({
     log(`catalog: ${args.slug} (${playgroundStoreKey(args.slug)})`);
     log(`source: ${detected.source.kind} at ${url}`);
     log(`name: ${detected.name}`);
-    const { llm, embeddings } = aiClients();
+    const { llm, vision, embeddings } = aiClients();
     const result = await ingestPublicCatalog({
       db,
       slug: args.slug,
@@ -291,6 +294,7 @@ export async function runIngestPublicCli({
       sourceUrl: url,
       maxProducts: args.max,
       llm,
+      vision,
       embeddings,
       imageFetch: (imageUrl) => fetch.fetch(imageUrl),
       now,
@@ -321,6 +325,9 @@ export async function runIngestPublicCli({
     log(
       `enrich: enriched ${result.enrich.enriched}, cached ${result.enrich.cached}, failed ${result.enrich.failed}`,
     );
+    if (result.enrich.vision !== undefined) {
+      log(formatVisionReport(result.enrich.vision));
+    }
     log(
       `embed: embedded ${result.embed.embedded}, cached ${result.embed.cached}, deleted ${result.embed.deleted}`,
     );

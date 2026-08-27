@@ -34,7 +34,9 @@ import {
 } from "../app/catalog/embed.server";
 import {
   createEnrichmentLlmClient,
+  createVisionLlmClient,
   enrichCatalog,
+  formatVisionReport,
 } from "../app/catalog/enrich.server";
 import { ingestCatalog } from "../app/catalog/ingest.server";
 import {
@@ -83,21 +85,27 @@ try {
   console.log(
     `images: fetched ${ingest.images.fetched}, unchanged ${ingest.images.unchanged}, failed ${ingest.images.failed}`,
   );
+  // Text enrichment plus the vision pass (YOY-121 AC-2): images are
+  // re-read with the platform fetch, the same fetch that hashed them.
+  const enrich = await enrichCatalog({
+    db,
+    shopDomain: shop,
+    llm: createEnrichmentLlmClient(db),
+    vision: { llm: createVisionLlmClient(db) },
+  });
   console.log(
-    "enrich:",
-    await enrichCatalog({
-      db,
-      shopDomain: shop,
-      llm: createEnrichmentLlmClient(db),
-    }),
+    `enrich: enriched ${enrich.enriched}, cached ${enrich.cached}, failed ${enrich.failed}`,
   );
+  if (enrich.vision !== undefined) {
+    console.log(formatVisionReport(enrich.vision));
+  }
+  const embed = await embedCatalog({
+    db,
+    shopDomain: shop,
+    embeddings: createCatalogEmbeddingClient(db),
+  });
   console.log(
-    "embed:",
-    await embedCatalog({
-      db,
-      shopDomain: shop,
-      embeddings: createCatalogEmbeddingClient(db),
-    }),
+    `embed: embedded ${embed.embedded}, cached ${embed.cached}, deleted ${embed.deleted}`,
   );
 } catch (error) {
   if (error instanceof OfflineAuthError) {

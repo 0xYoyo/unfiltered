@@ -38,7 +38,14 @@ const fixtureRoutes = () => ({
 });
 
 /** Fixture AI clients: no ledger rows here — the CLI's cost line is proven at $0. */
-const fixtureAi = (): { llm: LlmClient; embeddings: EmbeddingClient } => ({
+const fixtureAi = (): { llm: LlmClient; vision: LlmClient; embeddings: EmbeddingClient } => ({
+  vision: {
+    // The fixture store serves no image bytes, so no ProductImage row
+    // exists and the vision pass never reaches the model (YOY-121 AC-6).
+    async completeStructured() {
+      throw new Error("vision must not be called without images");
+    },
+  },
   llm: {
     async completeStructured() {
       return {
@@ -248,6 +255,9 @@ describe("runIngestPublicCli", () => {
         expect.stringMatching(/^skipped 1 product\(s\) beyond --max 4/),
         "skipped 1 product(s) with no title or no price",
         "enrich: enriched 3, cached 0, failed 0",
+        // The vision report line (YOY-121 AC-6): no product has an image
+        // row, so nothing is analysed, cached, or failed.
+        "vision: analysed 0, cached 0, failed 0, cost $0.000000",
         "embed: embedded 3, cached 0, deleted 0",
         expect.stringMatching(/^ai cost this run: \$0\.000000 over 0 call\(s\)$/),
         expect.stringMatching(/^requests: \d+, retries: 0, robots-skipped: 0$/),
@@ -267,6 +277,7 @@ describe("runIngestPublicCli", () => {
         "name: Renamed",
         "ingest: created 0, updated 0, unchanged 3, deleted 0",
         "enrich: enriched 0, cached 3, failed 0",
+        "vision: analysed 0, cached 0, failed 0, cost $0.000000",
         "embed: embedded 0, cached 3, deleted 0",
       ]),
     );

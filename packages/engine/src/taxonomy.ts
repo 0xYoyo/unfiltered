@@ -166,3 +166,118 @@ export function normalizeCategory(raw: string): CanonicalCategory | null {
 export function normalizeOccasion(raw: string): CanonicalOccasion | null {
   return normalizeToken(raw, CANONICAL_OCCASIONS, OCCASION_SYNONYMS);
 }
+
+/**
+ * Vision-only attribute vocabularies (YOY-121 AC-1; PRD capability 14):
+ * the closed value sets the vision pass answers with for the five coverage
+ * attributes text enrichment cannot see — `sleeveLength`, `neckline`,
+ * `garmentLength`, `pattern`, `materialAppearance`. Committed here, beside
+ * the category and occasion sets, for the same reason: the vision schema
+ * pins its enums to these lists, the parse site maps answers into them,
+ * and nothing else may define its own. Every list carries
+ * `VISION_NOT_APPLICABLE`, the answer for an item the attribute does not
+ * describe (a bag has no neckline; a plain tee has no pattern) — stored as
+ * null, never as a token, so it reaches neither the embedding text nor a
+ * filter. The values are those docs/VISION-MODEL.md scored the model on.
+ */
+export const VISION_NOT_APPLICABLE = "not-applicable";
+
+export const VISION_SLEEVE_LENGTHS = [
+  "sleeveless",
+  "short",
+  "three-quarter",
+  "long",
+  VISION_NOT_APPLICABLE,
+] as const;
+
+export const VISION_NECKLINES = [
+  "crew",
+  "v-neck",
+  "scoop",
+  "collar",
+  "high-neck",
+  "hooded",
+  "boat",
+  "square",
+  "asymmetric",
+  "notch",
+  "off-shoulder",
+  "halter",
+  VISION_NOT_APPLICABLE,
+] as const;
+
+export const VISION_GARMENT_LENGTHS = [
+  "cropped",
+  "hip",
+  "thigh",
+  "mini",
+  "knee",
+  "midi",
+  "maxi",
+  "ankle",
+  "full",
+  VISION_NOT_APPLICABLE,
+] as const;
+
+export const VISION_PATTERNS = [
+  "solid",
+  "stripe",
+  "check",
+  "floral",
+  "animal",
+  "graphic",
+  "print",
+  "colour-block",
+  "herringbone",
+  "quilted",
+  "polka-dot",
+  "multi",
+  VISION_NOT_APPLICABLE,
+] as const;
+
+export const VISION_MATERIAL_APPEARANCES = [
+  "cotton",
+  "denim",
+  "wool",
+  "knit",
+  "fleece",
+  "leather",
+  "suede",
+  "silk",
+  "satin",
+  "jersey",
+  "linen",
+  "lace",
+  "velvet",
+  "synthetic",
+  "canvas",
+  "metal",
+  "rubber",
+  VISION_NOT_APPLICABLE,
+] as const;
+
+export type VisionSleeveLength = (typeof VISION_SLEEVE_LENGTHS)[number];
+export type VisionNeckline = (typeof VISION_NECKLINES)[number];
+export type VisionGarmentLength = (typeof VISION_GARMENT_LENGTHS)[number];
+export type VisionPattern = (typeof VISION_PATTERNS)[number];
+export type VisionMaterialAppearance =
+  (typeof VISION_MATERIAL_APPEARANCES)[number];
+
+/**
+ * Map one vision answer into its vocabulary: lowercase, trim, exact match.
+ * `VISION_NOT_APPLICABLE` and anything outside the list become null — the
+ * stored form of "the attribute does not describe this item" and of an
+ * answer the schema should already have rejected.
+ */
+export function normalizeVisionValue<T extends string>(
+  raw: string,
+  vocabulary: readonly T[],
+): Exclude<T, typeof VISION_NOT_APPLICABLE> | null {
+  const token = raw.trim().toLowerCase();
+  if (token === VISION_NOT_APPLICABLE) {
+    return null;
+  }
+  return (vocabulary as readonly string[]).includes(token)
+    ? (token as Exclude<T, typeof VISION_NOT_APPLICABLE>)
+    : null;
+}

@@ -450,7 +450,14 @@ describe("the crawl source (AC-1, AC-2, AC-4)", () => {
 
 describe("pipeline + CLI integration on the hermetic DB (AC-5)", () => {
   let db: PrismaClient;
-  const fixtureAi = (): { llm: LlmClient; embeddings: EmbeddingClient } => ({
+  const fixtureAi = (): { llm: LlmClient; vision: LlmClient; embeddings: EmbeddingClient } => ({
+    vision: {
+      // The crawl fixture serves no image bytes, so the vision pass never
+      // reaches the model (YOY-121).
+      async completeStructured() {
+        throw new Error("vision must not be called without images");
+      },
+    },
     llm: {
       async completeStructured() {
         return { category: "dress", colors: [], occasions: [], fit: "regular", styleTags: [], seasons: [] };

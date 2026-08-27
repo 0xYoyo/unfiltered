@@ -7,6 +7,13 @@ import {
   expandCategoryConstraint,
   normalizeCategory,
   normalizeOccasion,
+  normalizeVisionValue,
+  VISION_GARMENT_LENGTHS,
+  VISION_MATERIAL_APPEARANCES,
+  VISION_NECKLINES,
+  VISION_NOT_APPLICABLE,
+  VISION_PATTERNS,
+  VISION_SLEEVE_LENGTHS,
 } from "../src/index.js";
 
 // The canonical taxonomy and its normalization map (YOY-31 AC-1, AC-4, AC-7):
@@ -139,5 +146,44 @@ describe("normalizeOccasion (AC-4)", () => {
   it("returns null for unmappable values", () => {
     expect(normalizeOccasion("brunch")).toBeNull();
     expect(normalizeOccasion("")).toBeNull();
+  });
+});
+
+// The vision-only vocabularies (YOY-121 AC-1): five closed sets the vision
+// pass answers with, each carrying the not-applicable sentinel that parses
+// to null so it reaches neither the embedding text nor a filter.
+describe("vision vocabularies (YOY-121 AC-1)", () => {
+  it("every vocabulary is lowercase, distinct, and carries the not-applicable sentinel", () => {
+    for (const vocabulary of [
+      VISION_SLEEVE_LENGTHS,
+      VISION_NECKLINES,
+      VISION_GARMENT_LENGTHS,
+      VISION_PATTERNS,
+      VISION_MATERIAL_APPEARANCES,
+    ]) {
+      expect(vocabulary).toContain(VISION_NOT_APPLICABLE);
+      expect(new Set(vocabulary).size).toBe(vocabulary.length);
+      for (const value of vocabulary) {
+        expect(value).toBe(value.trim().toLowerCase());
+      }
+    }
+    expect(VISION_SLEEVE_LENGTHS).toEqual([
+      "sleeveless",
+      "short",
+      "three-quarter",
+      "long",
+      "not-applicable",
+    ]);
+  });
+
+  it("normalizeVisionValue maps in-set answers, and nulls the sentinel and out-of-set values", () => {
+    expect(normalizeVisionValue("Long", VISION_SLEEVE_LENGTHS)).toBe("long");
+    expect(normalizeVisionValue(" v-neck ", VISION_NECKLINES)).toBe("v-neck");
+    expect(normalizeVisionValue("midi", VISION_GARMENT_LENGTHS)).toBe("midi");
+    expect(normalizeVisionValue("floral", VISION_PATTERNS)).toBe("floral");
+    expect(normalizeVisionValue("leather", VISION_MATERIAL_APPEARANCES)).toBe("leather");
+    expect(normalizeVisionValue(VISION_NOT_APPLICABLE, VISION_SLEEVE_LENGTHS)).toBeNull();
+    expect(normalizeVisionValue("paisley", VISION_PATTERNS)).toBeNull();
+    expect(normalizeVisionValue("", VISION_MATERIAL_APPEARANCES)).toBeNull();
   });
 });

@@ -13,6 +13,7 @@ import {
   composeEmbeddingText,
   embedCatalog,
   similarProducts,
+  visionAttributeTerms,
 } from "./catalog/embed.server";
 import { mapProductNode } from "./catalog/mapping.server";
 import { productNode } from "./catalog/mapping.test";
@@ -161,6 +162,53 @@ describe("composeEmbeddingText", () => {
     // Deterministic: identical inputs always compose identical text.
     expect(composeEmbeddingText(product, attributes)).toBe(
       composeEmbeddingText(product, attributes),
+    );
+  });
+
+  it("phrases the vision attributes after the text attributes (YOY-121 AC-4)", () => {
+    const vision = {
+      ...attributes,
+      sleeveLength: "long",
+      neckline: "v-neck",
+      garmentLength: "midi",
+      pattern: "floral",
+      materialAppearance: "knit",
+    };
+    expect(visionAttributeTerms(vision)).toEqual([
+      "long sleeves",
+      "v-neck neckline",
+      "midi length",
+      "floral pattern",
+      "knit",
+    ]);
+    expect(visionAttributeTerms({ ...attributes, sleeveLength: "sleeveless" })).toEqual([
+      "sleeveless",
+    ]);
+    // Null (not applicable / never analysed) contributes nothing — the
+    // composed text of a vision-less row is byte-for-byte what it was.
+    expect(visionAttributeTerms({ ...attributes, pattern: null, neckline: null })).toEqual([]);
+    expect(composeEmbeddingText(product, vision)).toBe(
+      [
+        "Black evening dress",
+        "dress",
+        "regular",
+        "black",
+        "evening",
+        "elegant",
+        "summer",
+        "long sleeves",
+        "v-neck neckline",
+        "midi length",
+        "floral pattern",
+        "knit",
+        "An elegant maxi dress.",
+        "dress",
+        "evening",
+      ].join("\n"),
+    );
+    // A vision change moves the text, hence the freshness hash.
+    expect(composeEmbeddingText(product, { ...vision, pattern: "stripe" })).not.toBe(
+      composeEmbeddingText(product, vision),
     );
   });
 
@@ -334,6 +382,53 @@ describe("catalog embedding", () => {
     });
     expect(unchanged).toEqual({ embedded: 0, cached: 3, deleted: 0 });
     expect(rerun.calls).toHaveLength(0);
+  });
+
+  it("re-embeds exactly the product whose vision attributes changed (YOY-121 AC-4)", async () => {
+    const snapshots = await db.catalogProduct.findMany({ orderBy: { productId: "asc" } });
+    for (const snapshot of snapshots) {
+      await db.productEnrichment.create({
+        data: {
+          shopDomain: SHOP,
+          productId: snapshot.productId,
+          contentHash: snapshot.contentHash,
+          status: "enriched",
+          category: "dress",
+          colors: [],
+          occasions: [],
+          fit: "",
+          styleTags: [],
+          seasons: [],
+        },
+      });
+    }
+    await embedCatalog({ db, shopDomain: SHOP, embeddings: embeddingStub().client });
+
+    // The vision pass lands its attributes on one product only.
+    await db.productEnrichment.update({
+      where: {
+        shopDomain_productId: { shopDomain: SHOP, productId: "gid://shopify/Product/2" },
+      },
+      data: { sleeveLength: "long", materialAppearance: "knit", visionStatus: "enriched" },
+    });
+    const rerun = embeddingStub();
+    const result = await embedCatalog({ db, shopDomain: SHOP, embeddings: rerun.client });
+
+    expect(result).toEqual({ embedded: 1, cached: 2, deleted: 0 });
+    expect(rerun.calls).toHaveLength(1);
+    expect(rerun.calls[0]!.texts).toEqual([
+      expect.stringContaining("long sleeves\nknit"),
+    ]);
+    expect(rerun.calls[0]!.texts[0]).toContain("שמלת ערב שחורה");
+
+    // Unchanged again: zero embedding calls.
+    const again = embeddingStub();
+    expect(await embedCatalog({ db, shopDomain: SHOP, embeddings: again.client })).toEqual({
+      embedded: 0,
+      cached: 3,
+      deleted: 0,
+    });
+    expect(again.calls).toHaveLength(0);
   });
 
   it("lands one embedding ledger row per batched call through a metered client", async () => {

@@ -292,6 +292,7 @@ export async function ingestPublicCatalog({
   sourceUrl,
   maxProducts = DEFAULT_MAX_PRODUCTS,
   llm,
+  vision,
   embeddings,
   imageFetch,
   onProgress,
@@ -304,6 +305,12 @@ export async function ingestPublicCatalog({
   sourceUrl: string;
   maxProducts?: number;
   llm: LlmClient;
+  /**
+   * The vision-model port of the enrichment's vision pass (YOY-121 AC-2);
+   * image bytes are re-read through `imageFetch`. Absent runs text
+   * enrichment only.
+   */
+  vision?: LlmClient;
   embeddings: EmbeddingClient;
   /** The polite fetcher's `.fetch` (YOY-120 AC-1): image bytes are read through it and hashed. */
   imageFetch: ImageFetch;
@@ -320,7 +327,14 @@ export async function ingestPublicCatalog({
     imageFetch,
     now,
   });
-  const enrich = await enrichCatalog({ db, shopDomain: storeKey, llm });
+  const enrich = await enrichCatalog({
+    db,
+    shopDomain: storeKey,
+    llm,
+    ...(vision !== undefined
+      ? { vision: { llm: vision, fetchImage: imageFetch } }
+      : {}),
+  });
   const embed = await embedCatalog({ db, shopDomain: storeKey, embeddings });
   const productCount = await db.catalogProduct.count({
     where: { shopDomain: storeKey },

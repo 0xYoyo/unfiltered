@@ -9,6 +9,8 @@ import {
   DEFAULT_INTENT_LITE_MODEL,
   DEFAULT_INTENT_LITE_THINKING_LEVEL,
   DEFAULT_INTENT_LITE_TIMEOUT_MS,
+  DEFAULT_VISION_MODEL,
+  DEFAULT_VISION_THINKING_LEVEL,
   DEFAULT_INTENT_TIMEOUT_MS,
   DEFAULT_INTENT_MODEL,
   DEFAULT_INTENT_THINKING_LEVEL,
@@ -89,6 +91,8 @@ describe("model configuration", () => {
       intentLiteModel: DEFAULT_INTENT_LITE_MODEL,
       embeddingModel: DEFAULT_EMBEDDING_MODEL,
       embeddingDimension: DEFAULT_EMBEDDING_DIMENSION,
+      visionModel: DEFAULT_VISION_MODEL,
+      visionThinkingLevel: DEFAULT_VISION_THINKING_LEVEL,
       intentThinkingLevel: DEFAULT_INTENT_THINKING_LEVEL,
       intentLiteThinkingLevel: DEFAULT_INTENT_LITE_THINKING_LEVEL,
       intentLiteTimeoutMs: DEFAULT_INTENT_LITE_TIMEOUT_MS,
@@ -100,6 +104,10 @@ describe("model configuration", () => {
     // The lite tier (YOY-116): the cheap model, thinking set explicitly.
     expect(DEFAULT_INTENT_LITE_MODEL).toBe("gemini-3.5-flash-lite");
     expect(DEFAULT_INTENT_LITE_THINKING_LEVEL).toBe("low");
+    // The vision pass (YOY-121): the docs/VISION-MODEL.md choice, thinking
+    // set explicitly per the binding comment.
+    expect(DEFAULT_VISION_MODEL).toBe("gemini-3.5-flash-lite");
+    expect(DEFAULT_VISION_THINKING_LEVEL).toBe("low");
   });
 
   it("reads every model from env overrides", () => {
@@ -113,6 +121,8 @@ describe("model configuration", () => {
       GEMINI_INTENT_LITE_THINKING_LEVEL: "medium",
       GEMINI_INTENT_LITE_TIMEOUT_MS: "5000",
       GEMINI_INTENT_TIMEOUT_MS: "7000",
+      GEMINI_VISION_MODEL: "model-e",
+      GEMINI_VISION_THINKING_LEVEL: "medium",
     });
     expect(models).toEqual({
       classificationModel: "model-a",
@@ -120,6 +130,8 @@ describe("model configuration", () => {
       intentLiteModel: "model-d",
       embeddingModel: "model-c",
       embeddingDimension: 1536,
+      visionModel: "model-e",
+      visionThinkingLevel: "medium",
       intentThinkingLevel: "high",
       intentLiteThinkingLevel: "medium",
       intentLiteTimeoutMs: 5000,
