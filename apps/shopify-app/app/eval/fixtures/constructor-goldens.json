@@ -1,0 +1,738 @@
+[
+  {
+    "id": "cn01",
+    "language": "en",
+    "group": "negation",
+    "query": "summer dress, not white",
+    "expectedProductIds": [
+      "p04",
+      "p05",
+      "p09",
+      "p12",
+      "p62"
+    ],
+    "mustNotProductIds": [
+      "p06",
+      "p08"
+    ],
+    "hardConstraints": {
+      "category": "dress",
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [],
+      "colorsExclude": [
+        "white"
+      ],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "cn02",
+    "language": "he",
+    "group": "negation",
+    "query": "שמלת קיץ לא לבנה",
+    "expectedProductIds": [
+      "p04",
+      "p05",
+      "p09",
+      "p12",
+      "p62"
+    ],
+    "mustNotProductIds": [
+      "p06",
+      "p08"
+    ],
+    "hardConstraints": {
+      "category": "dress",
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [],
+      "colorsExclude": [
+        "white"
+      ],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "cn03",
+    "language": "en",
+    "group": "negation",
+    "query": "pants, not black",
+    "expectedProductIds": [
+      "p42",
+      "p45",
+      "p46",
+      "p49",
+      "p50"
+    ],
+    "mustNotProductIds": [
+      "p41",
+      "p48"
+    ],
+    "hardConstraints": {
+      "category": "pants",
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [],
+      "colorsExclude": [
+        "black"
+      ],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "cn04",
+    "language": "he",
+    "group": "negation",
+    "query": "מכנסיים לא שחורים",
+    "expectedProductIds": [
+      "p42",
+      "p45",
+      "p46",
+      "p49",
+      "p50"
+    ],
+    "mustNotProductIds": [
+      "p41",
+      "p48"
+    ],
+    "hardConstraints": {
+      "category": "pants",
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [],
+      "colorsExclude": [
+        "black"
+      ],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "cn05",
+    "language": "en",
+    "group": "negation",
+    "query": "top, no sleeves",
+    "expectedProductIds": [
+      "p71",
+      "p73",
+      "p39"
+    ],
+    "mustNotProductIds": [
+      "p72",
+      "p74"
+    ],
+    "hardConstraints": {
+      "category": "top",
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "cn06",
+    "language": "he",
+    "group": "negation",
+    "query": "חולצה בלי שרוולים",
+    "expectedProductIds": [
+      "p71",
+      "p73",
+      "p39"
+    ],
+    "mustNotProductIds": [
+      "p72",
+      "p74"
+    ],
+    "hardConstraints": {
+      "category": "top",
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "cn07",
+    "language": "en",
+    "group": "negation",
+    "query": "winter coat, not wool",
+    "expectedProductIds": [
+      "p16",
+      "p17",
+      "p19",
+      "p77"
+    ],
+    "mustNotProductIds": [
+      "p13",
+      "p14",
+      "p76"
+    ],
+    "hardConstraints": {
+      "category": "coat",
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "cn08",
+    "language": "he",
+    "group": "negation",
+    "query": "מעיל חורף לא מצמר",
+    "expectedProductIds": [
+      "p16",
+      "p17",
+      "p19",
+      "p77"
+    ],
+    "mustNotProductIds": [
+      "p13",
+      "p14",
+      "p76"
+    ],
+    "hardConstraints": {
+      "category": "coat",
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "cn09",
+    "language": "en",
+    "group": "negation",
+    "query": "jacket, not leather",
+    "expectedProductIds": [
+      "p16",
+      "p20"
+    ],
+    "mustNotProductIds": [
+      "p18"
+    ],
+    "hardConstraints": {
+      "category": "jacket",
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "cn10",
+    "language": "he",
+    "group": "negation",
+    "query": "ז'קט לא מעור",
+    "expectedProductIds": [
+      "p16",
+      "p20"
+    ],
+    "mustNotProductIds": [
+      "p18"
+    ],
+    "hardConstraints": {
+      "category": "jacket",
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "cp01",
+    "language": "en",
+    "group": "priceCap",
+    "query": "dress under 150",
+    "expectedProductIds": [
+      "p05",
+      "p06",
+      "p62",
+      "p63"
+    ],
+    "mustNotProductIds": [
+      "p01",
+      "p02",
+      "p11",
+      "p67",
+      "p68"
+    ],
+    "hardConstraints": {
+      "category": "dress",
+      "priceMin": null,
+      "priceMax": 150,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "cp02",
+    "language": "he",
+    "group": "priceCap",
+    "query": "שמלה מתחת ל-150",
+    "expectedProductIds": [
+      "p05",
+      "p06",
+      "p62",
+      "p63"
+    ],
+    "mustNotProductIds": [
+      "p01",
+      "p02",
+      "p11",
+      "p67",
+      "p68"
+    ],
+    "hardConstraints": {
+      "category": "dress",
+      "priceMin": null,
+      "priceMax": 150,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "cp03",
+    "language": "en",
+    "group": "priceCap",
+    "query": "sneakers below 250",
+    "expectedProductIds": [
+      "p21",
+      "p24"
+    ],
+    "mustNotProductIds": [
+      "p61"
+    ],
+    "hardConstraints": {
+      "category": "sneakers",
+      "priceMin": null,
+      "priceMax": 250,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "cp04",
+    "language": "he",
+    "group": "priceCap",
+    "query": "סניקרס עד 250",
+    "expectedProductIds": [
+      "p21",
+      "p24"
+    ],
+    "mustNotProductIds": [
+      "p61"
+    ],
+    "hardConstraints": {
+      "category": "sneakers",
+      "priceMin": null,
+      "priceMax": 250,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "cp05",
+    "language": "en",
+    "group": "priceCap",
+    "query": "coat under ₪300",
+    "expectedProductIds": [
+      "p16",
+      "p17",
+      "p20"
+    ],
+    "mustNotProductIds": [
+      "p13",
+      "p15",
+      "p19",
+      "p76"
+    ],
+    "hardConstraints": {
+      "category": "coat",
+      "priceMin": null,
+      "priceMax": 300,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "cp06",
+    "language": "he",
+    "group": "priceCap",
+    "query": "מעיל עד ₪300",
+    "expectedProductIds": [
+      "p16",
+      "p17",
+      "p20"
+    ],
+    "mustNotProductIds": [
+      "p13",
+      "p15",
+      "p19",
+      "p76"
+    ],
+    "hardConstraints": {
+      "category": "coat",
+      "priceMin": null,
+      "priceMax": 300,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "cp07",
+    "language": "en",
+    "group": "priceCap",
+    "query": "bag under $100",
+    "expectedProductIds": [
+      "p51"
+    ],
+    "mustNotProductIds": [
+      "p52",
+      "p53",
+      "p78"
+    ],
+    "hardConstraints": {
+      "category": "bag",
+      "priceMin": null,
+      "priceMax": 100,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "cp08",
+    "language": "he",
+    "group": "priceCap",
+    "query": "תיק מתחת ל-100 ₪",
+    "expectedProductIds": [
+      "p51"
+    ],
+    "mustNotProductIds": [
+      "p52",
+      "p53",
+      "p78"
+    ],
+    "hardConstraints": {
+      "category": "bag",
+      "priceMin": null,
+      "priceMax": 100,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "cp09",
+    "language": "en",
+    "group": "priceCap",
+    "query": "skirt below 150",
+    "expectedProductIds": [
+      "p44",
+      "p47"
+    ],
+    "mustNotProductIds": [
+      "p43"
+    ],
+    "hardConstraints": {
+      "category": "skirt",
+      "priceMin": null,
+      "priceMax": 150,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "cp10",
+    "language": "he",
+    "group": "priceCap",
+    "query": "חצאית מתחת ל-150",
+    "expectedProductIds": [
+      "p44",
+      "p47"
+    ],
+    "mustNotProductIds": [
+      "p43"
+    ],
+    "hardConstraints": {
+      "category": "skirt",
+      "priceMin": null,
+      "priceMax": 150,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "co01",
+    "language": "en",
+    "group": "occasionVsCategory",
+    "query": "dress for a wedding",
+    "expectedProductIds": [
+      "p69",
+      "p70",
+      "p01",
+      "p04",
+      "p08"
+    ],
+    "mustNotProductIds": [
+      "p67",
+      "p68"
+    ],
+    "hardConstraints": {
+      "category": "dress",
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": "wedding",
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "co02",
+    "language": "en",
+    "group": "occasionVsCategory",
+    "query": "wedding dress",
+    "expectedRoute": "classic",
+    "expectedProductIds": [
+      "p67",
+      "p68"
+    ],
+    "mustNotProductIds": [
+      "p69",
+      "p70"
+    ],
+    "hardConstraints": {
+      "category": null,
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "co03",
+    "language": "he",
+    "group": "occasionVsCategory",
+    "query": "שמלה לחתונה",
+    "expectedProductIds": [
+      "p69",
+      "p70",
+      "p01",
+      "p04",
+      "p08"
+    ],
+    "mustNotProductIds": [
+      "p67",
+      "p68"
+    ],
+    "hardConstraints": {
+      "category": "dress",
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": "wedding",
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "co04",
+    "language": "he",
+    "group": "occasionVsCategory",
+    "query": "שמלת כלה",
+    "expectedProductIds": [
+      "p67",
+      "p68"
+    ],
+    "mustNotProductIds": [
+      "p69",
+      "p70"
+    ],
+    "hardConstraints": {
+      "category": "dress",
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": "wedding",
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "co05",
+    "language": "en",
+    "group": "occasionVsCategory",
+    "query": "shoes for a wedding",
+    "expectedProductIds": [
+      "p23",
+      "p22",
+      "p27"
+    ],
+    "mustNotProductIds": [
+      "p21",
+      "p24"
+    ],
+    "hardConstraints": {
+      "category": "shoes",
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": "wedding",
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "co06",
+    "language": "he",
+    "group": "occasionVsCategory",
+    "query": "נעליים לחתונה",
+    "expectedProductIds": [
+      "p23",
+      "p22",
+      "p27"
+    ],
+    "mustNotProductIds": [
+      "p21",
+      "p24"
+    ],
+    "hardConstraints": {
+      "category": "shoes",
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": "wedding",
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "co07",
+    "language": "en",
+    "group": "occasionVsCategory",
+    "query": "pants for the office",
+    "expectedProductIds": [
+      "p41",
+      "p45",
+      "p50"
+    ],
+    "mustNotProductIds": [
+      "p49"
+    ],
+    "hardConstraints": {
+      "category": "pants",
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": "work",
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "co08",
+    "language": "he",
+    "group": "occasionVsCategory",
+    "query": "מכנסיים למשרד",
+    "expectedProductIds": [
+      "p41",
+      "p45",
+      "p50"
+    ],
+    "mustNotProductIds": [
+      "p49"
+    ],
+    "hardConstraints": {
+      "category": "pants",
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": "work",
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "co09",
+    "language": "en",
+    "group": "occasionVsCategory",
+    "query": "sneakers for running",
+    "expectedRoute": "classic",
+    "expectedProductIds": [
+      "p24",
+      "p61"
+    ],
+    "mustNotProductIds": [
+      "p21"
+    ],
+    "hardConstraints": {
+      "category": null,
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "co10",
+    "language": "he",
+    "group": "occasionVsCategory",
+    "query": "סניקרס לריצה",
+    "expectedProductIds": [
+      "p24",
+      "p61"
+    ],
+    "mustNotProductIds": [
+      "p21"
+    ],
+    "hardConstraints": {
+      "category": "sneakers",
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": "sport",
+      "availabilityRequired": false
+    }
+  }
+]

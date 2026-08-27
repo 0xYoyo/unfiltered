@@ -3,16 +3,22 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 import { createTestDb } from "../testing/helpers.server";
 import {
+  CONSTRUCTOR_GROUPS,
+  CONSTRUCTOR_SET_MINIMUMS,
+  computeConstructorBar,
   findViolations,
   goldenHit,
   loadBaselineHits,
   loadCatalog,
+  loadConstructorFloor,
+  loadConstructorGoldens,
   loadGoldens,
   loadRefinementGoldens,
   refinementViolations,
   runEval,
   type EvalRunResult,
   type Golden,
+  type QueryScore,
 } from "./harness.server";
 import { assertEngineSourceExecution } from "./source-guard.server";
 
@@ -30,7 +36,7 @@ describe("eval fixtures (AC-1)", () => {
     const catalog = loadCatalog();
     const goldens = loadGoldens();
 
-    expect(catalog).toHaveLength(66);
+    expect(catalog).toHaveLength(78);
     expect(goldens).toHaveLength(35);
 
     // Deliberately sparse: descriptions are one-liners or empty, tags minimal.
@@ -91,6 +97,7 @@ describe("refinement fixtures (YOY-42 AC-3)", () => {
     const queries = [
       ...loadGoldens().map((golden) => golden.query),
       ...loadRefinementGoldens().map((golden) => golden.query),
+      ...loadConstructorGoldens().map((golden) => golden.query),
     ];
     expect(new Set(queries).size).toBe(queries.length);
   });
@@ -158,6 +165,132 @@ describe("refinement fixtures (YOY-42 AC-3)", () => {
     expect(
       refinementViolations(pricier, { ...raised, priceMin: undefined }),
     ).toHaveLength(1);
+  });
+});
+
+describe("Constructor-bar fixtures (YOY-118 AC-1)", () => {
+  it("ships ≥ 24 goldens, ≥ 12 per language, ≥ 8 per group, each with expectations, constraints, and a mustNot list", () => {
+    const goldens = loadConstructorGoldens();
+    const catalog = loadCatalog();
+    const ids = new Set(catalog.map((product) => product.productId));
+
+    expect(goldens.length).toBeGreaterThanOrEqual(CONSTRUCTOR_SET_MINIMUMS.total);
+    for (const language of ["en", "he"] as const) {
+      expect(
+        goldens.filter((golden) => golden.language === language).length,
+        language,
+      ).toBeGreaterThanOrEqual(CONSTRUCTOR_SET_MINIMUMS.perLanguage);
+    }
+    for (const group of CONSTRUCTOR_GROUPS) {
+      expect(
+        goldens.filter((golden) => golden.group === group).length,
+        group,
+      ).toBeGreaterThanOrEqual(CONSTRUCTOR_SET_MINIMUMS.perGroup);
+    }
+    for (const golden of goldens) {
+      expect(golden.expectedProductIds.length, golden.id).toBeGreaterThan(0);
+      expect(Array.isArray(golden.mustNotProductIds), golden.id).toBe(true);
+      expect(golden.hardConstraints, golden.id).toBeDefined();
+      for (const id of [...golden.expectedProductIds, ...golden.mustNotProductIds]) {
+        expect(ids.has(id), `${golden.id} names unknown product ${id}`).toBe(true);
+      }
+      // A product cannot be both expected and forbidden.
+      for (const id of golden.mustNotProductIds) {
+        expect(golden.expectedProductIds, golden.id).not.toContain(id);
+      }
+    }
+    // The set's ids never collide with the main goldens: recordings and
+    // ledger rows are keyed by them.
+    const mainIds = new Set(loadGoldens().map((golden) => golden.id));
+    for (const golden of goldens) {
+      expect(mainIds.has(golden.id), golden.id).toBe(false);
+    }
+  });
+
+  it("ships the catalog products the set needs: bridal vs guest dresses, sleeveless vs long-sleeve tops, multi-material items (AC-2)", () => {
+    const titles = new Map(loadCatalog().map((product) => [product.productId, product.title]));
+    expect(titles.get("p67")).toMatch(/wedding dress/i);
+    expect(titles.get("p68")).toContain("שמלת כלה");
+    expect(titles.get("p69")).toMatch(/guest/i);
+    expect(titles.get("p71")).toMatch(/sleeveless/i);
+    expect(titles.get("p72")).toMatch(/long-sleeve/i);
+    expect(titles.get("p73")).toContain("ללא שרוולים");
+    expect(titles.get("p76")).toMatch(/blend/i);
+  });
+
+  it("commits the floor as a whole percent (AC-3)", () => {
+    const floor = loadConstructorFloor();
+    expect(Number.isInteger(floor.overallHitRatePercent)).toBe(true);
+    expect(floor.overallHitRatePercent).toBeGreaterThanOrEqual(0);
+    expect(floor.overallHitRatePercent).toBeLessThanOrEqual(100);
+  });
+
+  it("computes the bar per group, per language, and overall, separating mustNot from hard-constraint violations", () => {
+    const golden = (id: string, language: "en" | "he", group: (typeof CONSTRUCTOR_GROUPS)[number]) => ({
+      id,
+      language,
+      group,
+      query: id,
+      expectedProductIds: ["p01"],
+      mustNotProductIds: [],
+      hardConstraints: {
+        category: null,
+        priceMin: null,
+        priceMax: null,
+        colorsInclude: [],
+        colorsExclude: [],
+        occasion: null,
+        availabilityRequired: false,
+      },
+    });
+    const score = (
+      overrides: Partial<QueryScore> & { golden: QueryScore["golden"] },
+    ): QueryScore => ({
+      route: "ai",
+      routeReason: "model",
+      intent: null,
+      intentTier: "lite",
+      hits: [],
+      closeMatches: [],
+      closeMatchesRelaxed: [],
+      firstExpectedRank: 1,
+      zeroHitSatisfied: null,
+      violations: [],
+      mustNotViolations: [],
+      costUsd: 0,
+      ...overrides,
+    });
+    const bar = computeConstructorBar(
+      [
+        score({ golden: golden("a", "en", "negation") }),
+        score({ golden: golden("b", "he", "negation"), firstExpectedRank: null }),
+        score({
+          golden: golden("c", "en", "priceCap"),
+          violations: ["p02: price 450 > cap 100", "p03: must not appear"],
+          mustNotViolations: ["p03: must not appear"],
+          intentTier: "accuracy",
+        }),
+        score({ golden: golden("d", "he", "occasionVsCategory"), route: "classic", routeReason: "short-query", intentTier: null }),
+      ],
+      [
+        { searchId: "a", costUsd: 0.001 },
+        { searchId: "c", costUsd: 0.002 },
+        { searchId: "g01", costUsd: 5 }, // a main golden's row: not this bar's
+        { searchId: null, costUsd: 5 }, // indexing: not per-search
+      ],
+    );
+    expect(bar.overall).toEqual({ hits: 3, total: 4, rate: 0.75 });
+    expect(bar.byGroup.negation.rate).toBe(0.5);
+    expect(bar.byGroup.negation.byLanguage.he.rate).toBe(0);
+    expect(bar.byGroup.priceCap.byLanguage.en).toEqual({ hits: 1, total: 1, rate: 1 });
+    expect(bar.byLanguage.en).toEqual({ hits: 2, total: 2, rate: 1 });
+    expect(bar.byLanguage.he.rate).toBe(0.5);
+    expect(bar.mustNotViolationCount).toBe(1);
+    expect(bar.hardConstraintViolationCount).toBe(1);
+    // One of three AI-routed goldens escalated; the classic one is not counted.
+    expect(bar.escalationRate).toBeCloseTo(1 / 3);
+    expect(bar.aiSearchCount).toBe(3);
+    expect(bar.costPer1000Usd).toBeCloseTo((0.003 / 3) * 1000);
   });
 });
 
@@ -432,6 +565,38 @@ describe("eval run (AC-2, AC-3, AC-4, AC-6)", () => {
     // golden (g22) keeps its expected hits.
     const classic = result.perQuery.find((entry) => entry.golden.id === "g22")!;
     expect(classic.firstExpectedRank).not.toBeNull();
+  });
+
+  it("clears the Constructor bar: 0 mustNot violations, 0 hard-constraint violations, overall hit rate ≥ the committed floor (YOY-118 AC-3)", () => {
+    const bar = result.constructorBar;
+    const floor = loadConstructorFloor();
+    expect(result.perConstructor.length).toBe(loadConstructorGoldens().length);
+    const mustNot = result.perConstructor.flatMap((score) => score.mustNotViolations);
+    expect(mustNot, `mustNot violations: ${mustNot.join("; ")}`).toEqual([]);
+    expect(bar.mustNotViolationCount).toBe(0);
+    const hard = result.perConstructor.flatMap((score) =>
+      score.violations.filter((violation) => !score.mustNotViolations.includes(violation)),
+    );
+    expect(hard, `hard-constraint violations: ${hard.join("; ")}`).toEqual([]);
+    expect(bar.hardConstraintViolationCount).toBe(0);
+    const misses = result.perConstructor
+      .filter((score) => !goldenHit(score))
+      .map((score) => score.golden.id);
+    expect(
+      Math.floor(bar.overall.rate * 100),
+      `overall ${(bar.overall.rate * 100).toFixed(1)} % below the committed floor ${floor.overallHitRatePercent} %; misses: ${misses.join(", ")}`,
+    ).toBeGreaterThanOrEqual(floor.overallHitRatePercent);
+    // Every golden in the set ran end to end: a route, and a tier on the AI path.
+    for (const score of result.perConstructor) {
+      expect(score.route, score.golden.id).toMatch(/^(ai|classic)$/);
+      if (score.route === "ai") {
+        expect(score.intentTier, score.golden.id).toMatch(/^(lite|accuracy)$/);
+      }
+    }
+    // The set's spend is its own line, never blended into the main bar.
+    expect(result.blendedAiSearchCount).toBe(
+      result.perQuery.filter((score) => score.route === "ai").length,
+    );
   });
 
   it("meets the pass bar: ≥80% of goldens hit an expected product in the top 10 (AC-3)", () => {

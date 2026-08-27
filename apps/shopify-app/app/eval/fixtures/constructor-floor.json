@@ -1,0 +1,5 @@
+{
+  "$comment": "Constructor-bar floor (YOY-118 AC-3): the overall hit rate the harness achieved on the committed recordings, rounded down to a whole percent. Records what the engine does today (NG-2); raise it only from a measured run, never lower it to absorb a regression.",
+  "recordedAt": "2026-08-27",
+  "overallHitRatePercent": 100
+}

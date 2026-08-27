@@ -696,6 +696,520 @@
       },
       "inputTokens": 267,
       "outputTokens": 107
+    },
+    "summer dress, not white": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [
+          "white"
+        ],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "summer"
+        ],
+        "confidence": 0.9,
+        "category": "dress",
+        "currency": null,
+        "occasion": null,
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 263,
+      "outputTokens": 52
+    },
+    "שמלת קיץ לא לבנה": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [
+          "white"
+        ],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "קיץ"
+        ],
+        "confidence": 0.9,
+        "category": "dress",
+        "occasion": null
+      },
+      "inputTokens": 265,
+      "outputTokens": 35
+    },
+    "pants, not black": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [
+          "black"
+        ],
+        "availabilityRequired": false,
+        "softAttributes": [],
+        "confidence": 1,
+        "category": "pants",
+        "currency": null,
+        "occasion": null,
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 262,
+      "outputTokens": 94
+    },
+    "מכנסיים לא שחורים": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [
+          "black"
+        ],
+        "availabilityRequired": false,
+        "softAttributes": [],
+        "confidence": 0.9,
+        "category": "pants",
+        "currency": null,
+        "occasion": null,
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 266,
+      "outputTokens": 94
+    },
+    "top, no sleeves": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "no sleeves"
+        ],
+        "confidence": 0.9,
+        "category": "top"
+      },
+      "inputTokens": 262,
+      "outputTokens": 59
+    },
+    "חולצה בלי שרוולים": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "בלי שרוולים"
+        ],
+        "confidence": 0.9,
+        "category": "top",
+        "currency": null,
+        "occasion": null,
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 265,
+      "outputTokens": 98
+    },
+    "winter coat, not wool": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "winter",
+          "not wool"
+        ],
+        "confidence": 0.9,
+        "category": "coat",
+        "currency": null,
+        "occasion": null,
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 263,
+      "outputTokens": 54
+    },
+    "מעיל חורף לא מצמר": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [
+          "wool"
+        ],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "חורף"
+        ],
+        "confidence": 0.8,
+        "category": "coat",
+        "currency": null,
+        "occasion": null,
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 266,
+      "outputTokens": 54
+    },
+    "jacket, not leather": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "not leather"
+        ],
+        "confidence": 0.9,
+        "category": "jacket"
+      },
+      "inputTokens": 262,
+      "outputTokens": 59
+    },
+    "ז'קט לא מעור": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [
+          "leather"
+        ],
+        "availabilityRequired": false,
+        "softAttributes": [],
+        "confidence": 0.8,
+        "category": "jacket",
+        "currency": null,
+        "occasion": null,
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 264,
+      "outputTokens": 51
+    },
+    "dress under 150": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [],
+        "confidence": 0.9,
+        "category": "dress",
+        "currency": null,
+        "occasion": null,
+        "priceMax": 150,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 264,
+      "outputTokens": 89
+    },
+    "שמלה מתחת ל-150": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [],
+        "confidence": 0.9,
+        "category": "dress",
+        "currency": "ILS",
+        "occasion": null,
+        "priceMax": 150,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 267,
+      "outputTokens": 90
+    },
+    "sneakers below 250": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [],
+        "confidence": 0.9,
+        "category": "sneakers",
+        "priceMax": 250
+      },
+      "inputTokens": 264,
+      "outputTokens": 61
+    },
+    "סניקרס עד 250": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [],
+        "confidence": 0.9,
+        "category": "sneakers",
+        "currency": "ILS",
+        "occasion": null,
+        "priceMax": 250,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 267,
+      "outputTokens": 91
+    },
+    "coat under ₪300": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [],
+        "confidence": 0.9,
+        "category": "coat",
+        "currency": "ILS",
+        "occasion": null,
+        "priceMax": 300,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 265,
+      "outputTokens": 90
+    },
+    "מעיל עד ₪300": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "עד 300"
+        ],
+        "confidence": 0.9,
+        "category": "coat",
+        "currency": "ILS",
+        "occasion": null,
+        "priceMax": 300,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 266,
+      "outputTokens": 57
+    },
+    "bag under $100": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [],
+        "confidence": 1,
+        "category": "bag",
+        "currency": "USD",
+        "occasion": null,
+        "priceMax": 100,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 264,
+      "outputTokens": 92
+    },
+    "תיק מתחת ל-100 ₪": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [],
+        "confidence": 0.9,
+        "category": "bag",
+        "currency": "ILS",
+        "priceMax": 100
+      },
+      "inputTokens": 269,
+      "outputTokens": 39
+    },
+    "skirt below 150": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [],
+        "confidence": 0.9,
+        "category": "skirt",
+        "priceMax": 150
+      },
+      "inputTokens": 264,
+      "outputTokens": 61
+    },
+    "חצאית מתחת ל-150": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [],
+        "confidence": 0.9,
+        "category": "skirt",
+        "currency": null,
+        "occasion": null,
+        "priceMax": 150,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 268,
+      "outputTokens": 90
+    },
+    "dress for a wedding": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [],
+        "confidence": 1,
+        "category": "dress",
+        "currency": null,
+        "occasion": "wedding",
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 262,
+      "outputTokens": 87
+    },
+    "wedding dress": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [],
+        "confidence": 1,
+        "category": "dress",
+        "currency": null,
+        "occasion": "wedding",
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 260,
+      "outputTokens": 87
+    },
+    "שמלה לחתונה": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [],
+        "confidence": 0.9,
+        "category": "dress",
+        "currency": null,
+        "occasion": "wedding",
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 263,
+      "outputTokens": 87
+    },
+    "שמלת כלה": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [],
+        "confidence": 0.9,
+        "category": "dress",
+        "occasion": "wedding"
+      },
+      "inputTokens": 262,
+      "outputTokens": 58
+    },
+    "shoes for a wedding": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [],
+        "confidence": 1,
+        "category": "shoes",
+        "currency": null,
+        "occasion": "wedding",
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 262,
+      "outputTokens": 87
+    },
+    "נעליים לחתונה": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [],
+        "confidence": 0.9,
+        "category": "shoes",
+        "currency": null,
+        "occasion": "wedding",
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 264,
+      "outputTokens": 87
+    },
+    "pants for the office": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "office"
+        ],
+        "confidence": 0.9,
+        "category": "pants",
+        "currency": null,
+        "occasion": "work",
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 262,
+      "outputTokens": 95
+    },
+    "מכנסיים למשרד": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "למשרד"
+        ],
+        "confidence": 0.9,
+        "category": "pants",
+        "occasion": "work"
+      },
+      "inputTokens": 265,
+      "outputTokens": 36
+    },
+    "sneakers for running": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "running"
+        ],
+        "confidence": 0.9,
+        "category": "sneakers",
+        "currency": null,
+        "occasion": "sport",
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 261,
+      "outputTokens": 52
+    },
+    "סניקרס לריצה": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "ריצה"
+        ],
+        "confidence": 0.9,
+        "category": "sneakers",
+        "currency": null,
+        "occasion": "sport",
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 265,
+      "outputTokens": 97
     }
   }
 }

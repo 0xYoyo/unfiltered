@@ -1180,6 +1180,216 @@
       },
       "inputTokens": 383,
       "outputTokens": 80
+    },
+    "Ivory Lace Wedding Dress": {
+      "output": {
+        "category": "dress",
+        "colors": [
+          "ivory"
+        ],
+        "primaryColor": "ivory",
+        "occasions": [
+          "wedding"
+        ],
+        "fit": "floor-length",
+        "styleTags": [
+          "lace",
+          "bridal"
+        ],
+        "seasons": []
+      },
+      "inputTokens": 379,
+      "outputTokens": 88
+    },
+    "שמלת כלה שנהב": {
+      "output": {
+        "category": "dress",
+        "colors": [
+          "ivory"
+        ],
+        "primaryColor": "ivory",
+        "occasions": [
+          "wedding"
+        ],
+        "fit": "",
+        "styleTags": [
+          "classic"
+        ],
+        "seasons": []
+      },
+      "inputTokens": 385,
+      "outputTokens": 61
+    },
+    "Sage Guest Midi Dress": {
+      "output": {
+        "category": "dress",
+        "colors": [
+          "sage"
+        ],
+        "primaryColor": "sage",
+        "occasions": [
+          "wedding"
+        ],
+        "fit": "flowy",
+        "styleTags": [
+          "guest",
+          "midi"
+        ],
+        "seasons": []
+      },
+      "inputTokens": 378,
+      "outputTokens": 65
+    },
+    "שמלת מידי לאורחת": {
+      "output": {
+        "category": "dress",
+        "colors": [],
+        "primaryColor": "",
+        "occasions": [
+          "wedding",
+          "evening"
+        ],
+        "fit": "midi",
+        "styleTags": [
+          "elegant"
+        ],
+        "seasons": []
+      },
+      "inputTokens": 387,
+      "outputTokens": 74
+    },
+    "Sleeveless Linen Tank Top": {
+      "output": {
+        "category": "top",
+        "colors": [],
+        "primaryColor": "",
+        "occasions": [],
+        "fit": "sleeveless",
+        "styleTags": [
+          "sleeveless",
+          "linen"
+        ],
+        "seasons": [
+          "summer"
+        ]
+      },
+      "inputTokens": 377,
+      "outputTokens": 62
+    },
+    "Long-Sleeve Cotton Top": {
+      "output": {
+        "category": "top",
+        "colors": [],
+        "primaryColor": "",
+        "occasions": [],
+        "fit": "",
+        "styleTags": [
+          "long sleeve"
+        ],
+        "seasons": []
+      },
+      "inputTokens": 378,
+      "outputTokens": 54
+    },
+    "גופייה ללא שרוולים": {
+      "output": {
+        "category": "top",
+        "colors": [],
+        "primaryColor": "",
+        "occasions": [],
+        "fit": "sleeveless",
+        "styleTags": [
+          "casual",
+          "lightweight",
+          "sleeveless"
+        ],
+        "seasons": [
+          "summer"
+        ]
+      },
+      "inputTokens": 385,
+      "outputTokens": 66
+    },
+    "חולצה עם שרוולים ארוכים": {
+      "output": {
+        "category": "top",
+        "colors": [],
+        "primaryColor": "",
+        "occasions": [],
+        "fit": "",
+        "styleTags": [],
+        "seasons": []
+      },
+      "inputTokens": 389,
+      "outputTokens": 51
+    },
+    "Cotton Linen Blend Shirt": {
+      "output": {
+        "category": "top",
+        "colors": [],
+        "primaryColor": "",
+        "occasions": [],
+        "fit": "",
+        "styleTags": [
+          "cotton-linen blend",
+          "breathable"
+        ],
+        "seasons": []
+      },
+      "inputTokens": 376,
+      "outputTokens": 60
+    },
+    "Wool Cashmere Blend Coat": {
+      "output": {
+        "category": "coat",
+        "colors": [],
+        "primaryColor": "",
+        "occasions": [],
+        "fit": "",
+        "styleTags": [
+          "wool",
+          "cashmere",
+          "warm"
+        ],
+        "seasons": [
+          "winter"
+        ]
+      },
+      "inputTokens": 378,
+      "outputTokens": 78
+    },
+    "מעיל פוך ניילון": {
+      "output": {
+        "category": "coat",
+        "colors": [],
+        "primaryColor": "",
+        "occasions": [],
+        "fit": "",
+        "styleTags": [
+          "puffer"
+        ],
+        "seasons": [
+          "winter"
+        ]
+      },
+      "inputTokens": 390,
+      "outputTokens": 28
+    },
+    "Vegan Leather Tote": {
+      "output": {
+        "category": "bag",
+        "colors": [],
+        "primaryColor": "",
+        "occasions": [],
+        "fit": "",
+        "styleTags": [
+          "vegan",
+          "leather"
+        ],
+        "seasons": []
+      },
+      "inputTokens": 375,
+      "outputTokens": 64
     }
   }
 }

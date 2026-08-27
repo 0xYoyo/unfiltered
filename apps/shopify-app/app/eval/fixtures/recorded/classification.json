@@ -211,6 +211,209 @@
       },
       "inputTokens": 182,
       "outputTokens": 11
+    },
+    "summer dress, not white": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 178,
+      "outputTokens": 11
+    },
+    "שמלת קיץ לא לבנה": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 180,
+      "outputTokens": 6
+    },
+    "pants, not black": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 177,
+      "outputTokens": 11
+    },
+    "מכנסיים לא שחורים": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 181,
+      "outputTokens": 11
+    },
+    "top, no sleeves": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 177,
+      "outputTokens": 11
+    },
+    "חולצה בלי שרוולים": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 180,
+      "outputTokens": 11
+    },
+    "winter coat, not wool": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 178,
+      "outputTokens": 11
+    },
+    "מעיל חורף לא מצמר": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 181,
+      "outputTokens": 11
+    },
+    "jacket, not leather": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 177,
+      "outputTokens": 11
+    },
+    "ז'קט לא מעור": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 179,
+      "outputTokens": 11
+    },
+    "dress under 150": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 179,
+      "outputTokens": 11
+    },
+    "שמלה מתחת ל-150": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 182,
+      "outputTokens": 11
+    },
+    "sneakers below 250": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 179,
+      "outputTokens": 11
+    },
+    "סניקרס עד 250": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 182,
+      "outputTokens": 6
+    },
+    "coat under ₪300": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 180,
+      "outputTokens": 11
+    },
+    "מעיל עד ₪300": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 181,
+      "outputTokens": 11
+    },
+    "bag under $100": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 179,
+      "outputTokens": 11
+    },
+    "תיק מתחת ל-100 ₪": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 184,
+      "outputTokens": 6
+    },
+    "skirt below 150": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 179,
+      "outputTokens": 11
+    },
+    "חצאית מתחת ל-150": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 183,
+      "outputTokens": 11
+    },
+    "dress for a wedding": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 177,
+      "outputTokens": 11
+    },
+    "שמלה לחתונה": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 178,
+      "outputTokens": 11
+    },
+    "שמלת כלה": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 177,
+      "outputTokens": 11
+    },
+    "shoes for a wedding": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 177,
+      "outputTokens": 11
+    },
+    "נעליים לחתונה": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 179,
+      "outputTokens": 11
+    },
+    "pants for the office": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 177,
+      "outputTokens": 11
+    },
+    "מכנסיים למשרד": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 180,
+      "outputTokens": 11
+    },
+    "sneakers for running": {
+      "output": {
+        "route": "classic"
+      },
+      "inputTokens": 176,
+      "outputTokens": 11
+    },
+    "סניקרס לריצה": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 180,
+      "outputTokens": 11
     }
   }
 }

@@ -35,9 +35,11 @@ import { computeContentHash } from "../catalog/mapping.server";
 import { createTestDb } from "../testing/helpers.server";
 import {
   loadCatalog,
+  loadConstructorGoldens,
   loadGoldens,
   loadRefinementGoldens,
   runEval,
+  type Golden,
 } from "./harness.server";
 import { recordingKeyFromPrompt } from "./replay.server";
 import {
@@ -398,12 +400,22 @@ describe("source-execution guard (YOY-52 run-6)", () => {
   });
 });
 
+/**
+ * Every golden the harness replays (YOY-118): the main set and the
+ * Constructor-bar set share the recording files, keyed by query, so each
+ * live scope records both — a Constructor golden with no recording would
+ * fail the offline run exactly like a main golden.
+ */
+function loadRecordedGoldens(): Golden[] {
+  return [...loadGoldens(), ...loadConstructorGoldens()];
+}
+
 describe("golden classification tiers (YOY-52 AC-1 amendment)", () => {
   // Pins each golden's regeneration expectation offline, so a heuristics
   // change that reroutes a golden fails here — in every `npm test` — instead
   // of surfacing as a false FAIL mid-way through a paid live regeneration.
   it("AI-tier goldens escalate past the heuristics; heuristic-settled goldens are classic controls", () => {
-    for (const golden of loadGoldens()) {
+    for (const golden of loadRecordedGoldens()) {
       const heuristic = classifyByHeuristics(normalizeQuery(golden.query));
       if ((golden.expectedRoute ?? "ai") === "ai") {
         expect(heuristic, `${golden.id} must escalate to the model`).toBeNull();
@@ -428,7 +440,7 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
   it.skipIf(scope !== "all")("re-records enrichments, classifications, intents, and embeddings", async () => {
     const models = geminiModelsFromEnv();
     const catalog = loadCatalog();
-    const goldens = loadGoldens();
+    const goldens = loadRecordedGoldens();
     const usage = captureUsage(createPrismaCostRecorder(db));
 
     // Failure collection (YOY-52 directive): a live run costs ~9 paid
@@ -718,7 +730,7 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
     // scored against the same index. The lite step below re-records the
     // lite tier and merges the query embeddings both tiers now need.
     const models = geminiModelsFromEnv();
-    const goldens = loadGoldens();
+    const goldens = loadRecordedGoldens();
     const usage = captureUsage(createPrismaCostRecorder(db));
     const failures: string[] = [];
     const check = (condition: boolean, message: string): void => {
@@ -806,7 +818,7 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
   it.skipIf(scope !== "catalog" && scope !== "goldens")("re-records every enrichment (catalog scope) and only the missing classification/intent/embedding entries (YOY-110 AC-5: REGEN_SCOPE=catalog; YOY-111: REGEN_SCOPE=goldens)", async () => {
     const models = geminiModelsFromEnv();
     const catalog = loadCatalog();
-    const goldens = loadGoldens();
+    const goldens = loadRecordedGoldens();
     const refinementGoldens = loadRefinementGoldens();
     const usage = captureUsage(createPrismaCostRecorder(db));
     const failures: string[] = [];
@@ -1119,7 +1131,7 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
     // which is what the offline harness routes on. Written beside the
     // accuracy recordings, never over them.
     const models = geminiModelsFromEnv();
-    const goldens = loadGoldens();
+    const goldens = loadRecordedGoldens();
     const usage = captureUsage(createPrismaCostRecorder(db));
     const failures: string[] = [];
     const check = (condition: boolean, message: string): void => {

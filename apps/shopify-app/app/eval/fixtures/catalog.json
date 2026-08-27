@@ -993,5 +993,189 @@
     "available": true,
     "imageAltTexts": [],
     "sourceUpdatedAt": "2026-08-01T00:00:00.000Z"
+  },
+  {
+    "productId": "p67",
+    "title": "Ivory Lace Wedding Dress",
+    "description": "Floor-length bridal gown with a lace train.",
+    "tags": [
+      "bridal"
+    ],
+    "vendor": "eval-fixture",
+    "productType": "Dresses",
+    "priceMin": 2400,
+    "priceMax": 2400,
+    "currencyCode": "ILS",
+    "available": true,
+    "imageAltTexts": [],
+    "sourceUpdatedAt": "2026-08-01T00:00:00.000Z"
+  },
+  {
+    "productId": "p68",
+    "title": "שמלת כלה שנהב",
+    "description": "שמלת כלה קלאסית עם שובל.",
+    "tags": [
+      "כלה"
+    ],
+    "vendor": "eval-fixture",
+    "productType": "Dresses",
+    "priceMin": 2900,
+    "priceMax": 2900,
+    "currencyCode": "ILS",
+    "available": true,
+    "imageAltTexts": [],
+    "sourceUpdatedAt": "2026-08-01T00:00:00.000Z"
+  },
+  {
+    "productId": "p69",
+    "title": "Sage Guest Midi Dress",
+    "description": "Flowy sage midi for a wedding guest.",
+    "tags": [
+      "guest"
+    ],
+    "vendor": "eval-fixture",
+    "productType": "Dresses",
+    "priceMin": 340,
+    "priceMax": 340,
+    "currencyCode": "ILS",
+    "available": true,
+    "imageAltTexts": [],
+    "sourceUpdatedAt": "2026-08-01T00:00:00.000Z"
+  },
+  {
+    "productId": "p70",
+    "title": "שמלת מידי לאורחת",
+    "description": "שמלת מידי אלגנטית לאורחת בחתונה.",
+    "tags": [],
+    "vendor": "eval-fixture",
+    "productType": "Dresses",
+    "priceMin": 360,
+    "priceMax": 360,
+    "currencyCode": "ILS",
+    "available": true,
+    "imageAltTexts": [],
+    "sourceUpdatedAt": "2026-08-01T00:00:00.000Z"
+  },
+  {
+    "productId": "p71",
+    "title": "Sleeveless Linen Tank Top",
+    "description": "Sleeveless tank in breezy linen.",
+    "tags": [
+      "sleeveless"
+    ],
+    "vendor": "eval-fixture",
+    "productType": "Tops",
+    "priceMin": 95,
+    "priceMax": 95,
+    "currencyCode": "ILS",
+    "available": true,
+    "imageAltTexts": [],
+    "sourceUpdatedAt": "2026-08-01T00:00:00.000Z"
+  },
+  {
+    "productId": "p72",
+    "title": "Long-Sleeve Cotton Top",
+    "description": "Long sleeves, soft cotton.",
+    "tags": [
+      "long sleeve"
+    ],
+    "vendor": "eval-fixture",
+    "productType": "Tops",
+    "priceMin": 110,
+    "priceMax": 110,
+    "currencyCode": "ILS",
+    "available": true,
+    "imageAltTexts": [],
+    "sourceUpdatedAt": "2026-08-01T00:00:00.000Z"
+  },
+  {
+    "productId": "p73",
+    "title": "גופייה ללא שרוולים",
+    "description": "גופייה קלילה ללא שרוולים.",
+    "tags": [],
+    "vendor": "eval-fixture",
+    "productType": "Tops",
+    "priceMin": 80,
+    "priceMax": 80,
+    "currencyCode": "ILS",
+    "available": true,
+    "imageAltTexts": [],
+    "sourceUpdatedAt": "2026-08-01T00:00:00.000Z"
+  },
+  {
+    "productId": "p74",
+    "title": "חולצה עם שרוולים ארוכים",
+    "description": "חולצת כותנה עם שרוולים ארוכים.",
+    "tags": [],
+    "vendor": "eval-fixture",
+    "productType": "Tops",
+    "priceMin": 105,
+    "priceMax": 105,
+    "currencyCode": "ILS",
+    "available": true,
+    "imageAltTexts": [],
+    "sourceUpdatedAt": "2026-08-01T00:00:00.000Z"
+  },
+  {
+    "productId": "p75",
+    "title": "Cotton Linen Blend Shirt",
+    "description": "Cotton-linen blend, breathable.",
+    "tags": [
+      "blend"
+    ],
+    "vendor": "eval-fixture",
+    "productType": "Tops",
+    "priceMin": 130,
+    "priceMax": 130,
+    "currencyCode": "ILS",
+    "available": true,
+    "imageAltTexts": [],
+    "sourceUpdatedAt": "2026-08-01T00:00:00.000Z"
+  },
+  {
+    "productId": "p76",
+    "title": "Wool Cashmere Blend Coat",
+    "description": "Wool and cashmere blend, very warm.",
+    "tags": [
+      "wool"
+    ],
+    "vendor": "eval-fixture",
+    "productType": "Coats",
+    "priceMin": 620,
+    "priceMax": 620,
+    "currencyCode": "ILS",
+    "available": true,
+    "imageAltTexts": [],
+    "sourceUpdatedAt": "2026-08-01T00:00:00.000Z"
+  },
+  {
+    "productId": "p77",
+    "title": "מעיל פוך ניילון",
+    "description": "מעיל פוך קל מניילון, ללא צמר.",
+    "tags": [],
+    "vendor": "eval-fixture",
+    "productType": "Coats",
+    "priceMin": 390,
+    "priceMax": 390,
+    "currencyCode": "ILS",
+    "available": true,
+    "imageAltTexts": [],
+    "sourceUpdatedAt": "2026-08-01T00:00:00.000Z"
+  },
+  {
+    "productId": "p78",
+    "title": "Vegan Leather Tote",
+    "description": "Vegan leather, no animal leather.",
+    "tags": [
+      "vegan"
+    ],
+    "vendor": "eval-fixture",
+    "productType": "Bags",
+    "priceMin": 160,
+    "priceMax": 160,
+    "currencyCode": "ILS",
+    "available": true,
+    "imageAltTexts": [],
+    "sourceUpdatedAt": "2026-08-01T00:00:00.000Z"
   }
 ]
