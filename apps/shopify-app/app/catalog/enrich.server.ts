@@ -21,11 +21,26 @@ import { createPrismaCostRecorder } from "../ai/cost-recorder.server";
 export interface ProductAttributes {
   category: string;
   colors: string[];
+  /**
+   * The product's primary/displayed colour (YOY-110): the colour named by
+   * the title's colourway designator, else the first colour the text states
+   * in reading order, else null. Lowercase English. Colour exclusions apply
+   * to this alone; `colors` keeps every stated colourway.
+   */
+  primaryColor: string | null;
   occasions: string[];
   fit: string;
   styleTags: string[];
   seasons: string[];
 }
+
+/**
+ * The enrichment rule set's version (YOY-110 AC-2), stored on every row.
+ * Bump it whenever the prompt, schema, or parse rule changes what a row
+ * holds: rows at an older version re-enrich on the next run even when their
+ * content is unchanged. Version 1 introduced `primaryColor`.
+ */
+export const ENRICHMENT_VERSION = 1;
 
 /**
  * JSON Schema every enrichment completion must satisfy. Passed to the LLM
@@ -40,6 +55,10 @@ export const ENRICHMENT_SCHEMA: JsonSchema = {
     // existing retry/failed path instead of landing free text in the store.
     category: { type: "string", enum: [...CANONICAL_CATEGORIES] },
     colors: { type: "array", items: { type: "string" } },
+    // The primary colour as a plain string: "" when the text states no
+    // colour. A nullable member is avoided because not every structured-
+    // output validator honours `nullable`; parseEnrichment maps "" to null.
+    primaryColor: { type: "string" },
     occasions: {
       type: "array",
       items: { type: "string", enum: [...CANONICAL_OCCASIONS] },
@@ -48,7 +67,15 @@ export const ENRICHMENT_SCHEMA: JsonSchema = {
     styleTags: { type: "array", items: { type: "string" } },
     seasons: { type: "array", items: { type: "string" } },
   },
-  required: ["category", "colors", "occasions", "fit", "styleTags", "seasons"],
+  required: [
+    "category",
+    "colors",
+    "primaryColor",
+    "occasions",
+    "fit",
+    "styleTags",
+    "seasons",
+  ],
 };
 
 /** The snapshot fields enrichment reads; a subset of one CatalogProduct row. */
@@ -72,12 +99,22 @@ export function buildEnrichmentPrompt(product: EnrichableProduct): string {
   return [
     "Extract structured attributes for this fashion e-commerce product.",
     "The product text may be in any language; answer with lowercase English",
-    "attribute values.",
+    "attribute values — always translate non-English words into English",
+    "(for example שחור → black, ורוד → pink, אפור → gray).",
     `- category must be one of: ${CANONICAL_CATEGORIES.join(", ")}. Use`,
     '  "other" when none fits.',
-    `- occasions may only contain: ${CANONICAL_OCCASIONS.join(", ")}.`,
-    "- colors: only colors the product text itself states. Never invent or",
-    "  infer a color; when the text states no color, colors must be [].",
+    `- occasions may only contain: ${CANONICAL_OCCASIONS.join(", ")}. Include`,
+    "  an occasion only when the product text itself states or clearly",
+    "  implies it; when the text gives no evidence, occasions must be [].",
+    "- colors: only colors the product text itself states, each as a plain",
+    '  lowercase English color word (e.g. "black", not "noir"). Never invent',
+    "  or infer a color; when the text states no color, colors must be [].",
+    "- primaryColor: the product's primary/displayed color, chosen by this",
+    "  rule: (a) the color named by the title's colorway designator —",
+    '  "in <Color>", "- <Color>", "/ <Color>", "(<Color>)" — else (b) the',
+    "  first color the product text states in reading order (title, then",
+    "  description, then tags). Write it exactly as it appears in colors.",
+    '  When the text states no color, primaryColor must be "".',
     "Use empty strings/arrays for the other attributes when the text gives",
     "no evidence for them. Answer as JSON.",
     "",
@@ -96,6 +133,83 @@ function isStringArray(value: unknown): value is string[] {
 }
 
 /**
+ * The colourway designator shapes a title carries (YOY-110 AC-1 rule a):
+ * `Mesh Over Dress in Pink`, `Linen Shirt - Sand`, `Court Sneaker / White`,
+ * `Wool Beanie (Black)`. Each captures the designator text after the marker,
+ * up to the end of the title (or the closing paren).
+ */
+const DESIGNATOR_PATTERNS: RegExp[] = [
+  /\bin\s+([^\-/()]+?)\s*$/i,
+  /\s[-–—]\s*([^\-/()]+?)\s*$/,
+  /\s\/\s*([^\-/()]+?)\s*$/,
+  /\(([^()]+)\)\s*$/,
+];
+
+/**
+ * The colour a title's colourway designator names, when it names one of the
+ * stated colours (YOY-110 AC-1 rule a). A designator that is not a stated
+ * colour ("Dress in Linen") is not a colour designator and yields null, so
+ * the fallback rule decides. Lowercase; case-insensitive against `colors`.
+ */
+export function primaryColorFromTitle(
+  title: string,
+  colors: string[],
+): string | null {
+  const stated = colors.map((color) => color.trim().toLowerCase());
+  for (const pattern of DESIGNATOR_PATTERNS) {
+    const match = pattern.exec(title);
+    if (match === null) {
+      continue;
+    }
+    const designator = match[1]!.trim().toLowerCase();
+    if (designator === "") {
+      continue;
+    }
+    // Exact colour first ("in Pink"), then a colour the designator contains
+    // ("in Dusty Pink" → pink) so a modifier does not hide the colour.
+    const exact = stated.find((color) => color === designator);
+    if (exact !== undefined) {
+      return exact;
+    }
+    const contained = stated.find(
+      (color) =>
+        color !== "" && new RegExp(`\\b${escapeRegExp(color)}\\b`).test(designator),
+    );
+    if (contained !== undefined) {
+      return contained;
+    }
+  }
+  return null;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Re-validate the model's primary colour against the rule (YOY-110 AC-1):
+ * the title's colourway designator wins when it names a stated colour; else
+ * the model's answer stands when it is one of the stated colours; else the
+ * first stated colour; else null. Never a colour the text does not state.
+ */
+export function resolvePrimaryColor(
+  title: string,
+  colors: string[],
+  answered: string,
+): string | null {
+  const fromTitle = primaryColorFromTitle(title, colors);
+  if (fromTitle !== null) {
+    return fromTitle;
+  }
+  const stated = colors.map((color) => color.trim().toLowerCase());
+  const candidate = answered.trim().toLowerCase();
+  if (candidate !== "" && stated.includes(candidate)) {
+    return candidate;
+  }
+  return stated.find((color) => color !== "") ?? null;
+}
+
+/**
  * Validate one model completion against the attribute schema and normalize
  * category/occasions into the canonical taxonomy (YOY-31 AC-4) before
  * anything is stored: in-set-but-messy answers ("Dresses", "gala") converge
@@ -103,8 +217,15 @@ function isStringArray(value: unknown): value is string[] {
  * so the retrieval side's hard filters always compare one vocabulary.
  * Returns null on any shape violation — the caller owns retry/failure
  * bookkeeping.
+ *
+ * `primaryColor` is re-validated against the product title (YOY-110 AC-1):
+ * see `resolvePrimaryColor`. The title is the only source field the rule
+ * reads, so callers pass `{ title }`.
  */
-export function parseEnrichment(value: unknown): ProductAttributes | null {
+export function parseEnrichment(
+  value: unknown,
+  source: Pick<EnrichableProduct, "title">,
+): ProductAttributes | null {
   if (typeof value !== "object" || value === null) {
     return null;
   }
@@ -112,6 +233,7 @@ export function parseEnrichment(value: unknown): ProductAttributes | null {
   if (
     typeof record.category !== "string" ||
     typeof record.fit !== "string" ||
+    typeof record.primaryColor !== "string" ||
     !isStringArray(record.colors) ||
     !isStringArray(record.occasions) ||
     !isStringArray(record.styleTags) ||
@@ -122,6 +244,11 @@ export function parseEnrichment(value: unknown): ProductAttributes | null {
   return {
     category: normalizeCategory(record.category) ?? "other",
     colors: record.colors,
+    primaryColor: resolvePrimaryColor(
+      source.title,
+      record.colors,
+      record.primaryColor,
+    ),
     occasions: [
       ...new Set(
         record.occasions.map(
@@ -152,6 +279,10 @@ export interface EnrichResult {
  * unchanged catalog performs zero LLM calls. A failed row retries only after
  * the product's content changes.
  *
+ * Versioned (YOY-110 AC-2): the cache hit also requires the row's
+ * `enrichmentVersion` to equal ENRICHMENT_VERSION, so a rule change re-runs
+ * every row once — including rows written before versioning, which carry 0.
+ *
  * Invalid output (schema-violating JSON, or a per-call adapter error) is
  * retried once, then the product is marked failed without blocking the batch
  * (AC-2). Every call goes through `llm` with operation "enrichment", so a
@@ -172,16 +303,18 @@ export async function enrichCatalog({
   });
   const existing = await db.productEnrichment.findMany({
     where: { shopDomain },
-    select: { productId: true, contentHash: true },
+    select: { productId: true, contentHash: true, enrichmentVersion: true },
   });
-  const enrichedHashes = new Map(
-    existing.map((row) => [row.productId, row.contentHash]),
+  const current = new Map(
+    existing
+      .filter((row) => row.enrichmentVersion === ENRICHMENT_VERSION)
+      .map((row) => [row.productId, row.contentHash]),
   );
 
   const result: EnrichResult = { enriched: 0, cached: 0, failed: 0 };
 
   for (const product of products) {
-    if (enrichedHashes.get(product.productId) === product.contentHash) {
+    if (current.get(product.productId) === product.contentHash) {
       result.cached += 1;
       continue;
     }
@@ -196,6 +329,7 @@ export async function enrichCatalog({
             operation: "enrichment",
             storeId: shopDomain,
           }),
+          product,
         );
       } catch {
         // A per-call failure (unparseable response, transient API error) is
@@ -210,6 +344,7 @@ export async function enrichCatalog({
             status: "failed",
             category: null,
             colors: [],
+            primaryColor: null,
             occasions: [],
             fit: null,
             styleTags: [],
@@ -224,9 +359,14 @@ export async function enrichCatalog({
         shopDomain,
         productId: product.productId,
         contentHash: product.contentHash,
+        enrichmentVersion: ENRICHMENT_VERSION,
         ...data,
       },
-      update: { contentHash: product.contentHash, ...data },
+      update: {
+        contentHash: product.contentHash,
+        enrichmentVersion: ENRICHMENT_VERSION,
+        ...data,
+      },
     });
     result[attributes === null ? "failed" : "enriched"] += 1;
   }

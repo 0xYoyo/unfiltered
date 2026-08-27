@@ -15,8 +15,11 @@ import type { ProductAttributes } from "./catalog/enrich.server";
 import {
   buildEnrichmentPrompt,
   ENRICHMENT_SCHEMA,
+  ENRICHMENT_VERSION,
   enrichCatalog,
   parseEnrichment,
+  primaryColorFromTitle,
+  resolvePrimaryColor,
 } from "./catalog/enrich.server";
 import { mapProductNode } from "./catalog/mapping.server";
 import { productNode } from "./catalog/mapping.test";
@@ -34,12 +37,16 @@ const recordedAttributes = (
 ): ProductAttributes => ({
   category: "dress",
   colors: ["black"],
+  primaryColor: "black",
   occasions: ["evening"],
   fit: "regular",
   styleTags: ["elegant"],
   seasons: ["summer"],
   ...overrides,
 });
+
+/** A title with no colourway designator, for parse tests. */
+const PLAIN = { title: "Evening dress" };
 
 /**
  * Fixture-backed LlmClient stub: answers each call from `respond`, records
@@ -112,41 +119,144 @@ afterAll(async () => {
 
 describe("parseEnrichment", () => {
   it("accepts a schema-valid record and rejects shape violations", () => {
-    expect(parseEnrichment(recordedAttributes())).toEqual(recordedAttributes());
-    expect(parseEnrichment(null)).toBeNull();
-    expect(parseEnrichment("dress")).toBeNull();
-    expect(parseEnrichment({ ...recordedAttributes(), category: 7 })).toBeNull();
-    expect(parseEnrichment({ ...recordedAttributes(), colors: "black" })).toBeNull();
-    expect(parseEnrichment({ ...recordedAttributes(), seasons: [1] })).toBeNull();
+    expect(parseEnrichment(recordedAttributes(), PLAIN)).toEqual(recordedAttributes());
+    expect(parseEnrichment(null, PLAIN)).toBeNull();
+    expect(parseEnrichment("dress", PLAIN)).toBeNull();
+    expect(parseEnrichment({ ...recordedAttributes(), category: 7 }, PLAIN)).toBeNull();
+    expect(parseEnrichment({ ...recordedAttributes(), colors: "black" }, PLAIN)).toBeNull();
+    expect(parseEnrichment({ ...recordedAttributes(), seasons: [1] }, PLAIN)).toBeNull();
     const missingFit: Partial<ProductAttributes> = recordedAttributes();
     delete missingFit.fit;
-    expect(parseEnrichment(missingFit)).toBeNull();
+    expect(parseEnrichment(missingFit, PLAIN)).toBeNull();
+    // primaryColor is part of the schema (YOY-110): a missing or non-string
+    // answer is a shape violation like any other.
+    const missingPrimary: Partial<ProductAttributes> = recordedAttributes();
+    delete missingPrimary.primaryColor;
+    expect(parseEnrichment(missingPrimary, PLAIN)).toBeNull();
+    expect(parseEnrichment({ ...recordedAttributes(), primaryColor: null }, PLAIN)).toBeNull();
   });
 
   it("normalizes category and occasions into the canonical taxonomy (YOY-31 AC-4)", () => {
     // Plural and synonym answers — the live-regeneration failure mode —
     // converge onto canonical tokens instead of landing as free text.
     expect(
-      parseEnrichment(recordedAttributes({ category: "Dresses" }))?.category,
+      parseEnrichment(recordedAttributes({ category: "Dresses" }), PLAIN)?.category,
     ).toBe("dress");
     expect(
-      parseEnrichment(recordedAttributes({ category: "outerwear" }))?.category,
+      parseEnrichment(recordedAttributes({ category: "outerwear" }), PLAIN)?.category,
     ).toBe("coat");
     expect(
-      parseEnrichment(recordedAttributes({ category: "accessory" }))?.category,
+      parseEnrichment(recordedAttributes({ category: "accessory" }), PLAIN)?.category,
     ).toBe("accessories");
     expect(
       parseEnrichment(
         recordedAttributes({ occasions: ["party", "gala", "office"] }),
+        PLAIN,
       )?.occasions,
     ).toEqual(["evening", "work"]);
     // Unmappable values become "other" — the enrichment site's contract.
     expect(
-      parseEnrichment(recordedAttributes({ category: "widget" }))?.category,
+      parseEnrichment(recordedAttributes({ category: "widget" }), PLAIN)?.category,
     ).toBe("other");
     expect(
-      parseEnrichment(recordedAttributes({ occasions: ["brunch"] }))?.occasions,
+      parseEnrichment(recordedAttributes({ occasions: ["brunch" ] }), PLAIN)?.occasions,
     ).toEqual(["other"]);
+  });
+});
+
+describe("primary colour rule (YOY-110 AC-1)", () => {
+  const colours = ["pink", "black", "navy"];
+
+  it("reads the title's colourway designator in all four shapes", () => {
+    expect(primaryColorFromTitle("Mesh Over Dress in Pink", colours)).toBe("pink");
+    expect(primaryColorFromTitle("Mesh Over Dress - Navy", colours)).toBe("navy");
+    expect(primaryColorFromTitle("Mesh Over Dress – Navy", colours)).toBe("navy");
+    expect(primaryColorFromTitle("Mesh Over Dress / Black", colours)).toBe("black");
+    expect(primaryColorFromTitle("Mesh Over Dress (Black)", colours)).toBe("black");
+    // Case-insensitive; a modifier does not hide the colour.
+    expect(primaryColorFromTitle("Mesh Over Dress in DUSTY PINK", colours)).toBe("pink");
+  });
+
+  it("ignores a designator that names no stated colour", () => {
+    // "in Linen" is a fabric; "Cabin Socks" contains "in" inside a word.
+    expect(primaryColorFromTitle("Shirt Dress in Linen", ["white"])).toBeNull();
+    expect(primaryColorFromTitle("Cabin Socks", ["red"])).toBeNull();
+    expect(primaryColorFromTitle("Plain Tee", [])).toBeNull();
+  });
+
+  it("falls back in order: designator, then the model's stated answer, then the first stated colour, then null", () => {
+    // (a) the designator wins over the model's answer.
+    expect(resolvePrimaryColor("Mesh Over Dress in Pink", colours, "black")).toBe("pink");
+    // (b) no designator: the model's answer stands when it is a stated colour.
+    expect(resolvePrimaryColor("Mesh Over Dress", colours, "Navy")).toBe("navy");
+    // An answer the text never states is never accepted — first stated colour.
+    expect(resolvePrimaryColor("Mesh Over Dress", colours, "red")).toBe("pink");
+    expect(resolvePrimaryColor("Mesh Over Dress", colours, "")).toBe("pink");
+    // No colours at all: null.
+    expect(resolvePrimaryColor("Plain Tee", [], "")).toBeNull();
+    expect(resolvePrimaryColor("Plain Tee", [], "black")).toBeNull();
+  });
+
+  it("parseEnrichment re-validates the model's primaryColor against the title", () => {
+    const answered = recordedAttributes({ colors: ["Pink", "Black"], primaryColor: "black" });
+    expect(
+      parseEnrichment(answered, { title: "Mesh Over Dress in Pink" })?.primaryColor,
+    ).toBe("pink");
+    // "" (no colour stated) maps to null; `colors` is stored unchanged.
+    const colourless = parseEnrichment(
+      recordedAttributes({ colors: [], primaryColor: "" }),
+      PLAIN,
+    );
+    expect(colourless?.primaryColor).toBeNull();
+    expect(colourless?.colors).toEqual([]);
+    expect(
+      parseEnrichment(answered, { title: "Mesh Over Dress" })?.colors,
+    ).toEqual(["Pink", "Black"]);
+  });
+
+  it("the prompt states the rule and the schema requires the field", () => {
+    const prompt = buildEnrichmentPrompt({
+      productId: "p",
+      title: "Mesh Over Dress in Pink",
+      description: "",
+      tags: [],
+      productType: "Dresses",
+      imageAltTexts: [],
+      contentHash: "h",
+    });
+    expect(prompt).toContain("primaryColor");
+    expect(prompt).toContain("colorway designator");
+    expect(prompt).toContain("reading order");
+    expect(ENRICHMENT_SCHEMA.required).toContain("primaryColor");
+  });
+
+  it("persists primaryColor on the enrichment row", async () => {
+    await db.catalogProduct.create({
+      data: {
+        shopDomain: SHOP,
+        ...mapProductNode(
+          productNode({
+            id: "gid://shopify/Product/4",
+            title: "Mesh Over Dress in Pink",
+            description: "Also in black and navy.",
+          }),
+        ),
+      },
+    });
+    const { llm } = llmStub((request) =>
+      request.prompt.includes("Mesh Over Dress in Pink")
+        ? recordedAttributes({ colors: ["pink", "black", "navy"], primaryColor: "pink" })
+        : recordedAttributes(),
+    );
+    await enrichCatalog({ db, shopDomain: SHOP, llm });
+    const row = await db.productEnrichment.findUniqueOrThrow({
+      where: {
+        shopDomain_productId: { shopDomain: SHOP, productId: "gid://shopify/Product/4" },
+      },
+    });
+    expect(row.primaryColor).toBe("pink");
+    expect(row.colors).toEqual(["pink", "black", "navy"]);
+    expect(row.enrichmentVersion).toBe(ENRICHMENT_VERSION);
   });
 });
 
@@ -292,6 +402,49 @@ describe("catalog enrichment", () => {
 
     expect(rerun).toEqual({ enriched: 0, cached: 3, failed: 0 });
     expect(calls).toHaveLength(0);
+    // Every row carries the version it was written at (YOY-110 AC-2).
+    const rows = await db.productEnrichment.findMany();
+    expect(rows.map((row) => row.enrichmentVersion)).toEqual(
+      rows.map(() => ENRICHMENT_VERSION),
+    );
+  });
+
+  it("re-enriches a row written at an older version even when its content is unchanged (YOY-110 AC-2)", async () => {
+    await enrichCatalog({ db, shopDomain: SHOP, llm: llmStub(() => recordedAttributes()).llm });
+    // Simulate rows from before a rule change: same content hash, older
+    // version — including 0, the backfill value for pre-versioning rows.
+    await db.productEnrichment.update({
+      where: {
+        shopDomain_productId: { shopDomain: SHOP, productId: "gid://shopify/Product/1" },
+      },
+      data: { enrichmentVersion: ENRICHMENT_VERSION - 1, primaryColor: null },
+    });
+    await db.productEnrichment.update({
+      where: {
+        shopDomain_productId: { shopDomain: SHOP, productId: "gid://shopify/Product/3" },
+      },
+      data: { enrichmentVersion: 0 },
+    });
+
+    const { llm, calls } = llmStub(() => recordedAttributes());
+    const rerun = await enrichCatalog({ db, shopDomain: SHOP, llm });
+
+    // Exactly the stale rows re-enrich; the current-version row is cached.
+    expect(rerun).toEqual({ enriched: 2, cached: 1, failed: 0 });
+    expect(calls).toHaveLength(2);
+    const rows = await db.productEnrichment.findMany({ orderBy: { productId: "asc" } });
+    for (const row of rows) {
+      expect(row.enrichmentVersion).toBe(ENRICHMENT_VERSION);
+      expect(row.primaryColor).toBe("black");
+    }
+    // And the catalog is fully cached again at the current version.
+    const again = llmStub(() => recordedAttributes());
+    expect(await enrichCatalog({ db, shopDomain: SHOP, llm: again.llm })).toEqual({
+      enriched: 0,
+      cached: 3,
+      failed: 0,
+    });
+    expect(again.calls).toHaveLength(0);
   });
 
   it("keeps a failed product cached until its content changes", async () => {

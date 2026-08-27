@@ -612,6 +612,27 @@
       },
       "inputTokens": 270,
       "outputTokens": 98
+    },
+    "summer dress, not black, under 200": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [
+          "black"
+        ],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "summer"
+        ],
+        "confidence": 0.95,
+        "category": "dress",
+        "currency": null,
+        "occasion": null,
+        "priceMax": 200,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 269,
+      "outputTokens": 106
     }
   }
 }

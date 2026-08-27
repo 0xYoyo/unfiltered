@@ -9,6 +9,23 @@ import { expandCategoryConstraint } from "@unfiltered/engine";
 import { withTenantVectorScan } from "../catalog/hnsw.server";
 
 /**
+ * The colour-evidence flag's SQL (YOY-67 AC-5, YOY-110 AC-3): under an
+ * exclusion-only colour constraint the evidence is the primary colour —
+ * `colorUnknown` means the enrichment states no primary colour — while a
+ * positive constraint reads the full `colors` list as before. Shared with
+ * the classic store so the two never drift.
+ */
+export function colorUnknownSql(constraints: {
+  colorsInclude: string[];
+  colorsExclude: string[];
+}): string {
+  return constraints.colorsInclude.length === 0 &&
+    constraints.colorsExclude.length > 0
+    ? `(en."primaryColor" IS NULL)`
+    : `(COALESCE(cardinality(en."colors"), 0) = 0)`;
+}
+
+/**
  * Postgres/pgvector implementation of the engine's RetrievalStore port.
  *
  * Every hard constraint is a WHERE predicate inside the similarity query
@@ -27,7 +44,9 @@ import { withTenantVectorScan } from "../catalog/hnsw.server";
  * proves an excluded color). Category stays evidence-required, expanded
  * through the taxonomy's category groups (AC-5) so a parent constraint
  * ("shoes") admits its members ("sneakers"). Price and availability come from
- * the catalog snapshot itself.
+ * the catalog snapshot itself. A colour EXCLUSION compares against the
+ * enrichment's `primaryColor` only (YOY-110): a pink dress that also comes
+ * in black is not "black"; a null primary colour passes.
  *
  * Vector comparisons cast both sides through the query vector's dimension, so
  * stored vectors of a different dimension fail loudly instead of comparing
@@ -100,9 +119,13 @@ export function createPgVectorRetrievalStore(db: PrismaClient): RetrievalStore {
         );
       }
       if (constraints.colorsExclude.length > 0) {
+        // Exclusion by PRIMARY colour (YOY-110 AC-3): a product is dropped
+        // only when its primary/displayed colour is an excluded one; the
+        // other colourways it comes in do not count, and a null primary
+        // colour passes (unknown passes).
         where.push(
-          `NOT EXISTS (SELECT 1 FROM unnest(COALESCE(en."colors", '{}')) c
-             WHERE lower(c) IN (SELECT lower(v)
+          `(en."primaryColor" IS NULL
+             OR lower(en."primaryColor") NOT IN (SELECT lower(v)
                FROM json_array_elements_text(${param(JSON.stringify(constraints.colorsExclude))}::json) v))`,
         );
       }
@@ -117,7 +140,7 @@ export function createPgVectorRetrievalStore(db: PrismaClient): RetrievalStore {
         constraints.colorsInclude.length > 0 ||
         constraints.colorsExclude.length > 0;
       const colorUnknownExpr = colorTiering
-        ? `(COALESCE(cardinality(en."colors"), 0) = 0)`
+        ? colorUnknownSql(constraints)
         : null;
       // Ranking keys, shared by the candidate scan and the re-rank below.
       const orderBy = `${colorUnknownExpr === null ? "" : `"colorUnknown" ASC, `}distance ASC`;

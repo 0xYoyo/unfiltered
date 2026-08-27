@@ -908,5 +908,39 @@
     "available": true,
     "imageAltTexts": [],
     "sourceUpdatedAt": "2026-08-01T00:00:00.000Z"
+  },
+  {
+    "productId": "p62",
+    "title": "Mesh Over Dress in Pink",
+    "description": "Sheer mesh overlay dress. Also in black and navy.",
+    "tags": [
+      "dress",
+      "summer"
+    ],
+    "vendor": "eval-fixture",
+    "productType": "Dresses",
+    "priceMin": 128,
+    "priceMax": 128,
+    "currencyCode": "ILS",
+    "available": true,
+    "imageAltTexts": [],
+    "sourceUpdatedAt": "2026-08-01T00:00:00.000Z"
+  },
+  {
+    "productId": "p63",
+    "title": "Tie Waist Dress in Black",
+    "description": "Black tie-waist summer dress.",
+    "tags": [
+      "dress",
+      "summer"
+    ],
+    "vendor": "eval-fixture",
+    "productType": "Dresses",
+    "priceMin": 148,
+    "priceMax": 148,
+    "currencyCode": "ILS",
+    "available": true,
+    "imageAltTexts": [],
+    "sourceUpdatedAt": "2026-08-01T00:00:00.000Z"
   }
 ]

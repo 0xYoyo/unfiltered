@@ -106,6 +106,15 @@ model ProductEnrichment {
   fit         String?
   styleTags   String[]
   seasons     String[]
+  // The product's primary/displayed colour (YOY-110): the title's colourway
+  // designator, else the first colour the text states; null when unknown.
+  // Colour EXCLUSIONS apply to this column only; `colors` keeps every
+  // stated colourway for inclusions.
+  primaryColor      String?
+  // ENRICHMENT_VERSION (app/catalog/enrich.server.ts) at the time the row
+  // was written: a row at an older version re-enriches on the next run even
+  // when its contentHash is unchanged. 0 = written before versioning.
+  enrichmentVersion Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

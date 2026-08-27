@@ -59,6 +59,7 @@ function llmStub(db: PrismaClient) {
       return {
         category: "dress",
         colors: ["black"],
+        primaryColor: "black",
         occasions: ["evening"],
         fit: "regular",
         styleTags: ["elegant"],

@@ -46,6 +46,8 @@ interface SeedProduct {
   enrichment?: {
     category?: string | null;
     colors?: string[];
+    /** Displayed colour (YOY-110); defaults to the first of `colors`. */
+    primaryColor?: string | null;
     occasions?: string[];
   } | null;
 }
@@ -83,6 +85,14 @@ async function seed(db: PrismaClient, products: SeedProduct[]): Promise<void> {
           category: product.enrichment.category ?? null,
           colors: product.enrichment.colors ?? [],
           occasions: product.enrichment.occasions ?? [],
+          // Default primary colour = the first stated colour, mirroring the
+          // enrichment fallback rule (YOY-110); pass `primaryColor` to seed a
+          // colourway product whose displayed colour differs, or null for an
+          // unknown one.
+          primaryColor:
+            product.enrichment.primaryColor === undefined
+              ? (product.enrichment.colors?.[0] ?? null)
+              : product.enrichment.primaryColor,
           fit: null,
           styleTags: [],
           seasons: [],
@@ -216,6 +226,75 @@ describe("hard constraints are filters, never preferences (AC-2)", () => {
       colorsExclude: ["black"],
     });
     expect(ids).toEqual(["unenriched"]);
+  });
+
+  it("excludes by the PRIMARY colour only: a colourway product is not its other colours (YOY-110 AC-3, AC-4)", async () => {
+    await seed(db, [
+      // The live F-1 shape: a pink dress that also comes in black and navy.
+      {
+        productId: "mesh-pink",
+        vector: [1, 0, 0],
+        enrichment: { category: "dress", colors: ["pink", "black", "navy"], primaryColor: "pink" },
+      },
+      // Primary colour IS the excluded colour, at perfect similarity.
+      {
+        productId: "tie-black",
+        vector: [1, 0, 0],
+        enrichment: { category: "dress", colors: ["black"], primaryColor: "black" },
+      },
+      // Stated colours but no primary colour: unknown passes.
+      {
+        productId: "no-primary",
+        vector: [0.6, 0.8, 0],
+        enrichment: { category: "dress", colors: ["black"], primaryColor: null },
+      },
+    ]);
+
+    const ids = await queryIds(db, {
+      ...noConstraints(),
+      colorsExclude: ["Black"],
+    });
+    expect(ids).toEqual(["mesh-pink", "no-primary"]);
+    expect(ids).not.toContain("tie-black");
+  });
+
+  it("colorsInclude still reads every colourway, unchanged (YOY-110 NG-1)", async () => {
+    await seed(db, [
+      {
+        productId: "mesh-pink",
+        vector: [1, 0, 0],
+        enrichment: { colors: ["pink", "black", "navy"], primaryColor: "pink" },
+      },
+      { productId: "red-one", vector: [0.9, 0.1, 0], enrichment: { colors: ["red"] } },
+    ]);
+    expect(
+      await queryIds(db, { ...noConstraints(), colorsInclude: ["black"] }),
+    ).toEqual(["mesh-pink"]);
+  });
+
+  it("under an exclusion-only colour constraint, colorUnknown means the primary colour is unknown (YOY-110 AC-3)", async () => {
+    await seed(db, [
+      // Colours stated but no primary colour: passes on leniency, flagged,
+      // tiered below the evidence-backed hit despite the nearer vector.
+      {
+        productId: "stated-no-primary",
+        vector: [1, 0, 0],
+        enrichment: { colors: ["black"], primaryColor: null },
+      },
+      {
+        productId: "known-pink",
+        vector: [0.6, 0.8, 0],
+        enrichment: { colors: ["pink", "black"], primaryColor: "pink" },
+      },
+    ]);
+    const hits = await createPgVectorRetrievalStore(db).query({
+      storeId: SHOP,
+      constraints: { ...noConstraints(), colorsExclude: ["black"] },
+      vector: [1, 0, 0],
+      limit: 10,
+    });
+    expect(hits.map((hit) => hit.productId)).toEqual(["known-pink", "stated-no-primary"]);
+    expect(hits.map((hit) => hit.colorUnknown)).toEqual([false, true]);
   });
 
   it("still requires enrichment evidence for the category constraint", async () => {

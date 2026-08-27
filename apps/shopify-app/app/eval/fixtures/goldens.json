@@ -584,5 +584,24 @@
       "occasion": null,
       "availabilityRequired": false
     }
+  },
+  {
+    "id": "g24",
+    "language": "en",
+    "query": "summer dress, not black, under 200",
+    "expectedProductIds": [
+      "p62"
+    ],
+    "hardConstraints": {
+      "category": "dress",
+      "priceMin": null,
+      "priceMax": 200,
+      "colorsInclude": [],
+      "colorsExclude": [
+        "black"
+      ],
+      "occasion": null,
+      "availabilityRequired": false
+    }
   }
 ]

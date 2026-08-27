@@ -68,6 +68,8 @@ interface SeedProduct {
   enrichment?: {
     category?: string | null;
     colors?: string[];
+    /** Displayed colour (YOY-110); defaults to the first of `colors`. */
+    primaryColor?: string | null;
     occasions?: string[];
   } | null;
 }
@@ -111,6 +113,14 @@ async function seed(db: PrismaClient, products: SeedProduct[]): Promise<void> {
           category: product.enrichment.category ?? null,
           colors: product.enrichment.colors ?? [],
           occasions: product.enrichment.occasions ?? [],
+          // Default primary colour = the first stated colour, mirroring the
+          // enrichment fallback rule (YOY-110); pass `primaryColor` to seed a
+          // colourway product whose displayed colour differs, or null for an
+          // unknown one.
+          primaryColor:
+            product.enrichment.primaryColor === undefined
+              ? (product.enrichment.colors?.[0] ?? null)
+              : product.enrichment.primaryColor,
           fit: null,
           styleTags: [],
           seasons: [],
