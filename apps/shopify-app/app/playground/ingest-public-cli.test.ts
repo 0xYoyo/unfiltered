@@ -111,7 +111,20 @@ describe("argument parsing (AC-6)", () => {
       delete: false,
       source: null,
       pages: DEFAULT_CRAWL_PAGE_BUDGET,
+      pathPrefix: null,
     });
+    // YOY-117 AC-4: the locale hint, normalised to /prefix with no trailing slash.
+    expect(
+      parseIngestPublicArgs(["--url", "https://s.example", "--slug", "s", "--path-prefix", "/uk/"]),
+    ).toMatchObject({ pathPrefix: "/uk" });
+    expect(
+      parseIngestPublicArgs(["--url", "https://s.example", "--slug", "s", "--path-prefix", "/en-gb"]),
+    ).toMatchObject({ pathPrefix: "/en-gb" });
+    for (const bad of ["uk", "/", "/uk?x=1", "https://s.example/uk"]) {
+      expect(() =>
+        parseIngestPublicArgs(["--url", "https://s.example", "--slug", "s", "--path-prefix", bad]),
+      ).toThrow(IngestPublicUsageError);
+    }
     expect(parseIngestPublicArgs(["--url", "https://s.example", "--slug", "s"])).toMatchObject({
       max: DEFAULT_MAX_PRODUCTS,
       name: null,

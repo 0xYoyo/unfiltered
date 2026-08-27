@@ -159,6 +159,34 @@ describe("paging (AC-4)", () => {
     expect(paths).toEqual(["/robots.txt", "/meta.json", page(1), page(2), page(3)]);
   });
 
+  it("--path-prefix reads the feed and composes product URLs under <origin><prefix>; meta stays at the origin (YOY-117 AC-4)", async () => {
+    // The localised storefront answers under /uk; the root feed is absent so
+    // a request there would be a 404 in the fake store.
+    const store = createFakeStore({
+      "/robots.txt": "",
+      "/uk/products.json?limit=1": { products: [FIXTURE_PAGE_1[0]] },
+      [`/uk${page(1)}`]: { products: FIXTURE_PAGE_1 },
+      [`/uk${page(2)}`]: { products: [] },
+      "/meta.json": FIXTURE_META,
+    });
+    const fetch = polite(store.fetch);
+    expect(await detectShopifyPublicStore(FIXTURE_ORIGIN, fetch, { pathPrefix: "/uk" })).toBe(true);
+    const source = createShopifyPublicSource({ storeUrl: FIXTURE_ORIGIN, fetch, pathPrefix: "/uk" });
+    const products = await source.fetchProducts({ maxProducts: 2000 });
+    expect(products.map((p) => p.sourceId)).toEqual(["7001", "7002"]);
+    for (const product of products) {
+      expect(product.url).toMatch(new RegExp(`^${FIXTURE_ORIGIN}/uk/products/`));
+    }
+    const paths = store.requests.map((r) => `${new URL(r.url).pathname}${new URL(r.url).search}`);
+    expect(paths).toEqual([
+      "/robots.txt",
+      "/uk/products.json?limit=1",
+      "/meta.json",
+      `/uk${page(1)}`,
+      `/uk${page(2)}`,
+    ]);
+  });
+
   it("stops paging once maxProducts are in hand and fails loudly on a non-JSON page", async () => {
     const store = fixtureStore();
     const source = createShopifyPublicSource({

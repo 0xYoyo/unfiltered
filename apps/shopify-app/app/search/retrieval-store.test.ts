@@ -42,6 +42,8 @@ interface SeedProduct {
   status?: string;
   /** Online Store publication; null seeds an unpublished row (YOY-67 AC-4). */
   publishedAt?: Date | null;
+  /** Product-family key (YOY-117); "" (the default) is its own family. */
+  familyKey?: string;
   /** null seeds no enrichment row (an unenriched product). */
   enrichment?: {
     category?: string | null;
@@ -70,6 +72,7 @@ async function seed(db: PrismaClient, products: SeedProduct[]): Promise<void> {
         available: product.available ?? true,
         status: product.status ?? "ACTIVE",
         publishedAt: product.publishedAt,
+        familyKey: product.familyKey ?? "",
         imageAltTexts: [],
         sourceUpdatedAt: new Date("2026-01-01T00:00:00Z"),
         contentHash: `hash-${product.productId}`,
@@ -521,6 +524,67 @@ describe("hard constraints are filters, never preferences (AC-2)", () => {
 
     const ids = await queryIds(db, { ...noConstraints(), availableOnly: true });
     expect(ids).toEqual(["in-stock"]);
+  });
+});
+
+describe("one hit per product family (YOY-117 AC-2)", () => {
+  let db: PrismaClient;
+
+  beforeEach(async () => {
+    db = await createTestDb();
+  });
+
+  const FAMILY = "eval|rib knit top|tops";
+  const seedFamily = (db: PrismaClient) =>
+    seed(db, [
+      // Three colourways of one top; the black one is the nearest vector.
+      { productId: "rib-black", vector: [1, 0, 0], familyKey: FAMILY, enrichment: { category: "top", colors: ["black"], primaryColor: "black" } },
+      { productId: "rib-navy", vector: [0.9, 0.1, 0], familyKey: FAMILY, enrichment: { category: "top", colors: ["navy"], primaryColor: "navy" } },
+      { productId: "rib-pink", vector: [0.8, 0.2, 0], familyKey: FAMILY, enrichment: { category: "top", colors: ["pink"], primaryColor: "pink" } },
+      // A different product, further away: never hidden by the family.
+      { productId: "linen-tee", vector: [0.7, 0.3, 0], familyKey: "eval|linen tee|tops", enrichment: { category: "top", colors: ["white"], primaryColor: "white" } },
+      // Two pre-YOY-117 rows with an empty key: each its own family.
+      { productId: "legacy-a", vector: [0.6, 0.4, 0], enrichment: { category: "top", colors: [] } },
+      { productId: "legacy-b", vector: [0.5, 0.5, 0], enrichment: { category: "top", colors: [] } },
+    ]);
+
+  it("returns the best-ranked member once when the query names no colour", async () => {
+    await seedFamily(db);
+    const ids = await allQueryIds(db, noConstraints());
+    expect(ids).toEqual(["rib-black", "linen-tee", "legacy-a", "legacy-b"]);
+  });
+
+  it("returns the member whose primary colour matches colorsInclude, ranked at the family's place", async () => {
+    await seedFamily(db);
+    const ids = await allQueryIds(db, { ...noConstraints(), colorsInclude: ["pink"] });
+    // The pink member represents the family; the other colourways fail the
+    // inclusion outright; the unknown-colour legacy rows pass on leniency
+    // and tier below.
+    expect(ids).toEqual(["rib-pink", "legacy-a", "legacy-b"]);
+  });
+
+  it("applies the limit AFTER the collapse, so a page counts families", async () => {
+    await seedFamily(db);
+    const ids = await queryIds(db, noConstraints());
+    expect(ids).toEqual(["rib-black", "linen-tee", "legacy-a", "legacy-b"]);
+    const hits = await createPgVectorRetrievalStore(db).query({
+      storeId: SHOP,
+      constraints: noConstraints(),
+      vector: [1, 0, 0],
+      limit: 2,
+    });
+    expect(hits.map((hit) => hit.productId)).toEqual(["rib-black", "linen-tee"]);
+  });
+
+  it("keeps the result shape: productId, distance, and the colour flag only", async () => {
+    await seedFamily(db);
+    const [hit] = await createPgVectorRetrievalStore(db).query({
+      storeId: SHOP,
+      constraints: { ...noConstraints(), colorsInclude: ["pink"] },
+      vector: [1, 0, 0],
+      limit: 1,
+    });
+    expect(Object.keys(hit!).sort()).toEqual(["colorUnknown", "distance", "productId"]);
   });
 });
 

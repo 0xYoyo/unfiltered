@@ -43,6 +43,12 @@ import { colorUnknownSql } from "./retrieval-store.server";
  * price cap compares against `priceMin`. Constraint-only requests (no
  * query text) filter without ranking and score every hit 0, ordered
  * deterministically by productId.
+ *
+ * One hit per product family (YOY-117 AC-2), mirroring the pgvector store:
+ * colourways sharing `familyKey` collapse to one representative inside the
+ * statement (`DISTINCT ON`), the member matching a requested colour first,
+ * else the best-ranked; the limit applies after the collapse, so pages
+ * count families. An empty `familyKey` is its own family.
  */
 
 /** word_similarity floor for a row to count as a keyword match. */
@@ -157,6 +163,14 @@ export function buildClassicSearchSql(request: ClassicSearchRequest): {
   if (colorUnknownExpr !== null) {
     select += `,\n        ${colorUnknownExpr} AS "colorUnknown"`;
   }
+  // Family collapse (YOY-117 AC-2): the family and the colour-preference
+  // flag ride the inner select; DISTINCT ON keeps one row per family.
+  select += `,\n        COALESCE(NULLIF(p."familyKey", ''), p."productId") AS "family"`;
+  select +=
+    constraints.colorsInclude.length > 0
+      ? `,\n        COALESCE(lower(en."primaryColor") IN (SELECT lower(v)
+             FROM json_array_elements_text(${param(JSON.stringify(constraints.colorsInclude))}::json) v), false) AS "preferred"`
+      : `,\n        false AS "preferred"`;
 
   if (constraints.priceMax !== undefined) {
     // Violates the cap when even its cheapest variant is above it.
@@ -204,17 +218,24 @@ export function buildClassicSearchSql(request: ClassicSearchRequest): {
   // the LATERAL dependency is real and the executor runs set_config first.
   // Ordering and the cap sit on the outer query over the joined columns —
   // one statement, one plan, one round trip.
-  const sql = `SELECT t.*
-     FROM (SELECT set_config('pg_trgm.word_similarity_threshold', '${WORD_SIMILARITY_THRESHOLD}', true) AS "threshold") s
-     CROSS JOIN LATERAL (
-       SELECT p."productId", ${CARD_COLUMNS},
-        ${select}
-       FROM "CatalogProduct" p
-       LEFT JOIN "ProductEnrichment" en
-         ON en."shopDomain" = p."shopDomain" AND en."productId" = p."productId"
-        AND en."status" = 'enriched'
-       WHERE s."threshold" IS NOT NULL
-         AND ${where.join("\n         AND ")}
+  const sql = `SELECT t."productId", t."title", t."url", t."imageUrl",
+        t."priceMin", t."priceMax", t."currencyCode", t."available", t.score${
+    colorUnknownExpr === null ? "" : `, t."colorUnknown"`
+  }
+     FROM (
+       SELECT DISTINCT ON (t."family") t.*
+       FROM (SELECT set_config('pg_trgm.word_similarity_threshold', '${WORD_SIMILARITY_THRESHOLD}', true) AS "threshold") s
+       CROSS JOIN LATERAL (
+         SELECT p."productId", ${CARD_COLUMNS},
+          ${select}
+         FROM "CatalogProduct" p
+         LEFT JOIN "ProductEnrichment" en
+           ON en."shopDomain" = p."shopDomain" AND en."productId" = p."productId"
+          AND en."status" = 'enriched'
+         WHERE s."threshold" IS NOT NULL
+           AND ${where.join("\n           AND ")}
+       ) t
+       ORDER BY t."family", t."preferred" DESC, ${orderBy}
      ) t
      ORDER BY ${orderBy}${limit === undefined ? "" : `
      LIMIT ${limit}`}`;

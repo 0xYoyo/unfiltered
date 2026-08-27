@@ -41,12 +41,22 @@ export interface ShopifyPublicStoreMeta {
  * (AC-6 detection): `/products.json?limit=1` answers JSON with a `products`
  * array. Anything else — HTML, a 404, JSON of another shape — is not.
  */
+/**
+ * The base every feed and product URL is read under (YOY-117 AC-4): the
+ * origin, plus `--path-prefix` when a localised storefront was asked for
+ * (`https://store.example/uk`).
+ */
+function baseOf(storeUrl: string, pathPrefix: string | null | undefined): string {
+  return `${originOf(storeUrl)}${pathPrefix ?? ""}`;
+}
+
 export async function detectShopifyPublicStore(
   storeUrl: string,
   fetch: PoliteFetch,
+  options: { pathPrefix?: string | null } = {},
 ): Promise<boolean> {
-  const origin = originOf(storeUrl);
-  const response = await fetch.fetch(`${origin}/products.json?limit=1`);
+  const base = baseOf(storeUrl, options.pathPrefix);
+  const response = await fetch.fetch(`${base}/products.json?limit=1`);
   if (!response.ok) {
     return false;
   }
@@ -153,13 +163,22 @@ export function createShopifyPublicSource({
   storeUrl,
   fetch,
   meta,
+  pathPrefix = null,
 }: {
   storeUrl: string;
   fetch: PoliteFetch;
   /** Pre-fetched meta (the CLI reads it for the store name); fetched when absent. */
   meta?: ShopifyPublicStoreMeta;
+  /**
+   * Localised storefront path (YOY-117 AC-4): the feed is read from
+   * `<origin><prefix>/products.json` and product URLs are composed as
+   * `<origin><prefix>/products/<handle>`. Store meta stays at the origin.
+   */
+  pathPrefix?: string | null;
 }): CatalogSource {
-  const origin = originOf(storeUrl);
+  // `origin` here is the base every feed and product URL hangs off — the
+  // origin plus the locale prefix when one was given.
+  const origin = baseOf(storeUrl, pathPrefix);
   return {
     kind: SHOPIFY_PUBLIC_SOURCE_KIND,
     async fetchProducts({ maxProducts, onProgress }) {

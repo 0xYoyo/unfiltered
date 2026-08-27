@@ -19,7 +19,7 @@ import {
 import { createPrismaCostRecorder } from "../ai/cost-recorder.server";
 import { embedCatalog } from "../catalog/embed.server";
 import { enrichCatalog } from "../catalog/enrich.server";
-import { computeContentHash } from "../catalog/mapping.server";
+import { computeContentHash, computeFamilyKey } from "../catalog/mapping.server";
 import { createPgTrgmClassicStore } from "../search/classic-store.server";
 import {
   createSearchOrchestrator,
@@ -87,6 +87,12 @@ export interface Golden {
   expectedRoute?: "classic" | "ai";
   hardConstraints: GoldenConstraints;
   expectedProductIds: string[];
+  /**
+   * Products that must NOT appear in the top 10 (YOY-117 AC-3): the other
+   * colourways of a family whose representative is expected. Each
+   * appearance is scored as a violation.
+   */
+  mustNotProductIds?: string[];
   /**
    * A zero-hit golden (YOY-111 AC-5): the constraints' intersection is
    * empty on the fixture catalog by design, so the golden scores the
@@ -519,6 +525,8 @@ export async function runEval(db: PrismaClient): Promise<EvalRunResult> {
         shopDomain,
         sourceUpdatedAt: new Date(sourceUpdatedAt),
         contentHash: computeContentHash(product),
+        // Same family rule every ingestion path applies (YOY-117 AC-1).
+        familyKey: computeFamilyKey(product),
       },
     });
   }
@@ -592,6 +600,13 @@ export async function runEval(db: PrismaClient): Promise<EvalRunResult> {
     const violations = hits.flatMap((hit) =>
       findViolations(golden, hit.productId, products, enrichments),
     );
+    // Family collapse (YOY-117 AC-3): a golden may name products that must
+    // never share its top 10 with the expected representative.
+    for (const hit of hits) {
+      if (golden.mustNotProductIds?.includes(hit.productId)) {
+        violations.push(`${hit.productId}: must not appear (colourway of an expected family)`);
+      }
+    }
     // Close matches may relax anything but an explicit exclusion (YOY-111
     // AC-1): a close match carrying an excluded primary colour is a
     // hard-constraint violation like any other.

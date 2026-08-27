@@ -942,5 +942,56 @@
     "available": true,
     "imageAltTexts": [],
     "sourceUpdatedAt": "2026-08-01T00:00:00.000Z"
+  },
+  {
+    "productId": "p64",
+    "title": "Rib Knit Top in Pink",
+    "description": "Ribbed knit top. Also in navy and black.",
+    "tags": [
+      "top",
+      "knit"
+    ],
+    "vendor": "eval-fixture",
+    "productType": "Tops",
+    "priceMin": 140,
+    "priceMax": 140,
+    "currencyCode": "ILS",
+    "available": true,
+    "imageAltTexts": [],
+    "sourceUpdatedAt": "2026-08-01T00:00:00.000Z"
+  },
+  {
+    "productId": "p65",
+    "title": "Rib Knit Top in Navy",
+    "description": "Ribbed knit top. Also in pink and black.",
+    "tags": [
+      "top",
+      "knit"
+    ],
+    "vendor": "eval-fixture",
+    "productType": "Tops",
+    "priceMin": 140,
+    "priceMax": 140,
+    "currencyCode": "ILS",
+    "available": true,
+    "imageAltTexts": [],
+    "sourceUpdatedAt": "2026-08-01T00:00:00.000Z"
+  },
+  {
+    "productId": "p66",
+    "title": "Rib Knit Top in Black",
+    "description": "Ribbed knit top. Also in pink and navy.",
+    "tags": [
+      "top",
+      "knit"
+    ],
+    "vendor": "eval-fixture",
+    "productType": "Tops",
+    "priceMin": 140,
+    "priceMax": 140,
+    "currencyCode": "ILS",
+    "available": true,
+    "imageAltTexts": [],
+    "sourceUpdatedAt": "2026-08-01T00:00:00.000Z"
   }
 ]

@@ -32,6 +32,11 @@ export interface CrawlStats {
   skippedNoPrice: number;
   /** Responses that were not HTML, skipped without parsing (AC-2). */
   skippedNonHtml: number;
+  /**
+   * Sitemap URLs outside `--path-prefix`, never fetched (YOY-117 AC-4):
+   * the locale hint keeps a multi-region store to one storefront.
+   */
+  skippedOutsidePrefix: number;
   /** URLs robots.txt disallowed, never fetched. */
   skippedRobots: number;
   /** Fetch failures (network, timeout, non-2xx) — skipped and counted. */
@@ -65,6 +70,7 @@ const emptyStats = (): CrawlStats => ({
   productsFound: 0,
   skippedNoPrice: 0,
   skippedNonHtml: 0,
+  skippedOutsidePrefix: 0,
   skippedRobots: 0,
   fetchErrors: 0,
   extractErrors: 0,
@@ -85,11 +91,19 @@ export function createJsonLdCrawlSource({
   fetch,
   pageBudget = DEFAULT_CRAWL_PAGE_BUDGET,
   concurrency = CRAWL_CONCURRENCY,
+  pathPrefix = null,
 }: {
   storeUrl: string;
   fetch: PoliteFetch;
   pageBudget?: number;
   concurrency?: number;
+  /**
+   * Only page URLs whose path is this prefix or starts with `prefix + "/"`
+   * are fetched (YOY-117 AC-4); the rest are counted, never requested.
+   * Sitemap discovery itself is unchanged. Normalised: leading slash, no
+   * trailing slash.
+   */
+  pathPrefix?: string | null;
 }): JsonLdCrawlSource {
   const origin = originOf(storeUrl);
   const stats = emptyStats();
@@ -108,7 +122,16 @@ export function createJsonLdCrawlSource({
           `JSON-LD crawl: no sitemap URLs found for ${origin} (robots.txt Sitemap: lines and /sitemap.xml) — nothing to crawl`,
         );
       }
-      const queue = prioritizeUrls(discovery.urls);
+      const inPrefix = (url: string): boolean => {
+        if (pathPrefix === null) {
+          return true;
+        }
+        const pathname = new URL(url).pathname;
+        return pathname === pathPrefix || pathname.startsWith(`${pathPrefix}/`);
+      };
+      const inside = discovery.urls.filter(inPrefix);
+      stats.skippedOutsidePrefix = discovery.urls.length - inside.length;
+      const queue = prioritizeUrls(inside);
       const products: SourceProduct[] = [];
       const seenIds = new Set<string>();
       let cursor = 0;

@@ -309,6 +309,7 @@ export async function syncProductFromWebhook({
         sourceUpdatedAt: true,
         handle: true,
         featuredImageUrl: true,
+        familyKey: true,
         url: true,
         publishedAt: true,
       },
@@ -356,6 +357,7 @@ export async function syncProductFromWebhook({
     if (
       product.handle !== existing.handle ||
       product.featuredImageUrl !== existing.featuredImageUrl ||
+      product.familyKey !== existing.familyKey ||
       product.url !== existing.url ||
       (product.publishedAt?.getTime() ?? null) !==
         (existing.publishedAt?.getTime() ?? null)
@@ -365,6 +367,7 @@ export async function syncProductFromWebhook({
         data: {
           handle: product.handle,
           featuredImageUrl: product.featuredImageUrl,
+          familyKey: product.familyKey,
           url: product.url,
           publishedAt: product.publishedAt,
           sourceUpdatedAt: product.sourceUpdatedAt,

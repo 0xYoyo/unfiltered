@@ -6,7 +6,7 @@ import { embedCatalog } from "../catalog/embed.server";
 import type { EnrichResult } from "../catalog/enrich.server";
 import { enrichCatalog } from "../catalog/enrich.server";
 import type { SnapshotProduct } from "../catalog/mapping.server";
-import { computeContentHash } from "../catalog/mapping.server";
+import { computeContentHash, computeFamilyKey } from "../catalog/mapping.server";
 import type {
   CatalogSource,
   SourceProduct,
@@ -107,6 +107,7 @@ export function mapSourceProduct(
     ...withoutHash,
     handle: "",
     featuredImageUrl: product.imageUrl,
+    familyKey: computeFamilyKey(withoutHash),
     url: product.url,
     publishedAt: now,
     sourceUpdatedAt: product.sourceUpdatedAt ?? now,
@@ -158,6 +159,7 @@ export async function snapshotPublicCatalog({
       productId: true,
       contentHash: true,
       featuredImageUrl: true,
+      familyKey: true,
       url: true,
     },
   });
@@ -187,6 +189,7 @@ export async function snapshotPublicCatalog({
       // Shopify ingest — YOY-44 AC-4 / YOY-87 AC-1).
       if (
         known.featuredImageUrl !== product.featuredImageUrl ||
+        known.familyKey !== product.familyKey ||
         known.url !== product.url
       ) {
         await db.catalogProduct.update({
@@ -196,7 +199,11 @@ export async function snapshotPublicCatalog({
               productId: product.productId,
             },
           },
-          data: { featuredImageUrl: product.featuredImageUrl, url: product.url },
+          data: {
+            featuredImageUrl: product.featuredImageUrl,
+            familyKey: product.familyKey,
+            url: product.url,
+          },
         });
       }
       result.unchanged += 1;

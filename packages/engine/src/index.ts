@@ -38,6 +38,11 @@ export {
   type QueryClassifierOptions,
   type QueryRoute,
 } from "./classify.js";
+export {
+  CLASSIFIER_COLOR_WORDS,
+  COLORWAY_WORDS,
+  isColorwayWord,
+} from "./colors.js";
 
 export {
   carryOverRefinementConstraints,

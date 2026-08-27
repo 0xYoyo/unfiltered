@@ -143,6 +143,7 @@ export async function ingestCatalog({
       contentHash: true,
       handle: true,
       featuredImageUrl: true,
+      familyKey: true,
       url: true,
       publishedAt: true,
     },
@@ -175,6 +176,7 @@ export async function ingestCatalog({
       if (
         known.handle !== product.handle ||
         known.featuredImageUrl !== product.featuredImageUrl ||
+        known.familyKey !== product.familyKey ||
         known.url !== product.url ||
         (known.publishedAt?.getTime() ?? null) !==
           (product.publishedAt?.getTime() ?? null)
@@ -186,6 +188,7 @@ export async function ingestCatalog({
           data: {
             handle: product.handle,
             featuredImageUrl: product.featuredImageUrl,
+            familyKey: product.familyKey,
             url: product.url,
             publishedAt: product.publishedAt,
           },

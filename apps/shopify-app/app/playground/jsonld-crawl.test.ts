@@ -303,6 +303,7 @@ describe("the crawl source (AC-1, AC-2, AC-4)", () => {
       productsFound: 9,
       skippedNoPrice: 1,
       skippedNonHtml: 1,
+      skippedOutsidePrefix: 0,
       skippedRobots: 0,
       fetchErrors: 0,
       extractErrors: 0,
@@ -312,6 +313,23 @@ describe("the crawl source (AC-1, AC-2, AC-4)", () => {
     const pagePaths = paths(store).filter((p) => !p.startsWith("/robots") && !p.startsWith("/sitemap"));
     const firstNonProductish = pagePaths.findIndex((p) => p === "/about" || p === "/catalog.pdf");
     expect(firstNonProductish).toBe(10);
+  });
+
+  it("--path-prefix fetches only pages under the prefix and counts the rest as outside prefix (YOY-117 AC-4)", async () => {
+    const { store, fetch } = polite(crawlStoreRoutes());
+    const source = createJsonLdCrawlSource({ storeUrl: CRAWL_ORIGIN, fetch, pathPrefix: "/product" });
+    const products = await source.fetchProducts({ maxProducts: 2000 });
+    const pagePaths = paths(store).filter((p) => !p.startsWith("/robots") && !p.startsWith("/sitemap"));
+    // Sitemap discovery is unchanged (3 sitemaps, 12 URLs); only the five
+    // /product/… pages are fetched; /products/…, /p/…, /item/…, /shop/…,
+    // /about and /catalog.pdf are never requested.
+    expect(pagePaths.every((p) => p.startsWith("/product/"))).toBe(true);
+    expect(pagePaths).toHaveLength(5);
+    expect(source.stats.sitemapsRead).toBe(3);
+    expect(source.stats.urlsDiscovered).toBe(12);
+    expect(source.stats.skippedOutsidePrefix).toBe(7);
+    expect(source.stats.pagesFetched).toBe(5);
+    expect(products.every((product) => product.url?.startsWith(`${CRAWL_ORIGIN}/product/`))).toBe(true);
   });
 
   it("stops at the page budget: --pages 5 → exactly 5 page fetches, product-ish first, budget exhausted (verify step 4)", async () => {

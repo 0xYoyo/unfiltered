@@ -654,6 +654,48 @@
       },
       "inputTokens": 269,
       "outputTokens": 106
+    },
+    "pink rib knit top": {
+      "output": {
+        "colorsInclude": [
+          "pink"
+        ],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "rib knit"
+        ],
+        "confidence": 1,
+        "category": "top",
+        "currency": null,
+        "occasion": null,
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 262,
+      "outputTokens": 103
+    },
+    "pink rib knit top under 200": {
+      "output": {
+        "colorsInclude": [
+          "pink"
+        ],
+        "colorsExclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "rib knit"
+        ],
+        "confidence": 0.95,
+        "category": "top",
+        "currency": null,
+        "occasion": null,
+        "priceMax": 200,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 267,
+      "outputTokens": 107
     }
   }
 }

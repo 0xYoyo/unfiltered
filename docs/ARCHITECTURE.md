@@ -132,7 +132,16 @@ idempotent re-ingestion via `app/catalog/ingest.server.ts`; also carries the
 display-only fields `handle`, `featuredImageUrl` (YOY-44) and the
 server-resolved product link `url` (YOY-87: Admin API `onlineStoreUrl`, else
 `https://<shop>/products/<handle>`; null when unresolvable) for result
-cards — deliberately outside `contentHash`, so ingestion and webhook sync
+cards, and the product-family key `familyKey` (YOY-117 AC-1:
+`lower(vendor) + "|" + normalizedTitle` plus `"|" + lower(productType)`
+when present, where `normalizedTitle` is the title with ONE trailing
+colourway designator — `in <Colour>`, `- <Colour>`, `/ <Colour>`,
+`(<Colour>)`, `<Colour>` being one or two words whose last word is in the
+engine's committed `COLORWAY_WORDS` list — stripped, whitespace collapsed,
+lowercased; `computeFamilyKey` in `mapping.server.ts`, applied identically
+by the Admin ingest, webhook sync, and `ingest:public`; indexed on
+`(shopDomain, familyKey)`; `""` for pre-migration rows means "own family")
+— all deliberately outside `contentHash`, so ingestion and webhook sync
 refresh them even when searchable content is unchanged, and a display-only
 change never triggers re-enrichment or re-embedding); the `ProductEnrichment`
 attribute record per product (`app/catalog/enrich.server.ts`: `category`,
@@ -375,6 +384,20 @@ Classic keyword search (the zero-LLM result path; YOY-41):
   category is evidence-required and expands through the taxonomy's category
   groups, a colour exclusion applies to `primaryColor` only, and a price cap
   compares against `priceMin`.
+
+**One card per product family (YOY-117 AC-2, founder decision):** public
+catalogs and the seed alike expose colourways as separate products ("Mesh
+Over Dress in Pink" / "in Navy"; six "Wildfire Retro Treeline T-Shirt"
+cards on `/s/tentree`). Both stores collapse each `familyKey` to one
+representative INSIDE the SQL (`DISTINCT ON (family)` over the ranked
+candidates, the limit applied after the collapse, so any page and any
+count is of families, never colourways): the best-ranked member whose
+`primaryColor` is one of the query's `colorsInclude` when it names
+colours, else the best-ranked member. An empty `familyKey` is its own
+family, and two products sharing vendor and title but not product type
+never collapse, so the rule can never hide a different product. The
+result shape is unchanged. The eval golden g26 `pink rib knit top` pins
+it (pink member first, navy and black never in the top 10).
 
 **Colour exclusion rule (YOY-110, binding — PRD §3 amendment, founder
 decision 2026-08-22):** `colorsExclude` is applied by both stores against
@@ -922,7 +945,8 @@ beside the Shopify Admin API one. Everything lives under
 - **CLI** (`scripts/ingest-public.mts`, logic in
   `ingest-public-cli.server.ts`): `npm run ingest:public -- --url <store URL>
   --slug <slug> [--name "<Store>"] [--max <N, default 2000>] [--source
-  shopify-public|jsonld-crawl] [--pages <N, default 3000>]` from
+  shopify-public|jsonld-crawl] [--pages <N, default 3000>] [--path-prefix
+  </locale/>]` from
   `apps/shopify-app` (env-loaded like `npm run ingest`; `PLAYGROUND_URL`
   becomes the User-Agent contact when set) detects a Shopify storefront
   (`/products.json?limit=1` answers JSON with a `products` array) and uses
@@ -933,7 +957,15 @@ beside the Shopify Admin API one. Everything lives under
   ingest/enrich/embed counts, the skips, the crawl report (sitemaps, URLs,
   pages fetched vs budget, products found, per-reason skips, budget
   exhaustion) with progress every 100 pages, the `AiCall` cost of the run,
-  and the fetch counters. `--delete --slug <slug>` removes the catalog. No
+  and the fetch counters. `--path-prefix <path>` (YOY-117 AC-4) is the
+  locale hint for multi-region stores — White Stuff's EU sitemap was
+  crawled first and EUR sale prices landed instead of the UK storefront's:
+  for `jsonld-crawl` only sitemap URLs whose path is the prefix or starts
+  with `prefix/` are fetched (discovery unchanged; the rest are counted as
+  `outside prefix` in the crawl line), and for `shopify-public` the feed
+  is read from `<origin><prefix>/products.json` and product URLs are
+  `<origin><prefix>/products/<handle>` (store meta stays at the origin).
+  `--delete --slug <slug>` removes the catalog. No
   HTTP/admin trigger exists; re-ingestion is a manual re-run.
 
 Tests (`app/playground/*.test.ts`) run fully offline against fixture feed

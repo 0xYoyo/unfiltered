@@ -6,6 +6,7 @@
  * concern.
  */
 
+import { CLASSIFIER_COLOR_WORDS } from "./colors.js";
 import type { JsonSchema, LlmClient } from "./index.js";
 
 /** Where a query should be routed. */
@@ -114,51 +115,11 @@ const HEBREW_PREFIXED_NUMBER = /^[בלמכ]-?\p{N}+$/u;
  * a color next to anything else is a descriptive constraint ("blue
  * snowboard", "סנובורד כחול"), not a keyword lookup — the live run's
  * misrouted queries were exactly this shape (YOY-61 defect 1). Deliberately
- * small: an unlisted color simply doesn't stop the classic fast path.
+ * small: an unlisted color simply doesn't stop the classic fast path. The
+ * list itself lives in colors.ts (YOY-117), shared with the colourway
+ * designator rule that groups product families.
  */
-const COLOR_WORDS = new Set([
-  "black",
-  "white",
-  "red",
-  "blue",
-  "green",
-  "yellow",
-  "pink",
-  "purple",
-  "orange",
-  "brown",
-  "grey",
-  "gray",
-  "beige",
-  "gold",
-  "silver",
-  "navy",
-  "שחור",
-  "שחורה",
-  "לבן",
-  "לבנה",
-  "אדום",
-  "אדומה",
-  "כחול",
-  "כחולה",
-  "ירוק",
-  "ירוקה",
-  "צהוב",
-  "צהובה",
-  "ורוד",
-  "ורודה",
-  "סגול",
-  "סגולה",
-  "כתום",
-  "כתומה",
-  "חום",
-  "חומה",
-  "אפור",
-  "אפורה",
-  "בז'",
-  "זהב",
-  "כסף",
-]);
+const COLOR_WORDS = CLASSIFIER_COLOR_WORDS;
 
 /**
  * Constraint-shaped query (YOY-61 AC-1): carries a price marker, a

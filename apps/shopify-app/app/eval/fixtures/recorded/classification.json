@@ -197,6 +197,20 @@
       },
       "inputTokens": 184,
       "outputTokens": 11
+    },
+    "pink rib knit top": {
+      "output": {
+        "route": "classic"
+      },
+      "inputTokens": 177,
+      "outputTokens": 11
+    },
+    "pink rib knit top under 200": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 182,
+      "outputTokens": 11
     }
   }
 }

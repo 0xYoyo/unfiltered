@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import type { ShopifyProductNode } from "./mapping.server";
 import {
   computeContentHash,
+  computeFamilyKey,
   mapProductNode,
+  normalizeFamilyTitle,
   resolveProductUrl,
 } from "./mapping.server";
 
@@ -180,6 +182,58 @@ describe("Shopify→snapshot mapping", () => {
       );
       expect(moved.url).not.toBe(base.url);
       expect(moved.contentHash).toBe(base.contentHash);
+    });
+  });
+
+  describe("product-family key (YOY-117 AC-1)", () => {
+    it("strips one trailing colourway designator in all four shapes", () => {
+      expect(normalizeFamilyTitle("Rib Knit Top in Pink")).toBe("rib knit top");
+      expect(normalizeFamilyTitle("Rib Knit Top - Navy")).toBe("rib knit top");
+      expect(normalizeFamilyTitle("Rib Knit Top – Navy")).toBe("rib knit top");
+      expect(normalizeFamilyTitle("Rib Knit Top / Black")).toBe("rib knit top");
+      expect(normalizeFamilyTitle("Rib Knit Top (Black)")).toBe("rib knit top");
+    });
+
+    it("accepts a two-word colourway whose last word is a colour, and Hebrew colours", () => {
+      expect(normalizeFamilyTitle("Trail Jacket in Meteorite Black")).toBe("trail jacket");
+      expect(normalizeFamilyTitle("Wrap Dress - Dusty Rose")).toBe("wrap dress");
+      expect(normalizeFamilyTitle("שמלת מקסי - שחורה")).toBe("שמלת מקסי");
+      // Only ONE designator is stripped, and only a trailing one.
+      expect(normalizeFamilyTitle("Top in Pink / Navy")).toBe("top in pink");
+    });
+
+    it("keeps a title with no designator, or a designator that is not a colour", () => {
+      expect(normalizeFamilyTitle("Black Evening Gown")).toBe("black evening gown");
+      expect(normalizeFamilyTitle("Shirt Dress in Linen")).toBe("shirt dress in linen");
+      expect(normalizeFamilyTitle("Jacket (Limited Edition)")).toBe("jacket (limited edition)");
+      expect(normalizeFamilyTitle("Trail Jacket in Very Dark Meteorite Black")).toBe(
+        "trail jacket in very dark meteorite black",
+      );
+      expect(normalizeFamilyTitle("  Wide   Leg  Pants ")).toBe("wide leg pants");
+    });
+
+    it("keys on vendor | normalized title | product type, lowercased; no type when absent", () => {
+      expect(computeFamilyKey({ vendor: "Tentree", title: "Rib Knit Top in Pink", productType: "Tops" })).toBe(
+        "tentree|rib knit top|tops",
+      );
+      expect(computeFamilyKey({ vendor: "Tentree", title: "Rib Knit Top in Navy", productType: "Tops" })).toBe(
+        computeFamilyKey({ vendor: "TENTREE", title: "Rib  Knit Top (Navy)", productType: "tops" }),
+      );
+      // Same vendor and title but a different type: a different product.
+      expect(computeFamilyKey({ vendor: "Acme", title: "Classic in Black", productType: "Belts" })).not.toBe(
+        computeFamilyKey({ vendor: "Acme", title: "Classic in Black", productType: "Hats" }),
+      );
+      expect(computeFamilyKey({ vendor: "Acme", title: "Classic Tee", productType: "" })).toBe("acme|classic tee");
+    });
+
+    it("rides the mapped snapshot outside the content hash", () => {
+      const pink = mapProductNode(productNode({ id: "gid://shopify/Product/1", title: "Rib Knit Top in Pink" }));
+      const navy = mapProductNode(productNode({ id: "gid://shopify/Product/1", title: "Rib Knit Top in Navy" }));
+      expect(pink.familyKey).toBe("test vendor|rib knit top|dress");
+      expect(navy.familyKey).toBe(pink.familyKey);
+      // The title differs, so the content hash does — the family key is
+      // display-only metadata over it, never part of it.
+      expect(pink.contentHash).not.toBe(navy.contentHash);
     });
   });
 
