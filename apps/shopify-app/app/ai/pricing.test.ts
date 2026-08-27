@@ -38,6 +38,17 @@ describe("AI price table", () => {
     expect(computeCostUsd("gemini-3.6-flash", 1000, 500)).toBeCloseTo(0.002625, 10);
   });
 
+  it("prices the vision model chosen in docs/VISION-MODEL.md (YOY-120 AC-4)", () => {
+    // gemini-3.5-flash-lite at the decision record's rates; image tokens
+    // are billed at the input rate as usageMetadata reports them.
+    expect(getModelPrice("gemini-3.5-flash-lite")).toMatchObject({
+      inputUsdPerMTok: 0.3,
+      outputUsdPerMTok: 2.5,
+    });
+    // One product at four images (~1,120 tokens each) + 400 text in, 400 out.
+    expect(computeCostUsd("gemini-3.5-flash-lite", 4 * 1_120 + 400, 400)).toBeCloseTo(0.002464, 10);
+  });
+
   it("charges nothing for output on embedding models priced input-only", () => {
     expect(computeCostUsd("gemini-embedding-001", 1_000_000, 0)).toBeCloseTo(
       0.15,

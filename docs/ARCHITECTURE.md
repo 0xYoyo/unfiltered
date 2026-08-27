@@ -158,7 +158,32 @@ stores the `ENRICHMENT_VERSION` it was written at (`enrichmentVersion`,
 re-enriches on the next run even when its content is unchanged, so a
 prompt/schema/rule change re-runs the catalog exactly once — the content
 hash alone could never trigger that. Unchanged content at the current
-version makes zero LLM calls); the baseline migration runs
+version makes zero LLM calls); the **`ProductImage`** rows per product
+(YOY-120 AC-1; PRD capability 14): up to four image URLs in source order —
+`position` 0–3, `url`, `contentHash` = SHA-256 of the fetched bytes,
+`fetchedAt`; unique on `(shopDomain, productId, position)`. Written by all
+three ingestion paths through `app/catalog/images.server.ts`
+(`syncProductImages`): the Admin ingest requests
+`images(first: 4) { nodes { url altText } }`, webhook sync maps
+`images[].src`, `ingest:public` keeps `images[0..3].src` from the Shopify
+feed and up to four `image` entries from JSON-LD (`SourceProduct.imageUrls`),
+with the public paths fetching through the polite fetcher. Bytes are hashed
+and discarded — never stored, never resized. Rows hold **distinct** images:
+the sync walks the source's whole ordered list, hashes each URL's bytes,
+records a URL whose hash equals an already-kept one as that row's
+`duplicateUrls` entry (a CDN serving one asset under several suffixes),
+and stops at four distinct images — so the cap counts pictures, not links.
+A URL whose path ends in `/img404` (the White Stuff CDN placeholder) is not
+an image: `usableImageUrls` drops it before anything is fetched. Idempotent
+by URL: every stored `url` and `duplicateUrls` entry maps to its hash, so a
+re-run over an unchanged list makes zero fetches; only a URL the product
+never carried is fetched; a position past the kept images is deleted; a
+fetch failure is counted (`images: fetched N, unchanged M, failed K` in
+every ingest report) without failing the product. Deliberately outside the product `contentHash`:
+an image change never dirties the searchable content or triggers text
+re-enrichment; vision enrichment (YOY-121) keys its own re-analysis on these
+hashes. No FK cascade, like enrichment and embedding rows — every product
+delete removes them in the same transaction); the baseline migration runs
 `CREATE EXTENSION IF NOT EXISTS vector`, and the classic-search migration
 `CREATE EXTENSION IF NOT EXISTS pg_trgm`). The app knows only Postgres
 connection strings, from a gitignored `.env` (a managed Neon database in
@@ -420,7 +445,14 @@ on the next `npm run ingest` (AC-6, a separate slice).
 AI ports (vendor-free; implemented by provider adapter packages):
 
 - `type JsonSchema` — `Record<string, unknown>` JSON Schema document.
-- `interface StructuredCompletionRequest` — `{ prompt; schema; operation; storeId?; searchId? }`.
+- `interface StructuredCompletionRequest` — `{ prompt; schema; operation; temperature?; storeId?; searchId?; signal?; images? }`.
+  `images?: InlineImage[]` (YOY-120 AC-3; PRD capability 14) carries raw
+  image bytes with their MIME type, vendor-free; the Gemini adapter sends
+  each as an `inlineData` part **before** the text part and meters usage
+  exactly as `usageMetadata` reports it, image tokens included. Absent or
+  empty, the request body is byte-for-byte the text-only call. No caller
+  sends images yet (YOY-121 adds the vision pass).
+- `interface InlineImage` — `{ mimeType: string; data: Uint8Array }`.
 - `interface LlmClient` — `{ completeStructured(request): Promise<unknown> }`.
 - `interface EmbeddingRequest` — `{ texts: string[]; operation?; storeId?; searchId? }`.
 - `interface EmbeddingClient` — `{ readonly dimension: number; embed(request): Promise<number[][]> }`.

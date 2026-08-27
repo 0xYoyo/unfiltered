@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { ShopifyProductNode } from "./mapping.server";
 import { mapProductNode } from "./mapping.server";
 import type { ProductWebhookPayload } from "./webhook-sync.server";
-import { mapWebhookProduct } from "./webhook-sync.server";
+import { mapWebhookProduct, webhookImageUrls } from "./webhook-sync.server";
 
 /** GraphQL product node matching the webhook payload `webhookPayload` builds. */
 function productNode(overrides: Partial<ShopifyProductNode> = {}): ShopifyProductNode {
@@ -76,6 +76,30 @@ describe("webhook→snapshot url resolution (YOY-87 AC-2)", () => {
     );
     expect(withoutShop.url).toBeNull();
     expect(withShop.contentHash).toBe(withoutShop.contentHash);
+  });
+});
+
+describe("webhook→snapshot image urls (YOY-120 AC-1)", () => {
+  it("maps every usable images[].src in order — the cap is applied by image capture — and none when payloads carry no src", () => {
+    const images = [
+      { src: "https://cdn.example.com/1.jpg", alt: "a" },
+      { src: null, alt: "no src" },
+      { src: "https://cdn.example.com/2.jpg", alt: null },
+      { src: "https://cdn.example.com/3.jpg", alt: null },
+      { src: "https://cdn.example.com/4.jpg", alt: null },
+      { src: "https://cdn.example.com/5.jpg", alt: null },
+    ];
+    expect(webhookImageUrls({ images })).toEqual([
+      "https://cdn.example.com/1.jpg",
+      "https://cdn.example.com/2.jpg",
+      "https://cdn.example.com/3.jpg",
+      "https://cdn.example.com/4.jpg",
+      "https://cdn.example.com/5.jpg",
+    ]);
+    expect(webhookImageUrls(webhookPayload())).toEqual([]);
+    // Beside the row, not on it: the snapshot mapping is unchanged by src.
+    const withSrc = mapWebhookProduct({ ...webhookPayload(), images: [{ src: "https://cdn.example.com/1.jpg", alt: "Model wearing linen dress" }] }, "ILS");
+    expect(withSrc).toEqual(mapWebhookProduct(webhookPayload(), "ILS"));
   });
 });
 

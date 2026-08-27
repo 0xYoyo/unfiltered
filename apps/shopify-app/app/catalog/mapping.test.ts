@@ -5,8 +5,11 @@ import {
   computeContentHash,
   computeFamilyKey,
   mapProductNode,
+  isPlaceholderImageUrl,
   normalizeFamilyTitle,
   resolveProductUrl,
+  snapshotImageUrls,
+  usableImageUrls,
 } from "./mapping.server";
 
 export function productNode(
@@ -182,6 +185,62 @@ describe("Shopify→snapshot mapping", () => {
       );
       expect(moved.url).not.toBe(base.url);
       expect(moved.contentHash).toBe(base.contentHash);
+    });
+  });
+
+  describe("image URLs (YOY-120 AC-1, AC-2)", () => {
+    it("keeps every usable image node url in order — no cap here — and none when nodes carry no url", () => {
+      const node = productNode({
+        id: "gid://shopify/Product/1",
+        images: {
+          nodes: [
+            { url: "https://cdn.example.com/1.jpg", altText: "a" },
+            { url: "https://cdn.example.com/2.jpg", altText: null },
+            { url: null, altText: "no url" },
+            { url: "https://cdn.example.com/3.jpg", altText: null },
+            { url: "https://cdn.example.com/4.jpg", altText: null },
+            { url: "https://cdn.example.com/5.jpg", altText: null },
+          ],
+        },
+      });
+      // The four-image cap counts distinct images, so it is applied by
+      // image capture after hashing, not at the URL list.
+      expect(snapshotImageUrls(node)).toEqual([
+        "https://cdn.example.com/1.jpg",
+        "https://cdn.example.com/2.jpg",
+        "https://cdn.example.com/3.jpg",
+        "https://cdn.example.com/4.jpg",
+        "https://cdn.example.com/5.jpg",
+      ]);
+      expect(snapshotImageUrls(productNode({ id: "gid://shopify/Product/2" }))).toEqual([]);
+    });
+
+    it("drops the CDN /img404 placeholder, empties, and repeated URLs (binding note, item 2)", () => {
+      expect(isPlaceholderImageUrl("https://whitestuff.cdn.example/images/img404")).toBe(true);
+      expect(isPlaceholderImageUrl("https://cdn.example/x/IMG404?w=1")).toBe(true);
+      expect(isPlaceholderImageUrl("https://cdn.example/img404.jpg")).toBe(false);
+      expect(isPlaceholderImageUrl("/relative/img404")).toBe(true);
+      expect(
+        usableImageUrls([
+          "https://whitestuff.cdn.example/images/img404",
+          "https://cdn.example.com/a.jpg",
+          "",
+          null,
+          "https://cdn.example.com/a.jpg",
+          "https://cdn.example.com/b.jpg",
+        ]),
+      ).toEqual(["https://cdn.example.com/a.jpg", "https://cdn.example.com/b.jpg"]);
+    });
+
+    it("keeps image urls outside the snapshot row and its content hash: an image-only change leaves the hash intact", () => {
+      const base = mapProductNode(productNode({ id: "gid://shopify/Product/1" }));
+      const withImages = productNode({
+        id: "gid://shopify/Product/1",
+        images: { nodes: [{ url: "https://cdn.example.com/new.jpg", altText: "Model wearing linen dress" }] },
+      });
+      expect(snapshotImageUrls(withImages)).toEqual(["https://cdn.example.com/new.jpg"]);
+      expect(mapProductNode(withImages)).toEqual(base);
+      expect(mapProductNode(withImages)).not.toHaveProperty("imageUrls");
     });
   });
 

@@ -2,6 +2,7 @@ import type {
   CatalogSource,
   SourceProduct,
 } from "./catalog-source.server";
+import { usableImageUrls } from "../catalog/mapping.server";
 import { htmlToPlainText } from "./catalog-source.server";
 import type { PoliteFetch } from "./polite-fetch.server";
 
@@ -143,6 +144,7 @@ export function mapShopifyPublicProduct(
       .map((image) => image.alt ?? "")
       .filter((alt) => alt !== ""),
     imageUrl: product.images[0]?.src ?? null,
+    imageUrls: usableImageUrls(product.images.map((image) => image.src)),
     url:
       product.handle !== undefined && product.handle !== ""
         ? `${origin}/products/${product.handle}`

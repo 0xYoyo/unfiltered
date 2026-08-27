@@ -149,6 +149,39 @@ model ProductEmbedding {
   @@index([shopDomain])
 }
 
+// Product images (YOY-120 AC-1): up to four image URLs per product in
+// source order, each with the SHA-256 of the image bytes, so vision
+// enrichment (PRD capability 14) re-analyses a product only when an image's
+// content changed. Bytes are hashed at ingestion and discarded — never
+// stored, never resized (NG-2). Outside the product's contentHash: an image
+// change is tracked here and never dirties the searchable content or
+// triggers text re-enrichment (AC-2). Keyed by tenant + product + position
+// with no FK cascade, like enrichment and embedding rows: every product
+// delete removes these in the same transaction. Rows hold DISTINCT images:
+// a source URL whose bytes hash identical to an earlier one (a CDN serving
+// one asset under several suffixes) is recorded as a duplicateUrl of that
+// row instead of a row of its own, so the four-image cap counts pictures,
+// not links.
+model ProductImage {
+  id          String   @id @default(uuid())
+  shopDomain  String
+  productId   String
+  // 0–3: the image's position among the product's distinct images, in source order.
+  position    Int
+  // The first source URL that produced this image.
+  url         String
+  // Later source URLs whose bytes hashed identical to `url`'s: known, never re-fetched.
+  duplicateUrls String[] @default([])
+  // sha256 of the fetched bytes, hex.
+  contentHash String
+  fetchedAt   DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([shopDomain, productId, position])
+  @@index([shopDomain, productId])
+}
+
 // Shopper search log (YOY-47): exactly one row per proxy search request —
 // including degraded, zero-hit, and throttled searches — for the dashboard
 // and attribution work of later milestones. Write-only in this milestone.

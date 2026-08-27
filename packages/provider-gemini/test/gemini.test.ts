@@ -226,6 +226,48 @@ describe("structured completion", () => {
     });
   });
 
+  it("sends images as inlineData parts before the text part, and a text-only body otherwise (YOY-120 AC-3)", async () => {
+    const { recorder, recorded } = recorderSpy();
+    const { captured, impl } = fetchStub(200, {
+      ...completionFixture,
+      usageMetadata: { promptTokenCount: 2_400, candidatesTokenCount: 30 },
+    });
+
+    await llmClient(impl, recorder).completeStructured({
+      prompt: "Describe only the item being sold",
+      schema: SCHEMA,
+      operation: "vision",
+      images: [
+        { mimeType: "image/jpeg", data: new Uint8Array([0xff, 0xd8, 0xff]) },
+        { mimeType: "image/png", data: new Uint8Array([0x89, 0x50, 0x4e, 0x47]) },
+      ],
+    });
+
+    expect(captured[0]!.body.contents).toEqual([
+      {
+        role: "user",
+        parts: [
+          { inlineData: { mimeType: "image/jpeg", data: "/9j/" } },
+          { inlineData: { mimeType: "image/png", data: "iVBORw==" } },
+          { text: "Describe only the item being sold" },
+        ],
+      },
+    ]);
+    // Usage is metered as the API reports it — image tokens included.
+    expect(recorded[0]).toMatchObject({ operation: "vision", inputTokens: 2_400, outputTokens: 30 });
+
+    // No images: exactly the single text part, as before images existed.
+    await llmClient(impl, recorder).completeStructured({
+      prompt: "Classify this product",
+      schema: SCHEMA,
+      operation: "classification",
+      images: [],
+    });
+    expect(captured[1]!.body.contents).toEqual([
+      { role: "user", parts: [{ text: "Classify this product" }] },
+    ]);
+  });
+
   it("forwards a request temperature into generationConfig, omitting it otherwise (YOY-52)", async () => {
     const { recorder } = recorderSpy();
     const { captured, impl } = fetchStub(200, completionFixture);

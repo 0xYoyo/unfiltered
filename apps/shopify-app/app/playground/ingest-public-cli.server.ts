@@ -292,11 +292,15 @@ export async function runIngestPublicCli({
       maxProducts: args.max,
       llm,
       embeddings,
+      imageFetch: (imageUrl) => fetch.fetch(imageUrl),
       now,
       onProgress: ({ fetched, stage }) => log(`fetched ${fetched} (${stage})`),
     });
     log(
       `ingest: created ${result.ingest.created}, updated ${result.ingest.updated}, unchanged ${result.ingest.unchanged}, deleted ${result.ingest.deleted}`,
+    );
+    log(
+      `images: fetched ${result.ingest.images.fetched}, unchanged ${result.ingest.images.unchanged}, failed ${result.ingest.images.failed}`,
     );
     if (result.ingest.skippedOverMax > 0) {
       log(

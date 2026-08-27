@@ -8,6 +8,7 @@ import type {
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { createPrismaCostRecorder } from "../ai/cost-recorder.server";
+import type { ImageFetch } from "../catalog/images.server";
 import { mapProductNode } from "../catalog/mapping.server";
 import { productNode } from "../catalog/mapping.test";
 import type { FakeRoute } from "../testing/fake-store.server";
@@ -128,6 +129,7 @@ beforeEach(async () => {
   await db.aiCall.deleteMany();
   await db.$executeRawUnsafe(`DELETE FROM "ProductEmbedding"`);
   await db.productEnrichment.deleteMany();
+  await db.productImage.deleteMany();
   await db.catalogProduct.deleteMany();
   await db.playgroundCatalog.deleteMany();
 });
@@ -142,9 +144,23 @@ const embeddingRows = (storeKey: string) =>
     storeKey,
   );
 
+/**
+ * Offline image bytes (YOY-120): deterministic bytes per URL, and a log of
+ * every image request so a re-run can prove it fetched nothing.
+ */
+function imageStub() {
+  const calls: string[] = [];
+  const fetchImage: ImageFetch = async (url) => {
+    calls.push(url);
+    return new Response(new TextEncoder().encode(`bytes:${url}`));
+  };
+  return { fetchImage, calls };
+}
+
 async function runDemo(source: CatalogSource, maxProducts = 2000) {
   const { llm, calls: llmCalls } = llmStub(db);
   const { embeddings, calls: embedCalls } = embeddingStub(db);
+  const images = imageStub();
   const result = await ingestPublicCatalog({
     db,
     slug: "demo",
@@ -154,8 +170,9 @@ async function runDemo(source: CatalogSource, maxProducts = 2000) {
     maxProducts,
     llm,
     embeddings,
+    imageFetch: images.fetchImage,
   });
-  return { result, llmCalls, embedCalls };
+  return { result, llmCalls, embedCalls, imageCalls: images.calls };
 }
 
 describe("slug and store key (AC-1)", () => {
@@ -185,10 +202,13 @@ describe("mapping (AC-3)", () => {
       available: true,
       imageAltTexts: ["x"],
       imageUrl: "https://img",
+      imageUrls: ["https://img", "https://img2", "https://img3", "https://img4", "https://img5"],
       url: "https://store/products/t",
       sourceUpdatedAt: null,
     };
     const row = mapSourceProduct(product, now);
+    // Image URLs ride beside the row (YOY-120), never on it.
+    expect(row).not.toHaveProperty("imageUrls");
     expect(row).toMatchObject({
       productId: "42",
       handle: "",
@@ -231,6 +251,8 @@ describe("pipeline (AC-3, AC-7)", () => {
       skippedOverMax: 0,
       // Gift card (no price) and the untitled product.
       skippedInvalid: 2,
+      // 7001 lists three images, 7003 one (YOY-120).
+      images: { fetched: 4, unchanged: 0, failed: 0 },
     });
     expect(result.enrich).toEqual({ enriched: 3, cached: 0, failed: 0 });
     expect(result.embed).toEqual({ embedded: 3, cached: 0, deleted: 0 });
@@ -272,6 +294,23 @@ describe("pipeline (AC-3, AC-7)", () => {
     // Every AI call of the run is metered under the catalog's tenant key.
     const ledger = await db.aiCall.findMany({ where: { shopDomain: "playground:demo" } });
     expect(ledger.length).toBe(llmCalls.length + embedCalls.length);
+  });
+
+  it("captures up to four images per product through the given fetcher, hashed, and re-uses them on a re-run (YOY-120 AC-1, AC-2)", async () => {
+    const first = await runDemo(fixtureSource().source);
+    // 7001 lists three images, 7003 one; the rest none.
+    expect(first.result.ingest.images).toEqual({ fetched: 4, unchanged: 0, failed: 0 });
+    expect(first.imageCalls).toHaveLength(4);
+    const stored = await db.productImage.findMany({ where: { shopDomain: "playground:demo" }, orderBy: [{ productId: "asc" }, { position: "asc" }] });
+    expect(stored.map((row) => [row.productId, row.position])).toEqual([["7001", 0], ["7001", 1], ["7001", 2], ["7003", 0]]);
+    expect(stored[0]).toMatchObject({ url: `${FIXTURE_ORIGIN}/cdn/black-dress-front.jpg` });
+    for (const row of stored) {
+      expect(row.contentHash).toMatch(/^[0-9a-f]{64}$/);
+    }
+
+    const second = await runDemo(fixtureSource().source);
+    expect(second.result.ingest.images).toEqual({ fetched: 0, unchanged: 4, failed: 0 });
+    expect(second.imageCalls).toEqual([]);
   });
 
   it("re-running over an unchanged source reports unchanged/cached and makes zero AI calls (verify step 3)", async () => {
@@ -377,6 +416,7 @@ describe("pipeline (AC-3, AC-7)", () => {
       products: 3,
       enrichments: 3,
       embeddings: 3,
+      images: 4,
       registry: 1,
     });
     expect(await db.catalogProduct.count({ where: { shopDomain: "playground:demo" } })).toBe(0);
@@ -387,5 +427,8 @@ describe("pipeline (AC-3, AC-7)", () => {
     expect(await db.catalogProduct.count({ where: { shopDomain: OTHER_SHOP } })).toBe(1);
     expect(await db.productEnrichment.count({ where: { shopDomain: OTHER_SHOP } })).toBe(1);
     expect(await db.playgroundCatalog.findUnique({ where: { id: otherRegistry.id } })).not.toBeNull();
+    // Image rows (YOY-120) go with the catalog; the other tenant's stay.
+    expect(await db.productImage.count({ where: { shopDomain: "playground:demo" } })).toBe(0);
+
   });
 });

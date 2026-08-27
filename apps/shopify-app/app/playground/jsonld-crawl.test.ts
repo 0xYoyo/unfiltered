@@ -142,6 +142,7 @@ describe("JSON-LD extraction (AC-3, AC-4)", () => {
         available: true,
         imageAltTexts: [],
         imageUrl: `${CRAWL_ORIGIN}/img/woo-dress-1.jpg`,
+        imageUrls: [`${CRAWL_ORIGIN}/img/woo-dress-1.jpg`, `${CRAWL_ORIGIN}/img/woo-dress-2.jpg`],
         url: `${CRAWL_ORIGIN}/product/woo-dress`,
         sourceUpdatedAt: null,
       },
@@ -469,6 +470,7 @@ describe("pipeline + CLI integration on the hermetic DB (AC-5)", () => {
   beforeEach(async () => {
     await db.$executeRawUnsafe(`DELETE FROM "ProductEmbedding"`);
     await db.productEnrichment.deleteMany();
+    await db.productImage.deleteMany();
     await db.catalogProduct.deleteMany();
     await db.playgroundCatalog.deleteMany();
   });
@@ -484,6 +486,7 @@ describe("pipeline + CLI integration on the hermetic DB (AC-5)", () => {
       name: "Crawl Demo",
       source: createJsonLdCrawlSource({ storeUrl: CRAWL_ORIGIN, fetch }),
       sourceUrl: CRAWL_ORIGIN,
+      imageFetch: (imageUrl) => fetch.fetch(imageUrl),
       ...fixtureAi(),
     });
     expect(result.ingest).toMatchObject({ created: 9, skippedInvalid: 0 });

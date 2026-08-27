@@ -1,4 +1,5 @@
 import type { SourceProduct } from "./catalog-source.server";
+import { usableImageUrls } from "../catalog/mapping.server";
 import { htmlToPlainText } from "./catalog-source.server";
 
 /**
@@ -121,6 +122,26 @@ const asNumber = (value: unknown): number | null => {
     return Number.isFinite(parsed) ? parsed : null;
   }
   return null;
+};
+
+/**
+ * Every image URL an `image` value names, in order (YOY-120 AC-1): a URL
+ * string, an ImageObject (`url` / `contentUrl`), or an array of either.
+ */
+const allImages = (value: unknown): string[] => {
+  const items = Array.isArray(value) ? value : [value];
+  const urls: string[] = [];
+  for (const item of items) {
+    if (typeof item === "string" && item !== "") {
+      urls.push(item);
+    } else if (item !== null && typeof item === "object") {
+      const url = asString((item as JsonNode)["url"]) ?? asString((item as JsonNode)["contentUrl"]);
+      if (url !== null) {
+        urls.push(url);
+      }
+    }
+  }
+  return urls;
 };
 
 /** `image` may be a URL string, an ImageObject, or an array of either. */
@@ -299,6 +320,15 @@ export function mapProductNode(
     asString(node["@id"]) ??
     (canonicalUrl ?? pageUrl);
   const image = firstImage(node["image"]) ?? variants.map((v) => firstImage(v["image"])).find((v) => v !== null) ?? null;
+  // Every `image` entry (YOY-120 AC-1): the product's own first, then the
+  // variants' — resolved like `imageUrl`, an unparseable one dropped rather
+  // than failing the page. Image capture de-duplicates by content and
+  // applies the four-image cap.
+  const imageUrls = usableImageUrls(
+    [...allImages(node["image"]), ...variants.flatMap((v) => allImages(v["image"]))].map(
+      (candidate) => resolveUrl(candidate, pageUrl),
+    ),
+  );
   const description = htmlToPlainText(asString(node["description"]) ?? "");
   const keywords = node["keywords"];
   const tags = Array.isArray(keywords)
@@ -320,6 +350,7 @@ export function mapProductNode(
     imageAltTexts: [],
     // Likewise an unparseable image URL yields no image, not a failed page.
     imageUrl: image !== null ? resolveUrl(image, pageUrl) : null,
+    imageUrls,
     url,
     sourceUpdatedAt: null,
   };
