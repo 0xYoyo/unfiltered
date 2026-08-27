@@ -80,7 +80,7 @@ describe("webhook→snapshot url resolution (YOY-87 AC-2)", () => {
 });
 
 describe("webhook→snapshot image urls (YOY-120 AC-1)", () => {
-  it("maps images[].src in order, capped at four, and none when payloads carry no src", () => {
+  it("maps every usable images[].src in order — the cap is applied by image capture — and none when payloads carry no src", () => {
     const images = [
       { src: "https://cdn.example.com/1.jpg", alt: "a" },
       { src: null, alt: "no src" },
@@ -94,6 +94,7 @@ describe("webhook→snapshot image urls (YOY-120 AC-1)", () => {
       "https://cdn.example.com/2.jpg",
       "https://cdn.example.com/3.jpg",
       "https://cdn.example.com/4.jpg",
+      "https://cdn.example.com/5.jpg",
     ]);
     expect(webhookImageUrls(webhookPayload())).toEqual([]);
     // Beside the row, not on it: the snapshot mapping is unchanged by src.

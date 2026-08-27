@@ -3,10 +3,27 @@ import { createHash } from "node:crypto";
 import { isColorwayWord } from "@unfiltered/engine";
 
 /**
- * Image cap per product (YOY-120 AC-1; PRD capability 14): every ingestion
- * path keeps at most this many image URLs, in source order.
+ * Image cap per product (YOY-120 AC-1; PRD capability 14): at most this
+ * many DISTINCT images per product, in source order — applied by image
+ * capture (`images.server.ts`) after content-hash de-duplication, so a CDN
+ * serving one asset under several URLs never fills the cap with one picture.
  */
 export const MAX_PRODUCT_IMAGES = 4;
+
+/**
+ * A CDN placeholder is not an image (YOY-120 binding note, item 2): the
+ * White Stuff CDN answers a missing image with a URL ending in `/img404`.
+ * Such a URL is never fetched, hashed, or sent to a model.
+ */
+export function isPlaceholderImageUrl(url: string): boolean {
+  let pathname = url;
+  try {
+    pathname = new URL(url).pathname;
+  } catch {
+    // Not an absolute URL: judge the raw string the same way.
+  }
+  return /\/img404$/i.test(pathname);
+}
 
 /**
  * Shape of one product node as returned by the Admin GraphQL products query
@@ -140,26 +157,38 @@ export function computeContentHash(
 }
 
 /**
- * The first MAX_PRODUCT_IMAGES non-empty URLs, in order (YOY-120 AC-1).
- * Shared by every ingestion path so the cap is applied once, identically.
+ * The usable image URLs of a source's list, in order (YOY-120 AC-1):
+ * non-empty, not a CDN placeholder, each URL once. Shared by every
+ * ingestion path so the rule is applied once, identically. Deliberately
+ * NOT capped: the four-image cap counts distinct images, which only the
+ * bytes can tell, so it lives in `syncProductImages` — a source hands over
+ * its whole ordered list.
  */
-export function capImageUrls(urls: Array<string | null | undefined>): string[] {
-  return urls
-    .filter((url): url is string => typeof url === "string" && url !== "")
-    .slice(0, MAX_PRODUCT_IMAGES);
+export function usableImageUrls(urls: Array<string | null | undefined>): string[] {
+  const seen = new Set<string>();
+  const usable: string[] = [];
+  for (const url of urls) {
+    if (typeof url !== "string" || url === "" || isPlaceholderImageUrl(url) || seen.has(url)) {
+      continue;
+    }
+    seen.add(url);
+    usable.push(url);
+  }
+  return usable;
 }
 
 /**
- * The image URLs of one Admin product node (YOY-120 AC-1): the first
- * MAX_PRODUCT_IMAGES `images.nodes[].url`, in order — the input of image
- * capture (`images.server.ts`), which hashes the bytes into `ProductImage`
- * rows. Kept beside the snapshot row rather than on it: `SnapshotProduct`
- * is exactly the `CatalogProduct` row, and image URLs sit outside
- * contentHash (AC-2) — an image change is tracked by its own hash, never
- * by re-enriching the text.
+ * The image URLs of one Admin product node (YOY-120 AC-1): the usable
+ * `images.nodes[].url`, in order (the query already asks for the first
+ * MAX_PRODUCT_IMAGES nodes) — the input of image capture
+ * (`images.server.ts`), which hashes the bytes into `ProductImage` rows.
+ * Kept beside the snapshot row rather than on it: `SnapshotProduct` is
+ * exactly the `CatalogProduct` row, and image URLs sit outside contentHash
+ * (AC-2) — an image change is tracked by its own hash, never by
+ * re-enriching the text.
  */
 export function snapshotImageUrls(node: Pick<ShopifyProductNode, "images">): string[] {
-  return capImageUrls(node.images.nodes.map((image) => image.url));
+  return usableImageUrls(node.images.nodes.map((image) => image.url));
 }
 
 /**

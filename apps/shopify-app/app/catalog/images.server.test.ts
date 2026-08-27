@@ -21,10 +21,17 @@ const SHOP = "test-shop.myshopify.com";
 const OTHER_SHOP = "other-shop.myshopify.com";
 const PRODUCT = "gid://shopify/Product/1";
 
-/** Deterministic bytes per URL; `failing` URLs answer 404, `throwing` ones reject. */
-function imageServer(options: { failing?: string[]; throwing?: string[] } = {}) {
+/**
+ * Deterministic bytes per URL; `failing` URLs answer 404, `throwing` ones
+ * reject; `sameBytes` maps a URL to the URL whose bytes it serves (a CDN
+ * suffix variant of one asset).
+ */
+function imageServer(
+  options: { failing?: string[]; throwing?: string[]; sameBytes?: Record<string, string> } = {},
+) {
   const calls: string[] = [];
-  const bytesFor = (url: string) => new TextEncoder().encode(`bytes-of:${url}`);
+  const bytesFor = (url: string) =>
+    new TextEncoder().encode(`bytes-of:${options.sameBytes?.[url] ?? url}`);
   const fetchImage: ImageFetch = async (url) => {
     calls.push(url);
     if (options.throwing?.includes(url)) {
@@ -175,7 +182,72 @@ describe("syncProductImages (YOY-120 AC-1, AC-2)", () => {
       fetchImage: failing.fetchImage,
     });
     expect(retry).toEqual({ fetched: 0, unchanged: 2, failed: 1 });
-    expect((await rows()).map((row) => row.position)).toEqual([0, 2]);
+    // A failed URL holds no slot: the kept images are positioned in order.
+    expect((await rows()).map((row) => [row.position, row.url])).toEqual([[0, three[0]], [1, three[2]]]);
+  });
+
+  it("de-duplicates by content: one row per distinct image, later URLs recorded as its duplicates, the cap counting pictures (binding note, item 4)", async () => {
+    // Six URLs; 1–3 serve the bytes of 0 (a CDN's FF/FD/FB/MF suffixes), 5
+    // serves the bytes of 4.
+    const six = urls(6);
+    const server = imageServer({
+      sameBytes: { [six[1]!]: six[0]!, [six[2]!]: six[0]!, [six[3]!]: six[0]!, [six[5]!]: six[4]! },
+    });
+
+    const first = await syncProductImages({
+      db,
+      shopDomain: SHOP,
+      productId: PRODUCT,
+      imageUrls: six,
+      fetchImage: server.fetchImage,
+    });
+    expect(first).toEqual({ fetched: 6, unchanged: 0, failed: 0 });
+    const stored = await rows();
+    expect(stored.map((row) => [row.position, row.url, row.duplicateUrls])).toEqual([
+      [0, six[0], [six[1], six[2], six[3]]],
+      [1, six[4], [six[5]]],
+    ]);
+    expect(stored[0]!.contentHash).toBe(server.hashOf(six[0]!));
+
+    // Re-run over the same list: every URL is known, so zero fetches.
+    server.calls.length = 0;
+    const second = await syncProductImages({
+      db,
+      shopDomain: SHOP,
+      productId: PRODUCT,
+      imageUrls: six,
+      fetchImage: server.fetchImage,
+    });
+    expect(second).toEqual({ fetched: 0, unchanged: 2, failed: 0 });
+    expect(server.calls).toEqual([]);
+
+    // A seventh, genuinely new picture is the only fetch on the next run.
+    const seventh = "https://cdn.example.com/p1-6.jpg";
+    const third = await syncProductImages({
+      db,
+      shopDomain: SHOP,
+      productId: PRODUCT,
+      imageUrls: [...six, seventh],
+      fetchImage: server.fetchImage,
+    });
+    expect(third).toEqual({ fetched: 1, unchanged: 2, failed: 0 });
+    expect(server.calls).toEqual([seventh]);
+    expect((await rows()).map((row) => row.url)).toEqual([six[0], six[4], seventh]);
+  });
+
+  it("stops at four distinct images: URLs past the cap are neither fetched nor stored", async () => {
+    const server = imageServer();
+    const six = urls(6, "https://cdn.example.com/d");
+    const counts = await syncProductImages({
+      db,
+      shopDomain: SHOP,
+      productId: PRODUCT,
+      imageUrls: six,
+      fetchImage: server.fetchImage,
+    });
+    expect(counts).toEqual({ fetched: 4, unchanged: 0, failed: 0 });
+    expect(server.calls).toEqual(six.slice(0, 4));
+    expect((await rows()).map((row) => row.url)).toEqual(six.slice(0, 4));
   });
 
   it("scopes every write to the tenant and product", async () => {

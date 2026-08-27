@@ -168,11 +168,18 @@ three ingestion paths through `app/catalog/images.server.ts`
 `images[].src`, `ingest:public` keeps `images[0..3].src` from the Shopify
 feed and up to four `image` entries from JSON-LD (`SourceProduct.imageUrls`),
 with the public paths fetching through the polite fetcher. Bytes are hashed
-and discarded — never stored, never resized. Idempotent by URL: an unchanged
-URL with an existing row makes zero fetches, a changed URL is re-hashed, a
-position the source no longer lists is deleted, and a fetch failure is
-counted (`images: fetched N, unchanged M, failed K` in every ingest report)
-without failing the product. Deliberately outside the product `contentHash`:
+and discarded — never stored, never resized. Rows hold **distinct** images:
+the sync walks the source's whole ordered list, hashes each URL's bytes,
+records a URL whose hash equals an already-kept one as that row's
+`duplicateUrls` entry (a CDN serving one asset under several suffixes),
+and stops at four distinct images — so the cap counts pictures, not links.
+A URL whose path ends in `/img404` (the White Stuff CDN placeholder) is not
+an image: `usableImageUrls` drops it before anything is fetched. Idempotent
+by URL: every stored `url` and `duplicateUrls` entry maps to its hash, so a
+re-run over an unchanged list makes zero fetches; only a URL the product
+never carried is fetched; a position past the kept images is deleted; a
+fetch failure is counted (`images: fetched N, unchanged M, failed K` in
+every ingest report) without failing the product. Deliberately outside the product `contentHash`:
 an image change never dirties the searchable content or triggers text
 re-enrichment; vision enrichment (YOY-121) keys its own re-analysis on these
 hashes. No FK cascade, like enrichment and embedding rows — every product

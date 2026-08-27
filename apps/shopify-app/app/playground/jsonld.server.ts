@@ -1,5 +1,5 @@
 import type { SourceProduct } from "./catalog-source.server";
-import { capImageUrls } from "../catalog/mapping.server";
+import { usableImageUrls } from "../catalog/mapping.server";
 import { htmlToPlainText } from "./catalog-source.server";
 
 /**
@@ -320,10 +320,11 @@ export function mapProductNode(
     asString(node["@id"]) ??
     (canonicalUrl ?? pageUrl);
   const image = firstImage(node["image"]) ?? variants.map((v) => firstImage(v["image"])).find((v) => v !== null) ?? null;
-  // Up to four `image` entries (YOY-120 AC-1): the product's own first,
-  // then the variants' — resolved like `imageUrl`, an unparseable one
-  // dropped rather than failing the page.
-  const imageUrls = capImageUrls(
+  // Every `image` entry (YOY-120 AC-1): the product's own first, then the
+  // variants' — resolved like `imageUrl`, an unparseable one dropped rather
+  // than failing the page. Image capture de-duplicates by content and
+  // applies the four-image cap.
+  const imageUrls = usableImageUrls(
     [...allImages(node["image"]), ...variants.flatMap((v) => allImages(v["image"]))].map(
       (candidate) => resolveUrl(candidate, pageUrl),
     ),

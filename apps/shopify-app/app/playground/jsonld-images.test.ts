@@ -2,9 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import { mapProductNode } from "./jsonld.server";
 
-// JSON-LD image capture (YOY-120 AC-1): up to four `image` entries — URL
-// strings, ImageObjects, arrays of either — the product's own first, then
-// the variants', resolved against the page like `imageUrl`.
+// JSON-LD image capture (YOY-120 AC-1): every `image` entry — URL strings,
+// ImageObjects, arrays of either — the product's own first, then the
+// variants', resolved against the page like `imageUrl`; image capture
+// de-duplicates by content and keeps the first four distinct images.
 
 const PAGE = "https://shop.example/item/dress-1";
 const withOffer = (node: Record<string, unknown>) => ({
@@ -16,7 +17,7 @@ const withOffer = (node: Record<string, unknown>) => ({
 });
 
 describe("JSON-LD imageUrls (YOY-120 AC-1)", () => {
-  it("keeps up to four image entries in order, mixing strings and ImageObjects", () => {
+  it("keeps every image entry in order, mixing strings and ImageObjects (the cap is applied by image capture)", () => {
     const product = mapProductNode(
       withOffer({
         image: [
@@ -35,6 +36,7 @@ describe("JSON-LD imageUrls (YOY-120 AC-1)", () => {
       "https://cdn.example/b.jpg",
       "https://shop.example/img/c.jpg",
       "https://shop.example/img/d.jpg",
+      "https://shop.example/img/e.jpg",
     ]);
   });
 

@@ -157,14 +157,21 @@ model ProductEmbedding {
 // change is tracked here and never dirties the searchable content or
 // triggers text re-enrichment (AC-2). Keyed by tenant + product + position
 // with no FK cascade, like enrichment and embedding rows: every product
-// delete removes these in the same transaction.
+// delete removes these in the same transaction. Rows hold DISTINCT images:
+// a source URL whose bytes hash identical to an earlier one (a CDN serving
+// one asset under several suffixes) is recorded as a duplicateUrl of that
+// row instead of a row of its own, so the four-image cap counts pictures,
+// not links.
 model ProductImage {
   id          String   @id @default(uuid())
   shopDomain  String
   productId   String
-  // 0–3: the image's position in the source's image list.
+  // 0–3: the image's position among the product's distinct images, in source order.
   position    Int
+  // The first source URL that produced this image.
   url         String
+  // Later source URLs whose bytes hashed identical to `url`'s: known, never re-fetched.
+  duplicateUrls String[] @default([])
   // sha256 of the fetched bytes, hex.
   contentHash String
   fetchedAt   DateTime

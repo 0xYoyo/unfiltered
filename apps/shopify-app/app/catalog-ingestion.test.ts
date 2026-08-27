@@ -73,6 +73,7 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
+  await db.productImage.deleteMany();
   await db.catalogProduct.deleteMany();
 });
 
@@ -644,8 +645,11 @@ describe("catalog ingestion", () => {
         expect(row.contentHash).toMatch(/^[0-9a-f]{64}$/);
         expect(row.position).toBeLessThan(4);
       }
-      // The failed image kept no row; the product itself still landed.
-      expect(stored.filter((row) => row.productId === "gid://shopify/Product/2").map((row) => row.position)).toEqual([0, 2]);
+      // The failed image kept no row and holds no slot; the product itself still landed.
+      expect(stored.filter((row) => row.productId === "gid://shopify/Product/2").map((row) => [row.position, row.url])).toEqual([
+        [0, "https://cdn.example.com/p2-0.jpg"],
+        [1, "https://cdn.example.com/p2-2.jpg"],
+      ]);
       expect(await db.catalogProduct.count({ where: { shopDomain: SHOP } })).toBe(3);
 
       server.calls.length = 0;
@@ -659,6 +663,41 @@ describe("catalog ingestion", () => {
       expect(second.images).toEqual({ fetched: 0, unchanged: 8, failed: 1 });
       expect(second.unchanged).toBe(3);
       expect(server.calls).toEqual(["https://cdn.example.com/p2-1.jpg"]);
+    });
+
+    it("collapses two identical images into one row on the Admin path, and never fetches a /img404 placeholder (binding note, items 2 and 4)", async () => {
+      const calls: string[] = [];
+      const fetchImage = async (url: string) => {
+        calls.push(url);
+        // Both product-1 URLs serve the same bytes.
+        return new Response(new TextEncoder().encode("same-picture"));
+      };
+      const result = await ingestCatalog({
+        db,
+        shopDomain: SHOP,
+        graphql: graphqlStub([
+          productNode({
+            id: "gid://shopify/Product/1",
+            images: {
+              nodes: [
+                { url: "https://cdn.example.com/p1-FF.jpg", altText: null },
+                { url: "https://cdn.example.com/p1-FB.jpg", altText: null },
+              ],
+            },
+          }),
+          productNode({
+            id: "gid://shopify/Product/2",
+            images: { nodes: [{ url: "https://whitestuff.cdn.example/images/img404", altText: null }] },
+          }),
+        ]).graphql,
+        fetchImage,
+      });
+      expect(result.images).toEqual({ fetched: 2, unchanged: 0, failed: 0 });
+      expect(calls).toEqual(["https://cdn.example.com/p1-FF.jpg", "https://cdn.example.com/p1-FB.jpg"]);
+      const stored = await db.productImage.findMany({ where: { shopDomain: SHOP }, orderBy: [{ productId: "asc" }, { position: "asc" }] });
+      expect(stored.map((row) => [row.productId, row.position, row.url, row.duplicateUrls])).toEqual([
+        ["gid://shopify/Product/1", 0, "https://cdn.example.com/p1-FF.jpg", ["https://cdn.example.com/p1-FB.jpg"]],
+      ]);
     });
 
     it("keeps the product contentHash unchanged by image changes, and deletes image rows with a stale product (AC-1, AC-2)", async () => {

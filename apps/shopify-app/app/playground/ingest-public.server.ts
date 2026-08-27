@@ -13,7 +13,7 @@ import {
 } from "../catalog/images.server";
 import type { SnapshotProduct } from "../catalog/mapping.server";
 import {
-  capImageUrls,
+  usableImageUrls,
   computeContentHash,
   computeFamilyKey,
 } from "../catalog/mapping.server";
@@ -173,8 +173,9 @@ export async function snapshotPublicCatalog({
     seenIds.add(product.sourceId);
     snapshot.push({
       product: mapSourceProduct(product, now),
-      // Beside the row, outside contentHash (YOY-120 AC-2), capped once.
-      imageUrls: capImageUrls(product.imageUrls),
+      // Beside the row, outside contentHash (YOY-120 AC-2); the cap is
+      // applied by image capture after de-duplication.
+      imageUrls: usableImageUrls(product.imageUrls),
     });
   }
 

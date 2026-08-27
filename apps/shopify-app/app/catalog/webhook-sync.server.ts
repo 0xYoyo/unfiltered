@@ -4,7 +4,7 @@ import type { PrismaClient } from "@prisma/client";
 import type { ImageFetch } from "./images.server";
 import { globalImageFetch, syncProductImages } from "./images.server";
 import type { ShopifyProductNode, SnapshotProduct } from "./mapping.server";
-import { capImageUrls, mapProductNode } from "./mapping.server";
+import { usableImageUrls, mapProductNode } from "./mapping.server";
 
 /**
  * Shape of a product webhook payload (`products/create` / `products/update`)
@@ -269,14 +269,15 @@ export function mapWebhookProduct(
 }
 
 /**
- * The image URLs a product webhook carries (YOY-120 AC-1): the first four
- * `images[].src`, in order. Kept beside the snapshot row, like
+ * The image URLs a product webhook carries (YOY-120 AC-1): the usable
+ * `images[].src`, in order — the whole list; image capture de-duplicates
+ * by content and applies the cap. Kept beside the snapshot row, like
  * `snapshotImageUrls` for the Admin ingest.
  */
 export function webhookImageUrls(
   payload: Pick<ProductWebhookPayload, "images">,
 ): string[] {
-  return capImageUrls(payload.images.map((image) => image.src));
+  return usableImageUrls(payload.images.map((image) => image.src));
 }
 
 /**

@@ -26,9 +26,10 @@ export interface SourceProduct {
   imageAltTexts: string[];
   imageUrl: string | null;
   /**
-   * Up to four image URLs in source order (YOY-120 AC-1), the input of
-   * image capture; the first is normally `imageUrl`. Empty when the source
-   * lists none.
+   * Every usable image URL in source order (YOY-120 AC-1), the input of
+   * image capture, which de-duplicates by content and keeps the first four
+   * distinct images; the first is normally `imageUrl`. Empty when the
+   * source lists none.
    */
   imageUrls: string[];
   /** The product's public page, resolved by the source; null when unknown. */
