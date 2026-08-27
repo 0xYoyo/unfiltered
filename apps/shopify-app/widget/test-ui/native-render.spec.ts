@@ -341,6 +341,10 @@ test.describe("Variant A — alternate-template fetch (AC-1)", () => {
     await expect(
       page.getByTestId("unfiltered-native-close-matches"),
     ).toBeVisible();
+    // The native heading names the relaxed constraint too (YOY-111 AC-4).
+    await expect(
+      page.getByTestId("unfiltered-native-close-matches").locator("h2"),
+    ).toHaveText("Close matches — over your budget");
     await expect(
       page.getByTestId("unfiltered-native-close-matches").locator(".card-wrapper"),
     ).toHaveCount(1);

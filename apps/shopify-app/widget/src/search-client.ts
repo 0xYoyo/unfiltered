@@ -63,6 +63,8 @@ export interface ProxySearchResponse {
   intent: ProxyIntent | null;
   /** Classic near-misses; present only on AI zero-hit responses. */
   closeMatches?: ProxyResult[];
+  /** Constraint names the server relaxed to find them (YOY-111). */
+  closeMatchesRelaxed?: string[];
 }
 
 /** Optional context a search request carries (YOY-49). */

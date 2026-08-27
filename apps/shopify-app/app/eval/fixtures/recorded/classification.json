@@ -190,6 +190,13 @@
       },
       "inputTokens": 184,
       "outputTokens": 11
+    },
+    "summer dress, not black, under 100": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 184,
+      "outputTokens": 11
     }
   }
 }

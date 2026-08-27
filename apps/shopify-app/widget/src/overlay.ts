@@ -4,7 +4,7 @@ import type {
   ProxyResult,
   ProxySearchResponse,
 } from "./search-client";
-import { getStrings, resolveLocale } from "./strings";
+import { closeMatchesHeadingText, getStrings, resolveLocale } from "./strings";
 import styles from "./widget.css?inline";
 
 /**
@@ -364,6 +364,11 @@ export function createOverlay(options: OverlayOptions): Overlay {
       noResults.hidden = !(empty && response.route === "classic");
 
       const matches = aiZeroHit ? (response.closeMatches ?? []) : [];
+      // The heading names what was relaxed to find them (YOY-111 AC-4).
+      closeMatchesHeading.textContent = closeMatchesHeadingText(
+        strings,
+        aiZeroHit ? response.closeMatchesRelaxed : undefined,
+      );
       closeMatchesGrid.replaceChildren(
         ...matches.map((result, index) =>
           card(result, index, handlers.onCardClick),

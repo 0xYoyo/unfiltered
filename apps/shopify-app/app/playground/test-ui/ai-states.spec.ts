@@ -248,10 +248,29 @@ test.describe("zero hit, degraded, and colorUnknown (AC-4, verify 4)", () => {
     // The chips stay, and stay removable: the way out of a zero hit is to
     // drop a constraint.
     await expect(chips(page)).toHaveCount(3);
+    // The heading names what the server relaxed to find them (YOY-111
+    // AC-4): the fixture relaxed the budget cap.
     await expect(
-      page.getByRole("heading", { name: strings("en").closeMatchesHeading }),
+      page.getByRole("heading", { name: "Close matches — over your budget" }),
     ).toBeVisible();
     await expect(cards(page)).toHaveCount(2);
+  });
+
+  test("the Hebrew close-matches heading names the relaxed constraint in Hebrew, RTL (YOY-111 AC-4)", async ({
+    page,
+  }) => {
+    await page.goto("/?lang=he");
+    await submit(page, "ai zero hit");
+
+    await expect(status(page)).toHaveText(strings("he").zeroHit);
+    const heading = page.getByRole("heading", {
+      name: "התאמות קרובות — מעל התקציב",
+    });
+    await expect(heading).toBeVisible();
+    await expect(heading).toHaveText("התאמות קרובות — מעל התקציב");
+    await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
+    // The chips and the zero-hit line are untouched by the heading change.
+    await expect(chips(page)).toHaveCount(3);
   });
 
   test("a degraded response is plain classic cards with no chips and no error language", async ({

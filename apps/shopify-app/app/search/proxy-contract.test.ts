@@ -53,6 +53,7 @@ const ORCHESTRATOR_RESPONSE = {
   chips: [{ field: "priceMax", value: "400" }],
   intent: null,
   closeMatches: [],
+  closeMatchesRelaxed: [],
   stages: { classify: 30, intent: 400, embed: 90, retrieve: 40, hydrate: 5 },
 } as unknown as SearchResponse;
 
@@ -220,6 +221,7 @@ describe("search response: route serialization → widget consumption", () => {
         route: "ai",
         hits: [],
         closeMatches: ORCHESTRATOR_RESPONSE.hits,
+        closeMatchesRelaxed: ["priceMax"],
         stages: { classify: 30, intent: 400, embed: 90, retrieve: 40, closeMatches: 25, hydrate: 5 },
       },
       { route: "classic", routeReason: "preview", stages: { classic: 20, hydrate: 3 } },

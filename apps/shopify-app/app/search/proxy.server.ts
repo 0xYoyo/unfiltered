@@ -344,6 +344,12 @@ export interface ProxySearchResponse {
   intent: ProxyIntent | null;
   /** Classic near-misses; present only on AI zero-hit responses. */
   closeMatches?: ProxyResult[];
+  /**
+   * The constraints relaxed to fill `closeMatches` (YOY-111 AC-2), in
+   * order; present exactly when `closeMatches` is, `[]` when the matches
+   * came without relaxing anything.
+   */
+  closeMatchesRelaxed?: string[];
 }
 
 function serializeCard(card: {
@@ -406,6 +412,7 @@ export function serializeProxySearchResponse(
   };
   if (response.closeMatches.length > 0) {
     body.closeMatches = response.closeMatches.map(serializeCard);
+    body.closeMatchesRelaxed = [...response.closeMatchesRelaxed];
   }
   return body;
 }

@@ -357,12 +357,15 @@ describe("constraint-only mode mirrors pgvector predicate semantics (AC-4)", () 
     expect(ids).toContain("stated-no-primary");
     expect(ids).not.toContain("pricey-dress");
     // The same product with query text (keyword mode) — same predicate.
-    expect(
-      await searchIds(db, {
-        query: "dress",
-        constraints: { ...noConstraints(), colorsExclude: ["black"] },
-      }),
-    ).toContain("mesh-pink");
+    // This is the close-match keyword fallback's shape (YOY-111 AC-1, AC-3):
+    // the raw query plus the exclusion, and the black-primary dress never
+    // rides it.
+    const keyword = await searchIds(db, {
+      query: "dress",
+      constraints: { ...noConstraints(), colorsExclude: ["black"] },
+    });
+    expect(keyword).toContain("mesh-pink");
+    expect(keyword).not.toContain("pricey-dress");
     // Inclusion still reads every colourway (NG-1).
     expect(
       await searchIds(db, { constraints: { ...noConstraints(), colorsInclude: ["black"] } }),

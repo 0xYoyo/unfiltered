@@ -97,7 +97,11 @@ test("AI zero-hits render the message, removable chips, and close matches (AC-3)
 
   const closeMatches = page.getByTestId("unfiltered-widget-close-matches");
   await expect(closeMatches).toBeVisible();
-  await expect(closeMatches.locator("h2")).toContainText("Close matches");
+  // The heading names what the server relaxed (YOY-111 AC-4): the fixture
+  // relaxed the budget cap.
+  await expect(closeMatches.locator("h2")).toHaveText(
+    "Close matches — over your budget",
+  );
   await expect(
     closeMatches.getByTestId("unfiltered-widget-card"),
   ).toHaveCount(1);

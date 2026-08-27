@@ -72,6 +72,11 @@ const live = process.env.LIVE_LLM_TESTS === "1";
  * embedding entries: new goldens and new or re-enriched product texts. Every
  * existing intent recording stays byte-identical, so the zero-regression
  * baseline is scored against the same intents; only the index changes.
+ *
+ * `REGEN_SCOPE=goldens` (YOY-111) is the same missing-only pass WITHOUT the
+ * enrichment re-record: for a new golden over an unchanged catalog, so the
+ * enrichment recordings — and with them every product vector — stay
+ * byte-identical too.
  */
 const scope =
   process.env.REGEN_SCOPE === "lite"
@@ -80,7 +85,9 @@ const scope =
       ? "intent"
       : process.env.REGEN_SCOPE === "catalog"
         ? "catalog"
-        : "all";
+        : process.env.REGEN_SCOPE === "goldens"
+          ? "goldens"
+          : "all";
 /**
  * `REGEN_RESUME=1` keeps the lite entries already on disk and records only
  * the missing keys and the recorded FAILURES — a lite run that a slow
@@ -796,7 +803,7 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
     expect(failures, `\n${failures.join("\n")}`).toEqual([]);
   }, 1_800_000);
 
-  it.skipIf(scope !== "catalog")("re-records every enrichment and only the missing classification/intent/embedding entries (YOY-110 AC-5: REGEN_SCOPE=catalog)", async () => {
+  it.skipIf(scope !== "catalog" && scope !== "goldens")("re-records every enrichment (catalog scope) and only the missing classification/intent/embedding entries (YOY-110 AC-5: REGEN_SCOPE=catalog; YOY-111: REGEN_SCOPE=goldens)", async () => {
     const models = geminiModelsFromEnv();
     const catalog = loadCatalog();
     const goldens = loadGoldens();
@@ -814,32 +821,45 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
     // 1. Enrichment: every product, at the current prompt and rule. The
     //    recording is keyed by title, so a product's entry is replaced, not
     //    merged — a stale entry would replay the pre-rule output shape.
-    const enrichmentEntries: Record<string, RecordedEntry> = {};
-    const enrichmentLlm = captureCompletions(
-      createGeminiLlmClient({
-        modelId: models.classificationModel,
-        costRecorder: usage.recorder,
-      }),
-      usage.last,
-      enrichmentEntries,
-    );
+    //    Under REGEN_SCOPE=goldens the recording on disk is reused as-is.
     const attributesByProduct = new Map<string, ReturnType<typeof parseEnrichment>>();
-    for (const { sourceUpdatedAt, ...product } of catalog) {
-      void sourceUpdatedAt;
-      const completion = await enrichmentLlm.completeStructured({
-        prompt: buildEnrichmentPrompt({ ...product, contentHash: computeContentHash(product) }),
-        schema: ENRICHMENT_SCHEMA,
-        operation: "enrichment",
-      });
-      const attributes = parseEnrichment(completion, product);
-      check(attributes !== null, `enrichment: ${product.productId} answered outside the schema`);
-      attributesByProduct.set(product.productId, attributes);
+    if (scope === "catalog") {
+      const enrichmentEntries: Record<string, RecordedEntry> = {};
+      const enrichmentLlm = captureCompletions(
+        createGeminiLlmClient({
+          modelId: models.classificationModel,
+          costRecorder: usage.recorder,
+        }),
+        usage.last,
+        enrichmentEntries,
+      );
+      for (const { sourceUpdatedAt, ...product } of catalog) {
+        void sourceUpdatedAt;
+        const completion = await enrichmentLlm.completeStructured({
+          prompt: buildEnrichmentPrompt({ ...product, contentHash: computeContentHash(product) }),
+          schema: ENRICHMENT_SCHEMA,
+          operation: "enrichment",
+        });
+        const attributes = parseEnrichment(completion, product);
+        check(attributes !== null, `enrichment: ${product.productId} answered outside the schema`);
+        attributesByProduct.set(product.productId, attributes);
+      }
+      writeRecording("enrichment.json", models.classificationModel, enrichmentEntries);
+      check(
+        Object.keys(enrichmentEntries).length === catalog.length,
+        `coverage: ${Object.keys(enrichmentEntries).length}/${catalog.length} enrichments recorded`,
+      );
+    } else {
+      const onDisk = readRecording("enrichment.json");
+      for (const product of catalog) {
+        const entry = onDisk.entries[product.title];
+        check(entry !== undefined, `enrichment: ${product.productId} has no recording; run REGEN_SCOPE=catalog`);
+        attributesByProduct.set(
+          product.productId,
+          entry === undefined ? null : parseEnrichment(entry.output, product),
+        );
+      }
     }
-    writeRecording("enrichment.json", models.classificationModel, enrichmentEntries);
-    check(
-      Object.keys(enrichmentEntries).length === catalog.length,
-      `coverage: ${Object.keys(enrichmentEntries).length}/${catalog.length} enrichments recorded`,
-    );
 
     // 2. Classification: only model-answered goldens with no live entry yet.
     const classification = readRecording("classification.json");
@@ -1058,7 +1078,7 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
     }
     console.log(
       [
-        `[regenerate-live] scope=catalog recorded: ${catalog.length} enrichments, ${classificationsRecorded} classifications, ${intentsRecorded} accuracy intents, ${liteRecorded} lite intents, ${missing.length} embeddings (${orphaned.length} orphaned vector(s) dropped)`,
+        `[regenerate-live] scope=${scope} recorded: ${scope === "catalog" ? catalog.length : 0} enrichments, ${classificationsRecorded} classifications, ${intentsRecorded} accuracy intents, ${liteRecorded} lite intents, ${missing.length} embeddings (${orphaned.length} orphaned vector(s) dropped)`,
         ...[...byOperation].map(([operation, bucket]) => `[regenerate-live]   ${operation}: ${bucket.calls} call(s), $${bucket.usd.toFixed(4)}`),
         `[regenerate-live]   total metered spend: $${spent.reduce((sum, row) => sum + row.costUsd, 0).toFixed(4)}`,
       ].join("\n"),
@@ -1066,7 +1086,7 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
     expect(failures, `\n${failures.join("\n")}`).toEqual([]);
   }, 2_700_000);
 
-  it.skipIf(scope === "catalog")("re-records the lite-tier intents (YOY-116 AC-5)", async () => {
+  it.skipIf(scope === "catalog" || scope === "goldens")("re-records the lite-tier intents (YOY-116 AC-5)", async () => {
     // The same goldens and refinement goldens, answered by the lite model at
     // its explicit thinking level — each answer carrying its `confidence`,
     // which is what the offline harness routes on. Written beside the

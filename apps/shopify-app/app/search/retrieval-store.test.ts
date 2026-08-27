@@ -258,6 +258,27 @@ describe("hard constraints are filters, never preferences (AC-2)", () => {
     expect(ids).not.toContain("tie-black");
   });
 
+  it("a close-match shaped query — every constraint relaxed but the exclusion — never returns a black-primary product (YOY-111 AC-3)", async () => {
+    await seed(db, [
+      // Nearest vector, primary colour black: excluded on every ladder rung.
+      {
+        productId: "black-primary",
+        vector: [1, 0, 0],
+        enrichment: { category: "dress", colors: ["black"], primaryColor: "black" },
+      },
+      {
+        productId: "pink-colourway",
+        vector: [0.9, 0.1, 0],
+        enrichment: { category: "dress", colors: ["pink", "black"], primaryColor: "pink" },
+      },
+      { productId: "unknown-primary", vector: [0.8, 0.2, 0], enrichment: { colors: [], primaryColor: null } },
+    ]);
+    // The ladder's last rung: only colorsExclude left.
+    const ids = await queryIds(db, { ...noConstraints(), colorsExclude: ["black"] });
+    expect(ids).toEqual(["pink-colourway", "unknown-primary"]);
+    expect(ids).not.toContain("black-primary");
+  });
+
   it("colorsInclude still reads every colourway, unchanged (YOY-110 NG-1)", async () => {
     await seed(db, [
       {

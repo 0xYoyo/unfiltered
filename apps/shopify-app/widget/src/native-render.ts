@@ -17,7 +17,7 @@ import type {
   ProxyResult,
   ProxySearchResponse,
 } from "./search-client";
-import { getStrings, resolveLocale } from "./strings";
+import { closeMatchesHeadingText, getStrings, resolveLocale } from "./strings";
 
 /**
  * Theme-native result rendering (YOY-70 spike): the submit tier's ranked
@@ -785,6 +785,11 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
     );
     chipsRow.hidden = chips.length === 0;
     list.replaceChildren(...items.items);
+    // The heading names what was relaxed to find them (YOY-111 AC-4).
+    closeMatchesHeading.textContent = closeMatchesHeadingText(
+      strings,
+      aiZeroHit ? response.closeMatchesRelaxed : undefined,
+    );
     closeMatchesList.replaceChildren(...builtMatches.items);
     closeMatches.hidden = builtMatches.items.length === 0;
     zeroHit.hidden = !aiZeroHit;

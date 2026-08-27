@@ -52,6 +52,7 @@ vi.mock("./search/proxy.server", async (importOriginal) => {
           chips: forced || preview ? [] : [{ field: "category", value: "dress" }],
           degraded: forced,
           closeMatches: [],
+          closeMatchesRelaxed: [],
           // Out of pipeline order on purpose: the serializer re-orders.
           stages:
             forced || preview
@@ -346,9 +347,11 @@ describe("the response contract (AC-2)", () => {
       await searchLoader(loaderArgs(searchRequest({})))
     ).json()) as Record<string, unknown>;
 
+    // `closeMatchesRelaxed` rides beside `closeMatches` (YOY-111 AC-2).
     expect(Object.keys(body).sort()).toEqual(
-      [...CONTRACT_KEYS, "closeMatches"].sort(),
+      [...CONTRACT_KEYS, "closeMatches", "closeMatchesRelaxed"].sort(),
     );
+    expect(body.closeMatchesRelaxed).toEqual([]);
   });
 
   it("asks the orchestrator for 24 primary hits", async () => {

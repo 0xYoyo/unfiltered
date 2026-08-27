@@ -1,5 +1,5 @@
 {
-  "$comment": "Per-golden zero-regression baseline (YOY-116 AC-5): recorded from the accuracy-only harness run on main before lite-first routing landed (2026-08-26, hit rate 97%, 30/31 goldens, 9/9 refinements clean). `goldens` maps golden id -> whether an expected product ranked in the top 10; `refinements` maps refinement golden id -> whether the merged intent had zero constraint misses. harness.test.ts asserts every true here is still true. Regenerate only when a golden legitimately changes, never to absorb a regression. g24 (YOY-110, 2026-08-27) was added with the primary-colour fixture products and baselined from its first live-recorded run.",
+  "$comment": "Per-golden zero-regression baseline (YOY-116 AC-5): recorded from the accuracy-only harness run on main before lite-first routing landed (2026-08-26, hit rate 97%, 30/31 goldens, 9/9 refinements clean). `goldens` maps golden id -> whether an expected product ranked in the top 10; `refinements` maps refinement golden id -> whether the merged intent had zero constraint misses. harness.test.ts asserts every true here is still true. Regenerate only when a golden legitimately changes, never to absorb a regression. g24 (YOY-110, 2026-08-27) was added with the primary-colour fixture products and baselined from its first live-recorded run. g25 (YOY-111, 2026-08-27) is a zero-hit golden scored on the close-match ladder; true means the ladder contract held.",
   "recordedAt": "2026-08-26",
   "goldens": {
     "g01": true,
@@ -33,7 +33,8 @@
     "gc06": true,
     "gc07": true,
     "gc08": true,
-    "g24": true
+    "g24": true,
+    "g25": true
   },
   "refinements": {
     "r01": true,
