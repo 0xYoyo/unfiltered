@@ -110,7 +110,13 @@ Numbered capabilities, each observable behavior:
     hash. This capability is standard on every plan — it is the
     differentiator, not an add-on — with no setup fee; one-time indexing
     cost is absorbed as COGS (measured ceiling: single-digit dollars per
-    1,000 products).
+    1,000 products). **Measured 2026-08-27 (YOY-121 AC-7)** on the live
+    seed catalog — 465 products, 1,787 images, `gemini-3.5-flash-lite` at
+    `thinking_level: low`, one request per product with all images
+    inline: **$0.000474 per image, $1.90 per 1,000 products at 4 images
+    each** (text re-enrichment adds $0.41 and re-embedding $0.02 per
+    1,000, ≈ $2.33 per 1,000 for a full first-time index); 0 of 465
+    products failed the vision pass. Evidence on YOY-121.
 
 **Parity floor (added 2026-08-10).** Any capability directly comparable
 to the incumbent search experience — plain keyword lookup, typo
