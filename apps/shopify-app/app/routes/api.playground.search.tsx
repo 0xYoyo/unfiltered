@@ -146,6 +146,9 @@ export const loader = async ({
       (response.route === "ai" && response.routeReason !== "intent-reuse") ||
       (response.degraded &&
         (response.routeReason === "model" ||
+          // A purpose phrase settles AI deterministically (YOY-133); its
+          // degraded fallback still spent the intent call, like "model".
+          response.routeReason === "purpose-phrase" ||
           response.routeReason === "classic-zero-hit"));
     if (guarded && limited === null && aiDecided) {
       throttle.recordAiSearch(ip);

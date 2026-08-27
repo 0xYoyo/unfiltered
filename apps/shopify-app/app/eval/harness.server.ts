@@ -464,6 +464,12 @@ export interface BaselineHits {
   recordedAt: string;
   goldens: Record<string, boolean>;
   refinements: Record<string, boolean>;
+  /**
+   * Every golden's route — main, Constructor-bar, and sparse sets (YOY-133
+   * AC-4): the harness asserts each run's route equals it, so a routing
+   * change shows in the scorecard diff instead of passing silently.
+   */
+  routes: Record<string, "classic" | "ai">;
 }
 
 export function loadBaselineHits(): BaselineHits {

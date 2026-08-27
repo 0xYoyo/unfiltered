@@ -712,9 +712,8 @@ describe("eval run (AC-2, AC-3, AC-4, AC-6)", () => {
     expect(result.perConstructor.length).toBe(loadConstructorGoldens().length);
     // mustNot (amended AC-3): the floor records the measured leak and the
     // harness holds the line there — never more appearances, never fewer
-    // clean goldens. YOY-133 made negated attributes hard exclusions (18 →
-    // 1); the one appearance left is co09's classic route, where keyword
-    // search has no filter to apply.
+    // clean goldens. YOY-133 made negated attributes hard exclusions and
+    // routed purpose phrases AI: the floor is 0 / 100 %.
     const mustNot = result.perConstructor.flatMap((score) => score.mustNotViolations);
     expect(
       mustNot.length,
@@ -894,6 +893,26 @@ describe("eval run (AC-2, AC-3, AC-4, AC-6)", () => {
     for (const score of result.perRefinement) {
       expect(baseline.refinements, score.golden.id).toHaveProperty(score.golden.id);
     }
+  });
+
+  it("takes exactly the committed route on every golden of every set (YOY-133 AC-4)", () => {
+    // The purpose-phrase heuristic moved co09 classic → ai; every other
+    // route must be byte-identical to the baseline, and every golden that
+    // runs must have a committed route.
+    const baseline = loadBaselineHits();
+    const drift: string[] = [];
+    for (const score of [...result.perQuery, ...result.perConstructor, ...result.perSparse]) {
+      const expected = baseline.routes[score.golden.id];
+      expect(expected, `${score.golden.id} has no committed route`).toBeDefined();
+      if (score.route !== expected) {
+        drift.push(`${score.golden.id}: ${expected} → ${score.route} (${score.routeReason})`);
+      }
+    }
+    expect(drift, `route drift: ${drift.join("; ")}`).toEqual([]);
+    const co09 = result.perConstructor.find((score) => score.golden.id === "co09")!;
+    expect(co09.route).toBe("ai");
+    expect(co09.routeReason).toBe("purpose-phrase");
+    expect(co09.costUsd).toBeGreaterThan(0);
   });
 
   it("trimmed the intent prompt by at least 30 % of input tokens with the bars intact (YOY-64 AC-2)", () => {

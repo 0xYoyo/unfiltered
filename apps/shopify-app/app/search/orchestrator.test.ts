@@ -42,7 +42,7 @@ import { createPgVectorRetrievalStore } from "./retrieval-store.server";
 const SHOP = "orchestrator-shop.myshopify.com";
 
 /** A query the routing heuristics cannot settle, so the model decides. */
-const AI_QUERY = "elegant dress for a summer wedding";
+const AI_QUERY = "elegant summer wedding dress with sleeves";
 
 /** The intent the fake model extracts for AI_QUERY. */
 const DRESS_INTENT = {
@@ -1677,7 +1677,7 @@ describe("intent tier and per-tier ledger rows (YOY-116 AC-2, AC-3)", () => {
 
   it("an escalation-class query skips the lite tier: one intent row, on the accuracy model", async () => {
     const response = await tieredOrchestrator(0.99).runSearch({
-      query: AI_QUERY, // "... for a summer wedding": the occasion class
+      query: AI_QUERY, // "... summer wedding ...": the occasion class
       shopDomain: SHOP,
       searchId: "search-class",
     });
@@ -1774,9 +1774,9 @@ describe("exact-query intent reuse (YOY-64 AC-4)", () => {
   });
 
   it("answers an identical normalized query from the stored intent with zero LLM calls", async () => {
-    await storeServedIntent("Elegant Dress For A Summer Wedding", DRESS_INTENT, new Date(NOW.getTime() - 5 * 60_000));
+    await storeServedIntent("Elegant Summer Wedding Dress With Sleeves", DRESS_INTENT, new Date(NOW.getTime() - 5 * 60_000));
     const response = await reuseOnlyOrchestrator().runSearch({
-      query: "  elegant dress for a summer   wedding ",
+      query: "  elegant summer wedding   dress with sleeves ",
       shopDomain: SHOP,
       searchId: "reused",
     });

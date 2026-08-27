@@ -18,6 +18,7 @@ export type ClassificationReason =
   | "quoted-phrase"
   | "sku-pattern"
   | "short-query"
+  | "purpose-phrase"
   | "model"
   | "model-error";
 
@@ -149,6 +150,66 @@ function isConstraintShaped(tokens: string[]): boolean {
  */
 const NON_LATIN_LETTER = /(?=\p{L})\P{Script=Latin}/u;
 
+/**
+ * Purpose phrases (YOY-133 AC-4, founder decision 2026-08-27): "<noun
+ * phrase> for <purpose>" — "sneakers for running", "dress for a wedding",
+ * "something to wear to a wedding" — is a statement of purpose, and purpose
+ * is exactly what keyword search cannot read: "sneakers for running" is not
+ * a lookup for the word "sneakers", it is `category: sneakers, occasion:
+ * sport`, which only the AI path produces. The live classifier routed that
+ * shape classic in one of four cases (co09), so the shape settles AI
+ * DETERMINISTICALLY, with no model call, before the model is asked.
+ *
+ * EN: a token `for` with at least one token on each side, or the phrase
+ * `to wear to`. HE: a Hebrew category noun followed, later in the query,
+ * by a `ל…` purpose word ("לריצה", "לחתונה", "למשרד") — the preposition ל
+ * (for / to) attached to its object. A `ל…` token that is a colour word
+ * ("לבנה", white) or the negation "לא" is not a purpose. The noun list
+ * mirrors the canonical categories' everyday Hebrew forms, singular,
+ * plural, and construct state; it is a routing lexicon, not display text.
+ */
+const PURPOSE_PHRASE_EN = /\S\s+for\s+\S|(^|\s)to wear to\s+\S/;
+
+const HEBREW_CATEGORY_NOUNS = new Set([
+  "שמלה", "שמלת", "שמלות",
+  "חולצה", "חולצת", "חולצות", "גופייה", "גופיה", "סוודר", "סווטשירט",
+  "חצאית", "חצאיות",
+  "מכנסיים", "מכנסי", "ג'ינס", "גינס",
+  "מעיל", "מעילים", "ז'קט", "זקט",
+  "נעליים", "נעלי", "נעל", "מגפיים", "מגפי", "סניקרס", "סנדלים",
+  "תיק", "תיקים",
+  "תכשיט", "תכשיטים", "אקססוריז",
+  "בגד", "בגדי", "ביקיני",
+]);
+
+const HEBREW_PURPOSE_TOKEN = /^ל[\u05D0-\u05EA]{2,}$/;
+
+/** Strip one attached conjunction/article (ו, ה) so "והשמלה" reads as "שמלה". */
+function hebrewNoun(token: string): string {
+  return token.replace(/^ו?ה?/, "");
+}
+
+function isPurposePhrase(normalized: string, tokens: string[]): boolean {
+  if (PURPOSE_PHRASE_EN.test(normalized)) {
+    return true;
+  }
+  const nounAt = tokens.findIndex(
+    (token) =>
+      HEBREW_CATEGORY_NOUNS.has(token) || HEBREW_CATEGORY_NOUNS.has(hebrewNoun(token)),
+  );
+  if (nounAt === -1) {
+    return false;
+  }
+  return tokens
+    .slice(nounAt + 1)
+    .some(
+      (token) =>
+        HEBREW_PURPOSE_TOKEN.test(token) &&
+        token !== "לא" &&
+        !COLOR_WORDS.has(token),
+    );
+}
+
 /** SKU_TOKEN, except a bare number right after a price marker is a price bound, not a SKU. */
 function isSkuToken(tokens: string[], index: number): boolean {
   const token = tokens[index]!;
@@ -164,11 +225,14 @@ function isSkuToken(tokens: string[], index: number): boolean {
 
 /**
  * Deterministic fast path (AC-1): settle clearly-simple queries as `classic`
- * without touching the LLM port. Returns null when the heuristics cannot
- * decide. Rules, in order:
+ * — and, since YOY-133, purpose phrases as `ai` — without touching the LLM
+ * port. Returns null when the heuristics cannot decide. Rules, in order:
  *
  * - empty query → classic (nothing to interpret)
  * - whole query wrapped in quotes → classic (exact-phrase intent)
+ * - purpose phrase ("sneakers for running", "שמלה לחתונה") → AI
+ *   (YOY-133 AC-4): purpose is natural-language intent by definition, so
+ *   it settles AI with zero LLM calls instead of asking the model
  * - constraint-shaped (price marker, Hebrew-prefixed number, or color word
  *   with company) → undecided, so the sku/short rules below cannot misroute
  *   "blue snowboard" or "סנובורד כחול מתחת ל-900" to classic (YOY-61 AC-1)
@@ -189,6 +253,9 @@ export function classifyByHeuristics(
     return { route: "classic", reason: "quoted-phrase" };
   }
   const tokens = normalized.split(" ");
+  if (isPurposePhrase(normalized, tokens)) {
+    return { route: "ai", reason: "purpose-phrase" };
+  }
   if (isConstraintShaped(tokens) || NON_LATIN_LETTER.test(normalized)) {
     return null;
   }

@@ -531,11 +531,18 @@ describe("golden classification tiers (YOY-52 AC-1 amendment)", () => {
   // Pins each golden's regeneration expectation offline, so a heuristics
   // change that reroutes a golden fails here — in every `npm test` — instead
   // of surfacing as a false FAIL mid-way through a paid live regeneration.
-  it("AI-tier goldens escalate past the heuristics; heuristic-settled goldens are classic controls", () => {
+  it("AI-tier goldens escalate past the heuristics or settle AI as purpose phrases; heuristic-settled classic goldens are classic controls", () => {
     for (const golden of loadRecordedGoldens()) {
       const heuristic = classifyByHeuristics(normalizeQuery(golden.query));
       if ((golden.expectedRoute ?? "ai") === "ai") {
-        expect(heuristic, `${golden.id} must escalate to the model`).toBeNull();
+        // A purpose phrase settles AI deterministically (YOY-133 AC-4);
+        // every other AI golden must reach the model.
+        if (heuristic !== null) {
+          expect(heuristic, `${golden.id} heuristic route`).toEqual({
+            route: "ai",
+            reason: "purpose-phrase",
+          });
+        }
       } else if (heuristic !== null) {
         expect(heuristic.route, `${golden.id} heuristic route`).toBe("classic");
       }

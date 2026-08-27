@@ -376,9 +376,19 @@ Query understanding (all LLM access through the `LlmClient` port):
 
 - `createQueryClassifier({ llm, timeoutMs?, cacheSize? }): QueryClassifier` —
   routes a query to `"classic"` or `"ai"`: a deterministic heuristic layer
-  settles clearly-simple queries with zero LLM calls, everything else asks
-  the model (operation `"classification"`), cached by normalized query and
-  failing safe to `classic`.
+  settles clearly-simple queries as classic with zero LLM calls — and,
+  since YOY-133 (founder decision 2026-08-27), **purpose phrases as AI**
+  with zero LLM calls (reason `purpose-phrase`): "<noun phrase> for
+  <purpose>" ("sneakers for running", "dress for a wedding", "something to
+  wear to a wedding") and, in Hebrew, a category noun followed by a `ל…`
+  purpose word ("סניקרס לריצה", "שמלה לחתונה", "מכנסיים למשרד"; a colour
+  such as "לבנה" or the negation "לא" is not a purpose). Purpose is what
+  keyword search cannot read, and the live classifier routed that shape
+  classic in one of four cases (co09), so the shape never asks the model.
+  Everything else asks the model (operation `"classification"`), cached by
+  normalized query and failing safe to `classic`. A purpose-phrase search
+  that later degrades to classic still counts toward the per-session and
+  per-IP AI budgets, like a degraded model-routed one.
 - `createIntentExtractor({ llm }): IntentExtractor` — turns free text into a
   vendor-free `Intent` (category, price bounds with currency, color
   inclusions/exclusions, **negated attributes** `attributesExclude` and
@@ -565,7 +575,9 @@ description says "ללא צמר" survives "not wool", the tank top described
 "ללא שרוולים" survives "no sleeves". A word the lexicon cannot turn into a
 term (an empty or multi-word value) applies no predicate: a filter that
 can match nothing is never applied. The eval's Constructor-bar set pins
-the rule end to end (cn05–cn10, co01, co03, co04: 0 mustNot leaks). The
+the rule end to end (cn05–cn10, co01, co03, co04: 0 mustNot leaks; with
+the purpose-phrase route for co09 the whole set is at 0 / 30 of 30 clean,
+and `baseline-hits.json` `routes` pins every golden's route). The
 generic-store analog (PRD portability rule) is the rule itself: every
 evidence column is the platform-free snapshot or the enrichment row every
 ingestion adapter fills, and the lexicon is the engine's; a Door 2 store
