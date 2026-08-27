@@ -16,6 +16,6 @@ Raw material for App Store listing copy and outreach emails. Shipped = M1–M3 s
 | Understanding thin catalogs | Only matches text that exists | LLM attribute enrichment at ingestion | M5 vision: image-derived attributes |
 | Merchant proof | Basically none | Query log, click beacon, cost metering plumbed | M6: attributed-orders dashboard (hero metric) |
 | Latency on simple queries | Instant | Instant (classic, <150ms, no LLM) | — |
-| Latency on AI queries | n/a | p50 ~0.9 s server-side (EN 908 ms, HE 976 ms); p95 EN 3.4 s, HE 8.0 s — the HE tail is an upstream intent-model hang rate, bounded at 8 s (docs/LATENCY.md, 2026-08-26) | YOY-64 tail: the HE hang rate |
+| Latency on AI queries | n/a | p50 ~0.9 s server-side (EN 933 ms, HE 973 ms); p95 EN 3.4 s, HE 3.4 s, 0 degraded of 200 — bars met in both languages on the hedged intent call (docs/LATENCY.md, 2026-08-27) | — |
 | Demo without installing | Impossible | — | M4 playground, per-store preloaded catalogs |
 | Economics | Flat app fee | Metered AI, classic free, blended $1.12/1k measured | M5 cost routing |
