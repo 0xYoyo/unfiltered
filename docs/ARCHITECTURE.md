@@ -283,9 +283,13 @@ once on the next run, and the vision pass runs for every product with images
 `analysed` = products sent to the model (enriched or failed), `cached` =
 products with images whose key matched, `failed` = two failed attempts or
 no fetchable image, `cost` = the run's `vision` ledger rows for the store —
-and `/internal/costs` shows the `vision` operation like any other. The
-measured cost per image and per 1,000 products is recorded on YOY-121
-(AC-7) and in PRD §3 capability 14 once the seed-catalog run has happened.
+and `/internal/costs` shows the `vision` operation like any other.
+**Measured** on the live seed catalog (2026-08-27, YOY-121 AC-7: 465
+products, 1,787 images, 0 failures): $0.000474 per image, $0.001823 per
+product, **$1.90 per 1,000 products at 4 images each**; the text
+re-enrichment and re-embedding of the same run cost $0.41 and $0.02 per
+1,000, so a full first-time index is ≈ $2.33 per 1,000 products. The
+whole 465-product run — images, text, vision, embed — cost $1.047.
 
 ### Multi-tenant vector search on one shared index (YOY-105)
 
