@@ -64,6 +64,32 @@ zero network calls, identical ledger shape to a live run.
   floor's committed count and clean-golden rate (see the pass bar below),
   and its spend is reported on its own line, never blended into the main
   cost bar.
+- `fixtures/vision/` (YOY-122) — the listing images of the 14 text-sparse
+  products p79–p92 (title-only, no description, no tags), one JPEG each,
+  ≤ 200 KB, rights-clear with the source, author, and licence of every
+  file in `fixtures/vision/SOURCES.md`. The harness seeds one
+  `ProductImage` row per file (bytes hashed exactly as image capture does)
+  and runs the production vision pass over them from
+  `recorded/vision.json`. `fixtures/vision/cases.json` declares the
+  **contamination cases**: 11 of those photos show a model wearing other
+  garments, footwear, jewellery, or a bag beside the sold item, and each
+  case names the sold item's categories and colours plus every other
+  item's colours. The harness scores the vision pass's OWN answer
+  (`visionAttributes`, before the merge) per case: the category must be
+  the sold item's, no answered colour may be one that appears only on the
+  other items, and no `styleTag` may name footwear, jewellery, or a bag
+  (`CONTAMINATION_TERMS`). Bar: contamination violations 0.
+- `fixtures/vision-goldens.json` (YOY-122 AC-2) — 12 **sparse-product
+  goldens** (EN + HE) that only vision can satisfy: the expected products'
+  titles carry no colour, sleeve, pattern, or material ("Sandals",
+  "Hoodie", "Party Dress"), and each query asks for exactly such an
+  attribute — "gold strappy heels under 400", "long sleeve dress under
+  300", "שמלה עם שרוולים ארוכים עד 300", "hooded sweatshirt under 200",
+  "striped breton top under 200". Every query carries a price cap so it
+  routes to the AI path (a two-word attribute-plus-noun query would settle
+  classic, where keyword search matches titles only). Scored end to end
+  like the goldens, on their own scorecard block and never blended into
+  the main bars; bar: ≥ 80 % hit.
 - `fixtures/refinement-goldens.json` — 9 follow-up queries (EN, HE, mixed),
   each with the previous query's intent and the constraint outcome the merged
   intent must produce (YOY-42). They run intent extraction only: a follow-up
@@ -73,8 +99,10 @@ zero network calls, identical ledger shape to a live run.
   normalized query), `intent.json` and `intent-refinement.json` (keyed by raw
   query; the accuracy tier), `intent-lite.json` and
   `intent-lite-refinement.json` (the same keys answered by the lite tier,
-  each answer carrying its `confidence` — YOY-116), `embeddings.json` (keyed
-  by exact embedded text). Each recording file declares its `provenance`;
+  each answer carrying its `confidence` — YOY-116), `vision.json` (keyed by
+  product title: the vision pass's answer for each product with fixture
+  images — YOY-122), `embeddings.json` (keyed by exact embedded text — the
+  product texts are composed from the MERGED text + vision attributes). Each recording file declares its `provenance`;
   the intent files of one tier are merged at replay time and a key present
   in both is an error.
 - `fixtures/baseline-hits.json` — the per-golden zero-regression baseline
@@ -112,6 +140,20 @@ Constructor bar block (YOY-118): one row per Constructor golden, then
 rates, hard-constraint violations, the set's escalation rate, and its cost
 per 1,000 AI searches.
 
+Vision pass bars (YOY-122, enforced as failing tests):
+
+- Contamination violations 0 over every case in `fixtures/vision/cases.json`
+  (`contamination violations: N over M cases (bar: 0)`).
+- Sparse-product goldens ≥ 80 % hit (`sparse goldens: N/M (… %; bar: ≥ 80 %)`),
+  every one on the AI path, zero hard-constraint violations.
+- The vision pass is one-time indexing cost: its ledger rows carry no
+  `searchId`, so they land in the one-time line and are also printed on
+  their own (`one-time vision cost (N products with images, reported
+  separately)`), never in the per-search blend. The main bars — per-golden
+  zero regression, 0 violations, refinement misses 0, Constructor floor,
+  blended ≤ $0.60/1K — are re-verified on the vision-enriched catalog by
+  the same tests as before (AC-3).
+
 Constructor-bar pass bar (enforced as failing tests):
 
 - Hard-constraint violations 0 across the set's top 10s.
@@ -137,6 +179,7 @@ never in CI, which holds no key (NG-2):
     LIVE_LLM_TESTS=1 GEMINI_API_KEY=... REGEN_SCOPE=lite npm run regen:live   # lite-tier intents only
     LIVE_LLM_TESTS=1 GEMINI_API_KEY=... REGEN_SCOPE=catalog npm run regen:live   # enrichment + missing entries only
     LIVE_LLM_TESTS=1 GEMINI_API_KEY=... REGEN_SCOPE=goldens npm run regen:live   # missing entries only (new goldens)
+    LIVE_LLM_TESTS=1 GEMINI_API_KEY=... REGEN_SCOPE=vision npm run regen:live    # every vision answer + missing entries
 
 `REGEN_SCOPE=lite` re-records only `intent-lite.json` and
 `intent-lite-refinement.json` and leaves every accuracy-tier recording
@@ -157,7 +200,14 @@ product vectors stay byte-identical too. A product with no enrichment
 recording yet (added with the golden, YOY-117) is recorded and merged; every
 existing enrichment entry is reused as-is. Every scope records the
 Constructor-bar goldens alongside the main goldens (YOY-118): both sets
-share the recording files, keyed by query.
+share the recording files, keyed by query — and the sparse-product goldens
+(YOY-122) likewise. Every scope also records the vision pass
+(`vision.json`) for the products with fixture images: `all`, `catalog`, and
+`vision` re-record every answer, `goldens` records only the missing ones;
+`REGEN_SCOPE=vision` exists for a vision prompt or model change, which
+invalidates every vision answer but no text enrichment. Product embedding
+texts are composed from the merged text + vision attributes, so a vision
+re-record re-embeds exactly the products whose merged text moved.
 
 The root `regen:live` script pins the run to the root `vitest.config.ts`,
 whose alias resolves `@unfiltered/*` to the TypeScript source. Invoking
@@ -180,6 +230,9 @@ Provenance of what is committed today:
 - `intent-refinement.json` — live Gemini output (`"provenance": "live"`)
   since the run-8 regeneration (YOY-67): the refinement rows are real model
   evidence, not hand-written plumbing checks.
+- `vision.json` — live `gemini-3.5-flash-lite` output at thinking level
+  `low` with the anchored anti-contamination prompt, recorded on YOY-122
+  (2026-08-27) via `REGEN_SCOPE=goldens` over the 14 fixture images.
 - `intent-lite.json`, `intent-lite-refinement.json` — live
   `gemini-3.5-flash-lite` output at thinking level `low`, recorded on
   YOY-116 (2026-08-26) with the confidence-bearing prompt. The accuracy

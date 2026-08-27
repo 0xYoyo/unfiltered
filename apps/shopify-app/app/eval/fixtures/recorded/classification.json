@@ -414,6 +414,90 @@
       },
       "inputTokens": 180,
       "outputTokens": 11
+    },
+    "gold strappy heels under 400": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 182,
+      "outputTokens": 11
+    },
+    "נעלי עקב זהב עד 400": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 184,
+      "outputTokens": 11
+    },
+    "long sleeve dress under 300": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 181,
+      "outputTokens": 6
+    },
+    "שמלה עם שרוולים ארוכים עד 300": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 187,
+      "outputTokens": 11
+    },
+    "hooded sweatshirt under 200": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 180,
+      "outputTokens": 11
+    },
+    "black leather biker jacket under 500": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 182,
+      "outputTokens": 11
+    },
+    "ז'קט עור שחור עד 500": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 186,
+      "outputTokens": 11
+    },
+    "striped breton top under 200": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 182,
+      "outputTokens": 11
+    },
+    "floral sleeveless summer dress under 300": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 182,
+      "outputTokens": 11
+    },
+    "blue denim shirt under 200": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 181,
+      "outputTokens": 11
+    },
+    "shiny puffer jacket under 600": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 181,
+      "outputTokens": 11
+    },
+    "חולצה עם פסים עד 200": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 184,
+      "outputTokens": 11
     }
   }
 }

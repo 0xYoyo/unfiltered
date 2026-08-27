@@ -1,0 +1,220 @@
+[
+  {
+    "id": "sg01",
+    "language": "en",
+    "query": "gold strappy heels under 400",
+    "expectedProductIds": [
+      "p89"
+    ],
+    "hardConstraints": {
+      "category": "shoes",
+      "priceMin": null,
+      "priceMax": 400,
+      "colorsInclude": [
+        "gold"
+      ],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "sg02",
+    "language": "he",
+    "query": "נעלי עקב זהב עד 400",
+    "expectedProductIds": [
+      "p89"
+    ],
+    "hardConstraints": {
+      "category": "shoes",
+      "priceMin": null,
+      "priceMax": 400,
+      "colorsInclude": [
+        "gold"
+      ],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "sg03",
+    "language": "en",
+    "query": "long sleeve dress under 300",
+    "expectedProductIds": [
+      "p91",
+      "p92"
+    ],
+    "hardConstraints": {
+      "category": "dress",
+      "priceMin": null,
+      "priceMax": 300,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "sg04",
+    "language": "he",
+    "query": "שמלה עם שרוולים ארוכים עד 300",
+    "expectedProductIds": [
+      "p91",
+      "p92"
+    ],
+    "hardConstraints": {
+      "category": "dress",
+      "priceMin": null,
+      "priceMax": 300,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "sg05",
+    "language": "en",
+    "query": "hooded sweatshirt under 200",
+    "expectedProductIds": [
+      "p79"
+    ],
+    "hardConstraints": {
+      "category": "top",
+      "priceMin": null,
+      "priceMax": 200,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "sg06",
+    "language": "en",
+    "query": "black leather biker jacket under 500",
+    "expectedProductIds": [
+      "p81",
+      "p84"
+    ],
+    "hardConstraints": {
+      "category": "jacket",
+      "priceMin": null,
+      "priceMax": 500,
+      "colorsInclude": [
+        "black"
+      ],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "sg07",
+    "language": "he",
+    "query": "ז'קט עור שחור עד 500",
+    "expectedProductIds": [
+      "p81",
+      "p84"
+    ],
+    "hardConstraints": {
+      "category": "jacket",
+      "priceMin": null,
+      "priceMax": 500,
+      "colorsInclude": [
+        "black"
+      ],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "sg08",
+    "language": "en",
+    "query": "striped breton top under 200",
+    "expectedProductIds": [
+      "p82"
+    ],
+    "hardConstraints": {
+      "category": "top",
+      "priceMin": null,
+      "priceMax": 200,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "sg09",
+    "language": "en",
+    "query": "floral sleeveless summer dress under 300",
+    "expectedProductIds": [
+      "p83"
+    ],
+    "hardConstraints": {
+      "category": "dress",
+      "priceMin": null,
+      "priceMax": 300,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "sg10",
+    "language": "en",
+    "query": "blue denim shirt under 200",
+    "expectedProductIds": [
+      "p86"
+    ],
+    "hardConstraints": {
+      "category": "top",
+      "priceMin": null,
+      "priceMax": 200,
+      "colorsInclude": [
+        "blue"
+      ],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "sg11",
+    "language": "en",
+    "query": "shiny puffer jacket under 600",
+    "expectedProductIds": [
+      "p87"
+    ],
+    "hardConstraints": {
+      "category": "jacket",
+      "priceMin": null,
+      "priceMax": 600,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "sg12",
+    "language": "he",
+    "query": "חולצה עם פסים עד 200",
+    "expectedProductIds": [
+      "p82"
+    ],
+    "hardConstraints": {
+      "category": "top",
+      "priceMin": null,
+      "priceMax": 200,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  }
+]

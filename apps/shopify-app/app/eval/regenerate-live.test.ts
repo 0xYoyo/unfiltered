@@ -14,6 +14,7 @@ import {
   type CostRecorder,
   type LlmClient,
   type StructuredCompletionRequest,
+  type InlineImage,
 } from "@unfiltered/engine";
 import {
   createGeminiEmbeddingClient,
@@ -30,6 +31,11 @@ import {
   buildEnrichmentPrompt,
   ENRICHMENT_SCHEMA,
   parseEnrichment,
+  buildVisionPrompt,
+  mergeAttributes,
+  parseVisionAttributes,
+  VISION_SCHEMA,
+  type VisionAttributes,
 } from "../catalog/enrich.server";
 import { computeContentHash } from "../catalog/mapping.server";
 import { createTestDb } from "../testing/helpers.server";
@@ -40,6 +46,10 @@ import {
   loadRefinementGoldens,
   runEval,
   type Golden,
+  goldenHit,
+  loadVisionGoldens,
+  VISION_FIXTURES_DIR,
+  type EvalProduct,
 } from "./harness.server";
 import { recordingKeyFromPrompt } from "./replay.server";
 import {
@@ -79,6 +89,11 @@ const live = process.env.LIVE_LLM_TESTS === "1";
  * enrichment re-record: for a new golden over an unchanged catalog, so the
  * enrichment recordings — and with them every product vector — stay
  * byte-identical too.
+ *
+ * `REGEN_SCOPE=vision` (YOY-122) is the goldens pass plus a re-record of
+ * EVERY vision answer (`vision.json`) — for a vision prompt/model change —
+ * and of the product vectors whose merged text moved with it. The catalog
+ * and goldens scopes record only the missing vision answers.
  */
 const scope =
   process.env.REGEN_SCOPE === "lite"
@@ -89,7 +104,9 @@ const scope =
         ? "catalog"
         : process.env.REGEN_SCOPE === "goldens"
           ? "goldens"
-          : "all";
+          : process.env.REGEN_SCOPE === "vision"
+            ? "vision"
+            : "all";
 /**
  * `REGEN_RESUME=1` keeps the lite entries already on disk and records only
  * the missing keys and the recorded FAILURES — a lite run that a slow
@@ -301,6 +318,91 @@ function writeRecording(
   );
 }
 
+/** The fixture image bytes of one product (YOY-122), in `images` order. */
+function visionImagesOf(product: EvalProduct): InlineImage[] {
+  return (product.images ?? []).map((file) => ({
+    mimeType: "image/jpeg",
+    data: new Uint8Array(readFileSync(join(VISION_FIXTURES_DIR, file))),
+  }));
+}
+
+/**
+ * Record the vision pass (YOY-122 AC-1) for every product with fixture
+ * images: the live vision model over the same anchored prompt and schema
+ * production uses, keyed by title in `vision.json`. `rerecordAll` replaces
+ * every entry (a prompt or model change); otherwise only missing entries
+ * are recorded and every existing answer is reused byte-identical. Returns
+ * each product's parsed answer (null without images) for the merged
+ * embedding text.
+ */
+async function recordVision({
+  models,
+  catalog,
+  usage,
+  check,
+  rerecordAll,
+}: {
+  models: ReturnType<typeof geminiModelsFromEnv>;
+  catalog: EvalProduct[];
+  usage: ReturnType<typeof captureUsage>;
+  check: (condition: boolean, message: string) => void;
+  rerecordAll: boolean;
+}): Promise<Map<string, VisionAttributes | null>> {
+  const path = join(recordedDir, "vision.json");
+  const onDisk = existsSync(path)
+    ? (JSON.parse(readFileSync(path, "utf8")) as { modelId: string; entries: Record<string, RecordedEntry> })
+    : { modelId: models.visionModel, entries: {} };
+  check(
+    rerecordAll || onDisk.modelId === models.visionModel,
+    `vision.json is ${onDisk.modelId}, env says ${models.visionModel}; regenerate with REGEN_SCOPE=vision`,
+  );
+  const entries: Record<string, RecordedEntry> = rerecordAll ? {} : onDisk.entries;
+  const llm = captureCompletions(
+    createGeminiLlmClient({
+      modelId: models.visionModel,
+      thinkingLevel: models.visionThinkingLevel,
+      costRecorder: usage.recorder,
+    }),
+    usage.last,
+    entries,
+  );
+  const byProduct = new Map<string, VisionAttributes | null>();
+  let recorded = 0;
+  let withImages = 0;
+  for (const product of catalog) {
+    if ((product.images ?? []).length === 0) {
+      byProduct.set(product.productId, null);
+      continue;
+    }
+    withImages += 1;
+    if (entries[product.title] === undefined) {
+      try {
+        await llm.completeStructured({
+          prompt: buildVisionPrompt({ ...product, contentHash: computeContentHash(product) }),
+          schema: VISION_SCHEMA,
+          operation: "vision",
+          temperature: 0,
+          images: visionImagesOf(product),
+        });
+        recorded += 1;
+      } catch (error) {
+        check(false, `vision: ${product.productId} failed: ${String(error)}`);
+        byProduct.set(product.productId, null);
+        continue;
+      }
+    }
+    const entry = entries[product.title];
+    const attributes = entry === undefined ? null : parseVisionAttributes(entry.output);
+    check(attributes !== null, `vision: ${product.productId} answered outside the schema`);
+    byProduct.set(product.productId, attributes);
+  }
+  writeRecording("vision.json", models.visionModel, entries);
+  console.log(
+    `[regenerate-live] vision: ${recorded} answer(s) recorded live, ${withImages} product(s) with images`,
+  );
+  return byProduct;
+}
+
 // Offline coverage for the retry predicate and pacing knob — these run in
 // every `npm test`, live or not.
 describe("transient network error predicate", () => {
@@ -407,7 +509,7 @@ describe("source-execution guard (YOY-52 run-6)", () => {
  * fail the offline run exactly like a main golden.
  */
 function loadRecordedGoldens(): Golden[] {
-  return [...loadGoldens(), ...loadConstructorGoldens()];
+  return [...loadGoldens(), ...loadConstructorGoldens(), ...loadVisionGoldens()];
 }
 
 describe("golden classification tiers (YOY-52 AC-1 amendment)", () => {
@@ -485,6 +587,8 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
       attributesByProduct.set(product.productId, attributes);
     }
     writeRecording("enrichment.json", models.classificationModel, enrichmentEntries);
+    // Vision (YOY-122): every product with fixture images, re-recorded.
+    const visionByProduct = await recordVision({ models, catalog, usage, check, rerecordAll: true });
 
     // Classification: through the real classifier so heuristics and prompt
     // wording match the harness exactly; only model-answered queries record.
@@ -638,7 +742,10 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
       ...catalog.map((product) =>
         composeEmbeddingText(
           { ...product, contentHash: computeContentHash(product) },
-          attributesByProduct.get(product.productId) ?? null,
+          mergeAttributes(
+            attributesByProduct.get(product.productId) ?? null,
+            visionByProduct.get(product.productId) ?? null,
+          ),
         ),
       ),
       ...goldens
@@ -711,6 +818,17 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
       check(
         rescored.perSearchCostPer1000Usd <= 0.6,
         `rescore: blended cost $${rescored.perSearchCostPer1000Usd.toFixed(4)}/1k exceeds the $0.60 bar`,
+      );
+      check(
+        rescored.contaminationViolations.length === 0,
+        `rescore: contamination: ${rescored.contaminationViolations.join("; ")}`,
+      );
+      const sparseMisses = rescored.perSparse
+        .filter((score) => !goldenHit(score))
+        .map((score) => score.golden.id);
+      check(
+        rescored.sparseHitRate >= 0.8,
+        `rescore: sparse goldens ${(rescored.sparseHitRate * 100).toFixed(0)} % below the 80 % bar; misses: ${sparseMisses.join(", ")}`,
       );
     } catch (error) {
       check(false, `rescore: eval run failed: ${String(error)}`);
@@ -815,7 +933,7 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
     expect(failures, `\n${failures.join("\n")}`).toEqual([]);
   }, 1_800_000);
 
-  it.skipIf(scope !== "catalog" && scope !== "goldens")("re-records every enrichment (catalog scope) and only the missing classification/intent/embedding entries (YOY-110 AC-5: REGEN_SCOPE=catalog; YOY-111: REGEN_SCOPE=goldens)", async () => {
+  it.skipIf(scope !== "catalog" && scope !== "goldens" && scope !== "vision")("re-records every enrichment (catalog scope) and only the missing classification/intent/embedding entries (YOY-110 AC-5: REGEN_SCOPE=catalog; YOY-111: REGEN_SCOPE=goldens; YOY-122: REGEN_SCOPE=vision)", async () => {
     const models = geminiModelsFromEnv();
     const catalog = loadCatalog();
     const goldens = loadRecordedGoldens();
@@ -899,6 +1017,17 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
       }
       console.log(`[regenerate-live] scope=goldens: ${recorded} missing enrichment(s) recorded`);
     }
+
+    // 1b. Vision (YOY-122): catalog and vision scopes re-record every
+    //     product with images (the answer shape or model changed); goldens
+    //     scope records only the products with no answer yet.
+    const visionByProduct = await recordVision({
+      models,
+      catalog,
+      usage,
+      check,
+      rerecordAll: scope === "catalog" || scope === "vision",
+    });
 
     // 2. Classification: only model-answered goldens with no live entry yet.
     const classification = readRecording("classification.json");
@@ -1029,7 +1158,10 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
       wanted.add(
         composeEmbeddingText(
           { ...product, contentHash: computeContentHash(product) },
-          attributesByProduct.get(product.productId) ?? null,
+          mergeAttributes(
+            attributesByProduct.get(product.productId) ?? null,
+            visionByProduct.get(product.productId) ?? null,
+          ),
         ),
       );
     }
@@ -1101,6 +1233,17 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
       check(
         rescored.perSearchCostPer1000Usd <= 0.6,
         `rescore: blended cost $${rescored.perSearchCostPer1000Usd.toFixed(4)}/1k exceeds the $0.60 bar`,
+      );
+      check(
+        rescored.contaminationViolations.length === 0,
+        `rescore: contamination: ${rescored.contaminationViolations.join("; ")}`,
+      );
+      const sparseMisses = rescored.perSparse
+        .filter((score) => !goldenHit(score))
+        .map((score) => score.golden.id);
+      check(
+        rescored.sparseHitRate >= 0.8,
+        `rescore: sparse goldens ${(rescored.sparseHitRate * 100).toFixed(0)} % below the 80 % bar; misses: ${sparseMisses.join(", ")}`,
       );
     } catch (error) {
       check(false, `rescore: eval run failed: ${String(error)}`);

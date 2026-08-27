@@ -595,16 +595,53 @@ async function loadVisionImages(
   return byProduct;
 }
 
-/** A stored JSON source answer back as a typed record; null when absent or malformed. */
-function storedTextAttributes(
-  value: Prisma.JsonValue | null,
+/**
+ * A stored `textAttributes` JSON back as a typed record; null when absent or
+ * malformed. The column holds the PARSED answer, whose `primaryColor` is
+ * null when the text stated no colour, while `parseEnrichment` validates
+ * the model's raw shape (a string, "" for none) — so the null is mapped
+ * back to "" before re-validation. Without that, a colourless product's
+ * text answer read back as malformed and was silently dropped on the next
+ * vision-only re-merge (found by the YOY-122 eval fixtures).
+ */
+export function textAttributesFromStored(
+  value: Prisma.JsonValue | null | undefined,
   product: Pick<EnrichableProduct, "title">,
 ): ProductAttributes | null {
-  return value === null ? null : parseEnrichment(value, product);
+  if (value === null || value === undefined || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  return parseEnrichment(
+    { ...record, primaryColor: record.primaryColor ?? "" },
+    product,
+  );
 }
 
-function storedVisionAttributes(value: Prisma.JsonValue | null): VisionAttributes | null {
-  return value === null ? null : parseVisionAttributes(value);
+/**
+ * A stored `visionAttributes` JSON back as a typed record; null when absent
+ * or malformed. Same rule as `textAttributesFromStored`: the stored answer
+ * carries null for "no colour" and for a not-applicable coverage field (a
+ * pair of trousers has no neckline), which `parseVisionAttributes` only
+ * accepts in their raw string forms — so each null is mapped back before
+ * re-validation.
+ */
+export function visionAttributesFromStored(
+  value: Prisma.JsonValue | null | undefined,
+): VisionAttributes | null {
+  if (value === null || value === undefined || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  return parseVisionAttributes({
+    ...record,
+    primaryColor: record.primaryColor ?? "",
+    sleeveLength: record.sleeveLength ?? VISION_NOT_APPLICABLE,
+    neckline: record.neckline ?? VISION_NOT_APPLICABLE,
+    garmentLength: record.garmentLength ?? VISION_NOT_APPLICABLE,
+    pattern: record.pattern ?? VISION_NOT_APPLICABLE,
+    materialAppearance: record.materialAppearance ?? VISION_NOT_APPLICABLE,
+  });
 }
 
 /** A source answer as the JSON column value: the record, or SQL NULL. */
@@ -706,7 +743,7 @@ export async function enrichCatalog({
     // Text side: the cached answer, or up to two fresh attempts.
     let text: ProductAttributes | null;
     if (textCached) {
-      text = storedTextAttributes(row.textAttributes, product);
+      text = textAttributesFromStored(row.textAttributes, product);
     } else {
       text = null;
       for (let attempt = 0; attempt < 2 && text === null; attempt += 1) {
@@ -731,8 +768,8 @@ export async function enrichCatalog({
 
     // Vision side: the stored answer, or a fresh analysis when the images
     // changed (or vanished).
-    let visionAnswer: VisionAttributes | null = storedVisionAttributes(
-      row?.visionAttributes ?? null,
+    let visionAnswer: VisionAttributes | null = visionAttributesFromStored(
+      row?.visionAttributes,
     );
     let visionStatus = row?.visionStatus ?? "none";
     let visionHashes = storedHashes;

@@ -1,0 +1,372 @@
+{
+  "modelId": "gemini-3.5-flash-lite",
+  "provenance": "live",
+  "entries": {
+    "Hoodie": {
+      "output": {
+        "category": "top",
+        "colors": [
+          "grey",
+          "black"
+        ],
+        "primaryColor": "grey",
+        "occasions": [
+          "casual",
+          "sport"
+        ],
+        "fit": "relaxed",
+        "styleTags": [
+          "sporty",
+          "casual"
+        ],
+        "sleeveLength": "long",
+        "neckline": "hooded",
+        "garmentLength": "hip",
+        "pattern": "graphic",
+        "materialAppearance": "fleece"
+      },
+      "inputTokens": 1682,
+      "outputTokens": 136
+    },
+    "Wrap Dress": {
+      "output": {
+        "category": "dress",
+        "colors": [
+          "black",
+          "multi"
+        ],
+        "primaryColor": "black",
+        "occasions": [
+          "casual",
+          "evening"
+        ],
+        "fit": "regular",
+        "styleTags": [
+          "boho",
+          "floral",
+          "wrap"
+        ],
+        "sleeveLength": "short",
+        "neckline": "v-neck",
+        "garmentLength": "mini",
+        "pattern": "floral",
+        "materialAppearance": "synthetic"
+      },
+      "inputTokens": 1712,
+      "outputTokens": 141
+    },
+    "Biker Jacket": {
+      "output": {
+        "category": "jacket",
+        "colors": [
+          "black"
+        ],
+        "primaryColor": "black",
+        "occasions": [
+          "casual",
+          "evening"
+        ],
+        "fit": "regular",
+        "styleTags": [
+          "biker",
+          "edgy",
+          "rock"
+        ],
+        "sleeveLength": "long",
+        "neckline": "collar",
+        "garmentLength": "hip",
+        "pattern": "solid",
+        "materialAppearance": "leather"
+      },
+      "inputTokens": 1686,
+      "outputTokens": 135
+    },
+    "Striped Tee": {
+      "output": {
+        "category": "top",
+        "colors": [
+          "white",
+          "black"
+        ],
+        "primaryColor": "white",
+        "occasions": [
+          "casual"
+        ],
+        "fit": "regular",
+        "styleTags": [
+          "casual",
+          "striped",
+          "basic"
+        ],
+        "sleeveLength": "three-quarter",
+        "neckline": "crew",
+        "garmentLength": "hip",
+        "pattern": "stripe",
+        "materialAppearance": "cotton"
+      },
+      "inputTokens": 1686,
+      "outputTokens": 135
+    },
+    "Sun Dress": {
+      "output": {
+        "category": "dress",
+        "colors": [
+          "white",
+          "blue"
+        ],
+        "primaryColor": "white",
+        "occasions": [
+          "casual",
+          "beach"
+        ],
+        "fit": "regular",
+        "styleTags": [
+          "summer",
+          "boho",
+          "cute"
+        ],
+        "sleeveLength": "sleeveless",
+        "neckline": "crew",
+        "garmentLength": "mini",
+        "pattern": "floral",
+        "materialAppearance": "cotton"
+      },
+      "inputTokens": 1705,
+      "outputTokens": 114
+    },
+    "Moto Jacket": {
+      "output": {
+        "category": "jacket",
+        "colors": [
+          "black"
+        ],
+        "primaryColor": "black",
+        "occasions": [
+          "casual",
+          "evening"
+        ],
+        "fit": "regular",
+        "styleTags": [
+          "edgy",
+          "moto",
+          "rocker"
+        ],
+        "sleeveLength": "long",
+        "neckline": "notch",
+        "garmentLength": "cropped",
+        "pattern": "solid",
+        "materialAppearance": "leather"
+      },
+      "inputTokens": 1685,
+      "outputTokens": 135
+    },
+    "Chinos": {
+      "output": {
+        "category": "pants",
+        "colors": [
+          "khaki",
+          "beige"
+        ],
+        "primaryColor": "khaki",
+        "occasions": [
+          "casual",
+          "work"
+        ],
+        "fit": "slim",
+        "styleTags": [
+          "casual",
+          "smart-casual"
+        ],
+        "sleeveLength": "not-applicable",
+        "neckline": "not-applicable",
+        "garmentLength": "ankle",
+        "pattern": "solid",
+        "materialAppearance": "cotton"
+      },
+      "inputTokens": 1685,
+      "outputTokens": 141
+    },
+    "Track Pants": {
+      "output": {
+        "category": "pants",
+        "colors": [
+          "black"
+        ],
+        "primaryColor": "black",
+        "occasions": [
+          "casual",
+          "sport"
+        ],
+        "fit": "relaxed",
+        "styleTags": [
+          "sporty",
+          "streetwear"
+        ],
+        "sleeveLength": "not-applicable",
+        "neckline": "not-applicable",
+        "garmentLength": "full",
+        "pattern": "solid",
+        "materialAppearance": "cotton"
+      },
+      "inputTokens": 1685,
+      "outputTokens": 134
+    },
+    "Sandals": {
+      "output": {
+        "category": "shoes",
+        "colors": [
+          "gold",
+          "bronze"
+        ],
+        "primaryColor": "gold",
+        "occasions": [
+          "evening",
+          "wedding"
+        ],
+        "fit": "regular",
+        "styleTags": [
+          "elegant",
+          "strappy",
+          "chic"
+        ],
+        "sleeveLength": "not-applicable",
+        "neckline": "not-applicable",
+        "garmentLength": "not-applicable",
+        "pattern": "solid",
+        "materialAppearance": "leather"
+      },
+      "inputTokens": 1668,
+      "outputTokens": 120
+    },
+    "Jacket": {
+      "output": {
+        "category": "jacket",
+        "colors": [
+          "tan",
+          "brown"
+        ],
+        "primaryColor": "tan",
+        "occasions": [
+          "casual"
+        ],
+        "fit": "regular",
+        "styleTags": [
+          "biker",
+          "casual"
+        ],
+        "sleeveLength": "long",
+        "neckline": "collar",
+        "garmentLength": "hip",
+        "pattern": "solid",
+        "materialAppearance": "leather"
+      },
+      "inputTokens": 1684,
+      "outputTokens": 129
+    },
+    "Party Dress": {
+      "output": {
+        "category": "dress",
+        "colors": [
+          "black",
+          "white"
+        ],
+        "primaryColor": "black",
+        "occasions": [
+          "evening",
+          "casual"
+        ],
+        "fit": "slim",
+        "styleTags": [
+          "chic",
+          "elegant",
+          "party"
+        ],
+        "sleeveLength": "long",
+        "neckline": "crew",
+        "garmentLength": "mini",
+        "pattern": "print",
+        "materialAppearance": "silk"
+      },
+      "inputTokens": 1685,
+      "outputTokens": 138
+    },
+    "Day Dress": {
+      "output": {
+        "category": "dress",
+        "colors": [
+          "green"
+        ],
+        "primaryColor": "green",
+        "occasions": [
+          "casual",
+          "work"
+        ],
+        "fit": "regular",
+        "styleTags": [
+          "chic",
+          "casual",
+          "everyday"
+        ],
+        "sleeveLength": "long",
+        "neckline": "crew",
+        "garmentLength": "mini",
+        "pattern": "solid",
+        "materialAppearance": "knit"
+      },
+      "inputTokens": 1715,
+      "outputTokens": 85
+    },
+    "Western Shirt": {
+      "output": {
+        "category": "top",
+        "colors": [
+          "blue"
+        ],
+        "primaryColor": "blue",
+        "occasions": [
+          "casual"
+        ],
+        "fit": "regular",
+        "styleTags": [
+          "casual",
+          "western"
+        ],
+        "sleeveLength": "long",
+        "neckline": "collar",
+        "garmentLength": "hip",
+        "pattern": "solid",
+        "materialAppearance": "denim"
+      },
+      "inputTokens": 1685,
+      "outputTokens": 124
+    },
+    "Winter Jacket": {
+      "output": {
+        "category": "jacket",
+        "colors": [
+          "blue",
+          "silver",
+          "black"
+        ],
+        "primaryColor": "blue",
+        "occasions": [
+          "casual",
+          "sport"
+        ],
+        "fit": "regular",
+        "styleTags": [
+          "puffer",
+          "winter",
+          "streetwear"
+        ],
+        "sleeveLength": "long",
+        "neckline": "high-neck",
+        "garmentLength": "hip",
+        "pattern": "quilted",
+        "materialAppearance": "synthetic"
+      },
+      "inputTokens": 1685,
+      "outputTokens": 148
+    }
+  }
+}

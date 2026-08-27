@@ -29,7 +29,9 @@ import {
   parseVisionAttributes,
   primaryColorFromTitle,
   resolvePrimaryColor,
+  textAttributesFromStored,
   VISION_SCHEMA,
+  visionAttributesFromStored,
 } from "./catalog/enrich.server";
 import { mapProductNode } from "./catalog/mapping.server";
 import { productNode } from "./catalog/mapping.test";
@@ -1139,6 +1141,76 @@ describe("vision pass in enrichCatalog (YOY-121 AC-2, AC-5, AC-6)", () => {
       colors: ["navy", "white"],
       primaryColor: "navy",
       sleeveLength: "long",
+      visionStatus: "enriched",
+    });
+  });
+
+  it("re-merges stored answers that carry nulls: a colourless text answer and a not-applicable coverage field survive a one-side re-run", async () => {
+    // Stored answers are the PARSED form — null primaryColor, null
+    // not-applicable fields — which the raw-shape parsers reject; the
+    // stored readers map them back (found by the YOY-122 eval fixtures:
+    // every pants product lost its vision answer on re-read).
+    const trousers = parsedVision({
+      category: "pants",
+      colors: ["khaki"],
+      primaryColor: "khaki",
+      sleeveLength: null,
+      neckline: null,
+      garmentLength: null,
+      pattern: "solid",
+      materialAppearance: "cotton",
+    });
+    expect(visionAttributesFromStored(trousers as unknown as Parameters<typeof visionAttributesFromStored>[0])).toEqual(trousers);
+    expect(visionAttributesFromStored(null)).toBeNull();
+    expect(visionAttributesFromStored({ category: "pants" })).toBeNull();
+    const colourless = recordedAttributes({ colors: [], primaryColor: null });
+    expect(textAttributesFromStored(colourless as unknown as Parameters<typeof textAttributesFromStored>[0], PLAIN)).toEqual(colourless);
+    expect(textAttributesFromStored(null, PLAIN)).toBeNull();
+
+    // End to end: a colourless text answer and a trousers vision answer,
+    // then a text-only re-run (version bump) — the vision fields survive.
+    await seedImages(P3, ["https://cdn.example/p3-a.jpg"]);
+    await enrichCatalog({
+      db,
+      shopDomain: SHOP,
+      llm: llmStub((request) =>
+        request.prompt.includes("Plain tee")
+          ? recordedAttributes({ category: "other", colors: [], primaryColor: "" })
+          : recordedAttributes(),
+      ).llm,
+      vision: {
+        llm: llmStub(() =>
+          recordedVision({
+            category: "pants",
+            colors: ["khaki"],
+            primaryColor: "khaki",
+            sleeveLength: "not-applicable",
+            neckline: "not-applicable",
+            garmentLength: "not-applicable",
+            pattern: "solid",
+            materialAppearance: "cotton",
+          }),
+        ).llm,
+        fetchImage: imageServer().fetchImage,
+      },
+    });
+    expect(await enrichmentRow(P3)).toMatchObject({ category: "pants", primaryColor: "khaki", sleeveLength: null, materialAppearance: "cotton" });
+    await db.productEnrichment.update({
+      where: { shopDomain_productId: { shopDomain: SHOP, productId: P3 } },
+      data: { enrichmentVersion: ENRICHMENT_VERSION - 1 },
+    });
+    const vision = llmStub(() => recordedVision());
+    await enrichCatalog({
+      db,
+      shopDomain: SHOP,
+      llm: llmStub(() => recordedAttributes({ category: "other", colors: [], primaryColor: "" })).llm,
+      vision: { llm: vision.llm, fetchImage: imageServer().fetchImage },
+    });
+    expect(vision.calls).toHaveLength(0);
+    expect(await enrichmentRow(P3)).toMatchObject({
+      category: "pants",
+      primaryColor: "khaki",
+      materialAppearance: "cotton",
       visionStatus: "enriched",
     });
   });

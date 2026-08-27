@@ -1177,5 +1177,243 @@
     "available": true,
     "imageAltTexts": [],
     "sourceUpdatedAt": "2026-08-01T00:00:00.000Z"
+  },
+  {
+    "productId": "p79",
+    "title": "Hoodie",
+    "description": "",
+    "tags": [],
+    "vendor": "eval-fixture",
+    "productType": "Tops",
+    "priceMin": 180,
+    "priceMax": 180,
+    "currencyCode": "ILS",
+    "available": true,
+    "imageAltTexts": [],
+    "sourceUpdatedAt": "2026-08-27T00:00:00.000Z",
+    "images": [
+      "p79-hoodie.jpg"
+    ]
+  },
+  {
+    "productId": "p80",
+    "title": "Wrap Dress",
+    "description": "",
+    "tags": [],
+    "vendor": "eval-fixture",
+    "productType": "Dresses",
+    "priceMin": 260,
+    "priceMax": 260,
+    "currencyCode": "ILS",
+    "available": true,
+    "imageAltTexts": [],
+    "sourceUpdatedAt": "2026-08-27T00:00:00.000Z",
+    "images": [
+      "p80-wrap-dress.jpg"
+    ]
+  },
+  {
+    "productId": "p81",
+    "title": "Biker Jacket",
+    "description": "",
+    "tags": [],
+    "vendor": "eval-fixture",
+    "productType": "Jackets",
+    "priceMin": 420,
+    "priceMax": 420,
+    "currencyCode": "ILS",
+    "available": true,
+    "imageAltTexts": [],
+    "sourceUpdatedAt": "2026-08-27T00:00:00.000Z",
+    "images": [
+      "p81-biker-jacket.jpg"
+    ]
+  },
+  {
+    "productId": "p82",
+    "title": "Striped Tee",
+    "description": "",
+    "tags": [],
+    "vendor": "eval-fixture",
+    "productType": "Tops",
+    "priceMin": 120,
+    "priceMax": 120,
+    "currencyCode": "ILS",
+    "available": true,
+    "imageAltTexts": [],
+    "sourceUpdatedAt": "2026-08-27T00:00:00.000Z",
+    "images": [
+      "p82-striped-tee.jpg"
+    ]
+  },
+  {
+    "productId": "p83",
+    "title": "Sun Dress",
+    "description": "",
+    "tags": [],
+    "vendor": "eval-fixture",
+    "productType": "Dresses",
+    "priceMin": 240,
+    "priceMax": 240,
+    "currencyCode": "ILS",
+    "available": true,
+    "imageAltTexts": [],
+    "sourceUpdatedAt": "2026-08-27T00:00:00.000Z",
+    "images": [
+      "p83-sun-dress.jpg"
+    ]
+  },
+  {
+    "productId": "p84",
+    "title": "Moto Jacket",
+    "description": "",
+    "tags": [],
+    "vendor": "eval-fixture",
+    "productType": "Jackets",
+    "priceMin": 460,
+    "priceMax": 460,
+    "currencyCode": "ILS",
+    "available": true,
+    "imageAltTexts": [],
+    "sourceUpdatedAt": "2026-08-27T00:00:00.000Z",
+    "images": [
+      "p84-moto-jacket.jpg"
+    ]
+  },
+  {
+    "productId": "p85",
+    "title": "Chinos",
+    "description": "",
+    "tags": [],
+    "vendor": "eval-fixture",
+    "productType": "Pants",
+    "priceMin": 190,
+    "priceMax": 190,
+    "currencyCode": "ILS",
+    "available": true,
+    "imageAltTexts": [],
+    "sourceUpdatedAt": "2026-08-27T00:00:00.000Z",
+    "images": [
+      "p85-chinos.jpg"
+    ]
+  },
+  {
+    "productId": "p86",
+    "title": "Western Shirt",
+    "description": "",
+    "tags": [],
+    "vendor": "eval-fixture",
+    "productType": "Tops",
+    "priceMin": 170,
+    "priceMax": 170,
+    "currencyCode": "ILS",
+    "available": true,
+    "imageAltTexts": [],
+    "sourceUpdatedAt": "2026-08-27T00:00:00.000Z",
+    "images": [
+      "p86-denim-shirt.jpg"
+    ]
+  },
+  {
+    "productId": "p87",
+    "title": "Winter Jacket",
+    "description": "",
+    "tags": [],
+    "vendor": "eval-fixture",
+    "productType": "Jackets",
+    "priceMin": 520,
+    "priceMax": 520,
+    "currencyCode": "ILS",
+    "available": true,
+    "imageAltTexts": [],
+    "sourceUpdatedAt": "2026-08-27T00:00:00.000Z",
+    "images": [
+      "p87-puffer-jacket.jpg"
+    ]
+  },
+  {
+    "productId": "p88",
+    "title": "Track Pants",
+    "description": "",
+    "tags": [],
+    "vendor": "eval-fixture",
+    "productType": "Pants",
+    "priceMin": 150,
+    "priceMax": 150,
+    "currencyCode": "ILS",
+    "available": true,
+    "imageAltTexts": [],
+    "sourceUpdatedAt": "2026-08-27T00:00:00.000Z",
+    "images": [
+      "p88-track-pants.jpg"
+    ]
+  },
+  {
+    "productId": "p89",
+    "title": "Sandals",
+    "description": "",
+    "tags": [],
+    "vendor": "eval-fixture",
+    "productType": "Shoes",
+    "priceMin": 350,
+    "priceMax": 350,
+    "currencyCode": "ILS",
+    "available": true,
+    "imageAltTexts": [],
+    "sourceUpdatedAt": "2026-08-27T00:00:00.000Z",
+    "images": [
+      "p89-sandals.jpg"
+    ]
+  },
+  {
+    "productId": "p90",
+    "title": "Jacket",
+    "description": "",
+    "tags": [],
+    "vendor": "eval-fixture",
+    "productType": "Jackets",
+    "priceMin": 480,
+    "priceMax": 480,
+    "currencyCode": "ILS",
+    "available": true,
+    "imageAltTexts": [],
+    "sourceUpdatedAt": "2026-08-27T00:00:00.000Z",
+    "images": [
+      "p90-tan-jacket.jpg"
+    ]
+  },
+  {
+    "productId": "p91",
+    "title": "Party Dress",
+    "description": "",
+    "tags": [],
+    "vendor": "eval-fixture",
+    "productType": "Dresses",
+    "priceMin": 290,
+    "priceMax": 290,
+    "currencyCode": "ILS",
+    "available": true,
+    "imageAltTexts": [],
+    "sourceUpdatedAt": "2026-08-27T00:00:00.000Z",
+    "images": [
+      "p91-party-dress.jpg"
+    ]
+  },
+  {
+    "productId": "p92",
+    "title": "Day Dress",
+    "description": "",
+    "tags": [],
+    "vendor": "eval-fixture",
+    "productType": "Dresses",
+    "priceMin": 210,
+    "priceMax": 210,
+    "currencyCode": "ILS",
+    "available": true,
+    "imageAltTexts": [],
+    "sourceUpdatedAt": "2026-08-27T00:00:00.000Z",
+    "images": [
+      "p92-day-dress.jpg"
+    ]
   }
 ]

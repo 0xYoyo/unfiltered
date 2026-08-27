@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -18,7 +18,12 @@ import {
 
 import { createPrismaCostRecorder } from "../ai/cost-recorder.server";
 import { embedCatalog } from "../catalog/embed.server";
-import { enrichCatalog } from "../catalog/enrich.server";
+import {
+  enrichCatalog,
+  visionAttributesFromStored,
+  type VisionAttributes,
+} from "../catalog/enrich.server";
+import { hashImageBytes } from "../catalog/images.server";
 import { computeContentHash, computeFamilyKey } from "../catalog/mapping.server";
 import { createPgTrgmClassicStore } from "../search/classic-store.server";
 import {
@@ -65,6 +70,138 @@ export interface EvalProduct {
   available: boolean;
   imageAltTexts: string[];
   sourceUpdatedAt: string;
+  /**
+   * Listing images under `fixtures/vision/` (YOY-122): the harness seeds
+   * one `ProductImage` row per file, hashed like ingestion does, and the
+   * vision pass reads the bytes back through `fixtureImageFetch`. Absent
+   * for the text-only products.
+   */
+  images?: string[];
+}
+
+/** Where the vision fixture images live; every `EvalProduct.images` entry is a file name in it. */
+export const VISION_FIXTURES_DIR = join(fixturesDir, "vision");
+/** The size cap on a committed fixture image (YOY-122 AC-1). */
+export const VISION_IMAGE_MAX_BYTES = 200 * 1024;
+/** The URL scheme the harness stores on `ProductImage` rows for fixture files. */
+export const FIXTURE_IMAGE_URL_PREFIX = "fixture://vision/";
+
+/**
+ * The fixture image fetcher (YOY-122): the vision pass re-reads image bytes
+ * through `ImageFetch`, so the harness answers `fixture://vision/<file>`
+ * from disk — a 404 for anything else, exactly as a CDN would.
+ */
+export async function fixtureImageFetch(url: string): Promise<Response> {
+  if (!url.startsWith(FIXTURE_IMAGE_URL_PREFIX)) {
+    return new Response("not a fixture image", { status: 404 });
+  }
+  const path = join(VISION_FIXTURES_DIR, url.slice(FIXTURE_IMAGE_URL_PREFIX.length));
+  if (!existsSync(path)) {
+    return new Response("missing fixture image", { status: 404 });
+  }
+  return new Response(readFileSync(path), {
+    status: 200,
+    headers: { "content-type": "image/jpeg" },
+  });
+}
+
+/**
+ * One contamination case (YOY-122 AC-1): a listing photo where a model wears
+ * other garments, footwear, jewellery, or a bag beside the sold item. The
+ * vision answer is scored against what the photo actually shows.
+ */
+export interface ContaminationCase {
+  productId: string;
+  sold: {
+    item: string;
+    /** Canonical categories the sold item may be labelled as. */
+    categories: string[];
+    /** Every colour that appears on the sold item itself. */
+    colors: string[];
+  };
+  otherItems: Array<{ item: string; colors: string[] }>;
+}
+
+export function loadContaminationCases(): ContaminationCase[] {
+  return readJson<{ cases: ContaminationCase[] }>("vision", "cases.json").cases;
+}
+
+/** The sparse-product goldens only vision can satisfy (YOY-122 AC-2). */
+export function loadVisionGoldens(): Golden[] {
+  return readJson<Golden[]>("vision-goldens.json");
+}
+
+/**
+ * Footwear, jewellery, and bag words a sold garment's `styleTags` must never
+ * carry (YOY-122 AC-1): a tag naming one of these on a hoodie or a dress is
+ * the model's shoes or necklace leaking into the product.
+ */
+export const CONTAMINATION_TERMS: readonly string[] = [
+  "sneaker", "sneakers", "trainer", "trainers", "shoe", "shoes", "boot", "boots",
+  "heel", "heels", "sandal", "sandals", "pump", "pumps", "loafer", "loafers",
+  "footwear", "necklace", "choker", "jewelry", "jewellery", "earring", "earrings",
+  "bracelet", "bangle", "watch", "wristwatch", "ring", "pendant", "chain",
+  "bag", "handbag", "tote", "purse", "clutch", "backpack", "satchel",
+];
+
+/** Lowercase, trimmed; grey and gray are one colour. */
+export function normalizeColorWord(color: string): string {
+  const word = color.trim().toLowerCase();
+  return word === "gray" ? "grey" : word;
+}
+
+/**
+ * Score one contamination case against the product's recorded vision answer
+ * (YOY-122 AC-1): the category must be the sold item's; no answered colour —
+ * `colors` or `primaryColor` — may be one that appears only on the other
+ * items in the photo (their colours minus the sold item's); no `styleTag`
+ * may name footwear, jewellery, or a bag. A missing answer is a violation:
+ * a case the vision pass never scored proves nothing.
+ */
+export function contaminationViolations(
+  kase: ContaminationCase,
+  vision: VisionAttributes | null,
+): string[] {
+  const id = kase.productId;
+  if (vision === null) {
+    return [`${id}: no vision answer recorded`];
+  }
+  const violations: string[] = [];
+  const categories = kase.sold.categories.map((category) => category.toLowerCase());
+  if (!categories.includes(vision.category.toLowerCase())) {
+    violations.push(
+      `${id}: category "${vision.category}" is not the sold item's [${categories.join(", ")}] (${kase.sold.item})`,
+    );
+  }
+  const soldColors = new Set(kase.sold.colors.map(normalizeColorWord));
+  const foreign = new Map<string, string>();
+  for (const other of kase.otherItems) {
+    for (const color of other.colors) {
+      const word = normalizeColorWord(color);
+      if (!soldColors.has(word) && !foreign.has(word)) {
+        foreign.set(word, other.item);
+      }
+    }
+  }
+  const answered = new Set(
+    [...vision.colors, ...(vision.primaryColor === null ? [] : [vision.primaryColor])].map(
+      normalizeColorWord,
+    ),
+  );
+  for (const color of answered) {
+    const owner = foreign.get(color);
+    if (owner !== undefined) {
+      violations.push(`${id}: colour "${color}" belongs to the ${owner}, not the ${kase.sold.item}`);
+    }
+  }
+  for (const tag of vision.styleTags) {
+    const tokens = tag.toLowerCase().split(/[^a-z]+/).filter((token) => token !== "");
+    const leaked = tokens.find((token) => CONTAMINATION_TERMS.includes(token));
+    if (leaked !== undefined) {
+      violations.push(`${id}: styleTag "${tag}" names ${leaked} on a ${kase.sold.item}`);
+    }
+  }
+  return violations;
 }
 
 /** The hard constraints a golden query's results are checked against. */
@@ -270,6 +407,18 @@ export interface EvalRunResult {
   perConstructor: QueryScore[];
   /** The Constructor bar block (YOY-118 AC-3). */
   constructorBar: ConstructorBar;
+  /** One row per sparse-product golden (YOY-122 AC-2), scored like the goldens. */
+  perSparse: QueryScore[];
+  /** Fraction of the sparse goldens with an expected product in the top 10 (bar ≥ 0.8). */
+  sparseHitRate: number;
+  /** Contamination cases scored (YOY-122 AC-1). */
+  contaminationCases: number;
+  /** Every contamination violation across the cases (bar: none). */
+  contaminationViolations: string[];
+  /** Products the vision pass analysed from fixture images. */
+  visionProducts: number;
+  /** The `vision` ledger rows of the run, USD: one-time indexing cost, reported on its own line. */
+  visionCostUsd: number;
 }
 
 /** Hit rate over a slice of the Constructor set, with its size. */
@@ -669,8 +818,14 @@ export async function runEval(db: PrismaClient): Promise<EvalRunResult> {
       `eval: lite refinement recordings collide with base lite recordings on ${liteCollisions.join(", ")}`,
     );
   }
+  // Vision recordings (YOY-122): the vision pass's answers per product title,
+  // replayed through the same client under operation "vision".
+  const visionRecording = readJson<LlmRecording>("recorded", "vision.json");
+  const visionGoldens = loadVisionGoldens();
+  const contaminationCases = loadContaminationCases();
   const recordings: Record<string, LlmRecording> = {
     enrichment: readJson<LlmRecording>("recorded", "enrichment.json"),
+    vision: visionRecording,
     classification: {
       modelId: classificationRecording.modelId,
       entries: {
@@ -707,7 +862,8 @@ export async function runEval(db: PrismaClient): Promise<EvalRunResult> {
 
   // Index the sparse catalog exactly the way production does: seed the
   // snapshot, then run the real enrichment and embedding pipelines.
-  for (const { sourceUpdatedAt, ...product } of catalog) {
+  let visionProducts = 0;
+  for (const { sourceUpdatedAt, images, ...product } of catalog) {
     await db.catalogProduct.create({
       data: {
         ...product,
@@ -718,10 +874,41 @@ export async function runEval(db: PrismaClient): Promise<EvalRunResult> {
         familyKey: computeFamilyKey(product),
       },
     });
+    // Listing images (YOY-122): one ProductImage row per fixture file, its
+    // bytes hashed exactly as image capture hashes a CDN's — the key the
+    // vision pass re-analyses on.
+    for (const [position, file] of (images ?? []).entries()) {
+      const bytes = readFileSync(join(VISION_FIXTURES_DIR, file));
+      await db.productImage.create({
+        data: {
+          shopDomain,
+          productId: product.productId,
+          position,
+          url: `${FIXTURE_IMAGE_URL_PREFIX}${file}`,
+          contentHash: hashImageBytes(bytes),
+          fetchedAt: new Date(sourceUpdatedAt),
+        },
+      });
+    }
+    if ((images ?? []).length > 0) {
+      visionProducts += 1;
+    }
   }
-  const enrichResult = await enrichCatalog({ db, shopDomain, llm });
+  // Text enrichment plus the vision pass (YOY-122), both answered from
+  // recordings: the same replay client serves operation "vision".
+  const enrichResult = await enrichCatalog({
+    db,
+    shopDomain,
+    llm,
+    vision: { llm, fetchImage: fixtureImageFetch },
+  });
   if (enrichResult.failed > 0) {
     throw new Error(`eval enrichment failed for ${enrichResult.failed} products`);
+  }
+  if ((enrichResult.vision?.failed ?? 0) > 0) {
+    throw new Error(
+      `eval vision pass failed for ${enrichResult.vision?.failed} products — a vision recording is missing or broken; regenerate with REGEN_SCOPE=goldens`,
+    );
   }
   await embedCatalog({ db, shopDomain, embeddings });
 
@@ -762,6 +949,18 @@ export async function runEval(db: PrismaClient): Promise<EvalRunResult> {
         primaryColor: row.primaryColor,
       },
     ]),
+  );
+  // Contamination (YOY-122 AC-1): scored on the vision pass's OWN answer
+  // (`visionAttributes`), not the merged columns — the question is what the
+  // model attributed to the sold item, before the text answer had its say.
+  const visionByProduct = new Map(
+    enrichmentRows.map((row) => [
+      row.productId,
+      visionAttributesFromStored(row.visionAttributes),
+    ]),
+  );
+  const contamination = contaminationCases.flatMap((kase) =>
+    contaminationViolations(kase, visionByProduct.get(kase.productId) ?? null),
   );
 
   const scoreGolden = async (golden: Golden): Promise<QueryScore> => {
@@ -853,6 +1052,13 @@ export async function runEval(db: PrismaClient): Promise<EvalRunResult> {
   for (const golden of constructorGoldens) {
     perConstructor.push(await scoreGolden(golden));
   }
+  // The sparse-product goldens (YOY-122 AC-2): title-only products whose
+  // only searchable attributes came from their images, scored end to end
+  // like the goldens and kept out of the main bars and the blend.
+  const perSparse: QueryScore[] = [];
+  for (const golden of visionGoldens) {
+    perSparse.push(await scoreGolden(golden));
+  }
 
   // Refinement goldens (YOY-42): one intent call each, with the previous
   // intent supplied by the golden — no classification or retrieval, because a
@@ -895,12 +1101,14 @@ export async function runEval(db: PrismaClient): Promise<EvalRunResult> {
   const constructorSearchIds = new Set(
     constructorGoldens.map((golden) => golden.id),
   );
+  const sparseSearchIds = new Set(visionGoldens.map((golden) => golden.id));
   const perSearchTotal = allRows
     .filter(
       (row) =>
         row.searchId !== null &&
         !refinementSearchIds.has(row.searchId) &&
-        !constructorSearchIds.has(row.searchId),
+        !constructorSearchIds.has(row.searchId) &&
+        !sparseSearchIds.has(row.searchId),
     )
     .reduce((sum, row) => sum + row.costUsd, 0);
   const refinementTotal = allRows
@@ -949,6 +1157,7 @@ export async function runEval(db: PrismaClient): Promise<EvalRunResult> {
     ),
     synthesizedRecordings:
       intentRecording.provenance === "synthesized" ||
+      visionRecording.provenance === "synthesized" ||
       refinementRecording.provenance === "synthesized" ||
       Object.keys(classificationSynthesized.entries).length > 0,
     hitRate: hitCount / goldens.length,
@@ -968,6 +1177,15 @@ export async function runEval(db: PrismaClient): Promise<EvalRunResult> {
     ),
     perConstructor,
     constructorBar: computeConstructorBar(perConstructor, allRows),
+    perSparse,
+    sparseHitRate:
+      perSparse.length === 0 ? 0 : perSparse.filter(goldenHit).length / perSparse.length,
+    contaminationCases: contaminationCases.length,
+    contaminationViolations: contamination,
+    visionProducts,
+    visionCostUsd: allRows
+      .filter((row) => row.operation === "vision")
+      .reduce((sum, row) => sum + row.costUsd, 0),
   };
   printScorecard(result);
   return result;
@@ -1069,6 +1287,36 @@ function printScorecard(result: EvalRunResult): void {
     `  hard-constraint violations: ${bar.hardConstraintViolationCount} (bar: 0); mustNot violations: ${bar.mustNotViolationCount} (target 0; floor: no regression), mustNot-clean goldens ${percent(bar.mustNotCleanRate)}`,
     `  intent escalation rate: ${(bar.escalationRate * 100).toFixed(0)} % of the set's AI searches`,
     `  per-search cost per 1,000 AI searches (${bar.aiSearchCount} full-path searches): $${bar.costPer1000Usd.toFixed(2)}`,
+  );
+  lines.push(
+    "",
+    "sparse-product goldens — title-only products, attributes from their images (YOY-122)",
+    "id   | lang  | route      | tier     | rank | viol | cost USD | query",
+    "-----+-------+------------+----------+------+------+----------+------",
+  );
+  for (const score of result.perSparse) {
+    lines.push(
+      [
+        score.golden.id.padEnd(4),
+        score.golden.language.padEnd(5),
+        `${score.route}/${score.routeReason}`.padEnd(10),
+        (score.intentTier ?? "-").padEnd(8),
+        String(score.firstExpectedRank ?? "MISS").padStart(4),
+        String(score.violations.length).padStart(4),
+        score.costUsd.toFixed(6).padStart(8),
+        score.golden.query,
+      ].join(" | "),
+    );
+    for (const violation of score.violations) {
+      lines.push(`  VIOLATION: ${violation}`);
+    }
+  }
+  const sparseHits = result.perSparse.filter(goldenHit).length;
+  lines.push(
+    `sparse goldens: ${sparseHits}/${result.perSparse.length} (${(result.sparseHitRate * 100).toFixed(0)} %; bar: ≥ 80 %)`,
+    `contamination violations: ${result.contaminationViolations.length} over ${result.contaminationCases} cases (bar: 0)`,
+    ...result.contaminationViolations.map((violation) => `  VIOLATION: ${violation}`),
+    `one-time vision cost (${result.visionProducts} products with images, reported separately): $${result.visionCostUsd.toFixed(4)}`,
   );
   if (result.synthesizedRecordings) {
     lines.push(
