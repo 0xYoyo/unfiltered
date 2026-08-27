@@ -115,7 +115,7 @@ import { createSessionThrottle } from "./search/throttle.server";
 const SHOP = "proxy-shop.myshopify.com";
 
 /** A query the routing heuristics cannot settle, so the model decides. */
-const AI_QUERY = "elegant dress for a summer wedding";
+const AI_QUERY = "elegant summer wedding dress with sleeves";
 
 /** The intent the fake model extracts for AI_QUERY (wire format). */
 const DRESS_INTENT = {
@@ -1666,9 +1666,9 @@ describe("exact-query intent reuse through the proxy (YOY-64 AC-4)", () => {
       llm: fakeLlm({ classification: () => ({ route: "ai" }), intent: () => DRESS_INTENT }),
       intentReuseWindowMs: 60 * 60_000,
     });
-    const ai = await (await action(actionArgs(proxyRequest({ payload: { query: "  Elegant DRESS for a summer   wedding", sessionId: "s1" } })))).json();
+    const ai = await (await action(actionArgs(proxyRequest({ payload: { query: "  Elegant summer WEDDING dress   with sleeves", sessionId: "s1" } })))).json();
     const aiRow = await db.searchEvent.findFirst({ where: { searchId: ai.searchId } });
-    expect(aiRow?.normalizedQuery).toBe("elegant dress for a summer wedding");
+    expect(aiRow?.normalizedQuery).toBe("elegant summer wedding dress with sleeves");
     expect(aiRow?.intent).toMatchObject({ category: "dress", occasion: "wedding" });
 
     const classic = await (await action(actionArgs(proxyRequest({ payload: { query: "nike 90", sessionId: "s1" } })))).json();

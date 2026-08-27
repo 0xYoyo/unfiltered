@@ -77,13 +77,63 @@ describe("heuristic fast path (AC-1, AC-5)", () => {
   }
 });
 
+describe("purpose phrases settle AI deterministically (YOY-133 AC-4)", () => {
+  // "<noun phrase> for <purpose>" is natural-language intent by definition
+  // — keyword search cannot read purpose — so the shape never asks the
+  // model: the live classifier routed "sneakers for running" classic, the
+  // one Constructor-bar leak no filter could reach.
+  const purposeFixtures = [
+    "sneakers for running",
+    "dress for a wedding",
+    "shoes for a wedding",
+    "pants for the office",
+    "Gift for mom",
+    "something to wear to a wedding",
+    "black evening gown for a formal gala",
+    // HE: a category noun, then a ל… purpose word.
+    "סניקרס לריצה",
+    "שמלה לחתונה",
+    "מכנסיים למשרד",
+    "נעליים לחתונה",
+    "שמלה אלגנטית לחתונה בקיץ לא שחור",
+    "שמלת מקסי elegant לחתונה בקיץ",
+    "והשמלה לערב",
+  ];
+  for (const query of purposeFixtures) {
+    it(`routes ${JSON.stringify(query)} to ai (purpose-phrase) with zero LLM calls`, async () => {
+      const classifier = createQueryClassifier({ llm: throwingLlm });
+      expect(await classifier.classify(query)).toEqual({
+        route: "ai",
+        reason: "purpose-phrase",
+      });
+      expect(classifier.settled!(query)).toEqual({ route: "ai", reason: "purpose-phrase" });
+    });
+  }
+
+  it("does not fire on 'for' without a purpose, on a colour or negation after ל, or without a category noun", async () => {
+    const classifier = createQueryClassifier({ llm: llmStub("classic").llm });
+    // No object after "for", or "for" first: not the shape.
+    expect((await classifier.classify("what is this for")).reason).not.toBe("purpose-phrase");
+    expect((await classifier.classify("for sale")).reason).not.toBe("purpose-phrase");
+    // "לבנה" is white, "לא" is not: neither is a purpose.
+    expect((await classifier.classify("שמלת קיץ לא לבנה")).reason).toBe("model");
+    // A ל… token with no category noun before it stays the model's call.
+    expect((await classifier.classify("משהו לחתונה")).reason).toBe("model");
+    // Quoted exact phrases still win, purpose or not.
+    expect(await classifier.classify('"sneakers for running"')).toEqual({
+      route: "classic",
+      reason: "quoted-phrase",
+    });
+  });
+});
+
 describe("model escalation (AC-2, AC-5)", () => {
   // Natural-language queries the heuristics cannot settle: English, Hebrew,
   // and mixed — each escalates to the port and returns the model's decision.
   const aiFixtures = [
     "elegant summer wedding dress, not black, under 400 ils",
-    "שמלה אלגנטית לחתונה בקיץ לא שחור",
-    "שמלת מקסי elegant לחתונה בקיץ",
+    "שמלה אלגנטית בקיץ לא שחור",
+    "שמלת מקסי elegant בקיץ",
     // Price-bound numbers are not SKUs (YOY-29 AC-7): these short queries
     // carry price intent and must reach the model, not the sku-pattern rule.
     "dress under 400",
@@ -150,7 +200,7 @@ describe("model escalation (AC-2, AC-5)", () => {
     const { llm, calls } = llmStub("ai");
     const classifier = createQueryClassifier({ llm });
 
-    await classifier.classify("linen dress for a beach wedding in october", {
+    await classifier.classify("linen beach wedding dress in october", {
       storeId: "test-shop.myshopify.com",
       searchId: "search-1",
     });
@@ -195,9 +245,9 @@ describe("cache (AC-3)", () => {
     const { llm, calls } = llmStub("ai");
     const classifier = createQueryClassifier({ llm, cacheSize: 1 });
 
-    await classifier.classify("silky maxi dress for an autumn gala evening");
-    await classifier.classify("warm wool coat for rainy winter commutes");
-    await classifier.classify("silky maxi dress for an autumn gala evening");
+    await classifier.classify("silky maxi dress with an autumn gala mood");
+    await classifier.classify("warm wool coat that suits rainy winter commutes");
+    await classifier.classify("silky maxi dress with an autumn gala mood");
 
     // The first query was evicted by the second, so it re-escalates.
     expect(calls).toHaveLength(3);

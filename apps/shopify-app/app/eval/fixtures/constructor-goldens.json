@@ -695,7 +695,7 @@
     "language": "en",
     "group": "occasionVsCategory",
     "query": "sneakers for running",
-    "expectedRoute": "classic",
+    "expectedRoute": "ai",
     "expectedProductIds": [
       "p24",
       "p61"
@@ -704,12 +704,12 @@
       "p21"
     ],
     "hardConstraints": {
-      "category": null,
+      "category": "sneakers",
       "priceMin": null,
       "priceMax": null,
       "colorsInclude": [],
       "colorsExclude": [],
-      "occasion": null,
+      "occasion": "sport",
       "availabilityRequired": false
     }
   },

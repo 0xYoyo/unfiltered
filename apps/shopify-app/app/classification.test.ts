@@ -49,10 +49,10 @@ describe("classification cost ledger", () => {
     });
 
     // Escalated query: one metered call. Cached repeat: no new row.
-    await classifier.classify("שמלה אלגנטית לחתונה בקיץ לא שחור", {
+    await classifier.classify("שמלה אלגנטית בקיץ לא שחור", {
       storeId: SHOP,
     });
-    await classifier.classify("שמלה אלגנטית לחתונה בקיץ לא שחור", {
+    await classifier.classify("שמלה אלגנטית בקיץ לא שחור", {
       storeId: SHOP,
     });
     // Heuristic fast path: no LLM call, no row.

@@ -1002,25 +1002,6 @@
       "inputTokens": 265,
       "outputTokens": 36
     },
-    "sneakers for running": {
-      "output": {
-        "colorsInclude": [],
-        "colorsExclude": [],
-        "availabilityRequired": false,
-        "softAttributes": [
-          "running"
-        ],
-        "confidence": 0.9,
-        "category": "sneakers",
-        "currency": null,
-        "occasion": "sport",
-        "priceMax": null,
-        "priceMin": null,
-        "size": null
-      },
-      "inputTokens": 261,
-      "outputTokens": 52
-    },
     "סניקרס לריצה": {
       "output": {
         "colorsInclude": [],
@@ -1494,6 +1475,27 @@
       },
       "inputTokens": 392,
       "outputTokens": 107
+    },
+    "sneakers for running": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "attributesExclude": [],
+        "attributesInclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "running"
+        ],
+        "confidence": 0.9,
+        "category": "sneakers",
+        "currency": null,
+        "occasion": "sport",
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 391,
+      "outputTokens": 60
     }
   }
 }

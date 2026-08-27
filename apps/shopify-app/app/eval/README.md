@@ -162,13 +162,15 @@ Constructor-bar pass bar (enforced as failing tests):
   in `fixtures/constructor-floor.json`. The reported target is 0. YOY-133
   made negated attributes hard exclusions (`attributesExclude`) and the
   bridal form a category-like inclusion (`attributesInclude`), taking the
-  measured leak from 18 appearances / 21 of 30 clean to **1 / 29 of 30**
-  (2026-08-27): every negation and wedding golden (cn05–cn10, co01, co03,
-  co04) is clean. The one remaining appearance is co09 `sneakers for
-  running`, a golden the live classifier routes classic (`expectedRoute:
-  "classic"`) where the keyword engine legitimately matches "White
-  Sneakers Classic" on "sneakers" — no filter exists on that route, so the
-  floor holds at 1 / 96 until the golden's routing is settled.
+  measured leak from 18 appearances / 21 of 30 clean to 1 / 29 of 30
+  (2026-08-27), and the purpose-phrase routing rule (founder decision
+  2026-08-27: "sneakers for running" is purpose, which only the AI path
+  reads, so the shape settles AI deterministically — co09 follows the
+  engine to `expectedRoute: "ai"`, `category: sneakers, occasion: sport`,
+  intents re-recorded live) took it to **0 / 30 of 30** (2026-08-28). The
+  floor is 0 / 100. `fixtures/baseline-hits.json` `routes` commits every
+  golden's route across the three sets and `harness.test.ts` asserts it,
+  so any routing change shows as a diff, never as a silent pass.
 - Overall hit rate ≥ `overallHitRatePercent` in the same file.
 
 ## Regenerating the recordings

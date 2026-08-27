@@ -194,9 +194,11 @@ close-match rescue ever violates it. "Dress for a wedding" is the guest's
 query — dresses for the occasion, bridal gowns excluded — while "wedding
 dress" is the bridal gown itself; the engine keeps the two apart with a
 closed set of category-like attributes (today: bridal) that an intent may
-require or exclude. Measured on the Constructor-bar set: 18 mustNot leaks
-→ 1, the remaining one a classic-routed golden no filter can reach.
-(Implementation: YOY-133.)
+require or exclude. A purpose phrase — "sneakers for running", "שמלה
+לחתונה" — is natural-language intent by definition and always takes the
+AI path, deterministically, because keyword search cannot read purpose.
+Measured on the Constructor-bar set: 19 mustNot leaks → 0, 30 of 30
+goldens clean. (Implementation: YOY-133.)
 
 ## 4. Explicitly out of v1 (Later)
 1. Image-input search ("a shoe like this Prada" + photo). Reuses the

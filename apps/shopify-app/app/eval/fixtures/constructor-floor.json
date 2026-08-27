@@ -1,7 +1,7 @@
 {
-  "$comment": "Constructor-bar floor (YOY-118 AC-3). overallHitRatePercent: the overall hit rate the harness achieved on the committed recordings, rounded down. mustNotViolationsMax / mustNotCleanRatePercent: the measured mustNot leak. YOY-133 (2026-08-27) made negated attributes hard exclusions and the bridal form a category-like inclusion, moving the leak from 19 / 66 to 1 / 96: the one remaining appearance is co09 `sneakers for running`, routed classic by the live classifier (expectedRoute classic), where keyword search legitimately matches `White Sneakers Classic` and no filter exists — it moves to 0 / 100 once that golden's routing is settled. Every value records what the engine does today (NG-2): tighten only from a measured run, never loosen to absorb a regression.",
-  "recordedAt": "2026-08-27",
+  "$comment": "Constructor-bar floor (YOY-118 AC-3). overallHitRatePercent: the overall hit rate the harness achieved on the committed recordings, rounded down. mustNotViolationsMax / mustNotCleanRatePercent: the measured mustNot leak. YOY-133 (2026-08-27/28) made negated attributes hard exclusions, the bridal form a category-like inclusion, and purpose phrases (\"sneakers for running\") a deterministic AI route: 19 / 66 → 0 / 100. Every value records what the engine does today (NG-2): tighten only from a measured run, never loosen to absorb a regression.",
+  "recordedAt": "2026-08-28",
   "overallHitRatePercent": 100,
-  "mustNotViolationsMax": 1,
-  "mustNotCleanRatePercent": 96
+  "mustNotViolationsMax": 0,
+  "mustNotCleanRatePercent": 100
 }
