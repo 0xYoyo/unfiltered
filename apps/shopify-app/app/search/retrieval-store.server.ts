@@ -4,9 +4,93 @@ import type {
   StoreQueryHit,
   StoreQueryRequest,
 } from "@unfiltered/engine";
-import { expandCategoryConstraint } from "@unfiltered/engine";
+import {
+  attributeEvidenceTerms,
+  expandCategoryConstraint,
+} from "@unfiltered/engine";
 
 import { withTenantVectorScan } from "../catalog/hnsw.server";
+
+/**
+ * The text an attribute constraint is judged on (YOY-133): the product's
+ * platform-free snapshot text — title, tags, description — and the
+ * enrichment evidence — `fit`, `styleTags`, and the five vision attribute
+ * values. `concat_ws` skips NULLs, so an unenriched product (the LEFT JOIN
+ * leaves `en` NULL) is judged on its snapshot text alone and a product
+ * with no evidence of a word simply does not match it.
+ */
+const ATTRIBUTE_EVIDENCE_TEXT = `concat_ws(' ', p."title", array_to_string(p."tags", ' '), p."description",
+               en."fit", array_to_string(en."styleTags", ' '), en."sleeveLength", en."neckline",
+               en."garmentLength", en."pattern", en."materialAppearance")`;
+
+/** A letter or digit in either script the catalogs carry: what a whole word may not touch. */
+const WORD_CHAR = "[[:alnum:]\\u05D0-\\u05EA]";
+
+/**
+ * Negation markers, EN + HE: a term right after one of these is a statement
+ * of ABSENCE, not evidence — "ללא צמר" (without wool) on a nylon coat,
+ * "no sleeves" in a tank top's description — and must not exclude the
+ * product from "not wool" / "no sleeves".
+ */
+const NEGATION_MARKERS = ["no", "not", "without", "non", "ללא", "בלי", "לא"];
+
+function escapeRegex(term: string): string {
+  return term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * The POSIX-ARE pattern that is evidence of one attribute word (YOY-133),
+ * bound as a parameter and matched case-insensitively (`~*`) against
+ * `ATTRIBUTE_EVIDENCE_TEXT`. Every surface form of the word from the
+ * engine's lexicon (EN and HE; the word itself, singular and plural, when
+ * unlisted) matches as a WHOLE word — "sleeveless" is not "sleeves",
+ * "Sleeveless Linen Tank Top" survives "no sleeves" — optionally carrying
+ * one attached Hebrew preposition/article (מצמר, העור, ובצמר), and never
+ * when it follows a negation marker or reads "<term>-free". Null for a
+ * word the lexicon cannot turn into a term (an empty or multi-word value),
+ * which the caller skips: a filter that can match nothing must not be
+ * applied. Exported for the classic store, so the two never drift.
+ */
+export function attributeEvidencePattern(word: string): string | null {
+  const terms = attributeEvidenceTerms(word);
+  if (terms.length === 0) {
+    return null;
+  }
+  const negated = `(^|[^${WORD_CHAR.slice(1)})(${NEGATION_MARKERS.join("|")})[ -]`;
+  return (
+    `(?<!${WORD_CHAR})(?<!${negated})` +
+    `(ו?[בכלמהש])?(${terms.map(escapeRegex).join("|")})` +
+    `(?!${WORD_CHAR})(?!-free)`
+  );
+}
+
+/**
+ * The WHERE predicates for an intent's attribute constraints (YOY-133),
+ * identical in both stores: one `NOT (evidence ~* pattern)` per excluded
+ * word — absent evidence passes, as for every enrichment constraint — and
+ * one `(evidence ~* pattern)` per required category-like word, which is
+ * evidence-required exactly as a category is. `param` binds each pattern
+ * and returns its placeholder.
+ */
+export function attributeConstraintSql(
+  constraints: { attributesExclude: string[]; attributesInclude: string[] },
+  param: (value: unknown) => string,
+): string[] {
+  const predicates: string[] = [];
+  for (const word of constraints.attributesExclude) {
+    const pattern = attributeEvidencePattern(word);
+    if (pattern !== null) {
+      predicates.push(`NOT (${ATTRIBUTE_EVIDENCE_TEXT} ~* ${param(pattern)})`);
+    }
+  }
+  for (const word of constraints.attributesInclude) {
+    const pattern = attributeEvidencePattern(word);
+    if (pattern !== null) {
+      predicates.push(`(${ATTRIBUTE_EVIDENCE_TEXT} ~* ${param(pattern)})`);
+    }
+  }
+  return predicates;
+}
 
 /**
  * The colour-evidence flag's SQL (YOY-67 AC-5, YOY-110 AC-3): under an
@@ -56,6 +140,11 @@ export function colorUnknownSql(constraints: {
  * colour is one of `colorsInclude` when the query names colours, else the
  * best-ranked member. A row with an empty `familyKey` (pre-YOY-117) is its
  * own family; the collapse never hides a different product.
+ *
+ * Negated attributes are hard exclusions and category-like attributes hard
+ * inclusions (YOY-133; PRD §3 amendment (d)): `attributeConstraintSql`
+ * above judges each word on the product's text and enrichment evidence,
+ * whole-word, EN and HE, a negated mention never counting as evidence.
  *
  * Vector comparisons cast both sides through the query vector's dimension, so
  * stored vectors of a different dimension fail loudly instead of comparing
@@ -127,6 +216,7 @@ export function createPgVectorRetrievalStore(db: PrismaClient): RetrievalStore {
                  FROM json_array_elements_text(${param(JSON.stringify(constraints.colorsInclude))}::json) v)))`,
         );
       }
+      where.push(...attributeConstraintSql(constraints, param));
       if (constraints.colorsExclude.length > 0) {
         // Exclusion by PRIMARY colour (YOY-110 AC-3): a product is dropped
         // only when its primary/displayed colour is an excluded one; the

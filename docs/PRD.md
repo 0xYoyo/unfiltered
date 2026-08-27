@@ -181,6 +181,23 @@ five colourways is one result, not five; the card shows the colourway the
 query asked for (or the primary colourway when the query named none).
 (Implementation: YOY-117.)
 
+(d) **A negated attribute is a hard exclusion, and "dress for a wedding ≠
+wedding dress".** (Added 2026-08-27 by YOY-133.) "No sleeves", "not
+wool", "not leather", "בלי שרוולים", "לא מצמר" exclude every product
+whose evidence — its title, tags, description, or enrichment — carries
+the negated attribute, in any language the catalog is written in; a
+product with no evidence of the attribute stays (unknown passes), and a
+product whose only mention is itself a negation ("ללא צמר", "wool-free")
+stays too. The negation is a filter, never a ranking preference, it shows
+as a removable chip ("Not wool ×") like a colour exclusion, and no
+close-match rescue ever violates it. "Dress for a wedding" is the guest's
+query — dresses for the occasion, bridal gowns excluded — while "wedding
+dress" is the bridal gown itself; the engine keeps the two apart with a
+closed set of category-like attributes (today: bridal) that an intent may
+require or exclude. Measured on the Constructor-bar set: 18 mustNot leaks
+→ 1, the remaining one a classic-routed golden no filter can reach.
+(Implementation: YOY-133.)
+
 ## 4. Explicitly out of v1 (Later)
 1. Image-input search ("a shoe like this Prada" + photo). Reuses the
    vision infrastructure built in the vision milestone.

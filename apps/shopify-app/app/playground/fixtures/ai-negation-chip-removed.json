@@ -1,0 +1,73 @@
+{
+  "searchId": "fixture-ai-negation-chip-removed",
+  "route": "ai",
+  "degraded": false,
+  "results": [
+    {
+      "productId": "p-coat-3",
+      "title": "Wool Winter Coat",
+      "url": "https://example.test/products/p-coat-3",
+      "imageUrl": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 4'><rect width='4' height='4' fill='%23c4beb5'/></svg>",
+      "priceMin": 480,
+      "priceMax": 480,
+      "currencyCode": "ILS",
+      "available": true,
+      "colorUnknown": false
+    },
+    {
+      "productId": "p-coat-1",
+      "title": "Puffer Winter Coat",
+      "url": "https://example.test/products/p-coat-1",
+      "imageUrl": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 4'><rect width='4' height='4' fill='%23d9d4cd'/></svg>",
+      "priceMin": 260,
+      "priceMax": 260,
+      "currencyCode": "ILS",
+      "available": true,
+      "colorUnknown": false
+    },
+    {
+      "productId": "p-coat-2",
+      "title": "Camel Overcoat",
+      "url": "https://example.test/products/p-coat-2",
+      "imageUrl": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 4'><rect width='4' height='4' fill='%23cfc9c1'/></svg>",
+      "priceMin": 540,
+      "priceMax": 540,
+      "currencyCode": "ILS",
+      "available": true,
+      "colorUnknown": false
+    }
+  ],
+  "chips": [
+    {
+      "field": "category",
+      "value": "coat"
+    }
+  ],
+  "intent": {
+    "category": "coat",
+    "priceMin": null,
+    "priceMax": null,
+    "currency": "ILS",
+    "colorsInclude": [],
+    "colorsExclude": [],
+    "attributesExclude": [],
+    "attributesInclude": [],
+    "occasion": null,
+    "size": null,
+    "availabilityRequired": false,
+    "softAttributes": [
+      "winter"
+    ]
+  },
+  "details": {
+    "routeReason": "resolved-intent",
+    "latencyMs": 143,
+    "limited": null,
+    "stages": {
+      "embed": 0,
+      "retrieve": 58,
+      "hydrate": 9
+    },
+    "intentTier": null
+  }
+}

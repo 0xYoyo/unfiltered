@@ -42,6 +42,8 @@ export interface ProxyChip {
     | "priceMax"
     | "colorsInclude"
     | "colorsExclude"
+    | "attributesExclude"
+    | "attributesInclude"
     | "occasion"
     | "availability";
   value: string;

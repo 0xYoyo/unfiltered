@@ -9,7 +9,10 @@ import type { JsonSchema, LlmClient } from "./index.js";
 import {
   CANONICAL_CATEGORIES,
   CANONICAL_OCCASIONS,
+  CATEGORY_LIKE_ATTRIBUTES,
+  normalizeAttributeWord,
   normalizeCategory,
+  normalizeCategoryLikeAttribute,
   normalizeOccasion,
 } from "./taxonomy.js";
 
@@ -32,6 +35,22 @@ export interface Intent {
   colorsInclude: string[];
   /** Colors the shopper explicitly rejects. */
   colorsExclude: string[];
+  /**
+   * Non-colour attributes the shopper ruled out (YOY-133): lowercase
+   * English words — a material, a sleeve, a style — "no sleeves" →
+   * `["sleeves"]`, "not wool" → `["wool"]`, "ז'קט לא מעור" → `["leather"]`.
+   * A hard exclusion, never a preference: both stores drop a product whose
+   * evidence carries the word. Always present, possibly empty.
+   */
+  attributesExclude: string[];
+  /**
+   * Category-like attributes the item must be (YOY-133 AC-3), from the
+   * closed `CATEGORY_LIKE_ATTRIBUTES` set: "wedding dress" / "שמלת כלה" is
+   * `["bridal"]`, while "dress for a wedding" is the guest's query and
+   * carries `attributesExclude: ["bridal"]` instead. A hard, evidence-
+   * required inclusion. Always present, possibly empty.
+   */
+  attributesInclude: string[];
   /** Occasion the item is for, e.g. "wedding". */
   occasion?: string;
   /** Requested size, e.g. "M" or "42". */
@@ -70,6 +89,15 @@ export const INTENT_SCHEMA: JsonSchema = {
     currency: { type: ["string", "null"] },
     colorsInclude: { type: "array", items: { type: "string" } },
     colorsExclude: { type: "array", items: { type: "string" } },
+    attributesExclude: { type: "array", items: { type: "string" } },
+    // Pinned to the closed category-like set (YOY-133 AC-3): a positive
+    // evidence filter the model could invent would kill recall on a sparse
+    // catalog, so the schema lets it require only what behaves like a
+    // category.
+    attributesInclude: {
+      type: "array",
+      items: { type: "string", enum: [...CATEGORY_LIKE_ATTRIBUTES] },
+    },
     occasion: {
       type: ["string", "null"],
       enum: [...CANONICAL_OCCASIONS, null],
@@ -82,6 +110,8 @@ export const INTENT_SCHEMA: JsonSchema = {
   required: [
     "colorsInclude",
     "colorsExclude",
+    "attributesExclude",
+    "attributesInclude",
     "availabilityRequired",
     "softAttributes",
     "confidence",
@@ -209,9 +239,26 @@ function serializePreviousIntent(intent: Intent): string {
   // not a constraint; it stays out of the prompt so the block reads as the
   // shopper's intent alone (and stays byte-identical to pre-YOY-116 prompts
   // for the same intent).
-  const { confidence: _confidence, ...previous } = intent;
+  const {
+    confidence: _confidence,
+    attributesExclude = [],
+    attributesInclude = [],
+    ...previous
+  } = intent;
   void _confidence;
-  return JSON.stringify(previous, null, 2);
+  // The attribute arrays (YOY-133) ride the block only when non-empty, so a
+  // previous intent recorded before they existed — a stored JSON intent
+  // that never went through parseIntent carries none — serializes
+  // byte-identical to its pre-YOY-133 form.
+  return JSON.stringify(
+    {
+      ...previous,
+      ...(attributesExclude.length > 0 ? { attributesExclude } : {}),
+      ...(attributesInclude.length > 0 ? { attributesInclude } : {}),
+    },
+    null,
+    2,
+  );
 }
 
 /**
@@ -352,6 +399,16 @@ export function carryOverRefinementConstraints(
       intent.colorsExclude.length > 0
         ? intent.colorsExclude
         : previousIntent.colorsExclude,
+    // Negated and category-like attributes are constraints too (YOY-133):
+    // "same but cheaper" after "not wool" keeps "not wool".
+    attributesExclude:
+      intent.attributesExclude.length > 0
+        ? intent.attributesExclude
+        : (previousIntent.attributesExclude ?? []),
+    attributesInclude:
+      intent.attributesInclude.length > 0
+        ? intent.attributesInclude
+        : (previousIntent.attributesInclude ?? []),
   };
 }
 
@@ -454,6 +511,13 @@ function buildIntentPrompt(query: string, previousIntent?: Intent): string {
     "- priceMin / priceMax: numeric bounds; currency as ISO 4217 when named.",
     '- colorsInclude / colorsExclude: colors wanted / rejected ("not black" →',
     "  exclude black).",
+    "- attributesExclude: non-colour attributes ruled out — a material, sleeve,",
+    '  or style — as lowercase English words: "no sleeves" → ["sleeves"],',
+    '  "not wool" / "לא מצמר" → ["wool"], "not leather" → ["leather"]; a',
+    '  guest\'s "dress for a wedding" / "שמלה לחתונה" → ["bridal"]. Never a',
+    "  colour, never a softAttribute.",
+    '- attributesInclude: ["bridal"] only for a bridal gown itself ("wedding',
+    '  dress", "bridal gown", "שמלת כלה"); otherwise [].',
     `- occasion: one of ${CANONICAL_OCCASIONS.join(", ")} —`,
     "  an event the shopper dresses FOR (a wedding, the office, a night out).",
     "  Null when the query states no occasion.",
@@ -488,6 +552,21 @@ function isStringArray(value: unknown): value is string[] {
   return (
     Array.isArray(value) && value.every((item) => typeof item === "string")
   );
+}
+
+function isOptionalStringArray(value: unknown): value is string[] | undefined {
+  return value === undefined || value === null || isStringArray(value);
+}
+
+/** Lexicon-normalized, de-duplicated attribute words; empties and phrases drop. */
+function normalizedAttributeWords(words: string[]): string[] {
+  return [
+    ...new Set(
+      words
+        .map(normalizeAttributeWord)
+        .filter((word): word is string => word !== null),
+    ),
+  ];
 }
 
 /**
@@ -526,6 +605,8 @@ export function parseIntent(value: unknown): Intent | null {
     currency,
     colorsInclude,
     colorsExclude,
+    attributesExclude,
+    attributesInclude,
     occasion,
     size,
     availabilityRequired,
@@ -542,6 +623,8 @@ export function parseIntent(value: unknown): Intent | null {
     !isOptionalString(currency) ||
     !isStringArray(colorsInclude) ||
     !isStringArray(colorsExclude) ||
+    !isOptionalStringArray(attributesExclude) ||
+    !isOptionalStringArray(attributesInclude) ||
     !isOptionalString(occasion) ||
     !isOptionalString(size) ||
     typeof availabilityRequired !== "boolean" ||
@@ -557,6 +640,19 @@ export function parseIntent(value: unknown): Intent | null {
     currency: currency ?? undefined,
     colorsInclude,
     colorsExclude,
+    // Optional at parse (YOY-133): the schema requires both arrays of the
+    // model, but every recording and stored intent from before them carries
+    // none, and an absent array means "nothing ruled out / required".
+    // Words fold onto the evidence lexicon's keys and de-duplicate; an
+    // include outside the closed category-like set drops.
+    attributesExclude: normalizedAttributeWords(attributesExclude ?? []),
+    attributesInclude: [
+      ...new Set(
+        (attributesInclude ?? [])
+          .map(normalizeCategoryLikeAttribute)
+          .filter((word): word is NonNullable<typeof word> => word !== null),
+      ),
+    ],
     occasion: normalizedConstraint(occasion ?? undefined, normalizeOccasion),
     // Size casing is canonicalized at parse (YOY-52): the model answers "m"
     // or "M" interchangeably, and downstream comparison must not care.

@@ -5,6 +5,7 @@ import {
   fixtureOutcome,
   playgroundFixturesEnabled,
   selectFixture,
+  selectFixtureForRemoval,
 } from "./fixture-mode.server";
 
 /**
@@ -52,6 +53,14 @@ describe("fixture selection by query text", () => {
     expect(selectFixture("ai delayed", false)).toBe("ai-delayed");
     expect(selectFixture("degraded", false)).toBe("degraded");
     expect(selectFixture("ai color beige", false)).toBe("color-unknown");
+    // A negated attribute (YOY-133 AC-5), and its removal echo.
+    expect(selectFixture("ai winter coat not wool", false)).toBe("ai-negation");
+    expect(selectFixture("ai winter coat not wool", true)).toBe("preview");
+    expect(selectFixtureForRemoval({ field: "attributesExclude", value: "wool" })).toBe(
+      "ai-negation-chip-removed",
+    );
+    expect(selectFixtureForRemoval({ field: "colorsExclude", value: "black" })).toBe("ai-chip-removed");
+    expect(selectFixtureForRemoval({ field: "category", value: "coat" })).toBe("ai");
     // A preview is classic-only however it is worded.
     expect(selectFixture("ai elegant dress", true)).toBe("preview");
     expect(selectFixture("ai zero hit", true)).toBe("preview");

@@ -11,6 +11,7 @@ import {
   createRetriever,
   DEFAULT_INTENT_ESCALATION_THRESHOLD,
   expandCategoryConstraint,
+  parseIntent,
   type Intent,
   type IntentEscalation,
   type IntentTier,
@@ -211,6 +212,13 @@ export interface GoldenConstraints {
   priceMax: number | null;
   colorsInclude: string[];
   colorsExclude: string[];
+  /**
+   * Negated / required attribute words (YOY-133); absent on every golden
+   * written before them, which reads as none. The Constructor-bar goldens
+   * pin the negation outcome through `mustNotProductIds` instead.
+   */
+  attributesExclude?: string[];
+  attributesInclude?: string[];
   occasion: string | null;
   availabilityRequired: boolean;
 }
@@ -503,7 +511,16 @@ export function loadGoldens(): Golden[] {
 }
 
 export function loadRefinementGoldens(): RefinementGolden[] {
-  return readJson<RefinementGolden[]>("refinement-goldens.json");
+  // The committed previous intents predate the attribute arrays (YOY-133)
+  // and carry wire-format nulls; parsing them exactly as the proxy parses an
+  // echoed intent gives the extractor the same Intent production would see.
+  return readJson<RefinementGolden[]>("refinement-goldens.json").map((golden) => {
+    const previousIntent = parseIntent(golden.previousIntent);
+    if (previousIntent === null) {
+      throw new Error(`eval: refinement golden ${golden.id} carries an invalid previousIntent`);
+    }
+    return { ...golden, previousIntent };
+  });
 }
 
 /**

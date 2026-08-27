@@ -78,6 +78,8 @@ const CHIP_FIELDS: ReadonlySet<string> = new Set([
   "priceMax",
   "colorsInclude",
   "colorsExclude",
+  "attributesExclude",
+  "attributesInclude",
   "occasion",
   "availability",
 ]);
@@ -268,6 +270,8 @@ export function removeChipFromIntent(intent: Intent, chip: ProxyChip): Intent {
     ...intent,
     colorsInclude: [...intent.colorsInclude],
     colorsExclude: [...intent.colorsExclude],
+    attributesExclude: [...intent.attributesExclude],
+    attributesInclude: [...intent.attributesInclude],
     softAttributes: [...intent.softAttributes],
   };
   switch (chip.field) {
@@ -288,6 +292,16 @@ export function removeChipFromIntent(intent: Intent, chip: ProxyChip): Intent {
     case "colorsExclude":
       next.colorsExclude = next.colorsExclude.filter(
         (color) => color !== chip.value,
+      );
+      break;
+    case "attributesExclude":
+      next.attributesExclude = next.attributesExclude.filter(
+        (word) => word !== chip.value,
+      );
+      break;
+    case "attributesInclude":
+      next.attributesInclude = next.attributesInclude.filter(
+        (word) => word !== chip.value,
       );
       break;
     case "occasion":
@@ -327,6 +341,10 @@ export interface ProxyIntent {
   currency: string | null;
   colorsInclude: string[];
   colorsExclude: string[];
+  /** Negated attribute words (YOY-133); always present, possibly empty. */
+  attributesExclude: string[];
+  /** Required category-like attributes (YOY-133); always present, possibly empty. */
+  attributesInclude: string[];
   occasion: string | null;
   size: string | null;
   availabilityRequired: boolean;
@@ -384,6 +402,8 @@ function serializeIntent(intent: Intent): ProxyIntent {
     currency: intent.currency ?? null,
     colorsInclude: intent.colorsInclude,
     colorsExclude: intent.colorsExclude,
+    attributesExclude: intent.attributesExclude,
+    attributesInclude: intent.attributesInclude,
     occasion: intent.occasion ?? null,
     size: intent.size ?? null,
     availabilityRequired: intent.availabilityRequired,

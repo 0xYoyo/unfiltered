@@ -237,6 +237,46 @@ test.describe("refinement (AC-2, AC-3, verify 2 and 3)", () => {
   });
 });
 
+test.describe("negated attributes are chips too (YOY-133 AC-5, verify 2)", () => {
+  test("a negation renders as a 'Not wool' chip, and removing it re-runs without the word", async ({
+    page,
+  }) => {
+    const urls = recordSearchRequests(page);
+    await page.goto("/");
+    await submit(page, "ai winter coat not wool");
+    await expect(chips(page)).toHaveCount(2);
+    await expect(chips(page)).toHaveText(["coat×", "Not wool×"]);
+    await expect(chips(page).nth(1)).toHaveAttribute("data-chip-field", "attributesExclude");
+    await expect(cards(page)).toHaveCount(2);
+    // No wool coat on the page while the negation stands.
+    await expect(cards(page).filter({ hasText: "Wool Winter Coat" })).toHaveCount(0);
+
+    await chips(page).nth(1).click();
+
+    await expect.poll(() => submitted(urls).length).toBe(2);
+    const removal = submitted(urls)[1];
+    expect(JSON.parse(removal.searchParams.get("removeChip") ?? "null")).toEqual({
+      field: "attributesExclude",
+      value: "wool",
+    });
+    const previous = JSON.parse(removal.searchParams.get("previousIntent") ?? "null");
+    expect(previous.attributesExclude).toEqual(["wool"]);
+    // Re-rendered from the response: the chip is gone and the wool coat is back.
+    await expect(chips(page)).toHaveCount(1);
+    await expect(cards(page)).toHaveCount(3);
+    await expect(cards(page).filter({ hasText: "Wool Winter Coat" })).toHaveCount(1);
+  });
+
+  test("the negation chip is localized in Hebrew chrome, RTL", async ({ page }) => {
+    await page.goto("/?lang=he");
+    await submit(page, "ai winter coat not wool");
+    await expect(chips(page)).toHaveCount(2);
+    await expect(chips(page).nth(0)).toContainText("מעיל");
+    await expect(chips(page).nth(1)).toContainText("לא צמר");
+    await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
+  });
+});
+
 test.describe("zero hit, degraded, and colorUnknown (AC-4, verify 4)", () => {
   test("an AI zero hit names what did not match and offers close matches", async ({
     page,

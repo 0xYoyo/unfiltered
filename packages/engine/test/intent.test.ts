@@ -59,6 +59,8 @@ const scenarios: RecordedScenario[] = [
       currency: null,
       colorsInclude: [],
       colorsExclude: ["black"],
+      attributesExclude: [],
+      attributesInclude: [],
       occasion: "wedding",
       size: null,
       availabilityRequired: false,
@@ -72,6 +74,8 @@ const scenarios: RecordedScenario[] = [
       currency: undefined,
       colorsInclude: [],
       colorsExclude: ["black"],
+      attributesExclude: [],
+      attributesInclude: [],
       occasion: "wedding",
       size: undefined,
       availabilityRequired: false,
@@ -89,6 +93,8 @@ const scenarios: RecordedScenario[] = [
       currency: null,
       colorsInclude: [],
       colorsExclude: ["שחור"],
+      attributesExclude: [],
+      attributesInclude: [],
       occasion: "wedding",
       size: null,
       availabilityRequired: false,
@@ -102,6 +108,8 @@ const scenarios: RecordedScenario[] = [
       currency: undefined,
       colorsInclude: [],
       colorsExclude: ["שחור"],
+      attributesExclude: [],
+      attributesInclude: [],
       occasion: "wedding",
       size: undefined,
       availabilityRequired: false,
@@ -119,6 +127,8 @@ const scenarios: RecordedScenario[] = [
       currency: null,
       colorsInclude: [],
       colorsExclude: [],
+      attributesExclude: [],
+      attributesInclude: [],
       occasion: "wedding",
       size: "M",
       availabilityRequired: true,
@@ -132,6 +142,8 @@ const scenarios: RecordedScenario[] = [
       currency: undefined,
       colorsInclude: [],
       colorsExclude: [],
+      attributesExclude: [],
+      attributesInclude: [],
       occasion: "wedding",
       size: "M",
       availabilityRequired: true,
@@ -149,6 +161,8 @@ const scenarios: RecordedScenario[] = [
       currency: null,
       colorsInclude: [],
       colorsExclude: [],
+      attributesExclude: [],
+      attributesInclude: [],
       occasion: null,
       size: null,
       availabilityRequired: false,
@@ -162,6 +176,8 @@ const scenarios: RecordedScenario[] = [
       currency: undefined,
       colorsInclude: [],
       colorsExclude: [],
+      attributesExclude: [],
+      attributesInclude: [],
       occasion: undefined,
       size: undefined,
       availabilityRequired: false,
@@ -500,6 +516,8 @@ describe("parseIntent", () => {
       parseIntent({
         colorsInclude: [],
         colorsExclude: [],
+        attributesExclude: [],
+        attributesInclude: [],
         availabilityRequired: false,
         softAttributes: ["linen"],
       }),
@@ -510,6 +528,8 @@ describe("parseIntent", () => {
       currency: undefined,
       colorsInclude: [],
       colorsExclude: [],
+      attributesExclude: [],
+      attributesInclude: [],
       occasion: undefined,
       size: undefined,
       availabilityRequired: false,
@@ -524,6 +544,8 @@ describe("deterministic comparative enforcement (YOY-52 AC-15)", () => {
     return {
       colorsInclude: [],
       colorsExclude: [],
+      attributesExclude: [],
+      attributesInclude: [],
       availabilityRequired: false,
       softAttributes: [],
       ...overrides,
@@ -655,6 +677,8 @@ describe("deterministic comparative enforcement (YOY-52 AC-15)", () => {
       priceMax: 400,
       colorsInclude: [],
       colorsExclude: ["black"],
+      attributesExclude: [],
+      attributesInclude: [],
       occasion: "wedding",
       availabilityRequired: false,
       softAttributes: ["elegant"],
@@ -668,6 +692,8 @@ describe("deterministic comparative enforcement (YOY-52 AC-15)", () => {
       currency: null,
       colorsInclude: [],
       colorsExclude: ["black"],
+      attributesExclude: [],
+      attributesInclude: [],
       occasion: "wedding",
       size: null,
       availabilityRequired: false,
@@ -692,6 +718,8 @@ describe("deterministic comparative enforcement (YOY-52 AC-15)", () => {
       currency: null,
       colorsInclude: [],
       colorsExclude: [],
+      attributesExclude: [],
+      attributesInclude: [],
       occasion: null,
       size: null,
       availabilityRequired: false,
@@ -736,6 +764,8 @@ describe("deterministic constraint carry-over (YOY-52 run-5 directive)", () => {
     return {
       colorsInclude: [],
       colorsExclude: [],
+      attributesExclude: [],
+      attributesInclude: [],
       availabilityRequired: false,
       softAttributes: [],
       ...overrides,
@@ -746,6 +776,8 @@ describe("deterministic constraint carry-over (YOY-52 run-5 directive)", () => {
     category: "dress",
     priceMax: 400,
     colorsExclude: ["black"],
+    attributesExclude: [],
+    attributesInclude: [],
     occasion: "wedding",
     softAttributes: ["elegant"],
   });
@@ -770,6 +802,8 @@ describe("deterministic constraint carry-over (YOY-52 run-5 directive)", () => {
         priceMax: 250,
         colorsInclude: ["red"],
         colorsExclude: ["black"],
+        attributesExclude: [],
+        attributesInclude: [],
         occasion: "evening",
       }),
     );
@@ -944,6 +978,8 @@ describe("confidence (YOY-116 AC-1)", () => {
     const base = {
       colorsInclude: [],
       colorsExclude: [],
+      attributesExclude: [],
+      attributesInclude: [],
       availabilityRequired: false,
       softAttributes: [],
     };
@@ -959,6 +995,8 @@ describe("confidence (YOY-116 AC-1)", () => {
     const base = {
       colorsInclude: [],
       colorsExclude: [],
+      attributesExclude: [],
+      attributesInclude: [],
       availabilityRequired: false,
       softAttributes: [],
     };
@@ -970,6 +1008,8 @@ describe("confidence (YOY-116 AC-1)", () => {
     const { llm, calls } = llmStub({
       colorsInclude: [],
       colorsExclude: [],
+      attributesExclude: [],
+      attributesInclude: [],
       availabilityRequired: false,
       softAttributes: [],
       outcome: "refinement",
@@ -979,6 +1019,8 @@ describe("confidence (YOY-116 AC-1)", () => {
       category: "dress",
       colorsInclude: [],
       colorsExclude: [],
+      attributesExclude: [],
+      attributesInclude: [],
       availabilityRequired: false,
       softAttributes: ["elegant"],
       confidence: 0.4,
@@ -991,5 +1033,89 @@ describe("confidence (YOY-116 AC-1)", () => {
     const block = prompt.slice(prompt.indexOf("Previous intent:"));
     expect(block).not.toContain("confidence");
     expect(block).toContain('"category": "dress"');
+  });
+});
+
+describe("negated and category-like attributes (YOY-133 AC-1)", () => {
+  const base = {
+    category: "coat",
+    priceMin: null,
+    priceMax: null,
+    currency: null,
+    colorsInclude: [],
+    colorsExclude: [],
+    occasion: null,
+    size: null,
+    availabilityRequired: false,
+    softAttributes: ["winter"],
+    confidence: 0.9,
+  };
+
+  it("the schema requires both arrays and pins attributesInclude to the category-like set", () => {
+    expect(INTENT_SCHEMA.required).toContain("attributesExclude");
+    expect(INTENT_SCHEMA.required).toContain("attributesInclude");
+    const properties = INTENT_SCHEMA.properties as Record<string, { type: string; items: Record<string, unknown> }>;
+    expect(properties.attributesExclude).toEqual({ type: "array", items: { type: "string" } });
+    expect(properties.attributesInclude).toEqual({
+      type: "array",
+      items: { type: "string", enum: ["bridal"] },
+    });
+    expect(REFINEMENT_INTENT_SCHEMA.required).toContain("attributesExclude");
+  });
+
+  it("parses the arrays, folding words onto the lexicon and de-duplicating", () => {
+    const intent = parseIntent({
+      ...base,
+      attributesExclude: ["Wool", "woollen", "sleeve", "polyester", ""],
+      attributesInclude: [],
+    })!;
+    expect(intent.attributesExclude).toEqual(["wool", "sleeves", "polyester"]);
+    expect(intent.attributesInclude).toEqual([]);
+  });
+
+  it("treats absent or null arrays as empty — every recording before YOY-133 carries none", () => {
+    const intent = parseIntent(base)!;
+    expect(intent.attributesExclude).toEqual([]);
+    expect(intent.attributesInclude).toEqual([]);
+    expect(parseIntent({ ...base, attributesExclude: null, attributesInclude: null })!.attributesExclude).toEqual([]);
+  });
+
+  it("drops an include outside the closed set and rejects wrong types", () => {
+    expect(parseIntent({ ...base, attributesInclude: ["bridal", "linen"] })!.attributesInclude).toEqual(["bridal"]);
+    expect(parseIntent({ ...base, attributesExclude: "wool" })).toBeNull();
+    expect(parseIntent({ ...base, attributesInclude: [7] })).toBeNull();
+  });
+
+  it("prompts for attributesExclude and attributesInclude, keeping the query line last", async () => {
+    const { llm, calls } = llmStub({ ...base, attributesExclude: ["wool"], attributesInclude: [] });
+    await createIntentExtractor({ llm }).extract("winter coat, not wool");
+    const prompt = calls[0]!.prompt;
+    expect(prompt).toContain("attributesExclude");
+    expect(prompt).toContain('"not wool" / "לא מצמר" → ["wool"]');
+    expect(prompt).toContain("attributesInclude");
+    expect(prompt).toContain("שמלת כלה");
+    expect(prompt.split("\n").at(-1)).toBe("Query: winter coat, not wool");
+  });
+
+  it("carries both arrays over a refinement that does not restate them, and lets a restated one win", () => {
+    const previous = parseIntent({ ...base, attributesExclude: ["wool"], attributesInclude: [] })!;
+    const answer = parseIntent({ ...base, softAttributes: ["winter", "cheap"] })!;
+    expect(carryOverRefinementConstraints(previous, answer).attributesExclude).toEqual(["wool"]);
+    const restated = parseIntent({ ...base, attributesExclude: ["leather"] })!;
+    expect(carryOverRefinementConstraints(previous, restated).attributesExclude).toEqual(["leather"]);
+    const bridal = parseIntent({ ...base, category: "dress", attributesInclude: ["bridal"] })!;
+    expect(carryOverRefinementConstraints(bridal, answer).attributesInclude).toEqual(["bridal"]);
+  });
+
+  it("serializes a previous intent without the arrays when they are empty, and with them when not", async () => {
+    const previousEmpty = parseIntent(base)!;
+    const { llm, calls } = llmStub({ ...base, outcome: "refinement" });
+    await createIntentExtractor({ llm }).extract("cheaper", { previousIntent: previousEmpty });
+    expect(calls[0]!.prompt).not.toContain("attributesExclude\":");
+    expect(calls[0]!.prompt).not.toContain('"attributesExclude": [');
+    const previousWool = parseIntent({ ...base, attributesExclude: ["wool"] })!;
+    const second = llmStub({ ...base, outcome: "refinement" });
+    await createIntentExtractor({ llm: second.llm }).extract("cheaper", { previousIntent: previousWool });
+    expect(second.calls[0]!.prompt).toContain('"attributesExclude": [');
   });
 });

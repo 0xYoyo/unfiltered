@@ -10,7 +10,7 @@ Raw material for App Store listing copy and outreach emails. Shipped = M1–M3 s
 | Natural language ("elegant, hides my arms, not black") | Nothing — shopper must translate intent into filter clicks | Full intent extraction → constraints + semantic match | Quality ↑ via M5 vision |
 | Cross-language (HE query, EN catalog) | Zero results, always | Works via AI route (YOY-67 closing the short-query hole) | Mirror direction + more languages post-launch |
 | Filters | Input the shopper must operate | Output — inferred, shown as removable chips | Truthful-chips labeling (YOY-67) |
-| Negation / price phrasing ("not black, under 400") | Impossible in a search bar | Hard constraints, code-enforced | — |
+| Negation / price phrasing ("not black, under 400", "not wool", "no sleeves") | Impossible in a search bar | Hard constraints, code-enforced — colours, price, and (YOY-133) negated materials/sleeves/styles, EN + HE; "dress for a wedding ≠ wedding dress". Constructor bar (30 hard queries, 15 EN + 15 HE): 100 % hit, 0 hard-constraint violations, 1 mustNot leak (29/30 clean; was 18 / 21 of 30 before YOY-133) | 0 leaks once the last classic-routed golden is settled |
 | Follow-ups ("same but cheaper") | Start over from scratch | Deterministic refinement merge, comparative enforcement | — |
 | Zero-hit state | Dead "no results" | Chips kept + close-match rescue, cross-language vector fallback | Escalate-on-empty (YOY-67) |
 | Understanding thin catalogs | Only matches text that exists | LLM attribute enrichment at ingestion | M5 vision: image-derived attributes |

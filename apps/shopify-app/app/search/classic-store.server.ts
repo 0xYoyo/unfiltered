@@ -8,7 +8,10 @@ import type {
 } from "@unfiltered/engine";
 import { expandCategoryConstraint, normalizeQuery } from "@unfiltered/engine";
 
-import { colorUnknownSql } from "./retrieval-store.server";
+import {
+  attributeConstraintSql,
+  colorUnknownSql,
+} from "./retrieval-store.server";
 
 /**
  * Postgres/pg_trgm implementation of the engine's ClassicSearchStore port
@@ -39,7 +42,9 @@ import { colorUnknownSql } from "./retrieval-store.server";
  * because the orchestrator falls back from one to the other: unknown
  * enrichment passes positive occasion/color constraints, category stays
  * evidence-required and expands through the taxonomy's category groups, a
- * colour exclusion applies to the primary colour only (YOY-110), and a
+ * colour exclusion applies to the primary colour only (YOY-110), negated
+ * attributes exclude and category-like attributes require on the same
+ * text-and-enrichment evidence (YOY-133, `attributeConstraintSql`), and a
  * price cap compares against `priceMin`. Constraint-only requests (no
  * query text) filter without ranking and score every hit 0, ordered
  * deterministically by productId.
@@ -76,6 +81,8 @@ export const SEARCH_TEXT = `catalog_search_text(p."title", p."tags", p."vendor",
 const NO_CONSTRAINTS: RetrievalConstraints = {
   colorsInclude: [],
   colorsExclude: [],
+  attributesExclude: [],
+  attributesInclude: [],
   availableOnly: false,
 };
 
@@ -203,6 +210,7 @@ export function buildClassicSearchSql(request: ClassicSearchRequest): {
              FROM json_array_elements_text(${param(JSON.stringify(constraints.colorsInclude))}::json) v)))`,
     );
   }
+  where.push(...attributeConstraintSql(constraints, param));
   if (constraints.colorsExclude.length > 0) {
     // Exclusion by PRIMARY colour (YOY-110 AC-3), mirroring the pgvector
     // store: only the primary/displayed colour can violate an exclusion,

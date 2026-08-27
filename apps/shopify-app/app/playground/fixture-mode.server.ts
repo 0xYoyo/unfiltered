@@ -13,6 +13,8 @@
  */
 
 import aiChipRemovedFixture from "./fixtures/ai-chip-removed.json";
+import aiNegationChipRemovedFixture from "./fixtures/ai-negation-chip-removed.json";
+import aiNegationFixture from "./fixtures/ai-negation.json";
 import aiReuseFixture from "./fixtures/ai-reuse.json";
 import aiZeroHitFixture from "./fixtures/ai-zero-hit.json";
 import aiFixture from "./fixtures/ai.json";
@@ -37,6 +39,9 @@ export type PlaygroundFixtureName =
   // YOY-93: the AI states.
   | "ai"
   | "ai-chip-removed"
+  // YOY-133: a negated attribute as a chip, and its removal echo.
+  | "ai-negation"
+  | "ai-negation-chip-removed"
   | "ai-zero-hit"
   | "ai-delayed"
   | "ai-reuse"
@@ -91,6 +96,10 @@ export function selectFixture(
     if (has("color")) {
       return "color-unknown";
     }
+    if (has("wool")) {
+      // A negated attribute (YOY-133 AC-5): "ai winter coat not wool".
+      return "ai-negation";
+    }
     if (has("ai")) {
       return has("delayed") ? "ai-delayed" : "ai";
     }
@@ -139,6 +148,14 @@ export function fixtureOutcome(
         status: 200,
         body: asResponse(aiChipRemovedFixture),
       };
+    case "ai-negation":
+      return { delayMs: 0, status: 200, body: asResponse(aiNegationFixture) };
+    case "ai-negation-chip-removed":
+      return {
+        delayMs: 0,
+        status: 200,
+        body: asResponse(aiNegationChipRemovedFixture),
+      };
     case "ai-reuse":
       return { delayMs: 0, status: 200, body: asResponse(aiReuseFixture) };
     case "ai-zero-hit":
@@ -170,16 +187,25 @@ function asResponse(fixture: unknown): PlaygroundSearchResponse {
  * the products it had excluded back in the set. Serving the unchanged AI
  * fixture would let a broken remove-and-re-render pass its test.
  *
- * Only the `colorsExclude` chip has a recorded echo, because that is the one
- * the specs remove; any other chip falls through to the plain AI fixture
- * rather than pretending to a change the fixture cannot represent.
+ * Only the `colorsExclude` chip and the `attributesExclude` chip (YOY-133)
+ * have recorded echoes, because those are the ones the specs remove; any
+ * other chip falls through to the plain AI fixture rather than pretending
+ * to a change the fixture cannot represent.
  */
 export function selectFixtureForRemoval(
   removeChip: { field: string; value: string } | null,
 ): PlaygroundFixtureName {
-  return removeChip !== null && removeChip.field === "colorsExclude"
-    ? "ai-chip-removed"
-    : "ai";
+  if (removeChip === null) {
+    return "ai";
+  }
+  switch (removeChip.field) {
+    case "colorsExclude":
+      return "ai-chip-removed";
+    case "attributesExclude":
+      return "ai-negation-chip-removed";
+    default:
+      return "ai";
+  }
 }
 
 export function sleep(ms: number): Promise<void> {

@@ -24,6 +24,8 @@ const intent: Intent = {
   currency: undefined,
   colorsInclude: [],
   colorsExclude: ["black"],
+  attributesExclude: [],
+  attributesInclude: [],
   occasion: "wedding",
   size: undefined,
   availabilityRequired: true,
@@ -65,6 +67,8 @@ describe("constraintsFromIntent (AC-1, AC-2)", () => {
       priceMax: 400,
       colorsInclude: [],
       colorsExclude: ["black"],
+      attributesExclude: [],
+      attributesInclude: [],
       occasion: "wedding",
       availableOnly: true,
     });
@@ -89,6 +93,8 @@ describe("composeQueryText", () => {
       category: undefined,
       occasion: undefined,
       colorsExclude: [],
+      attributesExclude: [],
+      attributesInclude: [],
       softAttributes: ["cozy", "warm"],
     };
     expect(composeQueryText(soft)).toBe("cozy\nwarm");
@@ -223,6 +229,8 @@ describe("empty query text (YOY-29 AC-9)", () => {
       currency: undefined,
       colorsInclude: [],
       colorsExclude: ["black"],
+      attributesExclude: [],
+      attributesInclude: [],
       occasion: undefined,
       size: undefined,
       availabilityRequired: true,
@@ -266,11 +274,47 @@ describe("appliedConstraints", () => {
       currency: undefined,
       colorsInclude: [],
       colorsExclude: [],
+      attributesExclude: [],
+      attributesInclude: [],
       occasion: undefined,
       size: undefined,
       availabilityRequired: false,
       softAttributes: ["cozy"],
     };
     expect(appliedConstraints(constraintsFromIntent(soft))).toEqual([]);
+  });
+});
+
+describe("negated and category-like attributes reach the store as filters (YOY-133)", () => {
+  const withAttributes: Intent = {
+    ...intent,
+    attributesExclude: ["wool", "sleeves"],
+    attributesInclude: ["bridal"],
+  };
+
+  it("constraintsFromIntent maps both arrays", () => {
+    expect(constraintsFromIntent(withAttributes)).toMatchObject({
+      attributesExclude: ["wool", "sleeves"],
+      attributesInclude: ["bridal"],
+    });
+  });
+
+  it("appliedConstraints lists one chip per include and per exclude, includes first", () => {
+    const applied = appliedConstraints(constraintsFromIntent(withAttributes));
+    const attributes = applied.filter((entry) => entry.field.startsWith("attributes"));
+    expect(attributes).toEqual([
+      { field: "attributesInclude", value: "bridal" },
+      { field: "attributesExclude", value: "wool" },
+      { field: "attributesExclude", value: "sleeves" },
+    ]);
+  });
+
+  it("composeQueryText embeds the required category-like attribute and never an exclusion", () => {
+    const text = composeQueryText(withAttributes);
+    expect(text.split("\n")).toContain("bridal");
+    expect(text).not.toContain("wool");
+    expect(text).not.toContain("sleeves");
+    // Order: category, occasion, wanted colours, includes, then soft attributes.
+    expect(text.indexOf("bridal")).toBeLessThan(text.indexOf(withAttributes.softAttributes[0]!));
   });
 });

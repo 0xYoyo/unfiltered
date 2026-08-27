@@ -77,11 +77,16 @@ export {
 } from "./intent-escalation.js";
 
 export {
+  ATTRIBUTE_EVIDENCE_TERMS,
+  attributeEvidenceTerms,
   CANONICAL_CATEGORIES,
   CANONICAL_OCCASIONS,
   CATEGORY_GROUPS,
+  CATEGORY_LIKE_ATTRIBUTES,
   expandCategoryConstraint,
+  normalizeAttributeWord,
   normalizeCategory,
+  normalizeCategoryLikeAttribute,
   normalizeOccasion,
   normalizeVisionValue,
   VISION_GARMENT_LENGTHS,
@@ -92,6 +97,7 @@ export {
   VISION_SLEEVE_LENGTHS,
   type CanonicalCategory,
   type CanonicalOccasion,
+  type CategoryLikeAttribute,
   type VisionGarmentLength,
   type VisionMaterialAppearance,
   type VisionNeckline,

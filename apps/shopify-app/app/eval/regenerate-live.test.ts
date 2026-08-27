@@ -94,6 +94,14 @@ const live = process.env.LIVE_LLM_TESTS === "1";
  * EVERY vision answer (`vision.json`) — for a vision prompt/model change —
  * and of the product vectors whose merged text moved with it. The catalog
  * and goldens scopes record only the missing vision answers.
+ *
+ * `REGEN_REQUERY=<golden ids, comma-separated>` (YOY-133) narrows an intent
+ * change to the goldens it changes: under the goldens scope the named
+ * goldens' intent entries — both tiers — are dropped before the missing-
+ * only pass, so exactly those are re-recorded at the current prompt and
+ * schema while every other intent recording stays byte-identical. The
+ * embedding step then records the re-recorded intents' query texts and
+ * drops the vectors nothing references any more, as it always did.
  */
 const scope =
   process.env.REGEN_SCOPE === "lite"
@@ -115,6 +123,13 @@ const scope =
  * accuracy-tier recordings.
  */
 const resume = process.env.REGEN_RESUME === "1";
+/** Golden ids whose intent recordings the goldens scope re-records (YOY-133). */
+const requery = new Set(
+  (process.env.REGEN_REQUERY ?? "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter((id) => id !== ""),
+);
 /** The lite tier is fast by design; a hung call is retried sooner. */
 const LITE_REQUEST_TIMEOUT_MS = 20_000;
 
@@ -1059,8 +1074,17 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
     }
     writeRecording("classification.json", classification.modelId, classification.entries);
 
-    // 3. Accuracy-tier intents: only goldens with no entry yet.
+    // 3. Accuracy-tier intents: only goldens with no entry yet — plus the
+    //    REGEN_REQUERY goldens, whose entries are dropped first (YOY-133).
     const intentRecording = readRecording("intent.json");
+    const requeried = goldens.filter((golden) => requery.has(golden.id));
+    check(
+      requeried.length === requery.size,
+      `REGEN_REQUERY names unknown golden id(s): ${[...requery].filter((id) => !goldens.some((golden) => golden.id === id)).join(", ")}`,
+    );
+    for (const golden of requeried) {
+      delete intentRecording.entries[golden.query];
+    }
     check(
       intentRecording.modelId === models.intentModel,
       `intent.json is ${intentRecording.modelId}, env says ${models.intentModel}; regenerate with REGEN_SCOPE=intent`,
@@ -1103,6 +1127,9 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
       liteRecording.modelId === models.intentLiteModel,
       `intent-lite.json is ${liteRecording.modelId}, env says ${models.intentLiteModel}; regenerate with REGEN_SCOPE=lite`,
     );
+    for (const golden of requeried) {
+      delete liteRecording.entries[golden.query];
+    }
     const liteExtractor = createIntentExtractor({
       llm: captureCompletions(
         createGeminiLlmClient({
@@ -1260,7 +1287,7 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
     }
     console.log(
       [
-        `[regenerate-live] scope=${scope} recorded: ${scope === "catalog" ? catalog.length : 0} enrichments, ${classificationsRecorded} classifications, ${intentsRecorded} accuracy intents, ${liteRecorded} lite intents, ${missing.length} embeddings (${orphaned.length} orphaned vector(s) dropped)`,
+        `[regenerate-live] scope=${scope} recorded: ${scope === "catalog" ? catalog.length : 0} enrichments, ${classificationsRecorded} classifications, ${intentsRecorded} accuracy intents, ${liteRecorded} lite intents (${requeried.length} re-queried), ${missing.length} embeddings (${orphaned.length} orphaned vector(s) dropped)`,
         ...[...byOperation].map(([operation, bucket]) => `[regenerate-live]   ${operation}: ${bucket.calls} call(s), $${bucket.usd.toFixed(4)}`),
         `[regenerate-live]   total metered spend: $${spent.reduce((sum, row) => sum + row.costUsd, 0).toFixed(4)}`,
       ].join("\n"),

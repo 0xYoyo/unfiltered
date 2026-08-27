@@ -19,6 +19,8 @@ function intent(overrides: Partial<Intent> = {}): Intent {
   return {
     colorsInclude: [],
     colorsExclude: [],
+    attributesExclude: [],
+    attributesInclude: [],
     availabilityRequired: false,
     softAttributes: [],
     ...overrides,
