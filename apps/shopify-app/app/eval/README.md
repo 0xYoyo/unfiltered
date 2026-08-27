@@ -18,8 +18,13 @@ zero network calls, identical ledger shape to a live run.
 
 ## Fixtures
 
-- `fixtures/catalog.json` — 66 sparse fashion products (EN + HE): one-line or
+- `fixtures/catalog.json` — 78 sparse fashion products (EN + HE): one-line or
   empty descriptions, ≤2 tags. Deliberately low-quality by design (NG-3).
+  p67–p78 (YOY-118) are the products the Constructor-bar set needs: bridal
+  gowns (p67, p68) vs. wedding-guest dresses (p69, p70), sleeveless (p71,
+  p73) vs. long-sleeve (p72, p74) tops, and multi-material items (p75 cotton-
+  linen shirt, p76 wool-cashmere coat, p77 nylon down coat, p78 vegan-leather
+  tote).
   p64–p66 "Rib Knit Top in Pink / in Navy / in Black" are one colourway
   family (YOY-117): the harness seeds them with the same `familyKey` every
   ingestion path computes, and the stores return one card per family.
@@ -40,7 +45,26 @@ zero network calls, identical ledger shape to a live run.
   the pink family member first and carry `mustNotProductIds` (the navy and
   black colourways): any of them in the top 10 is a violation (YOY-117
   AC-3).
-- `fixtures/refinement-goldens.json` — 6 follow-up queries (EN, HE, mixed),
+- `fixtures/constructor-goldens.json` — the **Constructor bar** (YOY-118):
+  30 goldens, 15 EN and 15 HE, in three tagged groups of 10 —
+  `negation` (colour, sleeve/category, and material negations: "not white",
+  "top, no sleeves", "חולצה בלי שרוולים", "winter coat, not wool"),
+  `priceCap` ("under", "below", "מתחת ל", "עד", with and without ₪/$), and
+  `occasionVsCategory` ("dress for a wedding" → guest dresses and NOT bridal
+  gowns; "wedding dress" → bridal gowns; "shoes for a wedding", "pants for
+  the office", and HE equivalents). Each golden carries
+  `expectedProductIds`, `hardConstraints`, and `mustNotProductIds`; the
+  loader rejects a set under 24 goldens, 12 per language, or 8 per group.
+  The set runs through the same orchestrator path as the goldens, on the
+  same recording files, but is scored apart from the main bars: its hit
+  rate is asserted against `fixtures/constructor-floor.json` (the achieved
+  overall rate rounded down to a whole percent — it records what the engine
+  does today and is raised only from a measured run), its hard-constraint
+  violations must be zero, its `mustNot` leak may be no worse than the
+  floor's committed count and clean-golden rate (see the pass bar below),
+  and its spend is reported on its own line, never blended into the main
+  cost bar.
+- `fixtures/refinement-goldens.json` — 9 follow-up queries (EN, HE, mixed),
   each with the previous query's intent and the constraint outcome the merged
   intent must produce (YOY-42). They run intent extraction only: a follow-up
   is scored on what it does to the constraints, not on ranking.
@@ -81,7 +105,26 @@ per tier.
   separately.
 
 The run prints a per-query scorecard (route, first-hit rank, violations,
-cost) so a regression is diagnosable, not just red.
+cost) so a regression is diagnosable, not just red, followed by the
+Constructor bar block (YOY-118): one row per Constructor golden, then
+`Constructor bar: overall NN % (negation …, priceCap …, occasionVsCategory
+…), mustNot violations N` with the per-group and per-language (EN / HE) hit
+rates, hard-constraint violations, the set's escalation rate, and its cost
+per 1,000 AI searches.
+
+Constructor-bar pass bar (enforced as failing tests):
+
+- Hard-constraint violations 0 across the set's top 10s.
+- `mustNot` violations ≤ `mustNotViolationsMax` and the share of goldens
+  with no `mustNot` appearance ≥ `mustNotCleanRatePercent`, both committed
+  in `fixtures/constructor-floor.json`. The reported target is 0; the floor
+  records the measured leak (19 appearances, 20/30 goldens clean on
+  2026-08-27) because the retriever hard-filters only category, price,
+  colour, occasion, and availability — a material, sleeve, or bridal
+  negation is ranking-only today, and a ~12-item filtered set fills its top
+  10 with the negated items. YOY-133 makes negated attributes hard
+  exclusions and moves this floor to 0.
+- Overall hit rate ≥ `overallHitRatePercent` in the same file.
 
 ## Regenerating the recordings
 
@@ -112,7 +155,9 @@ dropped. The run prints its metered spend per operation from the ledger.
 enrichment re-record — for a new golden over an unchanged catalog, so the
 product vectors stay byte-identical too. A product with no enrichment
 recording yet (added with the golden, YOY-117) is recorded and merged; every
-existing enrichment entry is reused as-is.
+existing enrichment entry is reused as-is. Every scope records the
+Constructor-bar goldens alongside the main goldens (YOY-118): both sets
+share the recording files, keyed by query.
 
 The root `regen:live` script pins the run to the root `vitest.config.ts`,
 whose alias resolves `@unfiltered/*` to the TypeScript source. Invoking
