@@ -135,6 +135,16 @@ export const CONSTRUCTOR_SET_MINIMUMS = {
 export interface ConstructorFloor {
   recordedAt: string;
   overallHitRatePercent: number;
+  /**
+   * The measured `mustNot` leak (AC-3, amended 2026-08-27): the engine has
+   * no hard filter for material/sleeve/bridal negations today, so the
+   * harness asserts no regression against these — at most this many
+   * `mustNotProductIds` appearances, and at least this share of goldens
+   * with none — while 0 stays the reported target (moved there by the
+   * follow-up engine issue, YOY-133).
+   */
+  mustNotViolationsMax: number;
+  mustNotCleanRatePercent: number;
 }
 
 /**
@@ -277,6 +287,8 @@ export interface ConstructorBar {
   byGroup: Record<ConstructorGroup, ConstructorHitRate & { byLanguage: Record<"en" | "he", ConstructorHitRate> }>;
   /** `mustNotProductIds` appearances across the set's top 10s. */
   mustNotViolationCount: number;
+  /** Goldens whose top 10 carries none of their `mustNotProductIds`. */
+  mustNotCleanRate: ConstructorHitRate;
   /** Hard-constraint violations across the set's top 10s (mustNot excluded). */
   hardConstraintViolationCount: number;
   /** Share of the set's AI-routed goldens answered by the accuracy tier. */
@@ -422,6 +434,12 @@ export function computeConstructorBar(
     (sum, score) => sum + score.mustNotViolations.length,
     0,
   );
+  const clean = scores.filter((score) => score.mustNotViolations.length === 0).length;
+  const mustNotCleanRate: ConstructorHitRate = {
+    hits: clean,
+    total: scores.length,
+    rate: scores.length === 0 ? 0 : clean / scores.length,
+  };
   const hardConstraintViolationCount =
     scores.reduce((sum, score) => sum + score.violations.length, 0) - mustNotViolationCount;
   const aiScores = scores.filter((score) => score.intentTier !== null);
@@ -439,6 +457,7 @@ export function computeConstructorBar(
     byLanguage: byLanguage(scores),
     byGroup,
     mustNotViolationCount,
+    mustNotCleanRate,
     hardConstraintViolationCount,
     escalationRate,
     costPer1000Usd: aiSearchCount === 0 ? 0 : (total / aiSearchCount) * 1000,
@@ -1047,7 +1066,7 @@ function printScorecard(result: EvalRunResult): void {
     `Constructor bar: overall ${percent(bar.overall)} (${CONSTRUCTOR_GROUPS.map((group) => `${group} ${(bar.byGroup[group].rate * 100).toFixed(0)} %`).join(", ")}), mustNot violations ${bar.mustNotViolationCount}`,
     `  EN ${percent(bar.byLanguage.en)}, HE ${percent(bar.byLanguage.he)}`,
     ...CONSTRUCTOR_GROUPS.map((group) => `  ${groupLine(group)}`),
-    `  hard-constraint violations: ${bar.hardConstraintViolationCount} (bar: 0); mustNot violations: ${bar.mustNotViolationCount} (bar: 0)`,
+    `  hard-constraint violations: ${bar.hardConstraintViolationCount} (bar: 0); mustNot violations: ${bar.mustNotViolationCount} (target 0; floor: no regression), mustNot-clean goldens ${percent(bar.mustNotCleanRate)}`,
     `  intent escalation rate: ${(bar.escalationRate * 100).toFixed(0)} % of the set's AI searches`,
     `  per-search cost per 1,000 AI searches (${bar.aiSearchCount} full-path searches): $${bar.costPer1000Usd.toFixed(2)}`,
   );

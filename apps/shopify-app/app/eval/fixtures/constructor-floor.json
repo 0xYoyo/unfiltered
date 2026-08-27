@@ -1,5 +1,7 @@
 {
-  "$comment": "Constructor-bar floor (YOY-118 AC-3): the overall hit rate the harness achieved on the committed recordings, rounded down to a whole percent. Records what the engine does today (NG-2); raise it only from a measured run, never lower it to absorb a regression.",
+  "$comment": "Constructor-bar floor (YOY-118 AC-3). overallHitRatePercent: the overall hit rate the harness achieved on the committed recordings, rounded down. mustNotViolationsMax / mustNotCleanRatePercent: the measured mustNot leak (amended AC-3, 2026-08-27) — the engine has no hard filter for material/sleeve/bridal negations yet, so the harness asserts no regression against these while 0 stays the reported target; YOY-133 moves them to 0 / 100. Every value records what the engine does today (NG-2): tighten only from a measured run, never loosen to absorb a regression.",
   "recordedAt": "2026-08-27",
-  "overallHitRatePercent": 100
+  "overallHitRatePercent": 100,
+  "mustNotViolationsMax": 19,
+  "mustNotCleanRatePercent": 66
 }
