@@ -7,19 +7,29 @@ import type {
 import {
   CANONICAL_CATEGORIES,
   CANONICAL_OCCASIONS,
+  VISION_GARMENT_LENGTHS,
+  VISION_MATERIAL_APPEARANCES,
+  VISION_NECKLINES,
+  VISION_PATTERNS,
+  VISION_SLEEVE_LENGTHS,
 } from "@unfiltered/engine";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { createPrismaCostRecorder } from "./ai/cost-recorder.server";
-import type { ProductAttributes } from "./catalog/enrich.server";
+import type { ProductAttributes, VisionAttributes } from "./catalog/enrich.server";
 import {
   buildEnrichmentPrompt,
+  buildVisionPrompt,
   ENRICHMENT_SCHEMA,
   ENRICHMENT_VERSION,
   enrichCatalog,
+  formatVisionReport,
+  mergeAttributes,
   parseEnrichment,
+  parseVisionAttributes,
   primaryColorFromTitle,
   resolvePrimaryColor,
+  VISION_SCHEMA,
 } from "./catalog/enrich.server";
 import { mapProductNode } from "./catalog/mapping.server";
 import { productNode } from "./catalog/mapping.test";
@@ -105,6 +115,7 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await db.productEnrichment.deleteMany();
+  await db.productImage.deleteMany();
   await db.catalogProduct.deleteMany();
   for (const node of fixtureNodes()) {
     await db.catalogProduct.create({
@@ -515,5 +526,704 @@ describe("catalog enrichment", () => {
       expect(row.shopDomain).toBe(SHOP);
       expect(row.costUsd).toBeGreaterThan(0);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Vision enrichment (YOY-121): the anchored vision pass, its merge with the
+// text answer, and the image-hash key it re-analyses on. Recorded fixture
+// responses only — no model call anywhere in the default run.
+// ---------------------------------------------------------------------------
+
+/** Recorded vision answer, as the schema-constrained model returns it. */
+const recordedVision = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
+  category: "dress",
+  colors: ["navy", "white"],
+  primaryColor: "navy",
+  occasions: ["evening"],
+  fit: "slim",
+  styleTags: ["elegant", "feminine"],
+  sleeveLength: "long",
+  neckline: "v-neck",
+  garmentLength: "midi",
+  pattern: "floral",
+  materialAppearance: "silk",
+  ...overrides,
+});
+
+/** The parsed form of `recordedVision()`. */
+const parsedVision = (overrides: Partial<VisionAttributes> = {}): VisionAttributes => ({
+  category: "dress",
+  colors: ["navy", "white"],
+  primaryColor: "navy",
+  occasions: ["evening"],
+  fit: "slim",
+  styleTags: ["elegant", "feminine"],
+  sleeveLength: "long",
+  neckline: "v-neck",
+  garmentLength: "midi",
+  pattern: "floral",
+  materialAppearance: "silk",
+  ...overrides,
+});
+
+/** Byte fixture per image URL: the bytes ARE the URL, served with a content type. */
+function imageServer(types: Record<string, string> = {}) {
+  const fetched: string[] = [];
+  const fetchImage = async (url: string): Promise<Response> => {
+    fetched.push(url);
+    if (url.includes("/missing/")) {
+      return new Response("nope", { status: 404 });
+    }
+    return new Response(new TextEncoder().encode(url), {
+      status: 200,
+      headers: { "content-type": types[url] ?? "image/jpeg" },
+    });
+  };
+  return { fetchImage, fetched };
+}
+
+async function seedImages(productId: string, urls: string[]): Promise<string[]> {
+  const hashes: string[] = [];
+  for (const [position, url] of urls.entries()) {
+    const contentHash = `hash-${url.replace(/[^a-z0-9]/gi, "")}`;
+    hashes.push(contentHash);
+    await db.productImage.upsert({
+      where: { shopDomain_productId_position: { shopDomain: SHOP, productId, position } },
+      create: { shopDomain: SHOP, productId, position, url, contentHash, fetchedAt: new Date() },
+      update: { url, contentHash, duplicateUrls: [] },
+    });
+  }
+  await db.productImage.deleteMany({
+    where: { shopDomain: SHOP, productId, position: { gte: urls.length } },
+  });
+  return hashes;
+}
+
+const P1 = "gid://shopify/Product/1";
+const P2 = "gid://shopify/Product/2";
+const P3 = "gid://shopify/Product/3";
+
+const enrichmentRow = (productId: string) =>
+  db.productEnrichment.findUniqueOrThrow({
+    where: { shopDomain_productId: { shopDomain: SHOP, productId } },
+  });
+
+describe("vision prompt and schema (YOY-121 AC-2)", () => {
+  it("anchors the prompt on the sold item and carries title, type, and text", () => {
+    const prompt = buildVisionPrompt({
+      productId: "p",
+      title: "Mesh Over Dress in Pink",
+      description: "Gold straps.",
+      tags: ["party"],
+      productType: "Dresses",
+      imageAltTexts: [],
+      contentHash: "h",
+    });
+    expect(prompt).toContain("Describe ONLY the item being sold");
+    expect(prompt).toContain("ignore other garments, footwear, and\njewelry worn by models");
+    expect(prompt).toContain("trust the\nimages");
+    expect(prompt).toContain("Title: Mesh Over Dress in Pink");
+    expect(prompt).toContain("Product type: Dresses");
+    expect(prompt).toContain("Text: Gold straps.");
+    expect(prompt).toContain("Tags: party");
+    // Sparse text is stated as such, never as an empty line the model
+    // might read as a value.
+    expect(
+      buildVisionPrompt({
+        productId: "p",
+        title: "Tee",
+        description: "",
+        tags: [],
+        productType: "",
+        imageAltTexts: [],
+        contentHash: "h",
+      }),
+    ).toContain("Product type: (none)\nText: (none)\nTags: (none)");
+  });
+
+  it("pins every enum to the committed vocabularies and requires every field", () => {
+    const property = (name: string) =>
+      (VISION_SCHEMA.properties as Record<string, Record<string, unknown>>)[name]!;
+    expect(property("category").enum).toEqual([...CANONICAL_CATEGORIES]);
+    expect((property("occasions").items as Record<string, unknown>).enum).toEqual([
+      ...CANONICAL_OCCASIONS,
+    ]);
+    expect(property("sleeveLength").enum).toEqual([...VISION_SLEEVE_LENGTHS]);
+    expect(property("neckline").enum).toEqual([...VISION_NECKLINES]);
+    expect(property("garmentLength").enum).toEqual([...VISION_GARMENT_LENGTHS]);
+    expect(property("pattern").enum).toEqual([...VISION_PATTERNS]);
+    expect(property("materialAppearance").enum).toEqual([...VISION_MATERIAL_APPEARANCES]);
+    expect(VISION_SCHEMA.required).toEqual([
+      "category",
+      "colors",
+      "primaryColor",
+      "occasions",
+      "fit",
+      "styleTags",
+      "sleeveLength",
+      "neckline",
+      "garmentLength",
+      "pattern",
+      "materialAppearance",
+    ]);
+    // Seasons are a text claim, never a visual one.
+    expect(VISION_SCHEMA.properties).not.toHaveProperty("seasons");
+  });
+
+  it("parseVisionAttributes normalizes into the vocabularies and rejects shape violations", () => {
+    expect(parseVisionAttributes(recordedVision())).toEqual(parsedVision());
+    // Category/occasion synonyms fold like the text answer; vision-only
+    // fields fold into their vocabularies; not-applicable becomes null.
+    expect(
+      parseVisionAttributes(
+        recordedVision({
+          category: "Gowns",
+          occasions: ["party", "gala"],
+          sleeveLength: "NOT-APPLICABLE",
+          neckline: "not-applicable",
+          garmentLength: "Midi",
+          pattern: "paisley",
+          materialAppearance: " Leather ",
+        }),
+      ),
+    ).toEqual(
+      parsedVision({
+        category: "dress",
+        occasions: ["evening"],
+        sleeveLength: null,
+        neckline: null,
+        garmentLength: "midi",
+        pattern: null,
+        materialAppearance: "leather",
+      }),
+    );
+    // primaryColor: the answer when it is an answered colour, else the
+    // first colour, else null; colours lowercased and de-duplicated.
+    expect(
+      parseVisionAttributes(recordedVision({ colors: ["Navy", "navy", "White"], primaryColor: "white" })),
+    ).toMatchObject({ colors: ["navy", "white"], primaryColor: "white" });
+    expect(
+      parseVisionAttributes(recordedVision({ colors: ["red"], primaryColor: "" })),
+    ).toMatchObject({ colors: ["red"], primaryColor: "red" });
+    expect(parseVisionAttributes(recordedVision({ colors: [], primaryColor: "" }))).toMatchObject({
+      colors: [],
+      primaryColor: null,
+    });
+    expect(parseVisionAttributes(null)).toBeNull();
+    expect(parseVisionAttributes(recordedVision({ sleeveLength: 3 }))).toBeNull();
+    expect(parseVisionAttributes(recordedVision({ colors: "navy" }))).toBeNull();
+    const missing = recordedVision();
+    delete missing.materialAppearance;
+    expect(parseVisionAttributes(missing)).toBeNull();
+  });
+});
+
+describe("merge rules (YOY-121 AC-3)", () => {
+  it("text wins on the factual fields when present; vision fills nulls and empties", () => {
+    const text = recordedAttributes({
+      category: "top",
+      colors: ["black"],
+      primaryColor: "black",
+      occasions: ["work"],
+      fit: "regular",
+      styleTags: ["elegant", "smart"],
+      seasons: ["winter"],
+    });
+    expect(mergeAttributes(text, parsedVision())).toEqual({
+      category: "top",
+      colors: ["black"],
+      primaryColor: "black",
+      occasions: ["work"],
+      fit: "regular",
+      // The union, text first, de-duplicated.
+      styleTags: ["elegant", "smart", "feminine"],
+      seasons: ["winter"],
+      sleeveLength: "long",
+      neckline: "v-neck",
+      garmentLength: "midi",
+      pattern: "floral",
+      materialAppearance: "silk",
+    });
+  });
+
+  it("fills category, colours, primary colour, occasions, and fit from vision when the text gave none", () => {
+    const sparse = recordedAttributes({
+      category: "other",
+      colors: [],
+      primaryColor: null,
+      occasions: [],
+      fit: "",
+      styleTags: [],
+      seasons: [],
+    });
+    expect(mergeAttributes(sparse, parsedVision())).toMatchObject({
+      category: "dress",
+      colors: ["navy", "white"],
+      primaryColor: "navy",
+      occasions: ["evening"],
+      fit: "slim",
+      styleTags: ["elegant", "feminine"],
+      seasons: [],
+    });
+    // primaryColor follows colors: text colours present ⇒ text primary,
+    // even when vision disagrees.
+    expect(
+      mergeAttributes(
+        recordedAttributes({ colors: ["gold"], primaryColor: "gold" }),
+        parsedVision({ colors: ["brown"], primaryColor: "brown" }),
+      ),
+    ).toMatchObject({ colors: ["gold"], primaryColor: "gold" });
+    // A vision category of "other" cannot replace a real text category,
+    // and two "other"s stay "other".
+    expect(
+      mergeAttributes(recordedAttributes({ category: "top" }), parsedVision({ category: "other" }))
+        ?.category,
+    ).toBe("top");
+    expect(
+      mergeAttributes(recordedAttributes({ category: "other" }), parsedVision({ category: "other" }))
+        ?.category,
+    ).toBe("other");
+  });
+
+  it("is text-only without vision, vision-only without text, and null with neither", () => {
+    expect(mergeAttributes(recordedAttributes(), null)).toEqual({
+      ...recordedAttributes(),
+      sleeveLength: null,
+      neckline: null,
+      garmentLength: null,
+      pattern: null,
+      materialAppearance: null,
+    });
+    expect(mergeAttributes(null, parsedVision())).toEqual({
+      ...parsedVision(),
+      seasons: [],
+    });
+    expect(mergeAttributes(null, null)).toBeNull();
+  });
+});
+
+describe("vision pass in enrichCatalog (YOY-121 AC-2, AC-5, AC-6)", () => {
+  it("analyses every product with images once, keyed on the image hashes, and merges the answer", async () => {
+    const hashes1 = await seedImages(P1, ["https://cdn.example/p1-a.png", "https://cdn.example/p1-b.jpg"]);
+    const hashes2 = await seedImages(P2, ["https://cdn.example/p2-a.webp"]);
+    const server = imageServer({
+      "https://cdn.example/p1-a.png": "image/png",
+      "https://cdn.example/p2-a.webp": "image/webp; charset=binary",
+    });
+    // The recorded answer form: "" for no colour (parseEnrichment maps it to null).
+    const text = llmStub(() => recordedAttributes({ colors: [], primaryColor: "", styleTags: ["smart"] }));
+    const vision = llmStub(() => recordedVision());
+
+    const result = await enrichCatalog({
+      db,
+      shopDomain: SHOP,
+      llm: text.llm,
+      vision: { llm: vision.llm, fetchImage: server.fetchImage },
+    });
+
+    expect(result).toEqual({
+      enriched: 3,
+      cached: 0,
+      failed: 0,
+      vision: { analysed: 2, cached: 0, failed: 0, costUsd: 0 },
+    });
+    expect(formatVisionReport(result.vision!)).toBe(
+      "vision: analysed 2, cached 0, failed 0, cost $0.000000",
+    );
+    // One call per product with images, all of its images inline, the
+    // anchored prompt, operation "vision", temperature 0.
+    expect(vision.calls).toHaveLength(2);
+    const [call1, call2] = vision.calls;
+    expect(call1!.operation).toBe("vision");
+    expect(call1!.schema).toBe(VISION_SCHEMA);
+    expect(call1!.temperature).toBe(0);
+    expect(call1!.storeId).toBe(SHOP);
+    expect(call1!.prompt).toContain("Describe ONLY the item being sold");
+    expect(call1!.images!.map((image) => image.mimeType)).toEqual(["image/png", "image/jpeg"]);
+    expect(new TextDecoder().decode(call1!.images![0]!.data)).toBe("https://cdn.example/p1-a.png");
+    expect(call2!.images!.map((image) => image.mimeType)).toEqual(["image/webp"]);
+    expect(call2!.prompt).toContain("שמלת ערב שחורה");
+    // Text enrichment ran once per product, as before.
+    expect(text.calls).toHaveLength(3);
+
+    const row1 = await enrichmentRow(P1);
+    expect(row1).toMatchObject({
+      status: "enriched",
+      enrichmentVersion: ENRICHMENT_VERSION,
+      // Text wins where present (category, occasions, fit); vision fills
+      // the colours the text lacked and brings the coverage fields.
+      category: "dress",
+      colors: ["navy", "white"],
+      primaryColor: "navy",
+      occasions: ["evening"],
+      fit: "regular",
+      styleTags: ["smart", "elegant", "feminine"],
+      seasons: ["summer"],
+      sleeveLength: "long",
+      neckline: "v-neck",
+      garmentLength: "midi",
+      pattern: "floral",
+      materialAppearance: "silk",
+      visionStatus: "enriched",
+      visionImageHashes: hashes1,
+    });
+    expect(row1.textAttributes).toEqual(
+      recordedAttributes({ colors: [], primaryColor: null, styleTags: ["smart"] }),
+    );
+    expect(row1.visionAttributes).toEqual(parsedVision());
+    expect((await enrichmentRow(P2)).visionImageHashes).toEqual(hashes2);
+    // No images: no vision, the row is text-only.
+    expect(await enrichmentRow(P3)).toMatchObject({
+      status: "enriched",
+      visionStatus: "none",
+      visionImageHashes: [],
+      visionAttributes: null,
+      sleeveLength: null,
+      materialAppearance: null,
+    });
+  });
+
+  it("unchanged images make zero vision calls; one changed image makes exactly one (AC-5)", async () => {
+    await seedImages(P1, ["https://cdn.example/p1-a.png", "https://cdn.example/p1-b.jpg"]);
+    await seedImages(P2, ["https://cdn.example/p2-a.webp"]);
+    const server = imageServer();
+    await enrichCatalog({
+      db,
+      shopDomain: SHOP,
+      llm: llmStub(() => recordedAttributes()).llm,
+      vision: { llm: llmStub(() => recordedVision()).llm, fetchImage: server.fetchImage },
+    });
+    expect(server.fetched).toHaveLength(3);
+
+    // Re-run: everything cached, nothing fetched, nothing called.
+    const rerunText = llmStub(() => recordedAttributes());
+    const rerunVision = llmStub(() => recordedVision());
+    const rerunServer = imageServer();
+    expect(
+      await enrichCatalog({
+        db,
+        shopDomain: SHOP,
+        llm: rerunText.llm,
+        vision: { llm: rerunVision.llm, fetchImage: rerunServer.fetchImage },
+      }),
+    ).toEqual({
+      enriched: 0,
+      cached: 3,
+      failed: 0,
+      vision: { analysed: 0, cached: 2, failed: 0, costUsd: 0 },
+    });
+    expect(rerunText.calls).toHaveLength(0);
+    expect(rerunVision.calls).toHaveLength(0);
+    expect(rerunServer.fetched).toHaveLength(0);
+
+    // One image of product 1 changes (new bytes, hence a new hash).
+    const changed = await seedImages(P1, ["https://cdn.example/p1-a.png", "https://cdn.example/p1-c.jpg"]);
+    const thirdText = llmStub(() => recordedAttributes());
+    const thirdVision = llmStub(() => recordedVision({ pattern: "stripe" }));
+    const thirdServer = imageServer();
+    expect(
+      await enrichCatalog({
+        db,
+        shopDomain: SHOP,
+        llm: thirdText.llm,
+        vision: { llm: thirdVision.llm, fetchImage: thirdServer.fetchImage },
+      }),
+    ).toEqual({
+      enriched: 0,
+      cached: 3,
+      failed: 0,
+      vision: { analysed: 1, cached: 1, failed: 0, costUsd: 0 },
+    });
+    // Exactly one vision call, for that product, with both of its current
+    // images; no text call — the content did not change.
+    expect(thirdVision.calls).toHaveLength(1);
+    expect(thirdVision.calls[0]!.prompt).toContain("Title: Linen summer dress");
+    expect(thirdVision.calls[0]!.images).toHaveLength(2);
+    expect(thirdText.calls).toHaveLength(0);
+    expect(thirdServer.fetched).toEqual(["https://cdn.example/p1-a.png", "https://cdn.example/p1-c.jpg"]);
+    expect(await enrichmentRow(P1)).toMatchObject({
+      pattern: "stripe",
+      visionImageHashes: changed,
+      visionStatus: "enriched",
+    });
+    // The other product's vision answer is untouched.
+    expect((await enrichmentRow(P2)).pattern).toBe("floral");
+  });
+
+  it('a text-sparse "Gold straps." product takes category and material from the images (How to verify 3)', async () => {
+    await db.catalogProduct.create({
+      data: {
+        shopDomain: SHOP,
+        ...mapProductNode(
+          productNode({ id: "gid://shopify/Product/4", title: "Strappy", description: "Gold straps." }),
+        ),
+      },
+    });
+    await seedImages("gid://shopify/Product/4", ["https://cdn.example/straps.jpg"]);
+    const text = llmStub((request) =>
+      request.prompt.includes("Gold straps.")
+        ? recordedAttributes({
+            category: "other",
+            colors: ["gold"],
+            primaryColor: "gold",
+            occasions: [],
+            fit: "",
+            styleTags: [],
+            seasons: [],
+          })
+        : recordedAttributes(),
+    );
+    const vision = llmStub(() =>
+      recordedVision({
+        category: "shoes",
+        colors: ["gold"],
+        primaryColor: "gold",
+        occasions: ["evening"],
+        fit: "",
+        styleTags: ["strappy"],
+        sleeveLength: "not-applicable",
+        neckline: "not-applicable",
+        garmentLength: "not-applicable",
+        pattern: "solid",
+        materialAppearance: "leather",
+      }),
+    );
+
+    await enrichCatalog({
+      db,
+      shopDomain: SHOP,
+      llm: text.llm,
+      vision: { llm: vision.llm, fetchImage: imageServer().fetchImage },
+    });
+
+    expect(await enrichmentRow("gid://shopify/Product/4")).toMatchObject({
+      category: "shoes",
+      colors: ["gold"],
+      primaryColor: "gold",
+      occasions: ["evening"],
+      styleTags: ["strappy"],
+      sleeveLength: null,
+      neckline: null,
+      garmentLength: null,
+      pattern: "solid",
+      materialAppearance: "leather",
+    });
+  });
+
+  it("two failed attempts mark visionStatus failed with the hashes recorded, without failing the run", async () => {
+    const hashes = await seedImages(P1, ["https://cdn.example/p1-a.png"]);
+    await seedImages(P2, ["https://cdn.example/p2-a.webp"]);
+    const vision = llmStub((request, call) =>
+      request.prompt.includes("Linen summer dress")
+        ? call % 2 === 1
+          ? new Error("upstream 503")
+          : { category: "dress" }
+        : recordedVision(),
+    );
+
+    const result = await enrichCatalog({
+      db,
+      shopDomain: SHOP,
+      llm: llmStub(() => recordedAttributes()).llm,
+      vision: { llm: vision.llm, fetchImage: imageServer().fetchImage },
+    });
+
+    expect(result).toEqual({
+      enriched: 3,
+      cached: 0,
+      failed: 0,
+      vision: { analysed: 2, cached: 0, failed: 1, costUsd: 0 },
+    });
+    // Product 1: two attempts (an error, then invalid output); product 2: one.
+    expect(vision.calls).toHaveLength(3);
+    const row = await enrichmentRow(P1);
+    // The text answer stands on its own — the row is enriched, vision-less.
+    expect(row).toMatchObject({
+      status: "enriched",
+      category: "dress",
+      visionStatus: "failed",
+      visionImageHashes: hashes,
+      visionAttributes: null,
+      sleeveLength: null,
+    });
+    // A model failure retries only when an image changes: the re-run makes
+    // zero vision calls.
+    const rerun = llmStub(() => recordedVision());
+    expect(
+      (
+        await enrichCatalog({
+          db,
+          shopDomain: SHOP,
+          llm: llmStub(() => recordedAttributes()).llm,
+          vision: { llm: rerun.llm, fetchImage: imageServer().fetchImage },
+        })
+      ).vision,
+    ).toEqual({ analysed: 0, cached: 2, failed: 0, costUsd: 0 });
+    expect(rerun.calls).toHaveLength(0);
+  });
+
+  it("images that cannot be fetched make no call and leave the key untouched, so the next run retries", async () => {
+    await seedImages(P1, ["https://cdn.example/missing/p1-a.png"]);
+    const vision = llmStub(() => recordedVision());
+
+    const result = await enrichCatalog({
+      db,
+      shopDomain: SHOP,
+      llm: llmStub(() => recordedAttributes()).llm,
+      vision: { llm: vision.llm, fetchImage: imageServer().fetchImage },
+    });
+
+    expect(result.vision).toEqual({ analysed: 0, cached: 0, failed: 1, costUsd: 0 });
+    expect(vision.calls).toHaveLength(0);
+    expect(await enrichmentRow(P1)).toMatchObject({
+      status: "enriched",
+      visionStatus: "failed",
+      visionImageHashes: [],
+    });
+
+    // The CDN answers next time: analysed, over unchanged text.
+    await seedImages(P1, ["https://cdn.example/p1-a.png"]);
+    const text = llmStub(() => recordedAttributes());
+    const again = await enrichCatalog({
+      db,
+      shopDomain: SHOP,
+      llm: text.llm,
+      vision: { llm: vision.llm, fetchImage: imageServer().fetchImage },
+    });
+    expect(again).toEqual({
+      enriched: 0,
+      cached: 3,
+      failed: 0,
+      vision: { analysed: 1, cached: 0, failed: 0, costUsd: 0 },
+    });
+    expect(text.calls).toHaveLength(0);
+    expect(vision.calls).toHaveLength(1);
+    expect((await enrichmentRow(P1)).visionStatus).toBe("enriched");
+  });
+
+  it("a text re-enrichment over unchanged images re-merges against the stored vision answer", async () => {
+    await seedImages(P1, ["https://cdn.example/p1-a.png"]);
+    await enrichCatalog({
+      db,
+      shopDomain: SHOP,
+      llm: llmStub(() => recordedAttributes({ category: "other", colors: [], primaryColor: "" })).llm,
+      vision: { llm: llmStub(() => recordedVision()).llm, fetchImage: imageServer().fetchImage },
+    });
+    expect(await enrichmentRow(P1)).toMatchObject({ category: "dress", colors: ["navy", "white"] });
+
+    // A rule change (older version) re-runs the text side only; the new
+    // text answer names a category, and the colours still come from vision.
+    await db.productEnrichment.update({
+      where: { shopDomain_productId: { shopDomain: SHOP, productId: P1 } },
+      data: { enrichmentVersion: ENRICHMENT_VERSION - 1 },
+    });
+    const text = llmStub(() => recordedAttributes({ category: "top", colors: [], primaryColor: "" }));
+    const vision = llmStub(() => recordedVision({ category: "skirt" }));
+    const result = await enrichCatalog({
+      db,
+      shopDomain: SHOP,
+      llm: text.llm,
+      vision: { llm: vision.llm, fetchImage: imageServer().fetchImage },
+    });
+    expect(result).toEqual({
+      enriched: 1,
+      cached: 2,
+      failed: 0,
+      vision: { analysed: 0, cached: 1, failed: 0, costUsd: 0 },
+    });
+    expect(text.calls).toHaveLength(1);
+    expect(vision.calls).toHaveLength(0);
+    expect(await enrichmentRow(P1)).toMatchObject({
+      category: "top",
+      colors: ["navy", "white"],
+      primaryColor: "navy",
+      sleeveLength: "long",
+      visionStatus: "enriched",
+    });
+  });
+
+  it("removing every image clears the vision answer without a call", async () => {
+    await seedImages(P1, ["https://cdn.example/p1-a.png"]);
+    await enrichCatalog({
+      db,
+      shopDomain: SHOP,
+      llm: llmStub(() => recordedAttributes()).llm,
+      vision: { llm: llmStub(() => recordedVision()).llm, fetchImage: imageServer().fetchImage },
+    });
+    await seedImages(P1, []);
+    const vision = llmStub(() => recordedVision());
+    const result = await enrichCatalog({
+      db,
+      shopDomain: SHOP,
+      llm: llmStub(() => recordedAttributes()).llm,
+      vision: { llm: vision.llm, fetchImage: imageServer().fetchImage },
+    });
+    expect(result.vision).toEqual({ analysed: 0, cached: 0, failed: 0, costUsd: 0 });
+    expect(vision.calls).toHaveLength(0);
+    expect(await enrichmentRow(P1)).toMatchObject({
+      visionStatus: "none",
+      visionImageHashes: [],
+      visionAttributes: null,
+      sleeveLength: null,
+      // Back to the text answer alone.
+      colors: ["black"],
+    });
+  });
+
+  it("without a vision pass, the result carries no vision counts and stored vision answers are kept", async () => {
+    await seedImages(P1, ["https://cdn.example/p1-a.png"]);
+    await enrichCatalog({
+      db,
+      shopDomain: SHOP,
+      llm: llmStub(() => recordedAttributes()).llm,
+      vision: { llm: llmStub(() => recordedVision()).llm, fetchImage: imageServer().fetchImage },
+    });
+    // Force a text re-run without the vision pass configured.
+    await db.productEnrichment.update({
+      where: { shopDomain_productId: { shopDomain: SHOP, productId: P1 } },
+      data: { enrichmentVersion: 0 },
+    });
+    const result = await enrichCatalog({
+      db,
+      shopDomain: SHOP,
+      llm: llmStub(() => recordedAttributes({ category: "other" })).llm,
+    });
+    expect(result).toEqual({ enriched: 1, cached: 2, failed: 0 });
+    expect(await enrichmentRow(P1)).toMatchObject({
+      category: "dress",
+      sleeveLength: "long",
+      visionStatus: "enriched",
+    });
+  });
+
+  it("meters every vision call under operation vision and reports the run's cost (AC-6)", async () => {
+    await db.aiCall.deleteMany();
+    await seedImages(P1, ["https://cdn.example/p1-a.png"]);
+    await seedImages(P2, ["https://cdn.example/p2-a.webp"]);
+    const recorder = createPrismaCostRecorder(db);
+    const vision = llmStub(
+      (request, call) =>
+        request.prompt.includes("Linen summer dress") && call === 1
+          ? { category: 42 }
+          : recordedVision(),
+      recorder,
+    );
+
+    const result = await enrichCatalog({
+      db,
+      shopDomain: SHOP,
+      llm: llmStub(() => recordedAttributes(), recorder).llm,
+      vision: { llm: vision.llm, fetchImage: imageServer().fetchImage },
+    });
+
+    // Three vision calls (one retried) — every one metered, including the
+    // rejected output — and the report sums exactly those rows.
+    const rows = await db.aiCall.findMany({ where: { operation: "vision" } });
+    expect(rows).toHaveLength(3);
+    const total = rows.reduce((sum, row) => sum + row.costUsd, 0);
+    expect(total).toBeGreaterThan(0);
+    expect(result.vision).toEqual({ analysed: 2, cached: 0, failed: 0, costUsd: total });
+    expect(await db.aiCall.count({ where: { operation: "enrichment" } })).toBe(3);
   });
 });

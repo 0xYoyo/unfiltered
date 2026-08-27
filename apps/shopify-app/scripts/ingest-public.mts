@@ -18,7 +18,10 @@
 import { PrismaClient } from "@prisma/client";
 
 import { createCatalogEmbeddingClient } from "../app/catalog/embed.server";
-import { createEnrichmentLlmClient } from "../app/catalog/enrich.server";
+import {
+  createEnrichmentLlmClient,
+  createVisionLlmClient,
+} from "../app/catalog/enrich.server";
 import { runIngestPublicCli } from "../app/playground/ingest-public-cli.server";
 import {
   CRAWL_CONCURRENCY,
@@ -43,6 +46,7 @@ try {
     }),
     aiClients: () => ({
       llm: createEnrichmentLlmClient(db),
+      vision: createVisionLlmClient(db),
       embeddings: createCatalogEmbeddingClient(db),
     }),
   });

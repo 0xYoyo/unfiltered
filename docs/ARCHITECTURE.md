@@ -27,7 +27,8 @@ npm-workspaces monorepo (`apps/*`, `packages/*`) with three workspaces:
   implementing the engine's LLM and embedding ports over plain `fetch`, with
   every call metered through the `CostRecorder` port. Model IDs come only
   from configuration/env (`geminiModelsFromEnv()`; defaults
-  `gemini-3.5-flash-lite` for classification/enrichment, `gemini-3.6-flash`
+  `gemini-3.5-flash-lite` for classification/enrichment and for the vision
+  enrichment pass (YOY-121, `GEMINI_VISION_MODEL`), `gemini-3.6-flash`
   for intent, `gemini-embedding-001` for embeddings); the API key comes from
   `GEMINI_API_KEY`. Fixture tests only by default; live round-trips run
   solely under `LIVE_LLM_TESTS=1` locally, never in CI.
@@ -204,6 +205,87 @@ Tests never require a live database: `createTestDb()`
 embedded Postgres (PGlite) with pgvector and pg_trgm loaded, applies the committed
 migration SQL, and hands Prisma a driver adapter for it — so `npm test`
 passes with no `DATABASE_URL` set and no external Postgres.
+
+### Vision enrichment at ingestion (YOY-121; PRD capability 14)
+
+Text-sparse catalogs cap what text enrichment can say, so `enrichCatalog`
+(`app/catalog/enrich.server.ts`) runs a second, image-driven pass and merges
+the two. Every ingest path — `npm run ingest`, `ingest:public`, and nothing
+else (webhook sync captures images but enrichment is a run, not a hook) —
+passes `vision: { llm, fetchImage }`: the vision-model port
+(`createVisionLlmClient`: `GEMINI_VISION_MODEL`, default
+`gemini-3.5-flash-lite` per `docs/VISION-MODEL.md`, at
+`GEMINI_VISION_THINKING_LEVEL`, default `low`, set explicitly and never the
+model default — the YOY-109 lesson) and the fetcher that re-reads the image
+bytes (`ProductImage` keeps hashes, never bytes; the Admin path uses the
+platform fetch, the public paths the polite fetcher).
+
+**The key.** A product is analysed when it has ≥ 1 `ProductImage` row and its
+current image hashes, in position order, differ from the enrichment row's
+`visionImageHashes`. Equal hashes make zero vision calls; one changed image
+re-analyses that product only (one call, all of its images inline, up to
+four); a product whose images all vanish has its vision answer cleared
+without a call. The key is independent of the text cache (`contentHash` +
+`ENRICHMENT_VERSION`): a text change over unchanged images re-runs the text
+side only, an image change over unchanged text the vision side only, and a
+product whose text is cached and whose images are unchanged is not written
+at all.
+
+**The call.** One `completeStructured` per product, operation `vision`,
+`temperature 0`, the images first and then the anchored prompt
+(`buildVisionPrompt`): title, product type, description, and tags anchor
+WHICH item in the photos is for sale, and the model must "describe ONLY the
+item being sold; ignore other garments, footwear, and jewelry worn by
+models" — the wording `docs/VISION-MODEL.md` measured at 3.4 % contamination
+— with "when text and images disagree, trust the images". The response
+schema (`VISION_SCHEMA`) is the shared enrichment fields — `category`,
+`colors`, `primaryColor`, `occasions`, `fit`, `styleTags` — plus the five
+vision-only fields, each pinned to a closed vocabulary in
+`packages/engine/src/taxonomy.ts` (`VISION_SLEEVE_LENGTHS`,
+`VISION_NECKLINES`, `VISION_GARMENT_LENGTHS`, `VISION_PATTERNS`,
+`VISION_MATERIAL_APPEARANCES`; every list carries `not-applicable`, which
+parses to null so a bag's neckline reaches neither the embedding text nor a
+filter). `seasons` is absent: a text claim, never a visual one. Two attempts
+(an adapter error or schema-violating JSON each count as one), then
+`visionStatus: failed` with the hashes recorded, so a model failure retries
+only when an image changes — the same rule as text failures, which retry
+only on a content change. Images that cannot be fetched at all make no call
+and leave the key untouched, so the next run tries again. A vision failure
+never fails the run or the product's text enrichment.
+
+**The merge** (`mergeAttributes`, "text-derived values win conflicts on
+factual fields, vision fills gaps"): on `category`, `colors`,
+`primaryColor`, `occasions`, and `fit` the text value wins when present and
+vision fills a null/empty one — a text `category` of `other` counts as
+absent (it is `parseEnrichment`'s "nothing mapped" token, not a claim), so
+a "Gold straps." product takes `shoes` from its images; `primaryColor`
+follows `colors` (text states no colour ⇒ both come from vision).
+`styleTags` is the union, text first. `seasons` is text only. The five
+vision-only fields are vision's. Text failed but images read is a valid,
+vision-only enrichment — the text-sparse catalog is the case the capability
+exists for. Each side's own parsed answer is kept raw on the row
+(`textAttributes`, `visionAttributes`, JSONB) and the columns are their
+merge, so re-running either side re-merges against what the other actually
+said, never against previously merged columns.
+
+**Re-embedding.** `composeEmbeddingText` folds the vision fields in after
+the text attributes as shopper phrases (`visionAttributeTerms`: "long
+sleeves", "v-neck neckline", "midi length", "floral pattern", "knit";
+"sleeveless" stays bare), so the composed-text freshness hash moves for
+exactly the products whose vision answer changed and `embedCatalog` re-embeds
+those and no others. Coverage attributes reach retrieval through the
+embedding text only — no intent-schema or filter change (NG-2).
+
+**Versioning and report.** `ENRICHMENT_VERSION` is 2: every row re-enriches
+once on the next run, and the vision pass runs for every product with images
+(the rows' `visionImageHashes` backfill to `[]`). Both CLIs print
+`vision: analysed N, cached M, failed K, cost $X` after the `enrich:` line —
+`analysed` = products sent to the model (enriched or failed), `cached` =
+products with images whose key matched, `failed` = two failed attempts or
+no fetchable image, `cost` = the run's `vision` ledger rows for the store —
+and `/internal/costs` shows the `vision` operation like any other. The
+measured cost per image and per 1,000 products is recorded on YOY-121
+(AC-7) and in PRD §3 capability 14 once the seed-catalog run has happened.
 
 ### Multi-tenant vector search on one shared index (YOY-105)
 

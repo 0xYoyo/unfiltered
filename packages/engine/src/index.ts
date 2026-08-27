@@ -83,8 +83,20 @@ export {
   expandCategoryConstraint,
   normalizeCategory,
   normalizeOccasion,
+  normalizeVisionValue,
+  VISION_GARMENT_LENGTHS,
+  VISION_MATERIAL_APPEARANCES,
+  VISION_NECKLINES,
+  VISION_NOT_APPLICABLE,
+  VISION_PATTERNS,
+  VISION_SLEEVE_LENGTHS,
   type CanonicalCategory,
   type CanonicalOccasion,
+  type VisionGarmentLength,
+  type VisionMaterialAppearance,
+  type VisionNeckline,
+  type VisionPattern,
+  type VisionSleeveLength,
 } from "./taxonomy.js";
 
 export {

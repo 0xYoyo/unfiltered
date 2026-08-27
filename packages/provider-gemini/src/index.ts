@@ -104,6 +104,14 @@ export const DEFAULT_INTENT_MODEL = "gemini-3.6-flash";
 /** The lite intent tier the lite-first ladder asks first (YOY-116). */
 export const DEFAULT_INTENT_LITE_MODEL = "gemini-3.5-flash-lite";
 export const DEFAULT_EMBEDDING_MODEL = "gemini-embedding-001";
+/**
+ * The vision model the ingestion enrichment pass reads product images with
+ * (YOY-121 AC-2): the docs/VISION-MODEL.md decision — matches the pro tier
+ * on category and colour, ties flash on contamination, 6× cheaper than pro,
+ * and already the repo's classification model. Override with
+ * `GEMINI_VISION_MODEL`.
+ */
+export const DEFAULT_VISION_MODEL = "gemini-3.5-flash-lite";
 export const DEFAULT_EMBEDDING_DIMENSION = 768;
 /** Thinking level the intent client runs at unless the env overrides it. */
 export const DEFAULT_INTENT_THINKING_LEVEL = "low";
@@ -113,6 +121,13 @@ export const DEFAULT_INTENT_THINKING_LEVEL = "low";
  * (YOY-109), and the lite tier's job is to be fast.
  */
 export const DEFAULT_INTENT_LITE_THINKING_LEVEL = "low";
+/**
+ * Thinking level of the vision enrichment call (YOY-121, binding comment):
+ * set explicitly, never the model default (the YOY-109 lesson), and the
+ * level docs/VISION-MODEL.md measured the decision at. Override with
+ * `GEMINI_VISION_THINKING_LEVEL` (`model-default` sends no thinkingConfig).
+ */
+export const DEFAULT_VISION_THINKING_LEVEL = "low";
 /**
  * Per-request abort timeout of the lite intent call (YOY-116): the lite
  * tier exists to be fast, and a hung lite call escalates to the accuracy
@@ -148,6 +163,13 @@ export interface GeminiModelConfig {
   intentLiteModel: string;
   embeddingModel: string;
   embeddingDimension: number;
+  /** For the vision enrichment pass at ingestion (YOY-121). */
+  visionModel: string;
+  /**
+   * Thinking level for the vision client, or undefined to leave the model
+   * at its own default (`GEMINI_VISION_THINKING_LEVEL=model-default`).
+   */
+  visionThinkingLevel: string | undefined;
   /**
    * Thinking level for the intent client, or undefined to leave the model at
    * its own default (`GEMINI_INTENT_THINKING_LEVEL=model-default`).
@@ -169,7 +191,8 @@ export interface GeminiModelConfig {
  * GEMINI_CLASSIFICATION_MODEL, GEMINI_INTENT_MODEL, GEMINI_EMBEDDING_MODEL,
  * GEMINI_EMBEDDING_DIMENSION, GEMINI_INTENT_THINKING_LEVEL,
  * GEMINI_INTENT_LITE_MODEL, GEMINI_INTENT_LITE_THINKING_LEVEL,
- * GEMINI_INTENT_LITE_TIMEOUT_MS, GEMINI_INTENT_TIMEOUT_MS.
+ * GEMINI_INTENT_LITE_TIMEOUT_MS, GEMINI_INTENT_TIMEOUT_MS,
+ * GEMINI_VISION_MODEL, GEMINI_VISION_THINKING_LEVEL.
  */
 export function geminiModelsFromEnv(
   env: Record<string, string | undefined> = process.env,
@@ -181,6 +204,12 @@ export function geminiModelsFromEnv(
     intentLiteModel: env.GEMINI_INTENT_LITE_MODEL ?? DEFAULT_INTENT_LITE_MODEL,
     embeddingModel: env.GEMINI_EMBEDDING_MODEL ?? DEFAULT_EMBEDDING_MODEL,
     embeddingDimension: parseEmbeddingDimension(env.GEMINI_EMBEDDING_DIMENSION),
+    visionModel: env.GEMINI_VISION_MODEL ?? DEFAULT_VISION_MODEL,
+    visionThinkingLevel: parseThinkingLevel(
+      "GEMINI_VISION_THINKING_LEVEL",
+      env.GEMINI_VISION_THINKING_LEVEL,
+      DEFAULT_VISION_THINKING_LEVEL,
+    ),
     intentThinkingLevel: parseThinkingLevel(
       "GEMINI_INTENT_THINKING_LEVEL",
       env.GEMINI_INTENT_THINKING_LEVEL,

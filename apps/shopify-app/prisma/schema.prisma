@@ -123,6 +123,32 @@ model ProductEnrichment {
   // was written: a row at an older version re-enriches on the next run even
   // when its contentHash is unchanged. 0 = written before versioning.
   enrichmentVersion Int      @default(0)
+  // Vision enrichment (YOY-121; PRD capability 14). The five vision-only
+  // coverage attributes, values from the committed vocabularies in
+  // packages/engine/src/taxonomy.ts (null = not applicable / unknown).
+  sleeveLength       String?
+  neckline           String?
+  garmentLength      String?
+  pattern            String?
+  materialAppearance String?
+  // The ProductImage contentHashes (position order) the vision pass last
+  // analysed for this product: the re-analysis key. A product whose
+  // current image hashes differ is re-analysed on the next run; equal
+  // hashes make zero vision calls. [] = never analysed.
+  visionImageHashes  String[] @default([])
+  // none (no images / never run) | enriched | failed (two attempts failed;
+  // retried only when the image hashes change).
+  visionStatus       String   @default("none")
+  // The two sources the columns above are merged from (YOY-121 AC-3): the
+  // text pass's own parsed answer and the vision pass's own parsed answer
+  // (its shared-schema fields plus the five vision-only fields). Kept so
+  // that re-running ONE side — text after a content change or version
+  // bump over unchanged images, vision after an image change over
+  // unchanged text — re-merges against what the other side actually said,
+  // never against the previously merged columns. Null when that side never
+  // ran or failed.
+  textAttributes     Json?
+  visionAttributes   Json?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
