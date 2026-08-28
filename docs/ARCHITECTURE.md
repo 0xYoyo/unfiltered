@@ -553,6 +553,19 @@ never collapse, so the rule can never hide a different product. The
 result shape is unchanged. The eval golden g26 `pink rib knit top` pins
 it (pink member first, navy and black never in the top 10).
 
+The vector candidate scan keeps a bound of its own (YOY-125 AC-10):
+`max(limit, 1) * FAMILY_OVERSCAN` rows, `FAMILY_OVERSCAN = 8` in
+`retrieval-store.server.ts`. An unbounded `ORDER BY distance` inside the
+`candidates` CTE cannot use the HNSW iterative scan `withTenantVectorScan`
+enables (YOY-105) — Postgres would compute the distance for every embedding
+of the tenant passing the WHERE clause and sort them, on every AI search:
+invisible on the seed catalog, a latency regression proportional to catalog
+size on `/s/tentree`, `/s/whitestuff`, and any real merchant. The trade-off
+the constant buys: a page whose window is filled by more than eight
+colourways of one family can crowd out a further family that would otherwise
+have made it. Eight is the headroom that keeps the common colourway depth
+(three to six members) fully visible to the collapse.
+
 **Attribute evidence rule (YOY-133, binding — PRD §3 amendment (d)):**
 both stores judge `attributesExclude` and `attributesInclude` on the same
 evidence text — `attributeConstraintSql` in `retrieval-store.server.ts`,

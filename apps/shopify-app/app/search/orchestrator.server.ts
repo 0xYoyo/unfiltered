@@ -190,21 +190,25 @@ export function relaxationLadder(intent: Intent): RelaxationRung[] {
  * server log: the live degraded-with-intent-null failures were diagnosable
  * only by reproduction because nothing recorded what actually threw.
  */
+/** The YOY-109 structured-error shape, shared by every `[search]` warning. */
+function errorDetail(error: unknown): Record<string, unknown> {
+  return error instanceof Error
+    ? {
+        error: error.name,
+        message: error.message,
+        ...("status" in error ? { status: error.status } : {}),
+        ...("code" in error ? { code: error.code } : {}),
+      }
+    : { error: String(error) };
+}
+
 function warnIntentFailure(
   searchId: string,
   routeReason: SearchRouteReason,
   error: unknown,
   startedAt: number,
 ): void {
-  const detail =
-    error instanceof Error
-      ? {
-          error: error.name,
-          message: error.message,
-          ...("status" in error ? { status: error.status } : {}),
-          ...("code" in error ? { code: error.code } : {}),
-        }
-      : { error: String(error) };
+  const detail = errorDetail(error);
   console.warn(
     "[search] intent extraction failed; degrading to classic",
     JSON.stringify({
@@ -639,9 +643,15 @@ export function createSearchOrchestrator(
       hits: Array<{ productId: string }>;
       relaxed: RelaxedConstraint[];
     }> => {
-      let relaxed: RelaxedConstraint[] = [];
-      for (const rung of relaxationLadder(intent)) {
-        relaxed = rung.relaxed;
+      const rungs = [...relaxationLadder(intent)];
+      // What the KEYWORD fallback ignores, whichever way the ladder ends
+      // (YOY-125 AC-9): it applies only the exclusions, so every stated
+      // relaxable constraint is gone from it — the last rung's list. Before,
+      // a rung that threw reported only the rungs tried so far, so a store
+      // error on rung one headed the keyword cards "over your budget" while
+      // category, occasion and colour inclusions had been dropped too.
+      const fullyRelaxed = rungs.length === 0 ? [] : rungs[rungs.length - 1]!.relaxed;
+      for (const rung of rungs) {
         try {
           const result = await retriever.retrieve({
             intent,
@@ -651,9 +661,20 @@ export function createSearchOrchestrator(
             constraintsOverride: rung.constraints,
           });
           if (result.hits.length > 0) {
-            return { hits: result.hits, relaxed };
+            return { hits: result.hits, relaxed: rung.relaxed };
           }
-        } catch {
+        } catch (error) {
+          // A rung failure is a real store error, not a miss: log it the
+          // YOY-109 way instead of swallowing it, then serve the keyword
+          // fallback rather than failing the search.
+          console.warn(
+            "[search] close-match rung failed; serving the keyword fallback",
+            JSON.stringify({
+              searchId,
+              relaxed: rung.relaxed,
+              ...errorDetail(error),
+            }),
+          );
           break;
         }
       }
@@ -662,7 +683,7 @@ export function createSearchOrchestrator(
         throw speculated.error;
       }
       return speculated.result.hits.length > 0
-        ? { hits: speculated.result.hits, relaxed }
+        ? { hits: speculated.result.hits, relaxed: fullyRelaxed }
         : { hits: [], relaxed: [] };
     };
 

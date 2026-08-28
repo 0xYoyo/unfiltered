@@ -110,6 +110,27 @@ export function colorUnknownSql(constraints: {
 }
 
 /**
+ * Colourways per family the candidate scan can absorb before a family may be
+ * under-represented (YOY-125 AC-10). The scan reads `max(limit, 1) *
+ * FAMILY_OVERSCAN` rows, so `DISTINCT ON (family)` still has several members
+ * of each family to choose its representative from while the bound keeps the
+ * scan index-driven. The trade-off: a page whose window is filled by more
+ * than FAMILY_OVERSCAN colourways of one family can crowd out a further
+ * family that would otherwise have made it — which is why the number is not
+ * 1 and not unbounded.
+ */
+export const FAMILY_OVERSCAN = 8;
+
+/** The candidate scan's own LIMIT clause; empty when the caller set none. */
+function candidateScanLimitSql(limit: number | undefined): string {
+  if (limit === undefined) {
+    return "";
+  }
+  return `
+         LIMIT ${Math.max(limit, 1) * FAMILY_OVERSCAN}`;
+}
+
+/**
  * Postgres/pgvector implementation of the engine's RetrievalStore port.
  *
  * Every hard constraint is a WHERE predicate inside the similarity query
@@ -256,9 +277,16 @@ export function createPgVectorRetrievalStore(db: PrismaClient): RetrievalStore {
       // `relaxed_order` (YOY-105), which may emit candidates slightly out of
       // distance order, and the outer ORDER BY restores exact ordering
       // without changing which rows are selected. The family collapse and
-      // the limit sit OUTSIDE the scan (YOY-117): the scan must see every
-      // colourway to pick the right representative, and a limit applied
-      // before collapsing would count colourways, not families.
+      // the final limit sit OUTSIDE the scan (YOY-117): the scan must see
+      // several colourways to pick the right representative, and a limit
+      // applied before collapsing would count colourways, not families.
+      //
+      // The scan still carries a bound of its own (YOY-125 AC-10). Without
+      // one, `ORDER BY distance` with no LIMIT cannot use the HNSW iterative
+      // scan `withTenantVectorScan` enables: Postgres computes the distance
+      // for every embedding of the tenant that passes the WHERE clause and
+      // sorts them, on every AI search — invisible on the seed catalog, a
+      // latency regression proportional to catalog size on a real merchant.
       const rows = await withTenantVectorScan(db, (tx) =>
         tx.$queryRawUnsafe<
           Array<{ productId: string; distance: number; colorUnknown?: boolean }>
@@ -279,7 +307,7 @@ export function createPgVectorRetrievalStore(db: PrismaClient): RetrievalStore {
            ON en."shopDomain" = e."shopDomain" AND en."productId" = e."productId"
           AND en."status" = 'enriched'
          WHERE ${where.join("\n           AND ")}
-         ORDER BY ${orderBy}
+         ORDER BY ${orderBy}${candidateScanLimitSql(limit)}
          ),
          families AS (
            SELECT DISTINCT ON ("family") *
