@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { normalizeReuseQuery } from "../app/search/events.server";
+import { SEARCH_STAGES } from "../app/search/stages";
 import {
   distinctQueryText,
   evaluateAssertions,
@@ -72,12 +73,13 @@ function sample(overrides: Partial<ProbeSample>): ProbeSample {
 
 describe("set summaries", () => {
   it("reports n, p50, p95, degraded/limited counts, routes, and the mean per stage", () => {
-    const summary = summarize("ai-en", [
+    const samples = [
       sample({ latencyMs: 900 }),
       sample({ latencyMs: 1100, routeReason: "intent-reuse", stages: { classify: 20, intent: 400, embed: 50, retrieve: 100, hydrate: 10 } }),
       sample({ latencyMs: 300, route: "classic", degraded: true, stages: { classify: 30, intent: 900, classic: 20, hydrate: 5 } }),
       sample({ latencyMs: 250, route: "classic", degraded: true, limited: "ip", stages: { classic: 20, hydrate: 5 } }),
-    ]);
+    ];
+    const summary = summarize("ai-en", samples);
     expect(summary).not.toBeNull();
     expect(summary!.n).toBe(4);
     expect(summary!.p50).toBe(300);
@@ -86,7 +88,13 @@ describe("set summaries", () => {
     expect(summary!.limited).toBe(1);
     expect(summary!.reused).toBe(1);
     expect(summary!.routes).toEqual({ ai: 2, classic: 2 });
-    // Means are over the samples that ran the stage, in pipeline order.
+    // Means are over the samples that ran the stage, in pipeline order —
+    // the orchestrator's own `SEARCH_STAGES` (YOY-125 AC-1), so the probe's
+    // key order cannot drift from a stage added there. `closeMatches` is a
+    // real stage no sample ran here, so it is absent, not zero.
+    expect(Object.keys(summary!.meanStages)).toEqual(
+      SEARCH_STAGES.filter((stage) => samples.some((s) => s.stages[stage] !== undefined)),
+    );
     expect(Object.keys(summary!.meanStages)).toEqual([
       "classify",
       "intent",
@@ -95,6 +103,8 @@ describe("set summaries", () => {
       "classic",
       "hydrate",
     ]);
+    expect(SEARCH_STAGES).toContain("closeMatches");
+    expect(summary!.meanStages.closeMatches).toBeUndefined();
     expect(summary!.meanStages.intent).toBe(Math.round((600 + 400 + 900) / 3));
     expect(summary!.meanStages.classic).toBe(20);
     expect(formatSummary(summary!)).toContain("p50=300 ms p95=1100 ms degraded=2 limited=1 reused=1");
