@@ -1,5 +1,5 @@
 {
   "url": "https://unfiltered-eu.onrender.com",
-  "classicMaxMs": 1500,
-  "aiMaxMs": 6000
+  "classicMaxMs": 800,
+  "aiMaxMs": 3500
 }

@@ -6,14 +6,23 @@ against the deployment and posts to Slack **only when something fails**. The
 script is read-only (four GETs, fresh `sessionId`s, no writes anywhere); the
 routine is read-only by construction (Slack is its only connector). Ceilings
 live in `apps/shopify-app/scripts/live-smoke.config.json`
-(`classicMaxMs: 1500`, `aiMaxMs: 6000`); the origin is
+(`classicMaxMs: 800`, `aiMaxMs: 3500`); the origin is
 `https://unfiltered-eu.onrender.com` (Frankfurt).
+
+The ceilings were tightened from `1500`/`6000` to `800`/`3500` on
+2026-08-28 (YOY-124 AC-9b). They are canary ceilings, not the bars: the
+bars are docs/LATENCY.md's (classic p95 ≤ 500 ms, AI p95 < 3500 ms) over
+≥ 100 samples, while the smoke takes one sample per probe per day. The
+classic ceiling sits above the measured p95 (19–26 ms) with room for a
+single slow sample; the AI ceiling is the bar itself, because a single AI
+sample over 3500 ms is exactly the hedge-tail regression worth waking
+someone for.
 
 What the four probes assert is in the script's header comment; in one line:
 `/healthz` is 200 and reports the engine version the source exports;
 classic `dress` is classic, not degraded, has results and no chips, under
-1.5 s; EN and HE AI queries are AI-routed, not degraded, have chips and
-results, under 6 s.
+0.8 s; EN and HE AI queries are AI-routed, not degraded, have chips and
+results, under 3.5 s.
 
 ## Phone checklist — creating the routine at https://claude.ai/code/routines
 

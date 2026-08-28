@@ -478,6 +478,7 @@ docs/
   M2-LIVE-RUN.md
   M3-LIVE-RUN.md
   M4-LIVE-RUN.md
+  M5-LIVE-RUN.md
   PORTABILITY.md
   PRD.md
   SMOKE.md
