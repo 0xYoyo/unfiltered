@@ -180,11 +180,16 @@ function isStringArray(value: unknown): value is string[] {
  * `Mesh Over Dress in Pink`, `Linen Shirt - Sand`, `Court Sneaker / White`,
  * `Wool Beanie (Black)`. Each captures the designator text after the marker,
  * up to the end of the title (or the closing paren).
+ *
+ * A designator may itself name more than one colour (YOY-125 AC-8): `in Pink
+ * and Black`, `- Black/White`. The `/` is therefore inside every capture —
+ * excluded before, which left `Tee - Black/White` matching no shape at all —
+ * while a dash still opens a new designator rather than joining one.
  */
 const DESIGNATOR_PATTERNS: RegExp[] = [
-  /\bin\s+([^\-/()]+?)\s*$/i,
-  /\s[-–—]\s*([^\-/()]+?)\s*$/,
-  /\s\/\s*([^\-/()]+?)\s*$/,
+  /\bin\s+([^\-()]+?)\s*$/i,
+  /\s[-–—]\s*([^\-()]+?)\s*$/,
+  /\s\/\s*([^\-()]+?)\s*$/,
   /\(([^()]+)\)\s*$/,
 ];
 
@@ -193,6 +198,11 @@ const DESIGNATOR_PATTERNS: RegExp[] = [
  * stated colours (YOY-110 AC-1 rule a). A designator that is not a stated
  * colour ("Dress in Linen") is not a colour designator and yields null, so
  * the fallback rule decides. Lowercase; case-insensitive against `colors`.
+ *
+ * When the designator names SEVERAL stated colours, the one it names first
+ * wins (YOY-125 AC-8): `Dress in Pink and Black` is a pink dress however the
+ * model happened to order its `colors` array. Reading order is the shopper's
+ * reading of the title; `colors` order is an artefact of the extraction.
  */
 export function primaryColorFromTitle(
   title: string,
@@ -208,18 +218,25 @@ export function primaryColorFromTitle(
     if (designator === "") {
       continue;
     }
-    // Exact colour first ("in Pink"), then a colour the designator contains
-    // ("in Dusty Pink" → pink) so a modifier does not hide the colour.
+    // Exact colour first ("in Pink"), then the colour the designator names
+    // first ("in Dusty Pink" → pink, "in Pink and Black" → pink) so neither a
+    // modifier nor a second colour hides the one the title leads with.
     const exact = stated.find((color) => color === designator);
     if (exact !== undefined) {
       return exact;
     }
-    const contained = stated.find(
-      (color) =>
-        color !== "" && new RegExp(`\\b${escapeRegExp(color)}\\b`).test(designator),
-    );
-    if (contained !== undefined) {
-      return contained;
+    let first: { color: string; at: number } | null = null;
+    for (const color of stated) {
+      if (color === "") {
+        continue;
+      }
+      const at = designator.search(new RegExp(`\\b${escapeRegExp(color)}\\b`));
+      if (at !== -1 && (first === null || at < first.at)) {
+        first = { color, at };
+      }
+    }
+    if (first !== null) {
+      return first.color;
     }
   }
   return null;

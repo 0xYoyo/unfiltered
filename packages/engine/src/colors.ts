@@ -7,14 +7,22 @@
  * path, and it is not extended here — routing behaviour is pinned by the
  * eval goldens.
  *
- * COLORWAY_WORDS (YOY-117 AC-1) is the committed superset the product-family
- * rule reads: the classifier list plus the common colourway vocabulary of
- * fashion catalogues (shades, finishes, and the modifiers that precede a
- * colour — "dusty pink", "washed indigo", "meteorite black" is still a
- * colourway because its LAST word is a colour). A trailing title designator
- * (`in <Colour>`, `- <Colour>`, `/ <Colour>`, `(<Colour>)`) of one or two
- * words whose last word is in this set is a colourway, so "Rib Knit Top in
- * Pink" and "Rib Knit Top in Navy" are one family.
+ * The product-family rule reads two sets (YOY-117 AC-1, split on YOY-125
+ * AC-11). COLORWAY_COLORS holds the words that are a colour ON THEIR OWN —
+ * the classifier list plus the common colourway vocabulary of fashion
+ * catalogues, finishes and patterns included ("floral", "multi") because a
+ * catalogue really does sell "Dress - Floral" as a variant. COLORWAY_MODIFIERS
+ * holds the shade and finish adjectives that only ever qualify a colour
+ * ("dusty pink", "washed indigo", "soft", "natural"): a designator made of a
+ * modifier alone names the product, not its colourway.
+ *
+ * A trailing title designator (`in <Colour>`, `- <Colour>`, `/ <Colour>`,
+ * `(<Colour>)`) is a colourway when `isColorwayDesignator` accepts it: one
+ * word that is a colour, or two words whose LAST word is a colour. Before the
+ * split, the rule tested only the designator's last word against the union,
+ * so "Jacket - Soft", "Sofa (Natural)" and "Tee / Light" collapsed with
+ * "Jacket", "Sofa" and "Tee" of the same vendor and type — hiding a different
+ * product behind a colourway that was never one.
  */
 export const CLASSIFIER_COLOR_WORDS: ReadonlySet<string> = new Set([
   "black",
@@ -60,7 +68,7 @@ export const CLASSIFIER_COLOR_WORDS: ReadonlySet<string> = new Set([
   "כסף",
 ]);
 
-export const COLORWAY_WORDS: ReadonlySet<string> = new Set([
+export const COLORWAY_COLORS: ReadonlySet<string> = new Set([
   ...CLASSIFIER_COLOR_WORDS,
   "ivory",
   "cream",
@@ -106,14 +114,12 @@ export const COLORWAY_WORDS: ReadonlySet<string> = new Set([
   "multi",
   "multicolour",
   "multicolor",
-  "print",
   "floral",
   "striped",
   "bronze",
   "copper",
   "platinum",
   "pearl",
-  "natural",
   "oat",
   "oatmeal",
   "forest",
@@ -139,7 +145,13 @@ export const COLORWAY_WORDS: ReadonlySet<string> = new Set([
   "scarlet",
   "crimson",
   "cyan",
-  "royal",
+]);
+
+/**
+ * Words allowed only as the FIRST word of a two-word designator: each
+ * qualifies a colour and is never a colourway on its own.
+ */
+export const COLORWAY_MODIFIERS: ReadonlySet<string> = new Set([
   "light",
   "dark",
   "pale",
@@ -155,9 +167,28 @@ export const COLORWAY_WORDS: ReadonlySet<string> = new Set([
   "metallic",
   "matte",
   "glossy",
+  "natural",
+  "print",
+  "royal",
 ]);
 
-/** Whether a word (lowercased, punctuation-trimmed) is a colourway word. */
-export function isColorwayWord(word: string): boolean {
-  return COLORWAY_WORDS.has(word.trim().toLowerCase());
+/** The committed colourway vocabulary: colours plus their modifiers. */
+export const COLORWAY_WORDS: ReadonlySet<string> = new Set([
+  ...COLORWAY_COLORS,
+  ...COLORWAY_MODIFIERS,
+]);
+
+/**
+ * Whether a designator's words (lowercased, punctuation-trimmed) name a
+ * colourway: one word that is a colour on its own, or two words whose LAST
+ * word is a colour — the first may be anything, so an unlisted shade name
+ * ("Meteorite Black") still reads as a colourway. Longer designators are
+ * product names, never colourways.
+ */
+export function isColorwayDesignator(words: readonly string[]): boolean {
+  const cleaned = words.map((word) => word.trim().toLowerCase()).filter((word) => word !== "");
+  if (cleaned.length === 0 || cleaned.length > 2) {
+    return false;
+  }
+  return COLORWAY_COLORS.has(cleaned[cleaned.length - 1]!);
 }
