@@ -381,8 +381,13 @@ Query understanding (all LLM access through the `LlmClient` port):
   with zero LLM calls (reason `purpose-phrase`): "<noun phrase> for
   <purpose>" ("sneakers for running", "dress for a wedding", "something to
   wear to a wedding") and, in Hebrew, a category noun followed by a `ל…`
-  purpose word ("סניקרס לריצה", "שמלה לחתונה", "מכנסיים למשרד"; a colour
-  such as "לבנה" or the negation "לא" is not a purpose). Purpose is what
+  purpose word ("סניקרס לריצה", "שמלה לחתונה", "מכנסיים למשרד"). Not every
+  ל-initial word is the preposition, so `HEBREW_NON_PURPOSE_L_WORDS`
+  (YOY-125 AC-15) excludes the colour forms "לבן"/"לבנה" (in
+  `CLASSIFIER_COLOR_WORDS`) plus their plurals "לבנים"/"לבנות" — white is
+  the only colour with ל-initial spellings — the negations "ללא"/"לא", and
+  the common ל-initial nouns and brands "לוגו", "לייקרה", "לקוסט",
+  "ליוויס", "לונג"; those shapes ask the model like any other query. Purpose is what
   keyword search cannot read, and the live classifier routed that shape
   classic in one of four cases (co09), so the shape never asks the model.
   Everything else asks the model (operation `"classification"`), cached by
