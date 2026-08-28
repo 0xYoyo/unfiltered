@@ -971,6 +971,21 @@ non-Latin scripts (Hebrew) tokenize to fewer characters per token, so the
 estimate skews low for HE-heavy text. If the API ever returns real usage
 metadata for embeddings, it replaces the estimate.
 
+Aborted calls are metered by the same estimate (YOY-125 AC-6). A structured
+completion cut short by the caller's signal or by the adapter's own request
+timeout raises `GeminiTimeoutError` before any usage metadata exists, but
+Google bills the prompt tokens of a request it has begun — and since the
+intent hedge (`hedgedAccuracy`) aborts the losing tier on every occasion-class
+query, an aborted intent call is a normal outcome, not a rare deadline cut.
+The adapter therefore records one `AiCall` row with `inputTokens` estimated
+from the prompt through the same `ESTIMATED_CHARS_PER_TOKEN` path,
+`outputTokens: 0` (whatever the model produced before the abort never reached
+us), and the call's own `operation`/`storeId`/`searchId`, then rethrows
+`GeminiTimeoutError` unchanged. Only the prompt text is estimated: inline
+image bytes are not, so an aborted vision call would be under-counted —
+nothing aborts vision calls today. A non-abort failure (an API error, a
+malformed response) is still not metered.
+
 ## Test-location rule
 
 New test files do not go inside `apps/shopify-app/app/routes/`: route tests
