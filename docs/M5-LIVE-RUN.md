@@ -37,7 +37,7 @@ paste a live key or connection string into this file.
 | Date / time (UTC) | **2026-08-28 18:28–19:50** (Parts 1, 2, 3 steps 7–8, Part 4, Part 5, Part 7 steps 19 and 21). Part 3 step 9 and Part 6 not yet run — the rows below say so. |
 | Deployment URL | `https://unfiltered-eu.onrender.com` |
 | Render service / region / plan | `unfiltered-eu` (`srv-da6uhoh5efls73cvfis0`) / **Frankfurt** / _fill_ |
-| Commit deployed (SHA) | `52a638c` (PR #141) — Render deploy `dep-da8t6h9srm7s73ahjil0`, live 2026-08-28 18:29:16 UTC |
+| Commit deployed (SHA) | **Per part** — `render.yaml` sets `autoDeploy: true` on `main`, and three docs-only merges landed while the run was in progress, so the live build moved between parts. The engine is byte-identical across all three (every delta is under `docs/`). **`52a638c`** (PR #141, deploy `dep-da8t6h9srm7s73ahjil0`, live 18:29:16–19:29:40 UTC): Parts 1, 3, 5, 7, and Part 2 step 5's recorded search (`02a945db…`, 19:28:47). **`4aa3feb`** (PR #142, deploy `dep-da8u2cgae00c73a7ivh0`, live 19:29:40–19:42:43): Part 2's route-comparison searches (19:29:59–19:30:13) and the first seven searches of Part 4 step 10 (19:41:45–19:42:37). **`611ff72`** (PR #143, deploy `dep-da8u8g0u01pc73ckn58g`, live from 19:42:43): the rest of step 10 and steps 11–14 (19:42:46–19:47). Part 2 steps 3, 4 and 6 read the database directly and depend on no deployed build. |
 | Engine version at `/healthz` | `0.4.0` ✓ |
 | `DATABASE_URL` | Neon, `vector` enabled — **redacted**. Record **pooled or direct**: pooled is `…-pooler.<region>.aws.neon.tech` with `pgbouncer=true` (AC-11). **This run: pooled**, switched 18:28 UTC — AC-11 |
 | `DIRECT_DATABASE_URL` | **redacted**; set iff pooled (Prisma `directUrl`, migrations on boot). **This run: set** by the AC-11 switch (= the previous `DATABASE_URL`) |
@@ -375,7 +375,7 @@ or the hardening-tail AC it was appended to (AC-10; NG-1: file, do not fix).
 
 - **Date:** 2026-08-28 (partial — Parts 1, 2, 3, 4, 5 and 7; step 9 and Part 6 open)
 - **Executed by:** founder (steps 1, 7–8, 15, 19, 21) + builder (steps 3–6 and 10–14 executed; the rest of this table from the founder's pasted output on YOY-124)
-- **Deployment URL / commit:** `https://unfiltered-eu.onrender.com` @ `52a638c`
+- **Deployment URL / commit:** `https://unfiltered-eu.onrender.com` @ `52a638c` → `4aa3feb` → `611ff72` — the build moved twice mid-run under `autoDeploy`; the header block above says which part each one served, and all three deltas are docs-only
 - **Connection at run time:** **pooled** (switched 18:28 UTC, AC-11)
 - **Seed catalog size (products):** 465
 - **Vision coverage:** 100.0 % (465/465 enriched, 0 none, 0 failed)
