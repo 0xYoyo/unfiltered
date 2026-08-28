@@ -14,7 +14,11 @@
  * catalogue really does sell "Dress - Floral" as a variant. COLORWAY_MODIFIERS
  * holds the shade and finish adjectives that only ever qualify a colour
  * ("dusty pink", "washed indigo", "soft", "natural"): a designator made of a
- * modifier alone names the product, not its colourway.
+ * modifier alone names the product, not its colourway. `print` sits with the
+ * colours, not the modifiers (YOY-125 AC-17): it is a TERMINAL colourway word
+ * — "Leopard Print", "Ditsy Print", and the bare "- Print" a catalogue really
+ * does sell — so treating it as a leading modifier split one product family
+ * into a card per pattern.
  *
  * A trailing title designator (`in <Colour>`, `- <Colour>`, `/ <Colour>`,
  * `(<Colour>)`) is a colourway when `isColorwayDesignator` accepts it: one
@@ -115,6 +119,7 @@ export const COLORWAY_COLORS: ReadonlySet<string> = new Set([
   "multicolour",
   "multicolor",
   "floral",
+  "print",
   "striped",
   "bronze",
   "copper",
@@ -168,7 +173,6 @@ export const COLORWAY_MODIFIERS: ReadonlySet<string> = new Set([
   "matte",
   "glossy",
   "natural",
-  "print",
   "royal",
 ]);
 

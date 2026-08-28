@@ -27,7 +27,15 @@ const PRODUCT = "gid://shopify/Product/1";
  * suffix variant of one asset).
  */
 function imageServer(
-  options: { failing?: string[]; throwing?: string[]; sameBytes?: Record<string, string> } = {},
+  options: {
+    failing?: string[];
+    throwing?: string[];
+    sameBytes?: Record<string, string>;
+    /** URLs a CDN answers 200 with an HTML page (a gate, a "not found" page). */
+    html?: string[];
+    /** URLs answered 200 with no content-type header at all. */
+    typeless?: string[];
+  } = {},
 ) {
   const calls: string[] = [];
   const bytesFor = (url: string) =>
@@ -39,6 +47,14 @@ function imageServer(
     }
     if (options.failing?.includes(url)) {
       return new Response("gone", { status: 404 });
+    }
+    if (options.html?.includes(url)) {
+      return new Response("<html>password required</html>", {
+        headers: { "Content-Type": "text/html; charset=utf-8" },
+      });
+    }
+    if (options.typeless?.includes(url)) {
+      return new Response(bytesFor(url), { headers: {} });
     }
     return new Response(bytesFor(url), { headers: { "Content-Type": "image/jpeg" } });
   };
@@ -184,6 +200,60 @@ describe("syncProductImages (YOY-120 AC-1, AC-2)", () => {
     expect(retry).toEqual({ fetched: 0, unchanged: 2, failed: 1 });
     // A failed URL holds no slot: the kept images are positioned in order.
     expect((await rows()).map((row) => [row.position, row.url])).toEqual([[0, three[0]], [1, three[2]]]);
+  });
+
+  it("a 200 that is not an image counts as failed and keeps no row (YOY-125 AC-12)", async () => {
+    // A CDN that answers a gated or missing image with a 200 HTML page would
+    // otherwise store the hash of that HTML as the image's contentHash —
+    // identical across products, and later handed to the vision model.
+    const two = urls(2);
+    const server = imageServer({ html: [two[1]!] });
+
+    const counts = await syncProductImages({
+      db,
+      shopDomain: SHOP,
+      productId: PRODUCT,
+      imageUrls: two,
+      fetchImage: server.fetchImage,
+    });
+
+    expect(counts).toEqual({ fetched: 1, unchanged: 0, failed: 1 });
+    expect((await rows()).map((row) => [row.position, row.url])).toEqual([[0, two[0]]]);
+
+    // The next run RETRIES the rejected URL — it is never "unchanged".
+    const again = await syncProductImages({
+      db,
+      shopDomain: SHOP,
+      productId: PRODUCT,
+      imageUrls: two,
+      fetchImage: imageServer({ html: [two[1]!] }).fetchImage,
+    });
+    expect(again).toEqual({ fetched: 0, unchanged: 1, failed: 1 });
+    expect((await rows()).map((row) => row.url)).toEqual([two[0]]);
+
+    // Once the CDN serves the real image, it is captured normally.
+    const healed = await syncProductImages({
+      db,
+      shopDomain: SHOP,
+      productId: PRODUCT,
+      imageUrls: two,
+      fetchImage: imageServer().fetchImage,
+    });
+    expect(healed).toEqual({ fetched: 1, unchanged: 1, failed: 0 });
+    expect((await rows()).map((row) => row.url)).toEqual(two);
+  });
+
+  it("a 200 with no content-type at all counts as failed (YOY-125 AC-12)", async () => {
+    const one = urls(1);
+    const counts = await syncProductImages({
+      db,
+      shopDomain: SHOP,
+      productId: PRODUCT,
+      imageUrls: one,
+      fetchImage: imageServer({ typeless: one }).fetchImage,
+    });
+    expect(counts).toEqual({ fetched: 0, unchanged: 0, failed: 1 });
+    expect(await rows()).toEqual([]);
   });
 
   it("de-duplicates by content: one row per distinct image, later URLs recorded as its duplicates, the cap counting pictures (binding note, item 4)", async () => {

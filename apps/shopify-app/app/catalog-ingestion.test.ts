@@ -618,7 +618,9 @@ describe("catalog ingestion", () => {
         calls.push(url);
         return failing === url
           ? new Response("gone", { status: 404 })
-          : new Response(new TextEncoder().encode(`bytes:${url}`));
+          : new Response(new TextEncoder().encode(`bytes:${url}`), {
+              headers: { "content-type": "image/jpeg" },
+            });
       };
       return { fetchImage, calls };
     };
@@ -670,7 +672,9 @@ describe("catalog ingestion", () => {
       const fetchImage = async (url: string) => {
         calls.push(url);
         // Both product-1 URLs serve the same bytes.
-        return new Response(new TextEncoder().encode("same-picture"));
+        return new Response(new TextEncoder().encode("same-picture"), {
+          headers: { "content-type": "image/jpeg" },
+        });
       };
       const result = await ingestCatalog({
         db,

@@ -152,7 +152,9 @@ function imageStub() {
   const calls: string[] = [];
   const fetchImage: ImageFetch = async (url) => {
     calls.push(url);
-    return new Response(new TextEncoder().encode(`bytes:${url}`));
+    return new Response(new TextEncoder().encode(`bytes:${url}`), {
+      headers: { "content-type": "image/jpeg" },
+    });
   };
   return { fetchImage, calls };
 }

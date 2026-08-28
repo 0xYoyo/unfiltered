@@ -33,6 +33,7 @@ import {
   VISION_SCHEMA,
   visionAttributesFromStored,
 } from "./catalog/enrich.server";
+import { embedCatalog } from "./catalog/embed.server";
 import { mapProductNode } from "./catalog/mapping.server";
 import { productNode } from "./catalog/mapping.test";
 import { createTestDb } from "./testing/helpers.server";
@@ -604,6 +605,21 @@ function imageServer(types: Record<string, string> = {}) {
   return { fetchImage, fetched };
 }
 
+/** An embedding port that counts the texts it was asked to embed. */
+function countingEmbeddings() {
+  const texts: string[] = [];
+  return {
+    texts,
+    client: {
+      dimension: 3,
+      async embed(request: { texts: string[] }): Promise<number[][]> {
+        texts.push(...request.texts);
+        return request.texts.map(() => [1, 0, 0]);
+      },
+    },
+  };
+}
+
 async function seedImages(productId: string, urls: string[]): Promise<string[]> {
   const hashes: string[] = [];
   for (const [position, url] of urls.entries()) {
@@ -1082,6 +1098,65 @@ describe("vision pass in enrichCatalog (YOY-121 AC-2, AC-5, AC-6)", () => {
       ).vision,
     ).toEqual({ analysed: 0, cached: 2, failed: 0, costUsd: 0 });
     expect(rerun.calls).toHaveLength(0);
+  });
+
+  it("a transient fetch failure keeps the stored vision answer instead of erasing it (YOY-125 AC-13)", async () => {
+    // One good analysis, then a run where every image fetch throws.
+    await seedImages(P1, ["https://cdn.example/p1-a.png"]);
+    const first = await enrichCatalog({
+      db,
+      shopDomain: SHOP,
+      llm: llmStub(() => recordedAttributes()).llm,
+      vision: { llm: llmStub(() => recordedVision()).llm, fetchImage: imageServer().fetchImage },
+    });
+    expect(first.vision).toMatchObject({ analysed: 1, failed: 0 });
+    const before = await enrichmentRow(P1);
+    expect(before).toMatchObject({ pattern: "floral", visionStatus: "enriched" });
+
+    // Embed once, so a re-embed afterwards would be visible.
+    const embeddings = countingEmbeddings();
+    await embedCatalog({ db, shopDomain: SHOP, embeddings: embeddings.client });
+
+    // The product's image changes, and every fetch for it now throws.
+    await seedImages(P1, ["https://cdn.example/p1-b.png"]);
+    const vision = llmStub(() => recordedVision());
+    const throwing = {
+      fetchImage: async (): Promise<Response> => {
+        throw new Error("cdn down");
+      },
+    };
+
+    const result = await enrichCatalog({
+      db,
+      shopDomain: SHOP,
+      llm: llmStub(() => recordedAttributes()).llm,
+      vision: { llm: vision.llm, fetchImage: throwing.fetchImage },
+    });
+
+    expect(result.vision).toMatchObject({ analysed: 0, failed: 1 });
+    expect(vision.calls).toHaveLength(0);
+    const after = await enrichmentRow(P1);
+    // The stale answer over the OLD images survives — a stale answer beats
+    // none — and only the status records the failure.
+    expect(after).toMatchObject({
+      visionStatus: "failed",
+      pattern: "floral",
+      sleeveLength: before!.sleeveLength,
+      neckline: before!.neckline,
+      garmentLength: before!.garmentLength,
+      materialAppearance: before!.materialAppearance,
+    });
+    expect(after!.visionAttributes).toEqual(before!.visionAttributes);
+    // The hashes are untouched, so the NEXT run still retries.
+    expect(after!.visionImageHashes).toEqual(before!.visionImageHashes);
+
+    // Nothing about the embeddable text changed, so no re-embed is spent.
+    const embedded = await embedCatalog({
+      db,
+      shopDomain: SHOP,
+      embeddings: embeddings.client,
+    });
+    expect(embedded.embedded).toBe(0);
   });
 
   it("images that cannot be fetched make no call and leave the key untouched, so the next run retries", async () => {
