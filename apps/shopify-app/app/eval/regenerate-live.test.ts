@@ -51,7 +51,7 @@ import {
   VISION_FIXTURES_DIR,
   type EvalProduct,
 } from "./harness.server";
-import { recordingKeyFromPrompt } from "./replay.server";
+import { recordingKeyFromRequest } from "./replay.server";
 import {
   assertEngineSourceExecution,
   engineSourceResolutionFailure,
@@ -312,7 +312,7 @@ function captureCompletions(
     async completeStructured(request: StructuredCompletionRequest) {
       const response = await paced(() => inner.completeStructured(request));
       const called = usage();
-      entries[recordingKeyFromPrompt(request.prompt)] = {
+      entries[recordingKeyFromRequest(request)] = {
         output: response,
         inputTokens: called.inputTokens,
         outputTokens: called.outputTokens,
@@ -344,7 +344,9 @@ function visionImagesOf(product: EvalProduct): InlineImage[] {
 /**
  * Record the vision pass (YOY-122 AC-1) for every product with fixture
  * images: the live vision model over the same anchored prompt and schema
- * production uses, keyed by title in `vision.json`. `rerecordAll` replaces
+ * production uses, keyed in `vision.json` by title plus a digest of the
+ * ordered image bytes (YOY-125 AC-14), the same key the replay client
+ * derives. `rerecordAll` replaces
  * every entry (a prompt or model change); otherwise only missing entries
  * are recorded and every existing answer is reused byte-identical. Returns
  * each product's parsed answer (null without images) for the merged
@@ -390,15 +392,17 @@ async function recordVision({
       continue;
     }
     withImages += 1;
-    if (entries[product.title] === undefined) {
+    const call = {
+      prompt: buildVisionPrompt({ ...product, contentHash: computeContentHash(product) }),
+      schema: VISION_SCHEMA,
+      operation: "vision" as const,
+      temperature: 0,
+      images: visionImagesOf(product),
+    };
+    const key = recordingKeyFromRequest(call);
+    if (entries[key] === undefined) {
       try {
-        await llm.completeStructured({
-          prompt: buildVisionPrompt({ ...product, contentHash: computeContentHash(product) }),
-          schema: VISION_SCHEMA,
-          operation: "vision",
-          temperature: 0,
-          images: visionImagesOf(product),
-        });
+        await llm.completeStructured(call);
         recorded += 1;
       } catch (error) {
         check(false, `vision: ${product.productId} failed: ${String(error)}`);
@@ -406,7 +410,7 @@ async function recordVision({
         continue;
       }
     }
-    const entry = entries[product.title];
+    const entry = entries[key];
     const attributes = entry === undefined ? null : parseVisionAttributes(entry.output);
     check(attributes !== null, `vision: ${product.productId} answered outside the schema`);
     byProduct.set(product.productId, attributes);

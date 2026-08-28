@@ -219,6 +219,16 @@ invalidates every vision answer but no text enrichment. Product embedding
 texts are composed from the merged text + vision attributes, so a vision
 re-record re-embeds exactly the products whose merged text moved.
 
+`vision.json` is keyed by `<title>#<digest>` — the product title plus a short
+digest of its ordered image bytes (YOY-125 AC-14) — because two products with
+the same title and different photos would otherwise share one recorded
+answer, the second silently scored on the first product's image. Changing a
+product's images therefore changes its key, so the entry is re-recorded on
+the next run rather than answered from the old photo. Use `REGEN_SCOPE=vision`
+to re-key the file wholesale after such a change; the digest is computed
+identically by the recorder and by the replay client
+(`recordingKeyFromRequest` in `replay.server.ts`), so the two cannot drift.
+
 The root `regen:live` script pins the run to the root `vitest.config.ts`,
 whose alias resolves `@unfiltered/*` to the TypeScript source. Invoking
 vitest directly with a working directory inside `apps/shopify-app` picks up

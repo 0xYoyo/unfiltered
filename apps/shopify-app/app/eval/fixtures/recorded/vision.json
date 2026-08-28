@@ -2,7 +2,7 @@
   "modelId": "gemini-3.5-flash-lite",
   "provenance": "live",
   "entries": {
-    "Hoodie": {
+    "Hoodie#b9dfb13fe1b39b1e": {
       "output": {
         "category": "top",
         "colors": [
@@ -28,7 +28,7 @@
       "inputTokens": 1682,
       "outputTokens": 136
     },
-    "Wrap Dress": {
+    "Wrap Dress#72c4facff167f41c": {
       "output": {
         "category": "dress",
         "colors": [
@@ -55,7 +55,7 @@
       "inputTokens": 1712,
       "outputTokens": 141
     },
-    "Biker Jacket": {
+    "Biker Jacket#2efc062f8aa1f4a2": {
       "output": {
         "category": "jacket",
         "colors": [
@@ -81,7 +81,7 @@
       "inputTokens": 1686,
       "outputTokens": 135
     },
-    "Striped Tee": {
+    "Striped Tee#d934885446946deb": {
       "output": {
         "category": "top",
         "colors": [
@@ -107,7 +107,7 @@
       "inputTokens": 1686,
       "outputTokens": 135
     },
-    "Sun Dress": {
+    "Sun Dress#30b03c58a5eb610e": {
       "output": {
         "category": "dress",
         "colors": [
@@ -134,7 +134,7 @@
       "inputTokens": 1705,
       "outputTokens": 114
     },
-    "Moto Jacket": {
+    "Moto Jacket#65fb64fe77b59340": {
       "output": {
         "category": "jacket",
         "colors": [
@@ -160,7 +160,7 @@
       "inputTokens": 1685,
       "outputTokens": 135
     },
-    "Chinos": {
+    "Chinos#504dad495df281b1": {
       "output": {
         "category": "pants",
         "colors": [
@@ -186,7 +186,7 @@
       "inputTokens": 1685,
       "outputTokens": 141
     },
-    "Track Pants": {
+    "Track Pants#58af23b608fc55a1": {
       "output": {
         "category": "pants",
         "colors": [
@@ -211,7 +211,7 @@
       "inputTokens": 1685,
       "outputTokens": 134
     },
-    "Sandals": {
+    "Sandals#ac4fd30e67f5107f": {
       "output": {
         "category": "shoes",
         "colors": [
@@ -238,7 +238,7 @@
       "inputTokens": 1668,
       "outputTokens": 120
     },
-    "Jacket": {
+    "Jacket#c6c53ac48592d439": {
       "output": {
         "category": "jacket",
         "colors": [
@@ -263,7 +263,7 @@
       "inputTokens": 1684,
       "outputTokens": 129
     },
-    "Party Dress": {
+    "Party Dress#f03763663bfc8a82": {
       "output": {
         "category": "dress",
         "colors": [
@@ -290,7 +290,7 @@
       "inputTokens": 1685,
       "outputTokens": 138
     },
-    "Day Dress": {
+    "Day Dress#42d8ee49b454862a": {
       "output": {
         "category": "dress",
         "colors": [
@@ -316,7 +316,7 @@
       "inputTokens": 1715,
       "outputTokens": 85
     },
-    "Western Shirt": {
+    "Western Shirt#e7468ed1b029aa5e": {
       "output": {
         "category": "top",
         "colors": [
@@ -340,7 +340,7 @@
       "inputTokens": 1685,
       "outputTokens": 124
     },
-    "Winter Jacket": {
+    "Winter Jacket#7f4463aa891104ad": {
       "output": {
         "category": "jacket",
         "colors": [

@@ -1,6 +1,9 @@
+import { createHash } from "node:crypto";
+
 import type {
   CostRecorder,
   EmbeddingClient,
+  InlineImage,
   LlmClient,
 } from "@unfiltered/engine";
 
@@ -65,6 +68,37 @@ export function recordingKeyFromPrompt(prompt: string): string {
   return match[1]!;
 }
 
+/**
+ * The recording key for one completion request. A text-only request keys by
+ * its `Title:`/`Query:` line exactly as before; a request that carries images
+ * (the vision pass) appends a digest of the ordered image bytes (YOY-125
+ * AC-14).
+ *
+ * Keying vision answers by the bare title let two catalog products with the
+ * same title but different photos share one recorded answer — the second
+ * scored on the first product's image. The builder hit exactly that collision
+ * regenerating the PR #128 fixtures and worked around it by renaming two
+ * products; the digest makes the collision impossible instead. The recorder
+ * and the replay client both call this, so the two can never disagree.
+ */
+export function recordingKeyFromRequest(request: {
+  prompt: string;
+  images?: readonly InlineImage[];
+}): string {
+  const title = recordingKeyFromPrompt(request.prompt);
+  const images = request.images ?? [];
+  if (images.length === 0) {
+    return title;
+  }
+  const digest = createHash("sha256");
+  for (const image of images) {
+    digest.update(image.data);
+  }
+  // Short digest: enough to separate distinct image sets, short enough to
+  // keep the fixture file readable.
+  return `${title}#${digest.digest("hex").slice(0, 16)}`;
+}
+
 /** Replay LlmClient over per-operation recordings. */
 export function createReplayLlmClient({
   recordings,
@@ -81,7 +115,7 @@ export function createReplayLlmClient({
           `eval replay: no recording file for operation "${request.operation}"`,
         );
       }
-      const key = recordingKeyFromPrompt(request.prompt);
+      const key = recordingKeyFromRequest(request);
       const entry = recording.entries[key];
       if (entry === undefined) {
         throw new Error(
