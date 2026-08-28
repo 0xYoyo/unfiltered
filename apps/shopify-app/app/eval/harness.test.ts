@@ -5,6 +5,7 @@ import { constraintsFromIntent } from "@unfiltered/engine";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { createTestDb } from "../testing/helpers.server";
+import { recordingKeyFromRequest } from "./replay.server";
 import {
   CONSTRUCTOR_GROUPS,
   CONSTRUCTOR_SET_MINIMUMS,
@@ -334,6 +335,42 @@ describe("vision fixtures (YOY-122 AC-1, AC-2)", () => {
       expect(kase.sold.colors.length, kase.productId).toBeGreaterThan(0);
       expect(kase.otherItems.length, kase.productId).toBeGreaterThan(0);
     }
+  });
+
+  it("keys a vision recording by title AND images, and every titled product is unique (YOY-125 AC-14)", () => {
+    // Before AC-14 the key was the bare title, so two products with the same
+    // title and different photos shared one recorded answer — the second
+    // silently scored on the first product's image. The builder hit exactly
+    // that collision regenerating the PR #128 fixtures.
+    const promptOf = (title: string) => `Title: ${title}\nDescribe ONLY the item being sold.`;
+    const image = (bytes: string) => ({
+      mimeType: "image/jpeg",
+      data: new TextEncoder().encode(bytes),
+    });
+    const first = { prompt: promptOf("Wrap Dress"), images: [image("photo-a")] };
+    const second = { prompt: promptOf("Wrap Dress"), images: [image("photo-b")] };
+    expect(recordingKeyFromRequest(first)).not.toBe(recordingKeyFromRequest(second));
+    // Both still carry the title, so a fixture file stays readable.
+    expect(recordingKeyFromRequest(first)).toContain("Wrap Dress");
+    // Order matters: the same two photos swapped are a different request.
+    expect(
+      recordingKeyFromRequest({
+        prompt: promptOf("Wrap Dress"),
+        images: [image("photo-a"), image("photo-b")],
+      }),
+    ).not.toBe(
+      recordingKeyFromRequest({
+        prompt: promptOf("Wrap Dress"),
+        images: [image("photo-b"), image("photo-a")],
+      }),
+    );
+    // A text-only request keys by the title alone, exactly as before.
+    expect(recordingKeyFromRequest({ prompt: promptOf("Wrap Dress") })).toBe("Wrap Dress");
+
+    // Belt and braces for the regeneration flow: a duplicate title in the
+    // committed catalog fails here, before any live spend.
+    const titles = withImages.map((product) => product.title);
+    expect(new Set(titles).size, titles.join(", ")).toBe(titles.length);
   });
 
   it("every fixture image exists, is ≤ 200 KB, and is listed with a licence in SOURCES.md", () => {
