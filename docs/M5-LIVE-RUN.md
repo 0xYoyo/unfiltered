@@ -34,7 +34,7 @@ paste a live key or connection string into this file.
 
 | Field | Value |
 | --- | --- |
-| Date / time (UTC) | **2026-08-28 18:28–19:50** (Parts 1, 2, 3 steps 7–8, Part 4, Part 5, Part 7 steps 19 and 21). Part 3 step 9 and Part 6 not yet run — the rows below say so. |
+| Date / time (UTC) | **2026-08-28 18:28–20:15** (Parts 1, 2, 3 steps 7–8, Parts 4, 5, 6 and Part 7 steps 19 and 21). Part 3 step 9 not yet run — the rows below say so. |
 | Deployment URL | `https://unfiltered-eu.onrender.com` |
 | Render service / region / plan | `unfiltered-eu` (`srv-da6uhoh5efls73cvfis0`) / **Frankfurt** / _fill_ |
 | Commit deployed (SHA) | **Per part** — `render.yaml` sets `autoDeploy: true` on `main`, and three docs-only merges landed while the run was in progress, so the live build moved between parts. The engine is byte-identical across all three (every delta is under `docs/`). **`52a638c`** (PR #141, deploy `dep-da8t6h9srm7s73ahjil0`, live 18:29:16–19:29:40 UTC): Parts 1, 3, 5, 7, and Part 2 step 5's recorded search (`02a945db…`, 19:28:47). **`4aa3feb`** (PR #142, deploy `dep-da8u2cgae00c73a7ivh0`, live 19:29:40–19:42:43): Part 2's route-comparison searches (19:29:59–19:30:13) and the first seven searches of Part 4 step 10 (19:41:45–19:42:37). **`611ff72`** (PR #143, deploy `dep-da8u8g0u01pc73ckn58g`, live from 19:42:43): the rest of step 10 and steps 11–14 (19:42:46–19:47). Part 2 steps 3, 4 and 6 read the database directly and depend on no deployed build. |
@@ -373,13 +373,13 @@ Fill one row per step. **YOY-124 closes only when every step has a row.**
 Every FAIL row must name the defect and link the Linear issue filed for it,
 or the hardening-tail AC it was appended to (AC-10; NG-1: file, do not fix).
 
-- **Date:** 2026-08-28 (partial — Parts 1, 2, 3, 4, 5 and 7; step 9 and Part 6 open)
-- **Executed by:** founder (steps 1, 7–8, 15, 19, 21) + builder (steps 3–6 and 10–14 executed; the rest of this table from the founder's pasted output on YOY-124)
+- **Date:** 2026-08-28 (partial — Parts 1, 2, 3, 4, 5, 6 and 7; step 9 open, step 18 waiting on the founder)
+- **Executed by:** founder (steps 1, 7–8, 15, 19, 21) + builder (steps 3–6, 10–14 and 16–17 executed; the rest of this table from the founder's pasted output on YOY-124)
 - **Deployment URL / commit:** `https://unfiltered-eu.onrender.com` @ `52a638c` → `4aa3feb` → `611ff72` — the build moved twice mid-run under `autoDeploy`; the header block above says which part each one served, and all three deltas are docs-only
 - **Connection at run time:** **pooled** (switched 18:28 UTC, AC-11)
 - **Seed catalog size (products):** 465
 - **Vision coverage:** 100.0 % (465/465 enriched, 0 none, 0 failed)
-- **Mean cost per search:** _fill_
+- **Mean cost per search:** **$0.000373** ($0.37 / 1,000) over this run's 16 AI searches — see row 16 for the method and its caveat
 - **Vision one-time cost per 1,000 products:** _fill_
 
 | # | AC | Scenario | Expected | Result | Evidence |
@@ -399,9 +399,9 @@ or the hardening-tail AC it was appended to (AC-10; NG-1: file, do not fix).
 | 13 | AC-5 | Both laws in Hebrew | same behaviour, RTL chrome, Hebrew chips | **PASS (engine half)** | `שמלת קיץ, לא שחורה, עד 200` (`fbe2f990…`) returns the same single `Mesh Over Dress in Navy` with the same three chips; `שמלת קיץ, לא שחורה, עד 100` (`58ea6434…`) returns 0 primary with `closeMatchesRelaxed: ["priceMax"]` and 10 close matches. Identical behaviour to steps 11–12, so the law is not language-specific. Two notes: the HE intents carry `currency: "ILS"` against a USD catalog (the cap is applied as a bare number), and the RTL chrome half was covered by the founder's step-15 pass, not re-checked here. |
 | 14 | AC-6 | `/s/tentree` `t-shirt`; `/s/whitestuff` prices | 24 distinct titles; GBP | **FAIL — YOY-135, YOY-137** | tentree `t-shirt` (`340911ce…`) returns 24 results but **22 distinct titles**: `Wildfire Retro Treeline T-Shirt` and `Juniper T-Shirt` each render twice (different colourway handles). It routes **classic**, and the family collapse is AI-only — the same catalog on an AI-routed query (`e7b7ade2…`) returns 24 results / **24 distinct** titles. Filed as YOY-135. whitestuff (`f3003d30…`) prices render **EUR**, not GBP: the catalog was crawled from the `/eu/` storefront, so EUR is its own currency — the law holds, the AC's expectation of GBP does not. Filed as YOY-137. |
 | 15 | AC-4 | Design eyes, EN + HE, phone + laptop | chips truthful, negation tinted, no bridal gown, spec matched | **PASS (founder)** | Founder ran the five named queries in EN and HE (go-signal step 3) and reported "Eye test looks about right" — YOY-124 comment 2026-08-28 19:08 UTC. No searchIds were captured, so AC-4's twelve-example table (step 10) is still open. |
-| 16 | AC-8 | Mean cost per search | ≤ $0.60 / 1,000 searches | | |
-| 17 | AC-8 | `/internal/costs` gate | `404` with no token and with a wrong token | | |
-| 18 | AC-8 | Vision one-time cost | recorded per 1,000 products | | |
+| 16 | AC-8 | Mean cost per search | ≤ $0.60 / 1,000 searches | **PASS (computed from the ledger, not read off `/internal/costs`)** | `evidence.mts costs SEARCH_ID` over all 16 AI searches of Part 4 (the twelve curated examples plus the four colour-law queries): total **$0.005967**, mean **$0.000373** = **$0.37 per 1,000**, against a $0.60 bar. Spread $0.000000–$0.000655; the four ~$0 searches are `intent-reuse` (no model call) and the dearest is a refinement (`6fba5e68…`, $0.000655 — classification $0.000080 + intent $0.000574), the shape the step says to call out. Excluding the reuses, the mean is $0.000497 ($0.50 / 1,000), still under. **Caveat:** the ledger page's own aggregate was not opened — see row 17's note — so this is a per-search readback over an enumerated set, not `/internal/costs`'s run-wide mean. |
+| 17 | AC-8 | `/internal/costs` gate | `404` with no token and with a wrong token | **PASS** | `GET /internal/costs` → **404**; `?token=definitely-not-the-token` → **404**; `?token=` (empty) → **404**. No 401, no 403, no login page — the route does not admit that it exists. |
+| 18 | AC-8 | Vision one-time cost | recorded per 1,000 products | **OPEN — founder** | Vision `AiCall` rows carry no `searchId`, so `evidence.mts costs` (which is keyed by search) cannot reach them; the figure lives only in `/internal/costs`'s operation rows, which needs `ADMIN_TOKEN`. Reading that secret from `.env` was denied to the agent by the permission guard, and the denial was not worked around. The founder opening `SERVICE/internal/costs?token=…` once and pasting the `vision` operation total plus its product count closes this row and completes AC-8. |
 | 19 | AC-9b | Smoke at the tightened ceilings | `4/4 passed → exit 0` | **PASS** | `live-smoke.mts` at 18:59:43 UTC: `4/4 passed → exit 0` against `classicMaxMs: 800` / `aiMaxMs: 3500` — healthz ✓, classic 126 ms (`short-query`), ai-en 1517 ms (3 chips), ai-he 3418 ms (3 chips, `purpose-phrase`). YOY-124 comment. |
 | 20 | AC-9a/c | Daily routine | **DEFERRED** to submission day (SMOKE.md) | | |
 | 21 | AC-11/12 | Founder-lane ACs | recorded on YOY-124, not here | **AC-11 PASS / AC-12 open** | AC-11: pooled switch + redeploy + `/healthz` + smoke + `--assert-classic-p95 500` exit 0 at p95 50 ms; docs/LATENCY.md row 3 replaced by the measured 2026-08-28 pooled row. AC-12: the `--set all` summary reports p50/p95, not the **max** latency AC-12 asks for, so the 4500 ms decision has no evidence yet. |
