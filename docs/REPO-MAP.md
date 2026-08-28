@@ -886,7 +886,7 @@ vitest.setup.ts
 - apps/shopify-app/app/ai/pricing.server.ts → config/ai-prices.json (unresolved)
 - apps/shopify-app/app/ai/pricing.test.ts → apps/shopify-app/app/ai/pricing.server.ts
 - apps/shopify-app/app/catalog-embedding.test.ts → apps/shopify-app/app/ai/cost-recorder.server.ts, apps/shopify-app/app/catalog/embed.server.ts, apps/shopify-app/app/catalog/mapping.server.ts, apps/shopify-app/app/catalog/mapping.test.ts, apps/shopify-app/app/testing/helpers.server.ts
-- apps/shopify-app/app/catalog-enrichment.test.ts → apps/shopify-app/app/ai/cost-recorder.server.ts, apps/shopify-app/app/catalog/enrich.server.ts, apps/shopify-app/app/catalog/mapping.server.ts, apps/shopify-app/app/catalog/mapping.test.ts, apps/shopify-app/app/testing/helpers.server.ts
+- apps/shopify-app/app/catalog-enrichment.test.ts → apps/shopify-app/app/ai/cost-recorder.server.ts, apps/shopify-app/app/catalog/embed.server.ts, apps/shopify-app/app/catalog/enrich.server.ts, apps/shopify-app/app/catalog/mapping.server.ts, apps/shopify-app/app/catalog/mapping.test.ts, apps/shopify-app/app/testing/helpers.server.ts
 - apps/shopify-app/app/catalog-ingestion.test.ts → apps/shopify-app/app/catalog/ingest.server.ts, apps/shopify-app/app/catalog/mapping.server.ts, apps/shopify-app/app/catalog/mapping.test.ts, apps/shopify-app/app/testing/helpers.server.ts
 - apps/shopify-app/app/catalog/embed.server.ts → apps/shopify-app/app/ai/cost-recorder.server.ts, apps/shopify-app/app/catalog/hnsw.server.ts
 - apps/shopify-app/app/catalog/enrich.server.ts → apps/shopify-app/app/ai/cost-recorder.server.ts, apps/shopify-app/app/catalog/images.server.ts
