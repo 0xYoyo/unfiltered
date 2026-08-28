@@ -82,7 +82,33 @@ Classic p95 ≤ 500 ms was met on 2026-08-26 at **19 ms** (row 2 below:
 Frankfurt, one-statement search, unpooled) — 26× under the bar, from
 50 ms on the two-statement code and 919–978 ms on the Oregon deployment
 that motivated it. The pooled-connection row (row 3) is the deployment's
-final form and is measured in YOY-124 AC-11; it is not what meets the bar.
+final form; it was measured in YOY-124 AC-11 on 2026-08-28 at **50 ms**
+(the subsection below), still 10× under the bar — pooling is not what meets the
+bar, and it does not cost the bar either.
+
+### Pooled classic — the deployment's final form (YOY-124 AC-11)
+
+The env-group switch ran on **2026-08-28 18:28 UTC**
+(`render-migrate.mts pool-database-url unfiltered-prod`: `DIRECT_DATABASE_URL`
+written from the previous `DATABASE_URL`, `DATABASE_URL` rewritten to the
+`-pooler` host with `pgbouncer=true`), then `trigger-deploy` and `wait-deploy`
+— deploy `dep-da8t6h9srm7s73ahjil0`, live 18:29:16 UTC, commit `52a638c`.
+`/healthz` answered `200` with engine `0.4.0`, and the four-probe smoke passed
+`4/4` at 18:59 UTC.
+
+The four 2026-08-27 PR #129 rows below say "pooled" in their Code column; that
+label is wrong. `pool-database-url` refuses an already-pooled host and it
+succeeded on 2026-08-28, writing `DIRECT_DATABASE_URL` from the then-current
+`DATABASE_URL` — so every row before 2026-08-28 ran direct. The rows are left
+as recorded rather than rewritten; this paragraph is the correction.
+
+Classic on the pooled connection is **p50 37 ms, p95 50 ms** (the 2026-08-28
+rows below) against 13 ms / 22 ms on the unpooled rows of 2026-08-26 and
+2026-08-27: PgBouncer costs roughly 20–25 ms per statement here, and the bar
+still clears by 10×. The AI sets ran pooled in the same invocation and met
+every bar — EN p95 2228 ms, HE p95 3421 ms, combined 3275 ms — with one
+degraded HE response of 200. Full probe output on
+[YOY-124](https://linear.app/0xyoyo/issue/YOY-124).
 
 ### AI bars — first run: EN met, HE missed on p95 (YOY-64, 2026-08-26)
 
@@ -155,7 +181,6 @@ links the issue comment carrying the probe's full output.
 | 2026-08-26 | Frankfurt | `main` before YOY-114 | ai-he | 100 | 1820 ms | 7370 ms | 0 degraded, 0 limited. p95 misses the 3500 ms bar. |
 | 2026-08-26 | Frankfurt | `main` before YOY-114 | ai-combined | 200 | 1830 ms | 7370 ms | Per-stage means absent: the deployed code predates `details.stages`. |
 | 2026-08-26 12:37 UTC | Frankfurt | PR #113 one-statement classic (YOY-115 AC-1..3), unpooled `DATABASE_URL` | classic | 100 | **9 ms** | **19 ms** | YOY-115 AC-6 row 2; `--assert-classic-p95 500` exit 0; full output on YOY-115. 1 `degraded` (a cold LLM-classifier timeout on "black shirt", served classic) — the classifier's cost, not the statement's: mean per stage classify 29 ms · classic 10 ms. |
-| — | Frankfurt | one-statement classic + pooled `-pooler` host (`pgbouncer=true`) | classic | — | — | — | YOY-115 AC-6 row 3: pooled — measured in YOY-124 AC-11 after the founder-lane env-group switch (docs/DEPLOY.md "Switching to the pooled connection"). |
 | 2026-08-26 ~21:30 UTC | Frankfurt | `main` at PR #117 (YOY-64 AC-1..5), unpooled | classic | 100 | **13 ms** | **22 ms** | YOY-64 AC-6 run; full output on YOY-64. One 948 ms sample (rank 100): "black shirt" is colour-shaped, so the model classified it while a speculative intent extraction ran alongside (AC-5) — the response was still classic; mean per stage classify 8 ms · classic 10 ms. |
 | 2026-08-26 ~21:30 UTC | Frankfurt | `main` at PR #117 | ai-en | 100 | **908 ms** | **3354 ms** | Both bars met. 1 degraded (an 8043 ms accuracy-tier hang cut by the ladder deadline), 0 limited, 0 reused. Mean per stage: classify 623 · intent 1232 · embed 26 · retrieve 31 · hydrate 12 · closeMatches 20 ms. |
 | 2026-08-26 ~21:30 UTC | Frankfurt | `main` at PR #117 | ai-he | 100 | **976 ms** | 8021 ms | p50 met; **p95 missed**: 12 degraded (accuracy-tier hangs at the 8 s deadline, 9 on one occasion-class query), 0 limited, 0 reused. Mean per stage: classify 585 · intent 2377 · embed 41 · retrieve 36 · hydrate 9 · closeMatches 18 ms. |
@@ -168,3 +193,7 @@ links the issue comment carrying the probe's full output.
 | 2026-08-27 ~21:10 UTC (2026-08-28 00:10 IDT) | Frankfurt | `main` at PR #129 | ai-en | 100 | **854 ms** | **3266 ms** | Both bars met. 1 degraded, 1 limited (one request hit the per-IP AI throttle and was served classic), 0 reused. Mean per stage: classify 532 · intent 1078 · embed 27 · retrieve 32 · hydrate 9 · closeMatches 19. The `attributesExclude` predicate costs nothing visible: retrieve 32 ms, as before. |
 | 2026-08-27 ~21:10 UTC (2026-08-28 00:10 IDT) | Frankfurt | `main` at PR #129 | ai-he | 100 | **905 ms** | **1688 ms** | Both bars met. 0 degraded, 0 limited, 0 reused. Mean per stage: classify 529 · intent 966 · embed 26 · retrieve 32 · hydrate 11 · closeMatches 15. |
 | 2026-08-27 ~21:10 UTC (2026-08-28 00:10 IDT) | Frankfurt | `main` at PR #129 | ai-combined | 200 | **886 ms** | **1841 ms** | Both bars met; 1 degraded of 200 (AC-6 bar ≤ 2). `--assert-classic-p95 500 --assert-ai-p50 2000 --assert-ai-p95 3500` exit 0: `assertions: all bars met`. The purpose-phrase route (this PR) was not yet deployed for this run; it removes the classification call (mean 531 ms) from purpose-shaped queries, so it can only lower these numbers. |
+| 2026-08-28 18:29–18:59 UTC | Frankfurt | `main` at `52a638c` (PR #141), one-statement classic + pooled `-pooler` host (`pgbouncer=true`) | classic | 100 | **37 ms** | **50 ms** | YOY-115 AC-6 row 3 = YOY-124 AC-11: the pooled measurement, taken after the founder-lane env-group switch (docs/DEPLOY.md "Switching to the pooled connection"). `--assert-classic-p95 500` exit 0; full output on YOY-124. 0 degraded, 0 limited; mean per stage classify 9 · intent 1039 · classic 30 — the intent mean is the speculative extraction that the colour-shaped classic query starts (YOY-64 AC-5), not time the classic answer waited on. |
+| 2026-08-28 18:29–18:59 UTC | Frankfurt | `main` at `52a638c` (PR #141), pooled | ai-en | 100 | **1008 ms** | **2228 ms** | Both bars met. 0 degraded, 0 limited, 0 reused. Mean per stage: classify 279 · intent 1096 · embed 28 · retrieve 48 · hydrate 20 · closeMatches 25 ms. |
+| 2026-08-28 18:29–18:59 UTC | Frankfurt | `main` at `52a638c` (PR #141), pooled | ai-he | 100 | **1060 ms** | **3421 ms** | Both bars met (p95 by 79 ms). **1 degraded** (routes: ai=99, classic=1), 0 limited, 0 reused. Mean per stage: classify 232 · intent 1313 · embed 39 · retrieve 46 · classic 22 · hydrate 21 · closeMatches 28 ms. |
+| 2026-08-28 18:29–18:59 UTC | Frankfurt | `main` at `52a638c` (PR #141), pooled | ai-combined | 200 | **1017 ms** | **3275 ms** | Both bars met. 1 degraded of 200 — inside the YOY-64 AC-6 bar (≤ 2 of 200), **outside YOY-124 AC-2's literal `degraded=0`**; which of the two governs AC-2 is the open founder question on YOY-124. `--assert-classic-p95 500 --assert-ai-p50 2000 --assert-ai-p95 3500` exit 0: `assertions: all bars met`. |

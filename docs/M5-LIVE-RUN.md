@@ -34,13 +34,13 @@ paste a live key or connection string into this file.
 
 | Field | Value |
 | --- | --- |
-| Date / time (UTC) | _fill_ |
+| Date / time (UTC) | **2026-08-28 18:28–19:08** (Part 1, Part 3 steps 7–8, Part 5, Part 7 steps 19 and 21). Parts 2, 4 and 6 not yet run — the rows below say so. |
 | Deployment URL | `https://unfiltered-eu.onrender.com` |
 | Render service / region / plan | `unfiltered-eu` (`srv-da6uhoh5efls73cvfis0`) / **Frankfurt** / _fill_ |
-| Commit deployed (SHA) | _fill — Render dashboard → the live deploy_ |
-| Engine version at `/healthz` | _fill — must be `0.4.0`_ |
-| `DATABASE_URL` | Neon, `vector` enabled — **redacted**. Record **pooled or direct**: pooled is `…-pooler.<region>.aws.neon.tech` with `pgbouncer=true` (AC-11) |
-| `DIRECT_DATABASE_URL` | **redacted**; set iff pooled (Prisma `directUrl`, migrations on boot) |
+| Commit deployed (SHA) | `52a638c` (PR #141) — Render deploy `dep-da8t6h9srm7s73ahjil0`, live 2026-08-28 18:29:16 UTC |
+| Engine version at `/healthz` | `0.4.0` ✓ |
+| `DATABASE_URL` | Neon, `vector` enabled — **redacted**. Record **pooled or direct**: pooled is `…-pooler.<region>.aws.neon.tech` with `pgbouncer=true` (AC-11). **This run: pooled**, switched 18:28 UTC — AC-11 |
+| `DIRECT_DATABASE_URL` | **redacted**; set iff pooled (Prisma `directUrl`, migrations on boot). **This run: set** by the AC-11 switch (= the previous `DATABASE_URL`) |
 | `GEMINI_API_KEY` | **redacted** (`AIza…`) — Google AI Studio, Tier 1 billing |
 | `SHOPIFY_API_KEY` / `SHOPIFY_API_SECRET` | both **redacted** — the existing app record; **not** re-pointed (NG-2) |
 | `SHOPIFY_APP_URL` | `https://unfiltered-eu.onrender.com` |
@@ -373,10 +373,10 @@ Fill one row per step. **YOY-124 closes only when every step has a row.**
 Every FAIL row must name the defect and link the Linear issue filed for it,
 or the hardening-tail AC it was appended to (AC-10; NG-1: file, do not fix).
 
-- **Date:** _fill_
-- **Executed by:** _fill_
-- **Deployment URL / commit:** `https://unfiltered-eu.onrender.com` @ _fill_
-- **Connection at run time:** _pooled / direct_
+- **Date:** 2026-08-28 (partial — Parts 1, 3, 5 and 7; Parts 2, 4 and 6 open)
+- **Executed by:** founder (steps 1, 7–8, 15, 19, 21) + builder (this table, from the founder's pasted output on YOY-124)
+- **Deployment URL / commit:** `https://unfiltered-eu.onrender.com` @ `52a638c`
+- **Connection at run time:** **pooled** (switched 18:28 UTC, AC-11)
 - **Seed catalog size (products):** _fill_
 - **Vision coverage:** _fill (%)_
 - **Mean cost per search:** _fill_
@@ -384,27 +384,27 @@ or the hardening-tail AC it was appended to (AC-10; NG-1: file, do not fix).
 
 | # | AC | Scenario | Expected | Result | Evidence |
 |---|---|---|---|---|---|
-| 1 | — | `/healthz` and deployed commit | `200`, engine `0.4.0`, commit matches header | | |
+| 1 | — | `/healthz` and deployed commit | `200`, engine `0.4.0`, commit matches header | **PASS** | `/healthz` `200`, engine `0.4.0`; Render deploy `dep-da8t6h9srm7s73ahjil0` live 18:29:16 UTC at `52a638c`. YOY-124 comment 2026-08-28. |
 | 2 | — | Keep-awake monitor running | monitor reports the service up | | |
 | 3 | AC-7 | Index counts | products = enriched = embedded | | |
 | 4 | AC-7 | Vision coverage | ≥ 90 % `visionStatus=enriched` | | |
 | 5 | AC-7 | `long sleeve midi dress` top 5 | ≥ 4 of 5 have `sleeveLength=long` | | |
 | 6 | AC-7 | Anti-contamination spot check | no footwear/jewelry attribute | | |
-| 7 | AC-2 | Full probe, bars asserted | exit 0, `assertions: all bars met`, four rows | | |
-| 8 | AC-2 | Degraded count | `degraded=0` (and `reused=0`) on every set | | |
+| 7 | AC-2 | Full probe, bars asserted | exit 0, `assertions: all bars met`, four rows | **PASS** | `--runs 20 --set all` with all three `--assert-*` flags: exit 0, `assertions: all bars met`. classic p50 37 / p95 50; ai-en 1008 / 2228; ai-he 1060 / 3421; ai-combined 1017 / 3275. Four rows added to docs/LATENCY.md (2026-08-28, pooled). |
+| 8 | AC-2 | Degraded count | `degraded=0` (and `reused=0`) on every set | **FLAG — founder decision open** | `reused=0` and `limited=0` on every set ✓, but ai-he shows **`degraded=1`** (routes ai=99, classic=1) → 1 of 200 AI samples. That is inside the binding docs/LATENCY.md bar for the AI run (YOY-64 AC-6, amended 2026-08-26: degraded ≤ 1 %, ≤ 2 of 200) and outside AC-2's literal `degraded=0`. Not recorded as PASS or FAIL until the founder says which governs; AC-2 stays unticked meanwhile. |
 | 9 | AC-3 | Parity floor, 3 warm loads each | server `latencyMs` ≤ 500 ms on all three | | |
 | 10 | AC-4 | Twelve curated examples (EN + HE) | all 12 ≥ 1 result; the 8 named route `ai` with ≥ 1 chip | | |
 | 11 | AC-5 | `…not black, under 200` | both 128-unit Mesh Over Dresses | | |
 | 12 | AC-5 | `…not black, under 100` | zero hits, "Close matches — over your budget", 0 black-primary | | |
 | 13 | AC-5 | Both laws in Hebrew | same behaviour, RTL chrome, Hebrew chips | | |
 | 14 | AC-6 | `/s/tentree` `t-shirt`; `/s/whitestuff` prices | 24 distinct titles; GBP | | |
-| 15 | AC-4 | Design eyes, EN + HE, phone + laptop | chips truthful, negation tinted, no bridal gown, spec matched | | |
+| 15 | AC-4 | Design eyes, EN + HE, phone + laptop | chips truthful, negation tinted, no bridal gown, spec matched | **PASS (founder)** | Founder ran the five named queries in EN and HE (go-signal step 3) and reported "Eye test looks about right" — YOY-124 comment 2026-08-28 19:08 UTC. No searchIds were captured, so AC-4's twelve-example table (step 10) is still open. |
 | 16 | AC-8 | Mean cost per search | ≤ $0.60 / 1,000 searches | | |
 | 17 | AC-8 | `/internal/costs` gate | `404` with no token and with a wrong token | | |
 | 18 | AC-8 | Vision one-time cost | recorded per 1,000 products | | |
-| 19 | AC-9b | Smoke at the tightened ceilings | `4/4 passed → exit 0` | | |
+| 19 | AC-9b | Smoke at the tightened ceilings | `4/4 passed → exit 0` | **PASS** | `live-smoke.mts` at 18:59:43 UTC: `4/4 passed → exit 0` against `classicMaxMs: 800` / `aiMaxMs: 3500` — healthz ✓, classic 126 ms (`short-query`), ai-en 1517 ms (3 chips), ai-he 3418 ms (3 chips, `purpose-phrase`). YOY-124 comment. |
 | 20 | AC-9a/c | Daily routine | **DEFERRED** to submission day (SMOKE.md) | | |
-| 21 | AC-11/12 | Founder-lane ACs | recorded on YOY-124, not here | | |
+| 21 | AC-11/12 | Founder-lane ACs | recorded on YOY-124, not here | **AC-11 PASS / AC-12 open** | AC-11: pooled switch + redeploy + `/healthz` + smoke + `--assert-classic-p95 500` exit 0 at p95 50 ms; docs/LATENCY.md row 3 replaced by the measured 2026-08-28 pooled row. AC-12: the `--set all` summary reports p50/p95, not the **max** latency AC-12 asks for, so the 4500 ms decision has no evidence yet. |
 
 **Findings filed (defects observed during the run, as Linear issues):**
 
