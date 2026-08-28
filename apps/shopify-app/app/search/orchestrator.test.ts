@@ -933,6 +933,90 @@ describe("classic zero hits escalate once into the AI path (YOY-67 AC-3)", () =>
     ]);
   });
 
+  it("a model-classic escalation reuses the speculative extraction: exactly one intent call (YOY-125 AC-4)", async () => {
+    // The model routes classic, so the parallel speculative extraction
+    // (YOY-64 AC-5) is not consumed on the classic arm; the keyword search
+    // then finds nothing and escalates. Before YOY-125 AC-4 that shape paid
+    // a second intent call — both tiers' ledger rows — for one search.
+    const db = await createTestDb();
+    await seedBlueDress(db);
+    let intentCalls = 0;
+    const intent = parseIntent(BLUE_DRESS_INTENT);
+    if (intent === null) {
+      throw new Error("fixture intent must parse");
+    }
+    const orchestrator = createSearchOrchestrator({
+      db,
+      classifier: createQueryClassifier({
+        llm: fakeLlm({ classification: () => ({ route: "classic" }) }),
+        timeoutMs: 500,
+      }),
+      extractor: {
+        extract: async () => {
+          intentCalls += 1;
+          return intent;
+        },
+        extractDetailed: async () => {
+          intentCalls += 1;
+          return { intent, tier: "lite" as const, escalation: null };
+        },
+      },
+      retriever: createRetriever({
+        embeddings: fakeEmbeddings(),
+        store: createPgVectorRetrievalStore(db),
+      }),
+      classicStore: createPgTrgmClassicStore(db),
+    });
+
+    const response = await orchestrator.runSearch({
+      query: HEBREW_QUERY,
+      shopDomain: SHOP,
+    });
+
+    expect(intentCalls).toBe(1);
+    expect(response.route).toBe("ai");
+    expect(response.routeReason).toBe("classic-zero-hit");
+    expect(response.degraded).toBe(false);
+    // The tier of the reused extraction is committed by the consumer.
+    expect(response.intentTier).toBe("lite");
+    expect(response.hits.map((hit) => hit.productId)).toEqual(["blue-dress"]);
+  });
+
+  it("a failed speculative extraction degrades the escalation exactly as a fresh one would (YOY-125 AC-4)", async () => {
+    const db = await createTestDb();
+    await seedBlueDress(db);
+    let intentCalls = 0;
+    const orchestrator = createSearchOrchestrator({
+      db,
+      classifier: createQueryClassifier({
+        llm: fakeLlm({ classification: () => ({ route: "classic" }) }),
+        timeoutMs: 500,
+      }),
+      extractor: {
+        extract: async () => {
+          intentCalls += 1;
+          throw new Error("intent upstream down");
+        },
+      },
+      retriever: createRetriever({
+        embeddings: fakeEmbeddings(),
+        store: createPgVectorRetrievalStore(db),
+      }),
+      classicStore: createPgTrgmClassicStore(db),
+    });
+
+    const response = await orchestrator.runSearch({
+      query: HEBREW_QUERY,
+      shopDomain: SHOP,
+    });
+
+    expect(intentCalls).toBe(1);
+    expect(response.route).toBe("classic");
+    expect(response.routeReason).toBe("classic-zero-hit");
+    expect(response.degraded).toBe(true);
+    expect(response.hits).toEqual([]);
+  });
+
   it("heuristic classic with zero keyword hits escalates the same way", async () => {
     const db = await createTestDb();
     await seedBlueDress(db);
