@@ -47,6 +47,24 @@
   cursor: pointer;
 }
 
+/* An EXCLUSION, marked achromatically (W-3): the chip's border thickens by
+   exactly one pixel — derived from the host's own width like the base rule,
+   so a theme with a 2px chip border gets 3px — and the excluded value is
+   struck in the theme's own currentColor. No fill and no hue of ours; the
+   negator word stays upright so the chip does not read as a double
+   negative.
+
+   `+ 1px` rather than the direction's 1.5× multiplier: Chrome rounds a
+   border width to whole device pixels, so 1× 1.5 computes to 1px at DPR 1
+   and the mark would not render at all on a hairline-bordered theme. */
+.unfiltered-native__chip--negated {
+  border-width: calc(var(--unfiltered-chip-border-width, 1px) + 1px);
+}
+
+.unfiltered-native__chip-value {
+  text-decoration: line-through;
+}
+
 /* Status text (loading, no results, zero hit): a plain line in the theme's
    own type, quieter by opacity only (W-8) — no box, no border, no fill. */
 .unfiltered-native__status {

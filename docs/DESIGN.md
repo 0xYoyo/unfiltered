@@ -93,6 +93,12 @@ Each is imperative, atomic, and checkable from a screenshot or the diff.
 - **W-7 Chips are removable filters, not tags.** Every chip shows its
   label and a remove affordance; removing one re-runs the search. Chips
   never appear on classic (keystroke-preview or classic-routed) results.
+  A chip for an EXCLUSION is distinguishable from an inclusion at a
+  glance, marked achromatically — a heavier border and the excluded value
+  struck through, both in the host's own inherited colour, with the
+  negator word left upright — never by a hue of ours (W-3). The
+  playground marks the same distinction with its accent tint (P-9); only
+  the means differ, because only the playground may own a hue.
 - **W-8 Quiet by default.** Preview and failure states are quieter (lower
   opacity, smaller type) than submitted-result states; the AI zero-hit
   state names what didn't match and offers close matches; no state ever
@@ -173,7 +179,8 @@ Unfiltered brand.
 - **P-9 Negation is visible.** A chip for an excluded constraint ("not
   wool", "not black") is distinguishable from an inclusion at a glance,
   by the accent tint and border of §2's chip rule — never by the label
-  alone.
+  alone. The widget must make the same distinction, and may not use this
+  means to do it (W-3, W-7).
 - **P-10 One theme.** The playground is the ivory direction only; it
   declares no dark palette and does not switch on
   `prefers-color-scheme`. The kit fixes one page on one ground, and a

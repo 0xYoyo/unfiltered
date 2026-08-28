@@ -42,11 +42,55 @@ export interface ChipDisplayContext {
  * A negated attribute (YOY-133) reads "Not wool" / "לא צמר", exactly the
  * colour-exclusion shape; a required category-like attribute reads its
  * word ("bridal" / "כלה").
+ *
+ * The joined string; `chipLabelParts` is the same label with the negator
+ * kept separate, for surfaces that mark an exclusion typographically.
  */
 export function chipLabel(
   chip: { field: string; value: string },
   context: ChipDisplayContext = { locale: "en" },
 ): string {
+  const { negator, value } = chipLabelParts(chip, context);
+  return negator === null ? value : `${negator} ${value}`;
+}
+
+/**
+ * The constraint fields whose chips are EXCLUSIONS. One list, shared by
+ * every surface that draws a chip: "not black" and "black" are opposite
+ * instructions, and a surface that cannot tell them apart cannot mark the
+ * difference (P-9, W-7).
+ */
+export const NEGATION_CHIP_FIELDS: ReadonlySet<string> = new Set([
+  "colorsExclude",
+  "attributesExclude",
+]);
+
+export function isNegationChip(chip: { field: string }): boolean {
+  return NEGATION_CHIP_FIELDS.has(chip.field);
+}
+
+/**
+ * One chip's label split at the negator: `{ negator: "Not", value: "black" }`
+ * for an exclusion, `{ negator: null, value: "dress" }` otherwise.
+ *
+ * The widget marks an exclusion by striking the excluded VALUE and leaving
+ * the negator upright — "Not b̶l̶a̶c̶k̶" — because striking the whole label
+ * would read as the negation of the negation. It cannot mark it the way the
+ * playground does (an accent tint), because W-3 forbids the widget a hue
+ * the host page does not already have; weight and this strike are the
+ * achromatic means available.
+ */
+export interface ChipLabelParts {
+  /** The exclusion word, or null when the chip is an inclusion. */
+  negator: string | null;
+  /** The constrained value, in the chrome language's display form. */
+  value: string;
+}
+
+export function chipLabelParts(
+  chip: { field: string; value: string },
+  context: ChipDisplayContext = { locale: "en" },
+): ChipLabelParts {
   if (context.locale === "he") {
     const priceAmount =
       context.currency === undefined
@@ -54,40 +98,51 @@ export function chipLabel(
         : `${chip.value} ${context.currency}`;
     switch (chip.field) {
       case "priceMin":
-        return `מעל ${priceAmount}`;
+        return bare(`מעל ${priceAmount}`);
       case "priceMax":
-        return `עד ${priceAmount}`;
+        return bare(`עד ${priceAmount}`);
       case "colorsExclude":
-        return `לא ${HEBREW_COLOR_DISPLAY[chip.value] ?? chip.value}`;
+        return {
+          negator: "לא",
+          value: HEBREW_COLOR_DISPLAY[chip.value] ?? chip.value,
+        };
       case "colorsInclude":
-        return HEBREW_COLOR_DISPLAY[chip.value] ?? chip.value;
+        return bare(HEBREW_COLOR_DISPLAY[chip.value] ?? chip.value);
       case "attributesExclude":
-        return `לא ${HEBREW_ATTRIBUTE_DISPLAY[chip.value] ?? chip.value}`;
+        return {
+          negator: "לא",
+          value: HEBREW_ATTRIBUTE_DISPLAY[chip.value] ?? chip.value,
+        };
       case "attributesInclude":
-        return HEBREW_ATTRIBUTE_DISPLAY[chip.value] ?? chip.value;
+        return bare(HEBREW_ATTRIBUTE_DISPLAY[chip.value] ?? chip.value);
       case "availability":
-        return HEBREW_AVAILABILITY_DISPLAY;
+        return bare(HEBREW_AVAILABILITY_DISPLAY);
       case "category":
-        return HEBREW_CATEGORY_DISPLAY[chip.value] ?? chip.value;
+        return bare(HEBREW_CATEGORY_DISPLAY[chip.value] ?? chip.value);
       case "occasion":
-        return HEBREW_OCCASION_DISPLAY[chip.value] ?? chip.value;
+        return bare(HEBREW_OCCASION_DISPLAY[chip.value] ?? chip.value);
       default:
-        return chip.value;
+        return bare(chip.value);
     }
   }
   switch (chip.field) {
     case "priceMin":
-      return `Over ${chip.value}`;
+      return bare(`Over ${chip.value}`);
     case "priceMax":
-      return `Under ${chip.value}`;
+      return bare(`Under ${chip.value}`);
     case "colorsExclude":
     case "attributesExclude":
-      return `Not ${chip.value}`;
+      return { negator: "Not", value: chip.value };
     case "availability":
-      return "In stock";
+      return bare("In stock");
     default:
       // category, colorsInclude, attributesInclude, occasion: the value
       // speaks for itself.
-      return chip.value;
+      return bare(chip.value);
   }
+}
+
+/** An inclusion: the whole label is the value, with nothing to strike. */
+function bare(value: string): ChipLabelParts {
+  return { negator: null, value };
 }

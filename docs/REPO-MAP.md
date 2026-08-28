@@ -422,6 +422,7 @@ apps/
         ai-results.spec.ts
         evidence-close-matches.spec.ts
         evidence-hardening.spec.ts
+        evidence-negation-chips.spec.ts
         localization.spec.ts
         localization.spec.ts-snapshots/
           ai-results-en-darwin.png
@@ -447,6 +448,16 @@ apps/
           native-B-en-mobile-linux.png
           native-B-he-desktop-darwin.png
           native-B-he-desktop-linux.png
+        negation-chips.spec.ts
+        negation-chips.spec.ts-snapshots/
+          native-negation-en-desktop-darwin.png
+          native-negation-en-desktop-linux.png
+          native-negation-en-mobile-darwin.png
+          native-negation-en-mobile-linux.png
+          native-negation-he-desktop-darwin.png
+          native-negation-he-desktop-linux.png
+          native-negation-he-mobile-darwin.png
+          native-negation-he-mobile-linux.png
         preview-submit.spec.ts
         search-takeover.spec.ts
         widget.spec.ts
@@ -501,6 +512,14 @@ docs/
       mobile-he-5-zero-hit-close-matches.png
       mobile-he-6-store-preload.png
       mobile-he-7-engine-panel.png
+      widget-dawn-desktop-en-8-negation-chips.png
+      widget-dawn-desktop-en-9-exclusion-removed.png
+      widget-dawn-desktop-he-8-negation-chips.png
+      widget-dawn-desktop-he-9-exclusion-removed.png
+      widget-dawn-mobile-en-8-negation-chips.png
+      widget-dawn-mobile-en-9-exclusion-removed.png
+      widget-dawn-mobile-he-8-negation-chips.png
+      widget-dawn-mobile-he-9-exclusion-removed.png
     YOY-100/
       0-origin-home-desktop.png
       1-results-view-desktop.png

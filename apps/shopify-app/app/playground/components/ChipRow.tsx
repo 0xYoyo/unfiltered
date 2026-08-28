@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 
 import type { ProxyChip } from "../../search/proxy.server";
-import { chipLabel } from "../../../widget/src/format";
+import { chipLabel, isNegationChip } from "../../../widget/src/format";
 import type { PlaygroundLocale, PlaygroundStrings } from "../strings";
 
 /**
@@ -16,7 +16,8 @@ import type { PlaygroundLocale, PlaygroundStrings } from "../strings";
  * inside a merchant theme (W-3, W-4), which is why only the anatomy is
  * shared.
  *
- * A NEGATED constraint (`colorsExclude`, `attributesExclude`) is tinted:
+ * A NEGATED constraint (`isNegationChip`, shared with the widget so the two
+ * surfaces cannot disagree about what an exclusion is) is tinted:
  * `--surface-accent-soft` behind `--border-accent`, the one place the
  * accent touches a chip (P-2). "Not black" and "black" are opposite
  * instructions and read as the same chip otherwise.
@@ -30,12 +31,6 @@ import type { PlaygroundLocale, PlaygroundStrings } from "../strings";
  * enforces that, because a chip on classic results would claim an
  * understanding the engine did not have.
  */
-
-/** Constraint fields whose chips read as exclusions (YOY-133). */
-const NEGATED_FIELDS: ReadonlySet<string> = new Set([
-  "colorsExclude",
-  "attributesExclude",
-]);
 
 /** Kept in step with `--dur-chip-out` in tokens.css. */
 const CHIP_OUT_MS = 200;
@@ -105,7 +100,7 @@ export function ChipRow({
           ...(currency === undefined ? {} : { currency }),
         });
         const key = chipKey(chip);
-        const negated = NEGATED_FIELDS.has(chip.field);
+        const negated = isNegationChip(chip);
         const className = [
           "chip",
           negated ? "chipNegated" : null,

@@ -90,6 +90,23 @@
   border-color: #a0a0a0;
 }
 
+/* An EXCLUSION, marked achromatically (W-3): a heavier border and the
+   excluded value struck through, both in the chip's own inherited colour.
+   No fill, no hue — "Not black" and "black" are opposite instructions and
+   the label alone was carrying the whole difference.
+
+   2px, not the 1.5px the direction names: Chrome rounds a border width to
+   whole device pixels, so 1.5px computes to 1px at DPR 1 and the mark
+   simply does not render on an ordinary display. One whole pixel heavier
+   is the smallest mark that always draws. */
+.chip--negated {
+  border-width: 2px;
+}
+
+.chip-value {
+  text-decoration: line-through;
+}
+
 .chip-remove {
   font-size: 1.1em;
   line-height: 1;
