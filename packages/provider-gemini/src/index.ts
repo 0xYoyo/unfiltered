@@ -423,9 +423,9 @@ export function createGeminiLlmClient(options: GeminiClientOptions): LlmClient {
     async completeStructured(
       request: StructuredCompletionRequest,
     ): Promise<unknown> {
-      const payload = (await postJson(
+      const payload = (await postStructured(
         resolved,
-        `models/${resolved.modelId}:generateContent`,
+        request,
         {
           contents: [
             {
@@ -456,7 +456,6 @@ export function createGeminiLlmClient(options: GeminiClientOptions): LlmClient {
               : {}),
           },
         },
-        request.signal,
       )) as GenerateContentResponse;
 
       const usage = payload.usageMetadata;
@@ -505,6 +504,53 @@ interface BatchEmbedResponse {
 }
 
 /**
+ * `generateContent` with the aborted call metered (YOY-125 AC-6).
+ *
+ * A caller-aborted or timed-out completion still cost real money: Google
+ * bills the prompt tokens of a request it has begun, and the intent hedge
+ * (`hedgedAccuracy`) now aborts the losing tier on every occasion-class
+ * query, so an aborted intent call is a normal outcome rather than a rare
+ * deadline cut. `postJson` raises `GeminiTimeoutError` before any usage
+ * metadata exists, so the row is written with the input tokens ESTIMATED
+ * from the prompt — the embedding precedent: recorded with this estimate
+ * rather than dropped from metering — and `outputTokens: 0`, since whatever
+ * the model produced before the abort never reached us. The error is then
+ * rethrown unchanged, so every caller behaves exactly as before.
+ *
+ * Only the prompt text is estimated; inline image bytes (`request.images`)
+ * are not, and a vision call aborted mid-flight is therefore under-counted.
+ * Nothing aborts vision calls today — they carry no caller signal and run
+ * off the hot path.
+ */
+async function postStructured(
+  resolved: ResolvedOptions,
+  request: StructuredCompletionRequest,
+  body: unknown,
+): Promise<Record<string, unknown>> {
+  try {
+    return await postJson(
+      resolved,
+      `models/${resolved.modelId}:generateContent`,
+      body,
+      request.signal,
+    );
+  } catch (error) {
+    if (error instanceof GeminiTimeoutError) {
+      await resolved.costRecorder.record({
+        provider: PROVIDER,
+        modelId: resolved.modelId,
+        operation: request.operation,
+        inputTokens: estimateTokens([request.prompt]),
+        outputTokens: 0,
+        storeId: request.storeId,
+        searchId: request.searchId,
+      });
+    }
+    throw error;
+  }
+}
+
+/**
  * Basis of the embedding token estimate (YOY-29 AC-4): `batchEmbedContents`
  * returns no usage metadata, so metering falls back to the common ~4
  * characters-per-token heuristic for Latin-script text. Error bound: roughly
@@ -515,9 +561,11 @@ interface BatchEmbedResponse {
 export const ESTIMATED_CHARS_PER_TOKEN = 4;
 
 /**
- * Estimate token count for embedding metering. See
- * `ESTIMATED_CHARS_PER_TOKEN` for the estimate's basis and error bound; the
- * call is recorded with this estimate rather than dropped from metering.
+ * Estimate token count for metering a call whose real usage is unavailable:
+ * an embedding batch (the API returns no usage metadata) or a completion cut
+ * short by an abort (YOY-125 AC-6). See `ESTIMATED_CHARS_PER_TOKEN` for the
+ * estimate's basis and error bound; the call is recorded with this estimate
+ * rather than dropped from metering.
  */
 function estimateTokens(texts: string[]): number {
   const chars = texts.reduce((sum, text) => sum + text.length, 0);

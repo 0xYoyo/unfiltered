@@ -19,6 +19,7 @@ import {
   GeminiConfigError,
   GeminiResponseError,
   GeminiTimeoutError,
+  ESTIMATED_CHARS_PER_TOKEN,
   createGeminiEmbeddingClient,
   createGeminiLlmClient,
   geminiModelsFromEnv,
@@ -602,8 +603,18 @@ describe("request timeout", () => {
       }),
       // ETIMEDOUT is the contract transient-retry predicates key on.
     ).rejects.toMatchObject({ code: "ETIMEDOUT", timeoutMs: 25 });
-    // A timed-out call never delivered usage — nothing to meter.
-    expect(recorded).toHaveLength(0);
+    // A timed-out completion delivered no usage metadata, but Google billed
+    // the prompt it had begun: both calls are metered by estimate
+    // (YOY-125 AC-6), never dropped.
+    expect(recorded).toHaveLength(2);
+    for (const row of recorded) {
+      expect(row).toMatchObject({
+        modelId: "test-flash-model",
+        operation: "classification",
+        inputTokens: Math.ceil("p".length / ESTIMATED_CHARS_PER_TOKEN),
+        outputTokens: 0,
+      });
+    }
   });
 
   it("aborts a hung embedding request the same way", async () => {
@@ -777,6 +788,87 @@ describe("embeddings", () => {
     await expect(client.embed({ texts: ["a", "b"] })).rejects.toThrow(
       /1 embeddings for 2 texts/,
     );
+  });
+});
+
+describe("aborted calls are metered by estimate (YOY-125 AC-6)", () => {
+  it("a caller-aborted completion records one estimated row and still throws GeminiTimeoutError", async () => {
+    const { recorded, recorder } = recorderSpy();
+    // Rejects with an AbortError the moment the caller's signal fires — the
+    // shape a hedged intent call takes when the other tier wins.
+    const impl = ((_url: unknown, init?: RequestInit) => {
+      return new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => {
+          reject(init.signal!.reason as Error);
+        });
+      });
+    }) as typeof fetch;
+    const client = createGeminiLlmClient({
+      modelId: "test-flash-model",
+      apiKey: "test-key-not-real",
+      costRecorder: recorder,
+      fetchImpl: impl,
+      requestTimeoutMs: 10_000,
+    });
+    const prompt = "an occasion-class query the accuracy tier was answering";
+
+    await expect(
+      client.completeStructured({
+        prompt,
+        schema: SCHEMA,
+        operation: "intent",
+        storeId: "store-1",
+        searchId: "search-1",
+        signal: AbortSignal.timeout(25),
+      }),
+    ).rejects.toThrow(GeminiTimeoutError);
+
+    expect(recorded).toEqual([
+      {
+        provider: "google",
+        modelId: "test-flash-model",
+        operation: "intent",
+        inputTokens: Math.ceil(prompt.length / ESTIMATED_CHARS_PER_TOKEN),
+        outputTokens: 0,
+        storeId: "store-1",
+        searchId: "search-1",
+      },
+    ]);
+  });
+
+  it("a successful completion still meters real usage, not the estimate", async () => {
+    const { recorded, recorder } = recorderSpy();
+    const impl = (async () =>
+      new Response(JSON.stringify(completionFixture), {
+        status: 200,
+      })) as unknown as typeof fetch;
+
+    await llmClient(impl, recorder).completeStructured({
+      prompt: "p",
+      schema: SCHEMA,
+      operation: "intent",
+      signal: AbortSignal.timeout(10_000),
+    });
+
+    expect(recorded).toHaveLength(1);
+    expect(recorded[0]!.inputTokens).toBe(
+      completionFixture.usageMetadata.promptTokenCount,
+    );
+  });
+
+  it("a non-abort failure is not metered", async () => {
+    const { recorded, recorder } = recorderSpy();
+    const impl = (async () =>
+      new Response("nope", { status: 500 })) as unknown as typeof fetch;
+
+    await expect(
+      llmClient(impl, recorder).completeStructured({
+        prompt: "p",
+        schema: SCHEMA,
+        operation: "intent",
+      }),
+    ).rejects.toThrow();
+    expect(recorded).toHaveLength(0);
   });
 });
 
