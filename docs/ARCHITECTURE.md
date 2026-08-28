@@ -1410,9 +1410,14 @@ combined. Three pieces implement it:
   space) so its exact-query reuse key differs per run and per invocation:
   without it, runs 2..N would be answered from the stored intent with zero
   LLM calls (YOY-64 AC-4) and the probe would measure the cache, not the
-  pipeline. The visible text — and what the intent model reads — stays the
-  committed query; `reused` in the summary is the count of samples the
-  marker failed to protect and must read 0. `--assert-classic-p95`,
+  pipeline. The marker is invisible, not absent: the orchestrator passes the
+  raw query to the LLM classifier and the intent model, so both receive the
+  committed query plus the marker as-is — roughly 6 extra input tokens per
+  call, no retrieval change — and the AI bars are measured on
+  committed-query-plus-marker, not on a byte-identical shopper query; only
+  `visibleQueryText` strips it, and only for the probe's reporting.
+  `reused` in the summary is the count of samples the marker failed to
+  protect and must read 0. `--assert-classic-p95`,
   `--assert-ai-p50`, `--assert-ai-p95` turn the bars into an exit code. The
   AI sets are paced under the playground's per-IP throttle so the probe
   measures the pipeline, not the guard. `scripts/latency-probe.test.ts`

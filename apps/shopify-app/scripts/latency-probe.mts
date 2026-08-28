@@ -28,19 +28,14 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+// The stage list is the orchestrator's own (`SEARCH_STAGES`), never a copy:
+// a stage added there reaches `mean per stage` without touching the probe
+// (YOY-125 AC-1). `stages.ts` has no `.server` suffix and no runtime
+// imports, so `tsx` loads it as the other scripts load app modules.
+import { SEARCH_STAGES } from "../app/search/stages";
+
 export const PROBE_SETS = ["classic", "ai-en", "ai-he"] as const;
 export type ProbeSet = (typeof PROBE_SETS)[number];
-
-/** Pipeline stages in the orchestrator's order (SEARCH_STAGES). */
-export const STAGE_ORDER = [
-  "classify",
-  "intent",
-  "embed",
-  "retrieve",
-  "classic",
-  "hydrate",
-  "closeMatches",
-] as const;
 
 export interface ProbeArgs {
   url: string;
@@ -61,9 +56,11 @@ const DEFAULT_RUNS = 20;
  * per-request marker (YOY-64 AC-6). None is whitespace to `\s` or to
  * `String.prototype.trim`, none is a letter or a digit, so the exact-query
  * reuse key (`normalizeReuseQuery`: trim, collapse whitespace, case-fold)
- * and the classifier's token rules both keep the marker while the shopper-
- * visible text — and what the intent model reads — stays the committed
- * query. U+FEFF is deliberately absent: `trim()` removes it.
+ * and the classifier's token rules both keep the marker. The marker is
+ * invisible, not absent: nothing on the server strips it, so the classifier
+ * and the intent model receive the committed query plus the marker as-is
+ * (see `distinctQueryText`). U+FEFF is deliberately absent: `trim()`
+ * removes it.
  */
 const INVISIBLE_DIGITS = ["\u200B", "\u200C", "\u200D", "\u2060"] as const;
 
@@ -75,6 +72,15 @@ const INVISIBLE_DIGITS = ["\u200B", "\u200C", "\u200D", "\u2060"] as const;
  * run 2 on and mask the AI bar; with a distinct text per (invocation, run)
  * every AI sample pays the full path. Classic queries never store an intent
  * and are sent unchanged.
+ *
+ * What the marker reaches (YOY-125 AC-5): the orchestrator passes the raw
+ * query to the LLM classifier and to the intent extractor, so both models
+ * receive the committed query plus one trailing space and 24 zero-width
+ * characters — roughly 6 extra input tokens per call, no retrieval change.
+ * Only `visibleQueryText` strips it, and only for reporting (the per-run
+ * log line); the reuse key treats it as text. The AI bars are therefore
+ * measured on committed-query-plus-marker, not on the byte-identical
+ * shopper query.
  */
 export function distinctQueryText(
   query: string,
@@ -234,7 +240,7 @@ export function summarize(
     routes[sample.route] = (routes[sample.route] ?? 0) + 1;
   }
   const meanStages: Record<string, number> = {};
-  for (const stage of STAGE_ORDER) {
+  for (const stage of SEARCH_STAGES) {
     const ran = samples.filter((sample) => sample.stages[stage] !== undefined);
     if (ran.length > 0) {
       const total = ran.reduce((sum, sample) => sum + sample.stages[stage]!, 0);
@@ -297,7 +303,7 @@ export function formatSummary(summary: SetSummary): string {
   const routes = Object.entries(summary.routes)
     .map(([route, count]) => `${route}=${count}`)
     .join(" ");
-  const stages = STAGE_ORDER.flatMap((stage) =>
+  const stages = SEARCH_STAGES.flatMap((stage) =>
     summary.meanStages[stage] === undefined
       ? []
       : [`${stage} ${summary.meanStages[stage]} ms`],
