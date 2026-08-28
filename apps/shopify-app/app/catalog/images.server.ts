@@ -54,6 +54,15 @@ export function hashImageBytes(bytes: ArrayBuffer | Uint8Array): string {
 /** The default fetcher: the platform `fetch`, resolved at call time so tests can stub it. */
 export const globalImageFetch: ImageFetch = (url) => fetch(url);
 
+/**
+ * The image's content hash, or null when the URL did not answer with an
+ * image. A non-2xx fails as it always did; so does a 2xx whose `content-type`
+ * is absent or is not `image/*` (YOY-125 AC-12) — a CDN that serves a gated
+ * or missing image as a 200 HTML page (a password page after a followed 302,
+ * a "not found" page served as 200) would otherwise store the hash of that
+ * HTML as a `ProductImage.contentHash`: stable across products, and later
+ * handed to the vision model as an image (YOY-121).
+ */
 async function fetchImageHash(
   fetchImage: ImageFetch,
   url: string,
@@ -61,6 +70,10 @@ async function fetchImageHash(
   try {
     const response = await fetchImage(url);
     if (!response.ok) {
+      return null;
+    }
+    const contentType = response.headers.get("content-type");
+    if (contentType === null || !contentType.toLowerCase().startsWith("image/")) {
       return null;
     }
     return hashImageBytes(await response.arrayBuffer());

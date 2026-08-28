@@ -798,8 +798,15 @@ export async function enrichCatalog({
       } else {
         const inline = await fetchInlineImages(fetchImage, images);
         if (inline.length === 0) {
-          // Nothing to show the model: no call, no key update — retried next run.
-          visionAnswer = null;
+          // Nothing to show the model (a CDN blip, 5xx, or a timeout on every
+          // image): no call, and no key update, so the next run retries.
+          // The product KEEPS whatever the last successful analysis said
+          // (YOY-125 AC-13) — `visionAnswer` and `visionHashes` stay as
+          // loaded, so the merged columns below are unchanged too. Erasing
+          // them would drop sleeveLength/neckline/garmentLength/pattern/
+          // materialAppearance until a later run fetched successfully, and
+          // would make `embedCatalog` re-embed the product twice for no model
+          // call. A stale answer over the old images beats none.
           visionStatus = "failed";
           visionCounts.failed += 1;
         } else {

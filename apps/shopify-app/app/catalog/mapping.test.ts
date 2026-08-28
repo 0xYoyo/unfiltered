@@ -278,6 +278,24 @@ describe("Shopify→snapshot mapping", () => {
       expect(normalizeFamilyTitle("Tee - Floral")).toBe("tee");
     });
 
+    it("a <pattern> Print designator is a colourway (YOY-125 AC-17)", () => {
+      // `print` is a TERMINAL colourway word, not a leading modifier:
+      // treating it as one split a single product family into a card per
+      // pattern — the duplicate-card side of the parity rule.
+      expect(normalizeFamilyTitle("Dress - Leopard Print")).toBe("dress");
+      expect(normalizeFamilyTitle("Dress - Floral Print")).toBe("dress");
+      expect(normalizeFamilyTitle("Dress in Ditsy Print")).toBe("dress");
+      expect(normalizeFamilyTitle("Dress - Print")).toBe("dress");
+      expect(
+        computeFamilyKey({ vendor: "Acme", title: "Dress - Leopard Print", productType: "Dresses" }),
+      ).toBe(
+        computeFamilyKey({ vendor: "Acme", title: "Dress - Floral Print", productType: "Dresses" }),
+      );
+      // The modifier rule is unchanged for the words that really are modifiers.
+      expect(normalizeFamilyTitle("Jacket - Soft")).toBe("jacket - soft");
+      expect(normalizeFamilyTitle("Sofa (Natural)")).toBe("sofa (natural)");
+    });
+
     it("keeps a title with no designator, or a designator that is not a colour", () => {
       expect(normalizeFamilyTitle("Black Evening Gown")).toBe("black evening gown");
       expect(normalizeFamilyTitle("Shirt Dress in Linen")).toBe("shirt dress in linen");
