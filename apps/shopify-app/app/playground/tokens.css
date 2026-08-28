@@ -56,7 +56,8 @@
   /* The hero bar's own height, desktop and ≤ 640px (kit §4 search card). */
   --search-height: 60px;
   --search-height-compact: 52px;
-  /* Results grid: `repeat(auto-fit, minmax(180px, 1fr))` (kit §4). */
+  /* Results grid: the kit's §4 180px track floor, laid out with
+     `auto-fill` — the deviation §2 Layout records. */
   --card-min-inline-size: 180px;
   /* Focus is a ring token (--ring-focus); the outline fallback needs a
      width and an offset of its own. */

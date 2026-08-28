@@ -184,6 +184,34 @@ const HEBREW_CATEGORY_NOUNS = new Set([
 
 const HEBREW_PURPOSE_TOKEN = /^ל[\u05D0-\u05EA]{2,}$/;
 
+/**
+ * ל-initial tokens that are NOT a purpose (YOY-125 AC-15). `HEBREW_PURPOSE_TOKEN`
+ * matches any word starting with ל, but the letter is only sometimes the
+ * preposition "for": these shapes are a colour, a negation, or a noun/brand
+ * that merely begins with ל. Excluding them does not change which route the
+ * query takes — a Hebrew query against a Latin catalog needs the AI path
+ * either way — but it stops `routeReason` from claiming a purpose the query
+ * never stated, in `/?details=1`, on `SearchEvent`, and in the goldens.
+ *
+ * Only white has ל-initial colour forms, so it is the only colour whose
+ * plural/construct spellings can reach this test; `CLASSIFIER_COLOR_WORDS`
+ * already covers the singular לבן / לבנה.
+ */
+const HEBREW_NON_PURPOSE_L_WORDS: ReadonlySet<string> = new Set([
+  // Colour, plural and construct: "מכנסיים לבנים", "שמלות לבנות".
+  "לבנים",
+  "לבנות",
+  // Negation: "שמלה ללא שרוולים" is "a dress WITHOUT sleeves".
+  "ללא",
+  "לא",
+  // Common ל-initial nouns and brands.
+  "לוגו",
+  "לייקרה",
+  "לקוסט",
+  "ליוויס",
+  "לונג",
+]);
+
 /** Strip one attached conjunction/article (ו, ה) so "והשמלה" reads as "שמלה". */
 function hebrewNoun(token: string): string {
   return token.replace(/^ו?ה?/, "");
@@ -205,7 +233,7 @@ function isPurposePhrase(normalized: string, tokens: string[]): boolean {
     .some(
       (token) =>
         HEBREW_PURPOSE_TOKEN.test(token) &&
-        token !== "לא" &&
+        !HEBREW_NON_PURPOSE_L_WORDS.has(token) &&
         !COLOR_WORDS.has(token),
     );
 }

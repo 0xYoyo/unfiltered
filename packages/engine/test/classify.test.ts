@@ -110,6 +110,33 @@ describe("purpose phrases settle AI deterministically (YOY-133 AC-4)", () => {
     });
   }
 
+  it("does not fire on a ל-initial colour plural, negation, noun or brand (YOY-125 AC-15)", async () => {
+    // `HEBREW_PURPOSE_TOKEN` matches any ל-initial word, but the letter is
+    // only sometimes the preposition "for". These reach the model instead of
+    // claiming a purpose the query never stated.
+    const classifier = createQueryClassifier({ llm: llmStub("classic").llm });
+    for (const query of [
+      "מכנסיים לבנים",
+      "שמלות לבנות",
+      "שמלה ללא שרוולים",
+      "חולצה לוגו",
+      "נעלי לקוסט",
+      "שמלה לייקרה",
+    ]) {
+      // Undecided by the heuristics — asserted BEFORE classify runs, since a
+      // model decision is cached and `settled` then reports it.
+      expect(classifier.settled!(query), query).toBeNull();
+      expect((await classifier.classify(query)).reason, query).toBe("model");
+    }
+    // A genuine purpose still settles without the model.
+    for (const query of ["סניקרס לריצה", "שמלה לחתונה"]) {
+      expect(classifier.settled!(query), query).toEqual({
+        route: "ai",
+        reason: "purpose-phrase",
+      });
+    }
+  });
+
   it("does not fire on 'for' without a purpose, on a colour or negation after ל, or without a category noun", async () => {
     const classifier = createQueryClassifier({ llm: llmStub("classic").llm });
     // No object after "for", or "for" first: not the shape.
