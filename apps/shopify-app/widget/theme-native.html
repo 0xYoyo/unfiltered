@@ -424,6 +424,32 @@
         chips: AI_CHIPS,
         intent: AI_INTENT,
       };
+      /**
+       * A response carrying EXCLUSIONS (YOY-123 AC-4): a colour and an
+       * attribute the shopper ruled out, beside two ordinary inclusions.
+       * `?fixture=ai-negation` selects it. The widget must make these two
+       * chips read as exclusions without introducing a hue the theme does
+       * not have (W-3), so this is what the Dawn-mirror evidence is taken
+       * against.
+       */
+      const AI_NEGATION_CHIPS = [
+        { field: "category", value: "dress" },
+        { field: "colorsExclude", value: "black" },
+        { field: "attributesExclude", value: "wool" },
+      ];
+      const AI_NEGATION_RESPONSE = {
+        ...AI_RESPONSE,
+        searchId: "harness-ai-negation-1",
+        chips: AI_NEGATION_CHIPS,
+        intent: {
+          ...AI_INTENT,
+          colorsInclude: [],
+          colorsExclude: ["black"],
+          attributesExclude: ["wool"],
+          attributesInclude: [],
+        },
+      };
+
       const AI_ZERO_HIT_RESPONSE = {
         ...AI_RESPONSE,
         searchId: "harness-ai-zero-1",
@@ -434,9 +460,9 @@
       };
 
       const chipRemovalResponse = (request) => ({
-        ...AI_RESPONSE,
+        ...(fixture === "ai-negation" ? AI_NEGATION_RESPONSE : AI_RESPONSE),
         searchId: "harness-ai-removal-1",
-        chips: AI_CHIPS.filter(
+        chips: (fixture === "ai-negation" ? AI_NEGATION_CHIPS : AI_CHIPS).filter(
           (chip) =>
             !(
               chip.field === request.removeChip.field &&
@@ -648,6 +674,8 @@
             body = chipRemovalResponse(request);
           } else if (fixture === "ai") {
             body = AI_RESPONSE;
+          } else if (fixture === "ai-negation") {
+            body = AI_NEGATION_RESPONSE;
           } else if (fixture === "ai-zero-hit") {
             body = AI_ZERO_HIT_RESPONSE;
           } else if (fixture === "empty") {

@@ -1,4 +1,4 @@
-import { chipLabel, formatPrice } from "./format";
+import { chipLabelParts, formatPrice, isNegationChip } from "./format";
 import {
   type NativeRenderConfig,
   type NativeRenderOverrides,
@@ -639,20 +639,40 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
     currency: string | undefined,
     onChipRemove: ResponseHandlers["onChipRemove"],
   ): HTMLElement {
-    const label = chipLabel(chip, { locale, currency });
+    const { negator, value } = chipLabelParts(chip, { locale, currency });
+    const label = negator === null ? value : `${negator} ${value}`;
+    const negated = isNegationChip(chip);
     const button = document.createElement("button");
     button.type = "button";
-    button.className = "unfiltered-native__chip";
+    button.className = negated
+      ? "unfiltered-native__chip unfiltered-native__chip--negated"
+      : "unfiltered-native__chip";
     button.setAttribute("data-testid", NATIVE_CHIP_TESTID);
     button.setAttribute("data-chip-field", chip.field);
     button.setAttribute("data-chip-value", chip.value);
+    if (negated) {
+      button.setAttribute("data-chip-negated", "true");
+    }
     button.setAttribute("role", "listitem");
     button.setAttribute(
       "aria-label",
       strings.removeFilter.replace("{label}", label),
     );
+    // An exclusion strikes the excluded VALUE and leaves the negator
+    // upright. Achromatic by construction (W-3): the strike and the
+    // heavier border are drawn in the theme's own currentColor.
     const text = document.createElement("span");
-    text.textContent = label;
+    if (negator === null) {
+      text.textContent = value;
+    } else {
+      const word = document.createElement("span");
+      word.className = "unfiltered-native__chip-negator";
+      word.textContent = `${negator} `;
+      const struck = document.createElement("s");
+      struck.className = "unfiltered-native__chip-value";
+      struck.textContent = value;
+      text.append(word, struck);
+    }
     const remove = document.createElement("span");
     remove.setAttribute("aria-hidden", "true");
     remove.textContent = "×";

@@ -1,4 +1,4 @@
-import { chipLabel, formatPrice } from "./format";
+import { chipLabelParts, formatPrice, isNegationChip } from "./format";
 import type {
   ProxyChip,
   ProxyResult,
@@ -264,21 +264,39 @@ export function createOverlay(options: OverlayOptions): Overlay {
     currency: string | undefined,
     onChipRemove: ResponseHandlers["onChipRemove"],
   ): HTMLElement {
-    const label = chipLabel(chip, { locale, currency });
+    const { negator, value } = chipLabelParts(chip, { locale, currency });
+    const label = negator === null ? value : `${negator} ${value}`;
+    const negated = isNegationChip(chip);
     const button = document.createElement("button");
     button.type = "button";
-    button.className = "chip";
+    button.className = negated ? "chip chip--negated" : "chip";
     button.setAttribute("data-testid", CHIP_TESTID);
     button.setAttribute("data-chip-field", chip.field);
     button.setAttribute("data-chip-value", chip.value);
+    if (negated) {
+      button.setAttribute("data-chip-negated", "true");
+    }
     button.setAttribute("role", "listitem");
     button.setAttribute(
       "aria-label",
       strings.removeFilter.replace("{label}", label),
     );
 
+    // An exclusion strikes the excluded VALUE and leaves the negator
+    // upright (W-3: weight and this strike, never a hue of ours). The
+    // accessible name above is the whole label, unstruck.
     const text = document.createElement("span");
-    text.textContent = label;
+    if (negator === null) {
+      text.textContent = value;
+    } else {
+      const word = document.createElement("span");
+      word.className = "chip-negator";
+      word.textContent = `${negator} `;
+      const struck = document.createElement("s");
+      struck.className = "chip-value";
+      struck.textContent = value;
+      text.append(word, struck);
+    }
     const remove = document.createElement("span");
     remove.className = "chip-remove";
     remove.setAttribute("aria-hidden", "true");
