@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { isColorwayWord } from "@unfiltered/engine";
+import { isColorwayDesignator } from "@unfiltered/engine";
 
 /**
  * Image cap per product (YOY-120 AC-1; PRD capability 14): at most this
@@ -194,8 +194,10 @@ export function snapshotImageUrls(node: Pick<ShopifyProductNode, "images">): str
 /**
  * A trailing colourway designator (YOY-117 AC-1): `in <Colour>`,
  * `- <Colour>` (any dash), `/ <Colour>`, or `(<Colour>)` at the end of a
- * title, where `<Colour>` is one or two words whose LAST word is in the
- * committed colourway list ("Pink", "Meteorite Black", "dusty rose"). The
+ * title, where `<Colour>` is one word that is a colour on its own or two
+ * words whose LAST word is one ("Pink", "Meteorite Black", "dusty rose") —
+ * `isColorwayDesignator`, so a bare modifier ("Jacket - Soft",
+ * "Sofa (Natural)") is NOT a designator (YOY-125 AC-11). The
  * marker-less form ("Black Evening Gown") is deliberately not a designator:
  * the colour is part of the name, not a variant of it.
  */
@@ -219,9 +221,11 @@ export function normalizeFamilyTitle(title: string): string {
     if (match === null) {
       continue;
     }
-    const words = match[1]!.trim().split(/\s+/);
-    const last = words[words.length - 1]!.replace(/[.,!?'"]+$/u, "");
-    if (words.length <= 2 && isColorwayWord(last)) {
+    const words = match[1]!
+      .trim()
+      .split(/\s+/)
+      .map((word) => word.replace(/[.,!?'"]+$/u, ""));
+    if (isColorwayDesignator(words)) {
       const stripped = collapsed.slice(0, match.index).trim();
       if (stripped !== "") {
         return stripped.toLowerCase();

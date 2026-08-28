@@ -190,6 +190,25 @@ describe("primary colour rule (YOY-110 AC-1)", () => {
     expect(primaryColorFromTitle("Mesh Over Dress in DUSTY PINK", colours)).toBe("pink");
   });
 
+  it("resolves a multi-colour designator in reading order, not colors order (YOY-125 AC-8)", () => {
+    // Which colour wins must not depend on how the model happened to order
+    // its `colors` array: the designator names pink first, so it is a pink
+    // dress under either ordering.
+    expect(primaryColorFromTitle("Dress in Pink and Black", ["black", "pink"])).toBe("pink");
+    expect(primaryColorFromTitle("Dress in Pink and Black", ["pink", "black"])).toBe("pink");
+    expect(primaryColorFromTitle("Dress in Black and Pink", ["pink", "black"])).toBe("black");
+    // A slash-joined designator is captured at all now, and reads the same
+    // way: before AC-8 the `/` was excluded from every capture, so this
+    // title matched no shape and fell through to the model's answer.
+    expect(primaryColorFromTitle("Tee - Black/White", ["white", "black"])).toBe("black");
+    expect(primaryColorFromTitle("Tee - White/Black", ["black", "white"])).toBe("white");
+    expect(primaryColorFromTitle("Tee (Black/White)", ["white", "black"])).toBe("black");
+    // A modifier in front of the first colour still does not hide it.
+    expect(primaryColorFromTitle("Dress in Dusty Pink and Black", ["black", "pink"])).toBe(
+      "pink",
+    );
+  });
+
   it("ignores a designator that names no stated colour", () => {
     // "in Linen" is a fabric; "Cabin Socks" contains "in" inside a word.
     expect(primaryColorFromTitle("Shirt Dress in Linen", ["white"])).toBeNull();

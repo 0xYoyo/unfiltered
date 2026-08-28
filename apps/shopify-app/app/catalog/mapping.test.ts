@@ -261,6 +261,23 @@ describe("Shopify→snapshot mapping", () => {
       expect(normalizeFamilyTitle("Top in Pink / Navy")).toBe("top in pink");
     });
 
+    it("a bare modifier is not a designator; it still qualifies a colour (YOY-125 AC-11)", () => {
+      // "Soft", "Natural", "Light" are shade/finish modifiers, never a
+      // colourway on their own: collapsing them would hide a different
+      // product of the same vendor and type behind a colourway that never
+      // existed (the co-manager parity rule).
+      expect(normalizeFamilyTitle("Jacket - Soft")).toBe("jacket - soft");
+      expect(normalizeFamilyTitle("Sofa (Natural)")).toBe("sofa (natural)");
+      expect(normalizeFamilyTitle("Tee / Light")).toBe("tee / light");
+      expect(normalizeFamilyTitle("Jacket in Vintage")).toBe("jacket in vintage");
+      // The same words still qualify a colour in the two-word form.
+      expect(normalizeFamilyTitle("Tee in Dusty Rose")).toBe("tee");
+      expect(normalizeFamilyTitle("Tee in Meteorite Black")).toBe("tee");
+      expect(normalizeFamilyTitle("Jacket - Soft Pink")).toBe("jacket");
+      // A one-word colour is unaffected.
+      expect(normalizeFamilyTitle("Tee - Floral")).toBe("tee");
+    });
+
     it("keeps a title with no designator, or a designator that is not a colour", () => {
       expect(normalizeFamilyTitle("Black Evening Gown")).toBe("black evening gown");
       expect(normalizeFamilyTitle("Shirt Dress in Linen")).toBe("shirt dress in linen");

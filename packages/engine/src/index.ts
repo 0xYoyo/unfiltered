@@ -40,8 +40,10 @@ export {
 } from "./classify.js";
 export {
   CLASSIFIER_COLOR_WORDS,
+  COLORWAY_COLORS,
+  COLORWAY_MODIFIERS,
   COLORWAY_WORDS,
-  isColorwayWord,
+  isColorwayDesignator,
 } from "./colors.js";
 
 export {
