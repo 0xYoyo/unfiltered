@@ -26,6 +26,13 @@ import {
 } from "../catalog/enrich.server";
 import { hashImageBytes } from "../catalog/images.server";
 import { computeContentHash, computeFamilyKey } from "../catalog/mapping.server";
+import {
+  EXAMPLE_QUERIES,
+  EXAMPLE_QUERY_KINDS,
+  PLAYGROUND_LOCALES,
+  type ExampleQueryKind,
+  type PlaygroundLocale,
+} from "../playground/strings";
 import { createPgTrgmClassicStore } from "../search/classic-store.server";
 import {
   createSearchOrchestrator,
@@ -250,6 +257,23 @@ export interface Golden {
 }
 
 /**
+ * One curated example query of the playground page (YOY-136 AC-3): the
+ * committed `EXAMPLE_QUERIES` set of `app/playground/strings.ts`, replayed
+ * end to end against the fixture catalog. The page's own suggestions must
+ * never come back empty, so each is scored on one thing — at least one
+ * primary hit — rather than on rank; `expectedProductIds` is empty by
+ * design and `hardConstraints` names the constraint the kind demonstrates.
+ * A `refinement` example carries the `previousIntent` the runbook gives it
+ * (the same locale's negation example, submitted immediately before), and
+ * runs the full path with it, exactly as the page does.
+ */
+export interface ExampleGolden extends Golden {
+  kind: ExampleQueryKind;
+  language: PlaygroundLocale;
+  previousIntent?: Intent;
+}
+
+/**
  * The three Constructor-bar groups (YOY-118): the hardest public
  * natural-language search bar (docs/COMPETITORS.md) — negations, price caps,
  * and "dress for a wedding ≠ wedding dress".
@@ -419,6 +443,12 @@ export interface EvalRunResult {
   perSparse: QueryScore[];
   /** Fraction of the sparse goldens with an expected product in the top 10 (bar ≥ 0.8). */
   sparseHitRate: number;
+  /**
+   * One row per curated example query (YOY-136 AC-3), scored like the
+   * goldens; the bar is ≥ 1 primary hit on every one of them, and their
+   * spend stays out of the blend like the other side sets.
+   */
+  perExample: QueryScore[];
   /** Contamination cases scored (YOY-122 AC-1). */
   contaminationCases: number;
   /** Every contamination violation across the cases (bar: none). */
@@ -514,6 +544,61 @@ export function loadCatalog(): EvalProduct[] {
 
 export function loadGoldens(): Golden[] {
   return readJson<Golden[]>("goldens.json");
+}
+
+/**
+ * The curated examples, validated against the committed set (YOY-136 AC-3):
+ * exactly one golden per kind per locale, its query byte-identical to the
+ * `EXAMPLE_QUERIES` entry — so a curation edit in strings.ts fails offline
+ * until its recording lands, and a stale fixture cannot vouch for a query
+ * the page no longer offers. Refinement examples must carry a valid
+ * previous intent; no other kind may.
+ */
+export function loadExampleGoldens(): ExampleGolden[] {
+  const goldens = readJson<
+    (Omit<ExampleGolden, "previousIntent"> & { previousIntent?: unknown })[]
+  >("example-goldens.json");
+  const ids = new Set<string>();
+  const seen = new Set<string>();
+  const loaded = goldens.map((golden): ExampleGolden => {
+    if (ids.has(golden.id)) {
+      throw new Error(`eval: example golden ${golden.id} is listed twice`);
+    }
+    ids.add(golden.id);
+    const committed = EXAMPLE_QUERIES[golden.language]?.find(
+      (query) => query.kind === golden.kind,
+    );
+    if (committed === undefined || committed.text !== golden.query) {
+      throw new Error(
+        `eval: example golden ${golden.id} (${golden.language} ${golden.kind}: ${JSON.stringify(golden.query)}) does not match EXAMPLE_QUERIES${committed === undefined ? "" : ` (${JSON.stringify(committed.text)})`} — update example-goldens.json and record it (REGEN_SCOPE=goldens)`,
+      );
+    }
+    const slot = `${golden.language}/${golden.kind}`;
+    if (seen.has(slot)) {
+      throw new Error(`eval: example golden ${golden.id} duplicates ${slot}`);
+    }
+    seen.add(slot);
+    const { previousIntent: rawPreviousIntent, ...plain } = golden;
+    if (golden.kind === "refinement") {
+      const previousIntent = parseIntent(rawPreviousIntent);
+      if (previousIntent === null) {
+        throw new Error(`eval: example golden ${golden.id} carries an invalid previousIntent`);
+      }
+      return { ...plain, previousIntent };
+    }
+    if (rawPreviousIntent !== undefined) {
+      throw new Error(`eval: example golden ${golden.id} is not a refinement but carries a previousIntent`);
+    }
+    return plain;
+  });
+  for (const locale of PLAYGROUND_LOCALES) {
+    for (const kind of EXAMPLE_QUERY_KINDS) {
+      if (!seen.has(`${locale}/${kind}`)) {
+        throw new Error(`eval: example-goldens.json has no ${locale} ${kind} entry`);
+      }
+    }
+  }
+  return loaded;
 }
 
 export function loadRefinementGoldens(): RefinementGolden[] {
@@ -845,6 +930,7 @@ export async function runEval(db: PrismaClient): Promise<EvalRunResult> {
   // replayed through the same client under operation "vision".
   const visionRecording = readJson<LlmRecording>("recorded", "vision.json");
   const visionGoldens = loadVisionGoldens();
+  const exampleGoldens = loadExampleGoldens();
   const contaminationCases = loadContaminationCases();
   const recordings: Record<string, LlmRecording> = {
     enrichment: readJson<LlmRecording>("recorded", "enrichment.json"),
@@ -986,13 +1072,17 @@ export async function runEval(db: PrismaClient): Promise<EvalRunResult> {
     contaminationViolations(kase, visionByProduct.get(kase.productId) ?? null),
   );
 
-  const scoreGolden = async (golden: Golden): Promise<QueryScore> => {
+  const scoreGolden = async (
+    golden: Golden,
+    previousIntent?: Intent,
+  ): Promise<QueryScore> => {
     const searchId = golden.id;
     const response = await orchestrator.runSearch({
       query: golden.query,
       shopDomain,
       searchId,
       limit: 10,
+      ...(previousIntent === undefined ? {} : { previousIntent }),
     });
     // The eval is offline and deterministic: a degraded response means a
     // replay recording is missing or broken, and the silent fallback would
@@ -1082,6 +1172,13 @@ export async function runEval(db: PrismaClient): Promise<EvalRunResult> {
   for (const golden of visionGoldens) {
     perSparse.push(await scoreGolden(golden));
   }
+  // The curated examples (YOY-136 AC-3): the page's own suggestions, run
+  // end to end — a refinement example with the previous intent the runbook
+  // hands it — and scored on answering at all, outside every bar above.
+  const perExample: QueryScore[] = [];
+  for (const golden of exampleGoldens) {
+    perExample.push(await scoreGolden(golden, golden.previousIntent));
+  }
 
   // Refinement goldens (YOY-42): one intent call each, with the previous
   // intent supplied by the golden — no classification or retrieval, because a
@@ -1125,13 +1222,15 @@ export async function runEval(db: PrismaClient): Promise<EvalRunResult> {
     constructorGoldens.map((golden) => golden.id),
   );
   const sparseSearchIds = new Set(visionGoldens.map((golden) => golden.id));
+  const exampleSearchIds = new Set(exampleGoldens.map((golden) => golden.id));
   const perSearchTotal = allRows
     .filter(
       (row) =>
         row.searchId !== null &&
         !refinementSearchIds.has(row.searchId) &&
         !constructorSearchIds.has(row.searchId) &&
-        !sparseSearchIds.has(row.searchId),
+        !sparseSearchIds.has(row.searchId) &&
+        !exampleSearchIds.has(row.searchId),
     )
     .reduce((sum, row) => sum + row.costUsd, 0);
   const refinementTotal = allRows
@@ -1201,6 +1300,7 @@ export async function runEval(db: PrismaClient): Promise<EvalRunResult> {
     perConstructor,
     constructorBar: computeConstructorBar(perConstructor, allRows),
     perSparse,
+    perExample,
     sparseHitRate:
       perSparse.length === 0 ? 0 : perSparse.filter(goldenHit).length / perSparse.length,
     contaminationCases: contaminationCases.length,
@@ -1340,6 +1440,35 @@ function printScorecard(result: EvalRunResult): void {
     `contamination violations: ${result.contaminationViolations.length} over ${result.contaminationCases} cases (bar: 0)`,
     ...result.contaminationViolations.map((violation) => `  VIOLATION: ${violation}`),
     `one-time vision cost (${result.visionProducts} products with images, reported separately): $${result.visionCostUsd.toFixed(4)}`,
+  );
+  lines.push(
+    "",
+    "curated example queries — the playground page's own suggestions (YOY-136)",
+    "id   | lang | kind              | route      | tier     | hits | viol | cost USD | query",
+    "-----+------+-------------------+------------+----------+------+------+----------+------",
+  );
+  for (const score of result.perExample) {
+    const golden = score.golden as ExampleGolden;
+    lines.push(
+      [
+        golden.id.padEnd(4),
+        golden.language.padEnd(4),
+        golden.kind.padEnd(17),
+        `${score.route}/${score.routeReason}`.padEnd(10),
+        (score.intentTier ?? "-").padEnd(8),
+        String(score.hits.length).padStart(4),
+        String(score.violations.length).padStart(4),
+        score.costUsd.toFixed(6).padStart(8),
+        golden.query,
+      ].join(" | "),
+    );
+    for (const violation of score.violations) {
+      lines.push(`  VIOLATION: ${violation}`);
+    }
+  }
+  const answered = result.perExample.filter((score) => score.hits.length > 0).length;
+  lines.push(
+    `curated examples answered: ${answered}/${result.perExample.length} (bar: every one ≥ 1 primary hit)`,
   );
   if (result.synthesizedRecordings) {
     lines.push(

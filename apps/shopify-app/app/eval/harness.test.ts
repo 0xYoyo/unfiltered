@@ -19,6 +19,7 @@ import {
   loadConstructorFloor,
   loadConstructorGoldens,
   loadContaminationCases,
+  loadExampleGoldens,
   loadGoldens,
   loadRefinementGoldens,
   loadVisionGoldens,
@@ -32,6 +33,11 @@ import {
   type QueryScore,
 } from "./harness.server";
 import { assertEngineSourceExecution } from "./source-guard.server";
+import {
+  EXAMPLE_QUERIES,
+  EXAMPLE_QUERY_KINDS,
+  PLAYGROUND_LOCALES,
+} from "../playground/strings";
 
 // Same source-execution guard as regenerate-live.test.ts (YOY-52 run-6): an
 // offline eval scored against dist-resolved engine logic is as misleading as
@@ -636,6 +642,39 @@ describe("violation scoring mirrors unknown-passes filtering (YOY-35 AC-2, AC-5)
   });
 });
 
+describe("curated example goldens (YOY-136 AC-3)", () => {
+  it("mirrors the committed EXAMPLE_QUERIES set: one golden per kind per locale, byte-identical queries, refinements carrying a previous intent", () => {
+    const goldens = loadExampleGoldens();
+    expect(goldens).toHaveLength(PLAYGROUND_LOCALES.length * EXAMPLE_QUERY_KINDS.length);
+    for (const locale of PLAYGROUND_LOCALES) {
+      for (const query of EXAMPLE_QUERIES[locale]) {
+        const golden = goldens.find(
+          (candidate) => candidate.language === locale && candidate.kind === query.kind,
+        );
+        expect(golden?.query, `${locale} ${query.kind}`).toBe(query.text);
+        expect(golden?.previousIntent !== undefined, `${locale} ${query.kind} previousIntent`).toBe(
+          query.kind === "refinement",
+        );
+        // Answering at all is the bar, so no example pins a product.
+        expect(golden?.expectedProductIds, `${locale} ${query.kind}`).toEqual([]);
+      }
+    }
+    // Ids never collide with the other sets: every set shares the ledger
+    // and the recordings, keyed by searchId and query respectively.
+    const others = new Set(
+      [
+        ...loadGoldens(),
+        ...loadConstructorGoldens(),
+        ...loadVisionGoldens(),
+        ...loadRefinementGoldens(),
+      ].map((golden) => golden.id),
+    );
+    for (const golden of goldens) {
+      expect(others.has(golden.id), golden.id).toBe(false);
+    }
+  });
+});
+
 describe("eval run (AC-2, AC-3, AC-4, AC-6)", () => {
   let result: EvalRunResult;
 
@@ -806,6 +845,24 @@ describe("eval run (AC-2, AC-3, AC-4, AC-6)", () => {
     }
     // Hard constraints hold on this set too.
     expect(result.perSparse.flatMap((score) => score.violations)).toEqual([]);
+  });
+
+  it("answers every curated example query with ≥ 1 primary result on the fixture catalog; the named kinds route ai (YOY-136 AC-3)", () => {
+    expect(result.perExample.length).toBe(loadExampleGoldens().length);
+    const unanswered = result.perExample
+      .filter((score) => score.hits.length === 0)
+      .map((score) => `${score.golden.id} ${JSON.stringify(score.golden.query)}`);
+    expect(unanswered, `examples answering nothing: ${unanswered.join("; ")}`).toEqual([]);
+    // The runbook's route half (YOY-124 AC-4): negation, priceCap, occasion,
+    // and colorAvailability show the AI path; softAttribute and refinement
+    // may settle either way.
+    const aiKinds = new Set(["negation", "priceCap", "occasion", "colorAvailability"]);
+    for (const score of result.perExample) {
+      const golden = loadExampleGoldens().find((candidate) => candidate.id === score.golden.id)!;
+      if (aiKinds.has(golden.kind)) {
+        expect(score.route, `${golden.id} ${golden.kind}`).toBe("ai");
+      }
+    }
   });
 
   it("reports the vision pass as one-time indexing cost on its own line, outside the per-search blend (YOY-122 AC-3)", () => {

@@ -400,16 +400,16 @@ export const EXAMPLE_QUERIES: Record<PlaygroundLocale, ExampleQuery[]> = {
     { kind: "priceCap", text: "linen shirt under 300" },
     { kind: "occasion", text: "something to wear to a wedding" },
     { kind: "softAttribute", text: "an oversized coat that drapes well" },
-    { kind: "colorAvailability", text: "beige boots in stock" },
-    { kind: "refinement", text: "same but cheaper" },
+    { kind: "colorAvailability", text: "brown boots in stock" },
+    { kind: "refinement", text: "same but under 400" },
   ],
   he: [
     { kind: "negation", text: "שמלת קיץ, לא שחורה" },
     { kind: "priceCap", text: "חולצת פשתן עד 300" },
     { kind: "occasion", text: "משהו ללבוש לחתונה" },
     { kind: "softAttribute", text: "מעיל אוברסייז שנופל יפה" },
-    { kind: "colorAvailability", text: "מגפיים בז' במלאי" },
-    { kind: "refinement", text: "אותו דבר אבל זול יותר" },
+    { kind: "colorAvailability", text: "מגפיים חומים במלאי" },
+    { kind: "refinement", text: "אותו דבר אבל עד 400" },
   ],
 };
 

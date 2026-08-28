@@ -1,6 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { PLAYGROUND_STRING_CATALOG, type PlaygroundLocale } from "../strings";
+import {
+  PLAYGROUND_STRING_CATALOG,
+  exampleQueriesFor,
+  type PlaygroundLocale,
+} from "../strings";
 
 /**
  * The playground's AI states (YOY-93): chips as removable output,
@@ -554,6 +558,35 @@ test.describe("example queries (AC-6, verify 6)", () => {
     await expect(examples.nth(4)).toHaveAttribute("dir", "rtl");
     await expect(examples.nth(4)).toHaveAttribute("lang", "he");
     await expect(examples.nth(0)).toHaveAttribute("dir", "ltr");
+  });
+
+  test("renders the committed curated set verbatim, in the committed order, under both chromes (YOY-136 AC-1)", async ({
+    page,
+  }) => {
+    // The page's suggestions are the committed `EXAMPLE_QUERIES` set and
+    // nothing else: the eval fixture (example-goldens.json) vouches for
+    // exactly these strings, so a rendered text that drifts from the set
+    // is a suggestion nobody has proven answerable.
+    for (const [locale, path] of [
+      ["en", "/"],
+      ["he", "/?lang=he"],
+    ] as const) {
+      await page.goto(path);
+      const examples = page.getByTestId("playground-example");
+      await expect(examples).toHaveCount(6);
+      const rendered = await examples.evaluateAll((nodes) =>
+        nodes.map((node) => ({
+          text: node.textContent?.trim() ?? "",
+          locale: node.getAttribute("data-example-locale"),
+        })),
+      );
+      expect(rendered, locale).toEqual(
+        exampleQueriesFor(locale).map((entry) => ({
+          text: entry.query.text,
+          locale: entry.locale,
+        })),
+      );
+    }
   });
 
   test("mirrors the split under Hebrew chrome", async ({ page }) => {

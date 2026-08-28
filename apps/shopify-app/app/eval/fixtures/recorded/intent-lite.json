@@ -1496,6 +1496,222 @@
       },
       "inputTokens": 391,
       "outputTokens": 60
+    },
+    "summer dress, not black": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [
+          "black"
+        ],
+        "attributesExclude": [],
+        "attributesInclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "summer"
+        ],
+        "confidence": 0.9,
+        "category": "dress",
+        "currency": null,
+        "occasion": null,
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 393,
+      "outputTokens": 116
+    },
+    "linen shirt under 300": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "attributesExclude": [],
+        "attributesInclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "linen"
+        ],
+        "confidence": 0.9,
+        "category": "top",
+        "currency": null,
+        "occasion": null,
+        "priceMax": 300,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 395,
+      "outputTokens": 111
+    },
+    "something to wear to a wedding": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "attributesExclude": [
+          "bridal"
+        ],
+        "attributesInclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [],
+        "confidence": 0.7,
+        "category": "dress",
+        "currency": null,
+        "occasion": "wedding",
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 394,
+      "outputTokens": 109
+    },
+    "an oversized coat that drapes well": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "attributesExclude": [],
+        "attributesInclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "oversized",
+          "drapes well"
+        ],
+        "confidence": 0.9,
+        "category": "coat",
+        "currency": null,
+        "occasion": null,
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 395,
+      "outputTokens": 116
+    },
+    "brown boots in stock": {
+      "output": {
+        "colorsInclude": [
+          "brown"
+        ],
+        "colorsExclude": [],
+        "attributesExclude": [],
+        "attributesInclude": [],
+        "availabilityRequired": true,
+        "softAttributes": [],
+        "confidence": 0.95,
+        "category": "boots",
+        "currency": null,
+        "occasion": null,
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 392,
+      "outputTokens": 109
+    },
+    "שמלת קיץ, לא שחורה": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [
+          "black"
+        ],
+        "attributesExclude": [],
+        "attributesInclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "קיץ"
+        ],
+        "confidence": 0.9,
+        "category": "dress",
+        "currency": null,
+        "occasion": null,
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 397,
+      "outputTokens": 117
+    },
+    "חולצת פשתן עד 300": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "attributesExclude": [],
+        "attributesInclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "פשתן"
+        ],
+        "confidence": 0.9,
+        "category": "top",
+        "currency": "ILS",
+        "occasion": null,
+        "priceMax": 300,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 399,
+      "outputTokens": 108
+    },
+    "משהו ללבוש לחתונה": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "attributesExclude": [
+          "bridal"
+        ],
+        "attributesInclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [],
+        "confidence": 0.7,
+        "category": "other",
+        "currency": null,
+        "occasion": "wedding",
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 397,
+      "outputTokens": 109
+    },
+    "מעיל אוברסייז שנופל יפה": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [],
+        "attributesExclude": [],
+        "attributesInclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "אוברסייז",
+          "שנופל יפה"
+        ],
+        "confidence": 0.9,
+        "category": "coat",
+        "currency": null,
+        "occasion": null,
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 400,
+      "outputTokens": 121
+    },
+    "מגפיים חומים במלאי": {
+      "output": {
+        "colorsInclude": [
+          "brown"
+        ],
+        "colorsExclude": [],
+        "attributesExclude": [],
+        "attributesInclude": [],
+        "availabilityRequired": true,
+        "softAttributes": [],
+        "confidence": 0.9,
+        "category": "boots",
+        "currency": null,
+        "occasion": null,
+        "priceMax": null,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 396,
+      "outputTokens": 108
     }
   }
 }

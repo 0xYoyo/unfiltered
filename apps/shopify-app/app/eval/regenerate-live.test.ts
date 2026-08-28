@@ -42,9 +42,11 @@ import { createTestDb } from "../testing/helpers.server";
 import {
   loadCatalog,
   loadConstructorGoldens,
+  loadExampleGoldens,
   loadGoldens,
   loadRefinementGoldens,
   runEval,
+  type RefinementGolden,
   type Golden,
   goldenHit,
   loadVisionGoldens,
@@ -528,7 +530,55 @@ describe("source-execution guard (YOY-52 run-6)", () => {
  * fail the offline run exactly like a main golden.
  */
 function loadRecordedGoldens(): Golden[] {
-  return [...loadGoldens(), ...loadConstructorGoldens(), ...loadVisionGoldens()];
+  return [
+    ...loadGoldens(),
+    ...loadConstructorGoldens(),
+    ...loadVisionGoldens(),
+    // The curated examples (YOY-136 AC-3) record like any golden; the two
+    // refinement examples carry a previous intent and record with the
+    // refinement goldens instead (`recordedRefinements`).
+    ...loadExampleGoldens().filter((golden) => golden.previousIntent === undefined),
+  ];
+}
+
+/**
+ * Every query the classifier must have an answer for (YOY-136 AC-3): the
+ * recorded goldens plus the curated refinement examples — the orchestrator
+ * classifies a follow-up like any query before extracting with the previous
+ * intent, so a refinement example with no classification entry degrades
+ * offline. They are classified here and nowhere else: their intents live in
+ * the refinement recordings, keyed by the same query, and a base-intent
+ * entry would collide.
+ */
+function classifiedGoldens(): Pick<Golden, "id" | "query" | "expectedRoute">[] {
+  return [
+    ...loadRecordedGoldens(),
+    ...loadExampleGoldens().flatMap((golden) =>
+      golden.previousIntent === undefined
+        ? []
+        : [{ id: golden.id, query: golden.query, expectedRoute: "ai" as const }],
+    ),
+  ];
+}
+
+/** One follow-up to record: a refinement golden or a refinement example. */
+type RecordedRefinement = Pick<RefinementGolden, "id" | "query" | "previousIntent">;
+
+/**
+ * Every follow-up the harness replays with a previous intent (YOY-136
+ * AC-3): the refinement goldens plus the curated refinement examples, so
+ * both tiers' refinement recordings and their query embeddings cover the
+ * page's own suggestions exactly as they cover the goldens.
+ */
+function recordedRefinements(): RecordedRefinement[] {
+  return [
+    ...loadRefinementGoldens(),
+    ...loadExampleGoldens().flatMap((golden) =>
+      golden.previousIntent === undefined
+        ? []
+        : [{ id: golden.id, query: golden.query, previousIntent: golden.previousIntent }],
+    ),
+  ];
 }
 
 describe("golden classification tiers (YOY-52 AC-1 amendment)", () => {
@@ -637,7 +687,7 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
     // the model, so demanding reason "model" for every golden is wrong since
     // the YOY-61 classifier rewrite. The heuristics are deterministic, so
     // each golden's expectation derives from classifyByHeuristics itself.
-    for (const golden of goldens) {
+    for (const golden of classifiedGoldens()) {
       const decision = await classifier.classify(golden.query);
       check(
         decision.route === (golden.expectedRoute ?? "ai"),
@@ -734,7 +784,7 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
         refinementEntries,
       ),
     });
-    for (const golden of loadRefinementGoldens()) {
+    for (const golden of recordedRefinements()) {
       try {
         await refinementExtractor.extract(golden.query, {
           previousIntent: golden.previousIntent,
@@ -939,7 +989,7 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
         refinementEntries,
       ),
     });
-    for (const golden of loadRefinementGoldens()) {
+    for (const golden of recordedRefinements()) {
       if (refinementEntries[golden.query] !== undefined) {
         continue; // resumed from disk
       }
@@ -963,7 +1013,7 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
     const models = geminiModelsFromEnv();
     const catalog = loadCatalog();
     const goldens = loadRecordedGoldens();
-    const refinementGoldens = loadRefinementGoldens();
+    const refinementGoldens = recordedRefinements();
     const usage = captureUsage(createPrismaCostRecorder(db));
     const failures: string[] = [];
     const check = (condition: boolean, message: string): void => {
@@ -1070,7 +1120,7 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
       timeoutMs: 600_000,
     });
     let classificationsRecorded = 0;
-    for (const golden of goldens) {
+    for (const golden of classifiedGoldens()) {
       const key = normalizeQuery(golden.query);
       if (classifyByHeuristics(key) !== null || classification.entries[key] !== undefined) {
         continue; // heuristic-settled, or already recorded live
@@ -1126,6 +1176,46 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
       check(intentRecording.entries[golden.query] !== undefined, `intent: ${golden.id} recorded no completion`);
     }
     writeRecording("intent.json", intentRecording.modelId, intentRecording.entries);
+
+    // 3b. Accuracy-tier refinement intents (YOY-136 AC-3): only follow-ups
+    //     with no entry yet. A refinement golden or a curated refinement
+    //     example added later records here, missing-only, like the base
+    //     goldens above — before this step the goldens scope never recorded
+    //     a refinement and a new one degraded offline.
+    const refinementRecording = readRecording("intent-refinement.json");
+    check(
+      refinementRecording.modelId === models.intentModel,
+      `intent-refinement.json is ${refinementRecording.modelId}, env says ${models.intentModel}; regenerate with REGEN_SCOPE=intent`,
+    );
+    const refinementExtractor = createIntentExtractor({
+      llm: captureCompletions(
+        createGeminiLlmClient({
+          modelId: models.intentModel,
+          costRecorder: usage.recorder,
+          thinkingLevel: models.intentThinkingLevel,
+        }),
+        usage.last,
+        refinementRecording.entries,
+      ),
+    });
+    let refinementsRecorded = 0;
+    for (const golden of refinementGoldens) {
+      if (refinementRecording.entries[golden.query] !== undefined) {
+        continue;
+      }
+      try {
+        await refinementExtractor.extract(golden.query, { previousIntent: golden.previousIntent });
+        refinementsRecorded += 1;
+      } catch (error) {
+        check(false, `refinement: ${golden.id} extraction failed: ${String(error)}`);
+        continue;
+      }
+      check(refinementRecording.entries[golden.query] !== undefined, `refinement: ${golden.id} recorded no completion`);
+    }
+    writeRecording("intent-refinement.json", refinementRecording.modelId, refinementRecording.entries);
+    if (refinementsRecorded > 0) {
+      console.log(`[regenerate-live] scope=${scope}: ${refinementsRecorded} missing accuracy refinement intent(s) recorded`);
+    }
     check(
       Object.keys(intentRecording.entries).length === goldens.length,
       `coverage: ${Object.keys(intentRecording.entries).length}/${goldens.length} intents recorded`,
@@ -1174,6 +1264,54 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
       check(liteRecording.entries[golden.query] !== undefined, `intent-lite: ${golden.id} recorded no completion`);
     }
     writeRecording("intent-lite.json", liteRecording.modelId, liteRecording.entries);
+
+    // 4b. Lite-tier refinement intents (YOY-136 AC-3): only follow-ups with
+    //     no entry yet. The curated refinement examples record here like
+    //     the refinement goldens, so the offline lite-first ladder can
+    //     answer them without a full REGEN_SCOPE=lite pass.
+    const liteRefinementRecording = readRecording("intent-lite-refinement.json");
+    check(
+      liteRefinementRecording.modelId === models.intentLiteModel,
+      `intent-lite-refinement.json is ${liteRefinementRecording.modelId}, env says ${models.intentLiteModel}; regenerate with REGEN_SCOPE=lite`,
+    );
+    const liteRefinementExtractor = createIntentExtractor({
+      llm: captureCompletions(
+        createGeminiLlmClient({
+          modelId: models.intentLiteModel,
+          costRecorder: usage.recorder,
+          thinkingLevel: models.intentLiteThinkingLevel,
+          requestTimeoutMs: LITE_REQUEST_TIMEOUT_MS,
+        }),
+        usage.last,
+        liteRefinementRecording.entries,
+      ),
+    });
+    let liteRefinementsRecorded = 0;
+    for (const golden of refinementGoldens) {
+      if (liteRefinementRecording.entries[golden.query] !== undefined) {
+        continue;
+      }
+      try {
+        await liteRefinementExtractor.extract(golden.query, { previousIntent: golden.previousIntent });
+        liteRefinementsRecorded += 1;
+      } catch (error) {
+        if (error instanceof GeminiTimeoutError) {
+          console.warn(`[regenerate-live] intent-lite-refinement: ${golden.id} timed out after retries; recorded as a lite failure`);
+          recordLiteFailure(liteRefinementRecording.entries, golden.query, error);
+          continue;
+        }
+        check(false, `intent-lite-refinement: ${golden.id} extraction failed: ${String(error)}`);
+        continue;
+      }
+      check(
+        liteRefinementRecording.entries[golden.query] !== undefined,
+        `intent-lite-refinement: ${golden.id} recorded no completion`,
+      );
+    }
+    writeRecording("intent-lite-refinement.json", liteRefinementRecording.modelId, liteRefinementRecording.entries);
+    if (liteRefinementsRecorded > 0) {
+      console.log(`[regenerate-live] scope=${scope}: ${liteRefinementsRecorded} missing lite refinement intent(s) recorded`);
+    }
 
     // 5. Embeddings: every product text (fresh enrichment attributes change
     //    the composed text) and every query text of both tiers, for goldens
@@ -1376,7 +1514,7 @@ describe.runIf(live)("eval fixture regeneration (live)", () => {
     const liteRefinementExtractor = createIntentExtractor({
       llm: captureCompletions(liteClient(), usage.last, liteRefinementEntries),
     });
-    for (const golden of loadRefinementGoldens()) {
+    for (const golden of recordedRefinements()) {
       if (
         liteRefinementEntries[golden.query] !== undefined &&
         liteRefinementEntries[golden.query]!.error === undefined
