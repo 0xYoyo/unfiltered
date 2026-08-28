@@ -10,6 +10,8 @@
  *   npx tsx scripts/evidence.mts searches [limit]   # latest SearchEvent rows
  *   npx tsx scripts/evidence.mts costs SEARCH_ID    # AiCall rows for one search
  *   npx tsx scripts/evidence.mts clicks [limit]     # latest ClickEvent rows
+ *   npx tsx scripts/evidence.mts vision             # visionStatus coverage
+ *   npx tsx scripts/evidence.mts attributes ID...   # enrichment of given products
  */
 
 import { PrismaClient } from "@prisma/client";
@@ -86,7 +88,98 @@ async function clicks(limit: number): Promise<void> {
   );
 }
 
-const [mode, argument] = process.argv.slice(2);
+/**
+ * Vision-enrichment coverage for the store (YOY-124 AC-7): one row per
+ * `visionStatus` value plus the percentage of the store's products that
+ * reached `enriched`. `none` means no images or never run; `failed` means
+ * two attempts failed and the product is retried only when its image
+ * hashes change (schema.prisma, ProductEnrichment).
+ */
+async function vision(): Promise<void> {
+  const [products, grouped] = await Promise.all([
+    db.catalogProduct.count({ where: { shopDomain: SHOP } }),
+    db.productEnrichment.groupBy({
+      by: ["visionStatus"],
+      where: { shopDomain: SHOP },
+      _count: { _all: true },
+    }),
+  ]);
+  const byStatus = new Map(
+    grouped.map((row) => [row.visionStatus, row._count._all]),
+  );
+  // The three documented values always appear, so a zero reads as a zero
+  // rather than as a missing row; any other value the column has grown to
+  // hold appears after them rather than vanishing from the total.
+  const statuses = [
+    ...["enriched", "none", "failed"],
+    ...[...byStatus.keys()].filter(
+      (status) => !["enriched", "none", "failed"].includes(status),
+    ),
+  ];
+  console.table(
+    statuses.map((status) => ({
+      shop: SHOP,
+      visionStatus: status,
+      count: byStatus.get(status) ?? 0,
+    })),
+  );
+  const enriched = byStatus.get("enriched") ?? 0;
+  const pct = products === 0 ? 0 : (enriched / products) * 100;
+  console.log(
+    `vision coverage: ${enriched}/${products} products enriched (${pct.toFixed(1)}%)`,
+  );
+}
+
+/**
+ * The enrichment a product actually carries (YOY-124 AC-7): the five
+ * vision-only coverage attributes plus the primary colour and the vision
+ * status, for the product ids a live-run step read off the result cards
+ * (`results[].productId` in the playground contract). Products are printed
+ * in the order given, so a top-5 check reads down the table.
+ */
+async function attributes(productIds: string[]): Promise<void> {
+  const rows = await db.productEnrichment.findMany({
+    where: { shopDomain: SHOP, productId: { in: productIds } },
+  });
+  const byId = new Map(rows.map((row) => [row.productId, row]));
+  const snapshots = await db.catalogProduct.findMany({
+    where: { shopDomain: SHOP, productId: { in: productIds } },
+    select: { productId: true, title: true },
+  });
+  const titleById = new Map(
+    snapshots.map((row) => [row.productId, row.title]),
+  );
+  console.table(
+    productIds.map((productId) => {
+      const row = byId.get(productId);
+      return {
+        productId,
+        title: (titleById.get(productId) ?? "—").slice(0, 40),
+        visionStatus: row?.visionStatus ?? "—",
+        primaryColor: row?.primaryColor ?? "—",
+        sleeveLength: row?.sleeveLength ?? "—",
+        neckline: row?.neckline ?? "—",
+        garmentLength: row?.garmentLength ?? "—",
+        pattern: row?.pattern ?? "—",
+        materialAppearance: row?.materialAppearance ?? "—",
+      };
+    }),
+  );
+  // The merged columns above are what search reads; the two source answers
+  // are what a contamination check must inspect, because a footwear or
+  // jewelry attribute leaking in from an accessory in the photo shows up in
+  // `visionAttributes` even when the merge dropped it.
+  for (const productId of productIds) {
+    const row = byId.get(productId);
+    if (!row) {
+      console.log(`${productId}: no enrichment row`);
+      continue;
+    }
+    console.log(`${productId} visionAttributes: ${JSON.stringify(row.visionAttributes)}`);
+  }
+}
+
+const [mode, argument, ...rest] = process.argv.slice(2);
 try {
   switch (mode) {
     case "counts":
@@ -104,9 +197,18 @@ try {
     case "clicks":
       await clicks(Number(argument ?? 5));
       break;
+    case "vision":
+      await vision();
+      break;
+    case "attributes":
+      if (!argument) {
+        throw new Error("usage: evidence.mts attributes PRODUCT_ID [PRODUCT_ID...]");
+      }
+      await attributes([argument, ...rest]);
+      break;
     default:
       throw new Error(
-        "usage: evidence.mts counts | searches [limit] | costs SEARCH_ID | clicks [limit]",
+        "usage: evidence.mts counts | searches [limit] | costs SEARCH_ID | clicks [limit] | vision | attributes PRODUCT_ID...",
       );
   }
 } finally {

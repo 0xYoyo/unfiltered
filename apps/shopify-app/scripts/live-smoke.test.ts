@@ -187,11 +187,16 @@ describe("live smoke (YOY-112)", () => {
 });
 
 describe("configuration", () => {
-  it("the committed config names the Frankfurt origin and the initial ceilings", () => {
+  // The ceilings were tightened from 1500/6000 on 2026-08-28 (YOY-124
+  // AC-9b) once the M5 bars were held on the deployment: 800 ms sits above
+  // the measured classic p95 (19-26 ms) with room for one slow sample, and
+  // 3500 ms is docs/LATENCY.md's AI p95 bar itself, so a single AI sample
+  // over it is the hedge-tail regression the canary exists to catch.
+  it("the committed config names the Frankfurt origin and the tightened ceilings", () => {
     expect(loadConfig()).toEqual({
       url: "https://unfiltered-eu.onrender.com",
-      classicMaxMs: 1500,
-      aiMaxMs: 6000,
+      classicMaxMs: 800,
+      aiMaxMs: 3500,
     });
   });
 
