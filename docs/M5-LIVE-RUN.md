@@ -34,10 +34,10 @@ paste a live key or connection string into this file.
 
 | Field | Value |
 | --- | --- |
-| Date / time (UTC) | **2026-08-28 18:28–19:35** (Part 1, Part 2, Part 3 steps 7–8, Part 5, Part 7 steps 19 and 21). Parts 4 and 6 not yet run — the rows below say so. |
+| Date / time (UTC) | **2026-08-28 18:28–19:50** (Parts 1, 2, 3 steps 7–8, Part 4, Part 5, Part 7 steps 19 and 21). Part 3 step 9 and Part 6 not yet run — the rows below say so. |
 | Deployment URL | `https://unfiltered-eu.onrender.com` |
 | Render service / region / plan | `unfiltered-eu` (`srv-da6uhoh5efls73cvfis0`) / **Frankfurt** / _fill_ |
-| Commit deployed (SHA) | `52a638c` (PR #141) — Render deploy `dep-da8t6h9srm7s73ahjil0`, live 2026-08-28 18:29:16 UTC |
+| Commit deployed (SHA) | **Per part** — `render.yaml` sets `autoDeploy: true` on `main`, and three docs-only merges landed while the run was in progress, so the live build moved between parts. The engine is byte-identical across all three (every delta is under `docs/`). **`52a638c`** (PR #141, deploy `dep-da8t6h9srm7s73ahjil0`, live 18:29:16–19:29:40 UTC): Parts 1, 3, 5, 7, and Part 2 step 5's recorded search (`02a945db…`, 19:28:47). **`4aa3feb`** (PR #142, deploy `dep-da8u2cgae00c73a7ivh0`, live 19:29:40–19:42:43): Part 2's route-comparison searches (19:29:59–19:30:13) and the first seven searches of Part 4 step 10 (19:41:45–19:42:37). **`611ff72`** (PR #143, deploy `dep-da8u8g0u01pc73ckn58g`, live from 19:42:43): the rest of step 10 and steps 11–14 (19:42:46–19:47). Part 2 steps 3, 4 and 6 read the database directly and depend on no deployed build. |
 | Engine version at `/healthz` | `0.4.0` ✓ |
 | `DATABASE_URL` | Neon, `vector` enabled — **redacted**. Record **pooled or direct**: pooled is `…-pooler.<region>.aws.neon.tech` with `pgbouncer=true` (AC-11). **This run: pooled**, switched 18:28 UTC — AC-11 |
 | `DIRECT_DATABASE_URL` | **redacted**; set iff pooled (Prisma `directUrl`, migrations on boot). **This run: set** by the AC-11 switch (= the previous `DATABASE_URL`) |
@@ -373,9 +373,9 @@ Fill one row per step. **YOY-124 closes only when every step has a row.**
 Every FAIL row must name the defect and link the Linear issue filed for it,
 or the hardening-tail AC it was appended to (AC-10; NG-1: file, do not fix).
 
-- **Date:** 2026-08-28 (partial — Parts 1, 2, 3, 5 and 7; Parts 4 and 6 open)
-- **Executed by:** founder (steps 1, 7–8, 15, 19, 21) + builder (steps 3–6 executed; the rest of this table from the founder's pasted output on YOY-124)
-- **Deployment URL / commit:** `https://unfiltered-eu.onrender.com` @ `52a638c`
+- **Date:** 2026-08-28 (partial — Parts 1, 2, 3, 4, 5 and 7; step 9 and Part 6 open)
+- **Executed by:** founder (steps 1, 7–8, 15, 19, 21) + builder (steps 3–6 and 10–14 executed; the rest of this table from the founder's pasted output on YOY-124)
+- **Deployment URL / commit:** `https://unfiltered-eu.onrender.com` @ `52a638c` → `4aa3feb` → `611ff72` — the build moved twice mid-run under `autoDeploy`; the header block above says which part each one served, and all three deltas are docs-only
 - **Connection at run time:** **pooled** (switched 18:28 UTC, AC-11)
 - **Seed catalog size (products):** 465
 - **Vision coverage:** 100.0 % (465/465 enriched, 0 none, 0 failed)
@@ -393,11 +393,11 @@ or the hardening-tail AC it was appended to (AC-10; NG-1: file, do not fix).
 | 7 | AC-2 | Full probe, bars asserted | exit 0, `assertions: all bars met`, four rows | **PASS** | `--runs 20 --set all` with all three `--assert-*` flags: exit 0, `assertions: all bars met`. classic p50 37 / p95 50; ai-en 1008 / 2228; ai-he 1060 / 3421; ai-combined 1017 / 3275. Four rows added to docs/LATENCY.md (2026-08-28, pooled). |
 | 8 | AC-2 | Degraded count | `degraded=0` (and `reused=0`) on every set | **FLAG — founder decision open** | `reused=0` and `limited=0` on every set ✓, but ai-he shows **`degraded=1`** (routes ai=99, classic=1) → 1 of 200 AI samples. That is inside the binding docs/LATENCY.md bar for the AI run (YOY-64 AC-6, amended 2026-08-26: degraded ≤ 1 %, ≤ 2 of 200) and outside AC-2's literal `degraded=0`. Not recorded as PASS or FAIL until the founder says which governs; AC-2 stays unticked meanwhile. |
 | 9 | AC-3 | Parity floor, 3 warm loads each | server `latencyMs` ≤ 500 ms on all three | | |
-| 10 | AC-4 | Twelve curated examples (EN + HE) | all 12 ≥ 1 result; the 8 named route `ai` with ≥ 1 chip | | |
-| 11 | AC-5 | `…not black, under 200` | both 128-unit Mesh Over Dresses | | |
-| 12 | AC-5 | `…not black, under 100` | zero hits, "Close matches — over your budget", 0 black-primary | | |
-| 13 | AC-5 | Both laws in Hebrew | same behaviour, RTL chrome, Hebrew chips | | |
-| 14 | AC-6 | `/s/tentree` `t-shirt`; `/s/whitestuff` prices | 24 distinct titles; GBP | | |
+| 10 | AC-4 | Twelve curated examples (EN + HE) | all 12 ≥ 1 result; the 8 named route `ai` with ≥ 1 chip | **FAIL — YOY-136** | Route half **passes**: all twelve route `ai`, and negation / priceCap / occasion / colorAvailability carry 2–3 truthful chips in both languages. Result half **fails on 4 of 12**: `beige boots in stock` (`249436cc…`) and `מגפיים בז' במלאי` (`a3937bcb…`) return 0 primary + 8 close matches (the catalog has no beige boot in stock); `same but cheaper` (`6fba5e68…`) and `אותו דבר אבל זול יותר` (`2b3c9113…`) return 0 primary + 10 close matches (the refinement over-narrows the cap). The other eight return 9–24 results at 69–2351 ms, 0 degraded. Full table on YOY-136. |
+| 11 | AC-5 | `…not black, under 200` | both 128-unit Mesh Over Dresses | **FLAG — spec conflict, founder call** | searchId `3b7a3ca6…`, `route: ai`, chips `dress` / `priceMax 200` / `colorsExclude black` (+ `occasion casual`). **One** result: `Mesh Over Dress in Navy` ($128). Its sibling `Mesh Over Dress in Pink` ($128, non-black, in stock) is a member of the same product family, and YOY-117 collapses a family to one card — which this very step also cites. The colour law itself holds (no black-primary product is served); the "both" expectation predates the family collapse. Not scored until the founder says which clause wins. |
+| 12 | AC-5 | `…not black, under 100` | zero hits, "Close matches — over your budget", 0 black-primary | **PASS** | searchId `50e51d1f…`: **0** primary results, `closeMatchesRelaxed: ["priceMax"]` (price relaxed first, and only price), 10 close-match cards. `evidence.mts attributes` on all ten: silver, navy, royal blue, blue, grey, navy, grey, mist, multi, navy — **0 black-primary**. The explicit exclusion survived the relaxation. |
+| 13 | AC-5 | Both laws in Hebrew | same behaviour, RTL chrome, Hebrew chips | **PASS (engine half)** | `שמלת קיץ, לא שחורה, עד 200` (`fbe2f990…`) returns the same single `Mesh Over Dress in Navy` with the same three chips; `שמלת קיץ, לא שחורה, עד 100` (`58ea6434…`) returns 0 primary with `closeMatchesRelaxed: ["priceMax"]` and 10 close matches. Identical behaviour to steps 11–12, so the law is not language-specific. Two notes: the HE intents carry `currency: "ILS"` against a USD catalog (the cap is applied as a bare number), and the RTL chrome half was covered by the founder's step-15 pass, not re-checked here. |
+| 14 | AC-6 | `/s/tentree` `t-shirt`; `/s/whitestuff` prices | 24 distinct titles; GBP | **FAIL — YOY-135, YOY-137** | tentree `t-shirt` (`340911ce…`) returns 24 results but **22 distinct titles**: `Wildfire Retro Treeline T-Shirt` and `Juniper T-Shirt` each render twice (different colourway handles). It routes **classic**, and the family collapse is AI-only — the same catalog on an AI-routed query (`e7b7ade2…`) returns 24 results / **24 distinct** titles. Filed as YOY-135. whitestuff (`f3003d30…`) prices render **EUR**, not GBP: the catalog was crawled from the `/eu/` storefront, so EUR is its own currency — the law holds, the AC's expectation of GBP does not. Filed as YOY-137. |
 | 15 | AC-4 | Design eyes, EN + HE, phone + laptop | chips truthful, negation tinted, no bridal gown, spec matched | **PASS (founder)** | Founder ran the five named queries in EN and HE (go-signal step 3) and reported "Eye test looks about right" — YOY-124 comment 2026-08-28 19:08 UTC. No searchIds were captured, so AC-4's twelve-example table (step 10) is still open. |
 | 16 | AC-8 | Mean cost per search | ≤ $0.60 / 1,000 searches | | |
 | 17 | AC-8 | `/internal/costs` gate | `404` with no token and with a wrong token | | |
@@ -415,6 +415,17 @@ or the hardening-tail AC it was appended to (AC-10; NG-1: file, do not fix).
   attribute becomes a `softAttribute` — embedding text with no predicate — so
   a `sleeveless` dress outranks a `long` one. The negative side is hard
   (YOY-133 `attributesExclude`); the positive side never was.
+- **Step 10 (AC-4) — YOY-136, priority Medium.** Two of the six curated
+  example kinds return zero primary results on the seed catalog, in both
+  languages: `colorAvailability` (no beige boot is in stock) and `refinement`
+  (the cheaper cap empties the set). The engine answers honestly in all four
+  cases; the curated set is what needs changing, or AC-4 does.
+- **Step 14 (AC-6) — YOY-135, priority High.** One card per product family is
+  implemented only in the pgvector candidate query, so the classic route —
+  every keystroke and every short query — still returns colourway duplicates.
+- **Step 14 (AC-6) — YOY-137, priority Low.** The White Stuff catalog was
+  crawled from the EU storefront, so its prices are EUR. Either re-ingest from
+  the UK path or amend the AC to name the catalog's own currency.
 - _one bullet per FAIL: the finding, the issue filed or the hardening-tail AC
   it was appended to, and the priority. AC-10 is not met until every FAIL row
   above has one._
