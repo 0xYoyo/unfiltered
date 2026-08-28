@@ -60,23 +60,30 @@ test.describe("the store's page (AC-1, AC-2, verify 1)", () => {
     await expect(storeLine(page)).toHaveCount(0);
   });
 
-  test("the store name is the ONLY new element (P-7)", async ({ page }) => {
+  test("the store name takes the hero's place and nothing else changes (P-7)", async ({
+    page,
+  }) => {
     // Same chrome, same controls: the page is the store's because it says
-    // so, not because it dressed up as the store.
+    // so, not because it dressed up as the store. The demo hero is the one
+    // block the store line replaces (P-7, re-authored 2026-08-28).
     await page.setViewportSize(DESKTOP);
 
-    const inventory = async (path: string) => {
+    const inventory = async (path: string, drop: string) => {
       await page.goto(path);
-      return page.evaluate(() =>
-        Array.from(document.querySelectorAll(".playground *"))
-          // getAttribute, not `className`: on an SVG element that property
-          // is an SVGAnimatedString, and the magnifier is an SVG.
-          .map((node) => (node.getAttribute("class") ?? "").split(" ")[0])
-          .filter((name) => name !== "" && !name.startsWith("store")),
+      return page.evaluate(
+        (prefix) =>
+          Array.from(document.querySelectorAll(".playground *"))
+            // getAttribute, not `className`: on an SVG element that property
+            // is an SVGAnimatedString, and the magnifier is an SVG.
+            .map((node) => (node.getAttribute("class") ?? "").split(" ")[0])
+            .filter((name) => name !== "" && !name.startsWith(prefix)),
+        drop,
       );
     };
 
-    expect(await inventory("/s/demo-store")).toEqual(await inventory("/"));
+    expect(await inventory("/s/demo-store", "store")).toEqual(
+      await inventory("/", "hero"),
+    );
   });
 });
 

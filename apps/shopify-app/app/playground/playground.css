@@ -1,10 +1,15 @@
 /**
- * Playground layout (YOY-92). Tokens only — no colour or pixel literal
- * appears below except inside a media query's prelude, which cannot take a
- * custom property (P-8, enforced by playground-css.test.ts).
+ * Playground layout (YOY-92, re-drawn against the 2026-08-28 direction in
+ * YOY-123). Tokens only — no colour or pixel literal appears below except
+ * inside a media query's prelude, which cannot take a custom property (P-8,
+ * enforced by playground-css.test.ts).
  *
  * Every box uses logical properties so the Hebrew chrome mirrors without a
  * second rule (F-5, also enforced by that test).
+ *
+ * The page is one column on ivory: top bar, hero, search card, then the
+ * answer. Chromatic colour comes from the product photography and from the
+ * one accent (P-1, P-2); everything else is the ink scale on ivory.
  */
 
 /* The scrollbar's own arrival is a layout shift: without a reserved gutter
@@ -17,8 +22,8 @@ html:has(.playground) {
 
 /* No global reset ships with this app, so padding would otherwise add to
    every 100%-wide box: `.shell` alone overflowed a 360px viewport by its own
-   32px of inline padding. Scoped to the playground, which owns its own
-   layout, rather than imposed on the Polaris admin. */
+   inline padding. Scoped to the playground, which owns its own layout,
+   rather than imposed on the Polaris admin. */
 .playground,
 .playground *,
 .playground *::before,
@@ -30,75 +35,121 @@ html:has(.playground) {
   min-block-size: 100vh;
   display: flex;
   flex-direction: column;
-  background: var(--bg);
-  color: var(--text);
-  /* Heebo is self-hosted by fonts.css (YOY-96 AC-13) and covers both
-     scripts; the rest is a neutral system fallback for the swap window. */
-  font-family:
-    Heebo,
-    system-ui,
-    -apple-system,
-    "Segoe UI",
-    sans-serif;
-  font-size: var(--type-16);
-  font-weight: var(--weight-body);
-  line-height: var(--leading-body);
+  background: var(--bg-page);
+  color: var(--text-body);
+  /* Assistant is self-hosted by fonts.css and covers both scripts; the rest
+     is a neutral system fallback for the swap window (DESIGN §2 Type). */
+  font-family: var(--font-sans);
+  font-size: var(--size-body);
+  font-weight: var(--weight-regular);
+  line-height: var(--lh-body);
 }
 
+/* One column, centred. The narrow container is the page's measure: the kit
+   puts everything from the hero to the chips inside it, and only the
+   results grid is allowed to breathe wider on a large screen. */
 .shell {
   inline-size: 100%;
-  max-inline-size: var(--content-max-inline-size);
+  max-inline-size: var(--width-container-narrow);
   margin-inline: auto;
-  padding-inline: var(--space-16);
+  padding-inline: var(--space-4);
 }
 
-/* Header: the product name in body type and the language toggle. Nothing
-   else — no logo, no mark, no tagline (P-1, P-3, X-1, X-3, X-6). */
+/* --- Top bar: wordmark and the language pill. No other nav (kit §4). --- */
+
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-16);
-  padding-block: var(--space-16);
+  gap: var(--space-4);
+  padding-block: var(--space-5);
 }
 
 .productName {
-  font-size: var(--type-16);
-  font-weight: var(--weight-ui);
-  color: var(--text);
+  font-family: var(--font-display);
+  font-size: var(--size-h3);
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--track-heading);
+  color: var(--text-display);
 }
 
+/* A quiet pill: hairline border, no fill — it is navigation, not an action
+   (P-2 keeps the accent off it). */
 .languageToggle {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   min-inline-size: var(--hit-target-min);
   min-block-size: var(--hit-target-min);
-  padding-inline: var(--space-12);
-  border: var(--border-width) solid var(--border);
-  border-radius: var(--radius-control);
-  background: var(--surface);
-  color: var(--text);
+  padding-inline: var(--space-4);
+  border: var(--border-width) solid var(--border-hairline);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-muted);
   font: inherit;
-  font-size: var(--type-13);
-  font-weight: var(--weight-ui);
+  font-size: var(--size-body-sm);
+  font-weight: var(--weight-medium);
   cursor: pointer;
   text-decoration: none;
-  transition: border-color var(--motion-hover) var(--ease-out);
+  transition: var(--motion-hover);
 }
 
 .languageToggle:hover {
-  border-color: var(--text-muted);
+  border-color: var(--border-strong);
+  color: var(--text-body);
 }
 
 .main {
   flex: 1 1 auto;
-  padding-block-start: var(--space-32);
-  padding-block-end: var(--space-48);
+  padding-block-start: var(--space-6);
+  padding-block-end: var(--space-8);
 }
 
-/* The search bar is the hero: the largest interactive element, the only
-   display-size type on the page, above the fold on every viewport (P-3). */
+/* --- Hero (kit §4): eyebrow, display heading, sub-copy. --- */
+
+.hero {
+  margin-block-end: var(--space-6);
+}
+
+.heroEyebrow {
+  margin: 0 0 var(--space-3);
+  color: var(--text-muted);
+  font-size: var(--size-eyebrow);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--track-eyebrow);
+  line-height: var(--lh-tight);
+  text-transform: uppercase;
+}
+
+/* The one display-size line on the page other than the bar itself (P-3):
+   the heading names the invitation, the bar answers it. */
+.heroHeading {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(var(--size-h1), 6vw, var(--size-display-2));
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--track-display);
+  line-height: var(--lh-display);
+  color: var(--text-display);
+}
+
+.heroSubcopy {
+  margin: var(--space-4) 0 0;
+  max-inline-size: var(--measure-prose);
+  color: var(--text-muted);
+  font-size: var(--size-body-lg);
+}
+
+/* --- Search card: the hero interaction, on white over the ivory page. --- */
+
+.searchCard {
+  padding: var(--space-6);
+  border: var(--border-width) solid var(--border-hairline);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+  box-shadow: var(--shadow-1);
+}
+
 .searchForm {
   position: relative;
   display: block;
@@ -110,35 +161,35 @@ html:has(.playground) {
   display: flex;
   align-items: center;
   block-size: var(--search-height);
-  border: var(--border-width) solid var(--border);
-  border-radius: var(--radius-control);
-  background: var(--surface);
-  transition: border-color var(--motion-hover) var(--ease-out);
+  border: var(--border-width) solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-card);
+  transition: var(--motion-hover);
 }
 
 .searchField:focus-within {
-  border-color: var(--accent);
-  border-width: var(--border-width-active);
+  border-color: var(--border-accent);
+  box-shadow: var(--ring-focus);
 }
 
 .searchInput {
   flex: 1 1 auto;
   min-inline-size: 0;
   block-size: 100%;
-  padding-inline-start: var(--space-16);
-  padding-inline-end: var(--space-8);
+  padding-inline-start: var(--space-4);
+  padding-inline-end: var(--space-2);
   border: 0;
   border-radius: inherit;
   background: transparent;
-  color: var(--text);
+  color: var(--text-body);
   font: inherit;
-  font-size: var(--type-25);
-  line-height: var(--leading-heading);
+  font-size: var(--size-body-lg);
+  line-height: var(--lh-tight);
 }
 
 .searchInput::placeholder {
   color: var(--text-muted);
-  font-size: var(--type-25);
+  font-size: var(--size-body-lg);
 }
 
 /* The native search decorations sit exactly where the magnifier does, and
@@ -151,59 +202,81 @@ html:has(.playground) {
   appearance: none;
 }
 
+/* The page's one primary action, and the one place the accent fills
+   anything (P-2). */
 .searchSubmit {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   inline-size: var(--hit-target-min);
   block-size: var(--hit-target-min);
-  margin-inline-end: var(--space-8);
+  margin-inline-end: var(--space-2);
   border: 0;
-  border-radius: var(--radius-control);
-  background: transparent;
-  color: var(--text);
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: var(--white);
   cursor: pointer;
+  transition: var(--motion-hover);
+}
+
+.searchSubmit:hover {
+  background: var(--accent-hover);
+}
+
+.searchSubmit:active {
+  background: var(--accent-press);
 }
 
 .searchSubmit svg {
-  inline-size: var(--space-24);
-  block-size: var(--space-24);
+  inline-size: var(--space-5);
+  block-size: var(--space-5);
 }
 
 /* The status line sits under the bar and is the loading, empty, and failure
    surface alike: one quiet muted sentence, never a spinner (F-6, X-4). */
 .statusLine {
-  min-block-size: var(--space-24);
-  margin-block-start: var(--space-12);
+  min-block-size: var(--space-5);
+  margin-block-start: var(--space-3);
   color: var(--text-muted);
-  font-size: var(--type-13);
+  font-size: var(--size-body-sm);
 }
 
-/* The store's name on a preload page (P-7): body type, muted count beside
-   it, and nothing else — the page is the store's because it says so. */
+/* An error is a plain sentence in the critical ink, never a red box (kit
+   §4 States). */
+.statusLineFailed {
+  color: var(--text-critical);
+}
+
+/* The store's name on a preload page (P-7): it takes the demo hero's place
+   and nothing else about the page changes. */
 .storeLine {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: var(--space-8);
-  margin: 0 0 var(--space-12);
-  font-size: var(--type-16);
+  gap: var(--space-2);
+  margin: 0 0 var(--space-6);
+  font-family: var(--font-display);
+  font-size: var(--size-h1);
+  letter-spacing: var(--track-heading);
+  line-height: var(--lh-heading);
 }
 
 .storeName {
-  color: var(--text);
-  font-weight: var(--weight-ui);
+  color: var(--text-display);
+  font-weight: var(--weight-medium);
 }
 
 /* The literal separator (YOY-96 AC-16): as quiet as the count it precedes. */
 .storeSeparator {
   color: var(--text-muted);
-  font-size: var(--type-13);
+  font-family: var(--font-sans);
+  font-size: var(--size-body-sm);
 }
 
 .storeCount {
   color: var(--text-muted);
-  font-size: var(--type-13);
+  font-family: var(--font-sans);
+  font-size: var(--size-body-sm);
 }
 
 /* Unknown slug: the playground's own shell, one sentence, a way onward. */
@@ -211,23 +284,23 @@ html:has(.playground) {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: var(--space-16);
-  padding-block: var(--space-48);
+  gap: var(--space-4);
+  padding-block: var(--space-7);
 }
 
 .catalogNotFoundText {
   margin: 0;
   color: var(--text-muted);
-  font-size: var(--type-16);
+  font-size: var(--size-body-lg);
 }
 
 .catalogNotFoundLink {
   display: inline-flex;
   align-items: center;
   min-block-size: var(--hit-target-min);
-  color: var(--accent);
+  color: var(--text-accent);
   text-decoration: underline;
-  text-underline-offset: var(--space-4);
+  text-underline-offset: var(--space-1);
 }
 
 /* Example queries (P-6). Text links, never pills: a pill here would read as
@@ -236,13 +309,13 @@ html:has(.playground) {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-12);
-  margin-block-start: var(--space-16);
+  gap: var(--space-3);
+  margin-block-start: var(--space-3);
 }
 
 .examplesLead {
   color: var(--text-muted);
-  font-size: var(--type-13);
+  font-size: var(--size-body-sm);
 }
 
 .exampleQuery {
@@ -254,35 +327,44 @@ html:has(.playground) {
   padding: 0;
   border: 0;
   background: none;
-  color: var(--accent);
+  color: var(--text-accent);
   font: inherit;
-  font-size: var(--type-13);
+  font-size: var(--size-body-sm);
   text-align: start;
   text-decoration: underline;
-  text-underline-offset: var(--space-4);
+  text-underline-offset: var(--space-1);
   cursor: pointer;
 }
 
 /* Once a search has run they stop competing with the results: one quiet
    row rather than a list under the bar. */
 .examplesCollapsed {
-  gap: var(--space-8);
-  margin-block-start: var(--space-12);
+  gap: var(--space-2);
 }
 
-/* Applied constraints, and the page's one secondary control. */
+/* --- Applied constraints, and the page's one secondary control. --- */
+
 .applied {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-8);
-  margin-block-start: var(--space-16);
+  gap: var(--space-2);
+  margin-block-start: var(--space-5);
+}
+
+/* "Understood as" — the eyebrow that names what the chips are (kit §4). */
+.appliedLead {
+  color: var(--text-muted);
+  font-size: var(--size-eyebrow);
+  font-weight: var(--weight-semibold);
+  letter-spacing: var(--track-eyebrow);
+  text-transform: uppercase;
 }
 
 .chips {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-8);
+  gap: var(--space-2);
   list-style: none;
   margin: 0;
   padding: 0;
@@ -293,52 +375,74 @@ html:has(.playground) {
 .chip {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-8);
+  gap: var(--space-2);
   min-block-size: var(--hit-target-min);
-  padding-inline: var(--space-12);
-  border: var(--border-width) solid var(--border);
+  padding-inline: var(--space-4);
+  border: var(--border-width) solid var(--border-strong);
   border-radius: var(--radius-pill);
-  background: var(--surface);
-  color: var(--text);
+  background: var(--surface-card);
+  color: var(--text-body);
   font: inherit;
-  font-size: var(--type-13);
+  font-size: var(--size-body-sm);
   cursor: pointer;
-  transition: border-color var(--motion-hover) var(--ease-out);
+  transition: var(--motion-hover);
 }
 
-/* Hover darkens the border only — no fill, no accent (DESIGN §2). */
 .chip:hover {
-  border-color: var(--text-muted);
+  border-color: var(--border-ink);
+}
+
+/* A negated constraint is the one chip the accent tints (P-2): an exclusion
+   reads differently from an inclusion, and weight alone did not carry it. */
+.chipNegated {
+  border-color: var(--border-accent);
+  background: var(--surface-accent-soft);
+}
+
+/* The removal the click already committed to, shown before the search
+   re-runs. One opacity/scale fade, no loop; reduced motion never reaches
+   this class because the component removes the chip outright (F-2). */
+.chipLeaving {
+  opacity: 0;
+  transform: scale(0.92);
+  transition:
+    opacity var(--dur-chip-out) var(--ease-standard),
+    transform var(--dur-chip-out) var(--ease-standard);
 }
 
 .chipRemove {
   color: var(--text-muted);
+  transition: var(--motion-hover);
 }
 
-/* Secondary: --surface on --border. The magnifier stays the one primary
+.chip:hover .chipRemove {
+  color: var(--text-accent);
+}
+
+/* Secondary: a ghost pill, no fill. The magnifier stays the one primary
    action on the page (P-2). */
 .newSearch {
   min-block-size: var(--hit-target-min);
-  padding-inline: var(--space-16);
-  border: var(--border-width) solid var(--border);
-  border-radius: var(--radius-control);
-  background: var(--surface);
-  color: var(--text);
+  padding-inline: var(--space-4);
+  border: var(--border-width) solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-body);
   font: inherit;
-  font-size: var(--type-13);
-  font-weight: var(--weight-ui);
+  font-size: var(--size-body-sm);
+  font-weight: var(--weight-medium);
   cursor: pointer;
-  transition: border-color var(--motion-hover) var(--ease-out);
+  transition: var(--motion-hover);
 }
 
 .newSearch:hover {
-  border-color: var(--text-muted);
+  border-color: var(--border-ink);
 }
 
-/* Engine details (P-4): opt-in, muted, no accent fill. Absent from the DOM
-   when closed — collapsed means gone, not hidden with space reserved. */
+/* --- Engine details (P-4): opt-in, and the page's one inverse surface. --- */
+
 .details {
-  margin-block-start: var(--space-16);
+  margin-block-start: var(--space-5);
 }
 
 .detailsToggle {
@@ -346,62 +450,57 @@ html:has(.playground) {
   align-items: center;
   min-block-size: var(--hit-target-min);
   color: var(--text-muted);
-  font-size: var(--type-13);
+  font-size: var(--size-body-sm);
   text-decoration: underline;
-  text-underline-offset: var(--space-4);
+  text-underline-offset: var(--space-1);
 }
 
 .detailsPanel {
-  margin-block-start: var(--space-12);
-  padding: var(--space-16);
-  border: var(--border-width) solid var(--border);
-  border-radius: var(--radius-card);
-  background: var(--surface);
-  color: var(--text-muted);
-  font-size: var(--type-13);
+  margin-block-start: var(--space-3);
+  padding: var(--space-5);
+  border-radius: var(--radius-md);
+  background: var(--surface-inverse);
+  color: var(--text-inverse);
+  font-family: var(--font-mono);
+  font-size: var(--size-caption);
 }
 
 .detailsRows {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-16);
+  gap: var(--space-4);
   margin: 0;
 }
 
 .detailsRow {
   display: flex;
-  gap: var(--space-8);
+  gap: var(--space-2);
 }
 
 .detailsRow dt,
-.detailsIntentLabel {
-  color: var(--text-muted);
-  font-weight: var(--weight-ui);
+.detailsIntentLabel,
+.detailsStagesLabel {
+  color: var(--ink-400);
+  font-weight: var(--weight-medium);
 }
 
 .detailsRow dd {
   margin: 0;
 }
 
-/* Stage timings (YOY-114): the same muted evidence voice as the rows above,
-   one line per stage the search ran, listed in pipeline order. Not
-   monospace — the intent JSON keeps that privilege (DESIGN §2). */
+/* Stage timings (YOY-114): one line per stage the search ran, in pipeline
+   order. */
 .detailsStagesRow {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
-  margin-block-start: var(--space-16);
-}
-
-.detailsStagesLabel {
-  color: var(--text-muted);
-  font-weight: var(--weight-ui);
+  gap: var(--space-1);
+  margin-block-start: var(--space-4);
 }
 
 .detailsStages {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-8) var(--space-16);
+  gap: var(--space-2) var(--space-4);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -412,28 +511,31 @@ html:has(.playground) {
 .detailsIntentRow {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
-  margin-block-start: var(--space-16);
+  gap: var(--space-1);
+  margin-block-start: var(--space-4);
 }
 
-/* The one place monospace is permitted on the page (DESIGN §2). */
 .detailsIntent {
-  margin-block: var(--space-8) 0;
+  margin-block: var(--space-2) 0;
   overflow-x: auto;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: var(--type-13);
+  font-family: var(--font-mono);
+  font-size: var(--size-caption);
 }
+
+/* --- Results. --- */
 
 .closeMatches {
-  margin-block-start: var(--space-32);
+  margin-block-start: var(--space-6);
 }
 
 .closeMatchesHeading {
   margin: 0;
-  color: var(--text-muted);
-  font-size: var(--type-16);
-  font-weight: var(--weight-ui);
-  line-height: var(--leading-heading);
+  font-family: var(--font-display);
+  font-size: var(--size-h3);
+  font-weight: var(--weight-medium);
+  letter-spacing: var(--track-heading);
+  line-height: var(--lh-heading);
+  color: var(--text-display);
 }
 
 /* A card that satisfied a colour filter without colour evidence: shown, but
@@ -445,49 +547,72 @@ html:has(.playground) {
 .cardColorUnknown {
   align-self: flex-start;
   color: var(--text-muted);
-  font-size: var(--type-13);
+  font-size: var(--size-caption);
 }
 
 /* Reserved so the grid appearing does not move the bar (F-8). */
 .results {
-  min-block-size: var(--space-64);
-  margin-block-start: var(--space-32);
+  min-block-size: var(--space-8);
+  margin-block-start: var(--space-6);
 }
 
+/* `auto-fill`, not the kit's `auto-fit`: with auto-fit a two-card answer
+   (a zero-hit rescue's close matches) stretches into two 440px cards, which
+   reads as a different page from the same query answered by eight. Empty
+   tracks keep every card the same size whatever the result count — the
+   density parity W-9 asks of the widget, held here too. */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(var(--card-min-inline-size), 1fr));
-  gap: var(--space-24);
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(var(--card-min-inline-size), 1fr)
+  );
+  gap: var(--space-4);
   list-style: none;
   margin: 0;
   padding: 0;
 }
 
+/* The shape of the answer while the first one is in flight (DESIGN §2
+   States): sunken blocks at the card's own proportion, no shimmer and no
+   motion of any kind. */
+.skeletonCard {
+  aspect-ratio: 3 / 4;
+  inline-size: 100%;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+}
+
+/* No border and no card fill: the photograph is the card (P-1). Hover
+   lifts it, and nothing else changes. */
 .card {
   display: flex;
   flex-direction: column;
-  gap: var(--space-8);
-  padding: var(--space-12);
-  border: var(--border-width) solid var(--border);
-  border-radius: var(--radius-card);
-  background: var(--surface);
+  gap: var(--space-2);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  transition: var(--motion-hover);
+}
+
+.card:hover {
+  box-shadow: var(--shadow-2);
 }
 
 .cardLink {
   display: flex;
   flex-direction: column;
-  gap: var(--space-8);
+  gap: var(--space-2);
   color: inherit;
   text-decoration: none;
 }
 
 .cardImage,
 .cardImagePlaceholder {
-  aspect-ratio: 1 / 1;
+  aspect-ratio: 3 / 4;
   inline-size: 100%;
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-sm);
   object-fit: cover;
-  background: var(--bg);
+  background: var(--surface-sunken);
 }
 
 .cardTitle {
@@ -503,63 +628,84 @@ html:has(.playground) {
   -webkit-line-clamp: 2;
   line-clamp: 2;
   overflow: hidden;
-  font-size: var(--type-16);
-  font-weight: var(--weight-ui);
-  color: var(--text);
+  font-size: var(--size-body);
+  font-weight: var(--weight-medium);
+  color: var(--text-body);
 }
 
 .cardPrice {
-  font-size: var(--type-16);
-  font-weight: var(--weight-body);
+  font-family: var(--font-mono);
+  font-size: var(--size-body-sm);
+  font-weight: var(--weight-regular);
   color: var(--text-muted);
 }
 
 .cardSoldOut {
   align-self: flex-start;
-  padding-inline: var(--space-8);
-  padding-block: var(--space-4);
-  border: var(--border-width) solid var(--border);
+  padding-inline: var(--space-2);
+  padding-block: var(--space-1);
+  border: var(--border-width) solid var(--border-hairline);
   border-radius: var(--radius-pill);
   color: var(--text-muted);
-  font-size: var(--type-13);
+  font-size: var(--size-caption);
 }
 
 .footer {
-  padding-block: var(--space-24);
+  padding-block: var(--space-6);
   color: var(--text-muted);
-  font-size: var(--type-13);
+  font-size: var(--size-body-sm);
 }
 
 /* One focus treatment for everything focusable (F-4). */
 .playground :focus-visible {
-  outline: var(--focus-ring-width) solid var(--accent);
+  outline: var(--focus-ring-width) solid var(--focus-ring);
   outline-offset: var(--focus-ring-offset);
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-sm);
 }
 
-/* Except the search input: the field around it already turns 2px --accent
-   on focus (well past the 3:1 floor), so the generic ring would draw a
-   second box around the input alone, inside the field. Needs to outrank the
-   rule above — equal specificity would leave it to source order. */
+/* Except the search input: the field around it already takes the accent
+   border and the focus ring (well past the 3:1 floor), so the generic ring
+   would draw a second box around the input alone, inside the field. Needs
+   to outrank the rule above — equal specificity would leave it to source
+   order. */
 .playground .searchInput:focus,
 .playground .searchInput:focus-visible {
   outline: none;
 }
 
 @media (max-width: 640px) {
+  /* The answer has to stay above the fold on a 360×640 phone (YOY-96
+     AC-15): the hero and the page's own block rhythm are what push it
+     down, so they tighten one step here rather than the results moving. */
+  .main {
+    padding-block-start: var(--space-5);
+  }
+
+  .hero {
+    margin-block-end: var(--space-5);
+  }
+
+  .heroSubcopy {
+    margin-block-start: var(--space-3);
+    font-size: var(--size-body);
+  }
+
+  .applied {
+    margin-block-start: var(--space-4);
+  }
+
+  .searchCard {
+    padding: var(--space-4);
+  }
+
   .searchField {
     block-size: var(--search-height-compact);
   }
 
-  /* The bar gets shorter on mobile (48px), but the input type does NOT drop
-     below the display size: AC-4 fixes it at >=25px everywhere, and 25px at
-     1.2 line-height still sits inside a 48px field. The search input is the
-     page's one display-size element (P-3) at every viewport. */
-
   /* Two columns minimum on mobile (DESIGN §2 spacing). */
   .grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--space-12);
+    gap: var(--space-3);
   }
 
   /* The collapsed "Try:" row stays ONE quiet row on a narrow viewport
@@ -575,7 +721,7 @@ html:has(.playground) {
     overflow-x: auto;
     overflow-y: hidden;
     scroll-snap-type: x proximity;
-    scroll-padding-inline: var(--space-8);
+    scroll-padding-inline: var(--space-2);
     overscroll-behavior-inline: contain;
     scrollbar-width: none;
   }

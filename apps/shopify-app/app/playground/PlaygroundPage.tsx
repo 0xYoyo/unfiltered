@@ -330,30 +330,49 @@ export function PlaygroundPage({
       </header>
 
       <main className="main shell">
-        {store === undefined ? null : (
+        {store === undefined ? (
+          // The demo hero. On a preload page the store's name takes its
+          // place and nothing else about the page changes (P-7).
+          <section className="hero" data-testid="playground-hero">
+            <p className="heroEyebrow">{strings.heroEyebrow}</p>
+            <h1 className="heroHeading">{strings.heroHeading}</h1>
+            <p className="heroSubcopy">{strings.heroSubcopy}</p>
+          </section>
+        ) : (
           <StoreLine
             name={store.name}
             productCount={store.productCount}
             strings={strings}
           />
         )}
-        <SearchBar
-          strings={strings}
-          value={query}
-          onChange={setQuery}
-          onSubmit={() => submit()}
-          inputRef={inputRef}
-        />
-        <StatusLine text={status} />
 
-        <ExampleQueries
-          locale={locale}
-          strings={strings}
-          collapsed={searched}
-          onPick={pickExample}
-        />
+        {/* The bar, its status line, and the examples are one white card on
+            the ivory page: the search is the page's subject, and the card
+            is what says so (P-3). */}
+        <section className="searchCard" data-testid="playground-search-card">
+          <SearchBar
+            strings={strings}
+            value={query}
+            onChange={setQuery}
+            onSubmit={() => submit()}
+            inputRef={inputRef}
+          />
+          <StatusLine text={status} failed={failed} />
+
+          <ExampleQueries
+            locale={locale}
+            strings={strings}
+            collapsed={searched}
+            onPick={pickExample}
+          />
+        </section>
 
         <div className="applied">
+          {chips.length === 0 ? null : (
+            <span className="appliedLead" aria-hidden="true">
+              {strings.chipsLead}
+            </span>
+          )}
           <ChipRow
             chips={chips}
             locale={locale}
@@ -378,7 +397,12 @@ export function PlaygroundPage({
           />
         )}
 
-        <ResultsGrid cards={cards} strings={strings} onOpen={openCard} />
+        <ResultsGrid
+          cards={cards}
+          strings={strings}
+          skeleton={phase === "loading" && cards.length === 0}
+          onOpen={openCard}
+        />
 
         {closeMatches.length === 0 ? null : (
           <section className="closeMatches">

@@ -1,15 +1,27 @@
 import { expect, test, type Page } from "@playwright/test";
 
 /**
- * Visual baselines for the playground (YOY-92 AC-8), EN and HE, initial and
- * results. Per-OS like the widget's, so a font-rendering difference between
- * a laptop and CI is a missing baseline rather than a false failure.
+ * Visual baselines for the playground (YOY-92 AC-8; re-recorded against the
+ * 2026-08-28 direction by YOY-123 AC-3). EN and HE, desktop and 360px, over
+ * every state the issue's verify steps name: the initial page, classic
+ * results, the AI state with its chip row, the zero-hit rescue with its
+ * close matches, the opened engine panel, and the store-preload page.
+ *
+ * Per-OS like the widget's, so a font-rendering difference between a laptop
+ * and CI is a missing baseline rather than a false failure.
  *
  * These are the durable form of the design evidence: a mirrored RTL layout,
- * a stranded magnifier, or a card that grew a shadow fails here.
+ * a stranded magnifier, a chip that lost its accent tint, or a card that
+ * grew a border fails here.
  */
 
 const DESKTOP = { width: 1280, height: 800 };
+const MOBILE = { width: 360, height: 640 };
+
+const VIEWPORTS = [
+  ["desktop", DESKTOP],
+  ["mobile", MOBILE],
+] as const;
 
 const input = (page: Page) => page.getByTestId("playground-input");
 
@@ -18,89 +30,114 @@ async function settle(page: Page): Promise<void> {
   await page.evaluate(() => document.fonts.ready);
 }
 
+async function submit(page: Page, query: string): Promise<void> {
+  await input(page).fill(query);
+  await input(page).press("Enter");
+}
+
 test.describe("visual baselines", () => {
-  test.beforeEach(async ({ page }) => {
-    await page.setViewportSize(DESKTOP);
-  });
+  for (const [device, viewport] of VIEWPORTS) {
+    for (const locale of ["en", "he"] as const) {
+      const base = locale === "en" ? "/" : "/?lang=he";
 
-  for (const locale of ["en", "he"] as const) {
-    test(`initial state — ${locale}`, async ({ page }) => {
-      await page.goto(locale === "en" ? "/" : "/?lang=he");
+      test(`initial state — ${locale} ${device}`, async ({ page }) => {
+        await page.setViewportSize(viewport);
+        await page.goto(base);
+        await settle(page);
+        await expect(page).toHaveScreenshot(
+          `playground-initial-${locale}-${device}.png`,
+          { fullPage: true },
+        );
+      });
+
+      test(`results state — ${locale} ${device}`, async ({ page }) => {
+        await page.setViewportSize(viewport);
+        await page.goto(base);
+        await submit(page, "dress");
+        await expect(page.getByTestId("playground-card")).toHaveCount(4);
+        await settle(page);
+        await expect(page).toHaveScreenshot(
+          `playground-results-${locale}-${device}.png`,
+          { fullPage: true },
+        );
+      });
+
+      test(`ai state — ${locale} ${device}`, async ({ page }) => {
+        await page.setViewportSize(viewport);
+        await page.goto(base);
+        await submit(page, "ai elegant dress");
+        await expect(page.getByTestId("playground-chip")).toHaveCount(3);
+        await settle(page);
+        await expect(page).toHaveScreenshot(
+          `playground-ai-${locale}-${device}.png`,
+          { fullPage: true },
+        );
+      });
+
+      // Zero hit AND close matches in one frame: the fixture answers with no
+      // results and two close matches under a relaxed-budget heading.
+      test(`zero hit and close matches — ${locale} ${device}`, async ({
+        page,
+      }) => {
+        await page.setViewportSize(viewport);
+        await page.goto(base);
+        await submit(page, "ai zero hit");
+        await expect(page.getByTestId("playground-chip")).toHaveCount(3);
+        await expect(page.locator(".closeMatches")).toBeVisible();
+        await settle(page);
+        await expect(page).toHaveScreenshot(
+          `playground-zero-hit-${locale}-${device}.png`,
+          { fullPage: true },
+        );
+      });
+
+      // The negated chip's accent tint is the one place the accent touches a
+      // chip (P-9): it gets its own frame in both languages.
+      test(`negation chips — ${locale} ${device}`, async ({ page }) => {
+        await page.setViewportSize(viewport);
+        await page.goto(base);
+        await submit(page, "ai negation");
+        await expect(
+          page.locator("[data-chip-negated='true']"),
+        ).not.toHaveCount(0);
+        await settle(page);
+        await expect(page).toHaveScreenshot(
+          `playground-negation-${locale}-${device}.png`,
+          { fullPage: true },
+        );
+      });
+
+      test(`store page — ${locale} ${device}`, async ({ page }) => {
+        await page.setViewportSize(viewport);
+        await page.goto(locale === "en" ? "/s/demo-store" : "/s/demo-store?lang=he");
+        await settle(page);
+        await expect(page).toHaveScreenshot(
+          `playground-store-${locale}-${device}.png`,
+          { fullPage: true },
+        );
+      });
+    }
+
+    test(`details open — en ${device}`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await page.goto("/?details=1");
+      await submit(page, "ai elegant dress");
+      await page.getByTestId("playground-details-panel").waitFor();
       await settle(page);
-      await expect(page).toHaveScreenshot(`playground-initial-${locale}.png`);
+      await expect(page).toHaveScreenshot(
+        `playground-details-en-${device}.png`,
+        { fullPage: true },
+      );
     });
 
-    test(`results state — ${locale}`, async ({ page }) => {
-      await page.goto(locale === "en" ? "/" : "/?lang=he");
-      await input(page).fill("dress");
-      await input(page).press("Enter");
-      await expect(page.getByTestId("playground-card")).toHaveCount(4);
+    test(`unknown slug — en ${device}`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await page.goto("/s/nope");
       await settle(page);
-      await expect(page).toHaveScreenshot(`playground-results-${locale}.png`);
+      await expect(page).toHaveScreenshot(
+        `playground-store-404-en-${device}.png`,
+        { fullPage: true },
+      );
     });
   }
-});
-
-/**
- * AI-state baselines (YOY-93 AC-7, verify 7). The chip row, the zero-hit
- * rescue, and the opened details panel are where a mirrored layout or a
- * stray accent would show first, so they get their own baselines.
- */
-test.describe("AI-state baselines", () => {
-  test.beforeEach(async ({ page }) => {
-    await page.setViewportSize(DESKTOP);
-  });
-
-  for (const locale of ["en", "he"] as const) {
-    const base = locale === "en" ? "/" : "/?lang=he";
-
-    test(`ai state — ${locale}`, async ({ page }) => {
-      await page.goto(base);
-      await input(page).fill("ai elegant dress");
-      await input(page).press("Enter");
-      await expect(page.getByTestId("playground-chip")).toHaveCount(3);
-      await settle(page);
-      await expect(page).toHaveScreenshot(`playground-ai-${locale}.png`);
-    });
-
-    test(`zero hit — ${locale}`, async ({ page }) => {
-      await page.goto(base);
-      await input(page).fill("ai zero hit");
-      await input(page).press("Enter");
-      await expect(page.getByTestId("playground-chip")).toHaveCount(3);
-      await settle(page);
-      await expect(page).toHaveScreenshot(`playground-zero-hit-${locale}.png`);
-    });
-  }
-
-  test("details open — en", async ({ page }) => {
-    await page.goto("/?details=1");
-    await input(page).fill("ai elegant dress");
-    await input(page).press("Enter");
-    await page.getByTestId("playground-details-panel").waitFor();
-    await settle(page);
-    await expect(page).toHaveScreenshot("playground-details-en.png");
-  });
-});
-
-/**
- * The store-preload page (YOY-94 AC-4). The baseline is what proves P-7
- * held: the store's name is there and nothing else about the page moved.
- */
-test.describe("store-preload baselines", () => {
-  test.beforeEach(async ({ page }) => {
-    await page.setViewportSize(DESKTOP);
-  });
-
-  test("store page — en", async ({ page }) => {
-    await page.goto("/s/demo-store");
-    await settle(page);
-    await expect(page).toHaveScreenshot("playground-store-en.png");
-  });
-
-  test("unknown slug — en", async ({ page }) => {
-    await page.goto("/s/nope");
-    await settle(page);
-    await expect(page).toHaveScreenshot("playground-store-404-en.png");
-  });
 });

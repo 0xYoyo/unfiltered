@@ -19,8 +19,17 @@ export interface PlaygroundStrings {
   pageTitle: string;
   /** Document meta description (AC-1). */
   metaDescription: string;
-  /** The product name in the header — body type, no logo or mark (AC-4). */
+  /** The wordmark in the top bar — the display face, no logo or mark. */
   productName: string;
+  /**
+   * The hero's eyebrow line (YOY-123): the kit's tagline direction, set in
+   * the one uppercase style on the page.
+   */
+  heroEyebrow: string;
+  /** The hero heading — the page's one display-size line of text. */
+  heroHeading: string;
+  /** One paragraph under the heading saying what this page is. */
+  heroSubcopy: string;
   searchPlaceholder: string;
   /** aria-label of the magnifier submit button. */
   searchSubmit: string;
@@ -52,6 +61,8 @@ export interface PlaygroundStrings {
 
   /** aria-label of the chip row. */
   appliedFilters: string;
+  /** The eyebrow that names what the chips are (YOY-123). */
+  chipsLead: string;
   /** aria template for a chip's remove control; {label} is the chip's text. */
   removeFilter: string;
   /** AI zero-hit: nothing satisfied every applied constraint. */
@@ -115,6 +126,10 @@ export const PLAYGROUND_STRING_CATALOG: Record<
     metaDescription:
       "Describe what you are looking for the way you would say it out loud, and see a fashion catalog answer.",
     productName: "Unfiltered",
+    heroEyebrow: "Your shoppers don't think in filters",
+    heroHeading: "Type like a person. See what happens.",
+    heroSubcopy:
+      "A demo store with a real fashion catalogue, open to anyone. Ask it for something the way you'd ask a person in the shop, and watch it take the sentence apart.",
     searchPlaceholder: "elegant summer wedding dress, not black",
     searchSubmit: "Search",
     searchLabel: "Search the catalog",
@@ -129,6 +144,7 @@ export const PLAYGROUND_STRING_CATALOG: Record<
     languageToggleTarget: "עברית",
 
     appliedFilters: "Applied filters",
+    chipsLead: "Understood as",
     removeFilter: "Remove filter: {label}",
     zeroHit: "Nothing matches all of these",
     closeMatchesHeading: "Close matches",
@@ -165,6 +181,10 @@ export const PLAYGROUND_STRING_CATALOG: Record<
     metaDescription:
       "תארו מה אתם מחפשים בדיוק כמו שהייתם אומרים בקול, וראו קטלוג אופנה עונה.",
     productName: "Unfiltered",
+    heroEyebrow: "הקונים שלכם לא חושבים במסננים",
+    heroHeading: "כתבו כמו בני אדם. תראו מה קורה.",
+    heroSubcopy:
+      "חנות הדגמה עם קטלוג אופנה אמיתי, פתוחה לכולם. בקשו משהו בדיוק כמו שהייתם מבקשים ממוכרת בחנות, ותראו איך המשפט מתפרק.",
     searchPlaceholder: "שמלה אלגנטית לחתונה בקיץ, לא שחורה",
     searchSubmit: "חיפוש",
     searchLabel: "חיפוש בקטלוג",
@@ -179,6 +199,7 @@ export const PLAYGROUND_STRING_CATALOG: Record<
     languageToggleTarget: "English",
 
     appliedFilters: "מסננים פעילים",
+    chipsLead: "הבנו אותך כך",
     removeFilter: "הסרת מסנן: {label}",
     zeroHit: "אין פריט שעונה על כל אלה",
     closeMatchesHeading: "התאמות קרובות",

@@ -1,83 +1,65 @@
 /**
- * Playground design tokens (YOY-92 AC-2) — the only file in the playground
+ * Playground design tokens (YOY-123 AC-1) — the only file in the playground
  * allowed to hold raw colour and pixel literals (P-8). Every other
  * playground stylesheet references these variables, and
  * `playground-css.test.ts` fails the suite on any literal that escapes.
  *
- * The colour roles, type scale, spacing scale, radii, shadow, and motion
- * durations are exactly those in docs/DESIGN.md §2. Nothing here is
- * invented: adding a chromatic token is a DESIGN change, not a CSS change.
+ * The first block below is the founder's Claude-Design kit ("Unfiltered
+ * marketing landing page", 2026-08-28) reproduced VERBATIM, and it is
+ * reproduced verbatim in docs/DESIGN.md §2 as well: that test asserts the
+ * two are byte-identical, so a token cannot be edited here without the
+ * direction changing with it. Adding a token is a DESIGN change, not a CSS
+ * change.
  */
 
-:root {
-  /* Colour roles — light. */
-  --bg: #faf9f7;
-  --surface: #ffffff;
-  --text: #141414;
-  --text-muted: #5c5a56;
-  --border: #e4e1dc;
-  --accent: #1f3a93;
-  --accent-contrast: #ffffff;
-
-  /* Type scale: major third, base 16. */
-  --type-13: 13px;
-  --type-16: 16px;
-  --type-20: 20px;
-  --type-25: 25px;
-  --type-31: 31px;
-  --type-39: 39px;
-
-  --leading-body: 1.5;
-  --leading-heading: 1.2;
-
-  --weight-body: 400;
-  --weight-ui: 500;
-  --weight-emphasis: 600;
-
-  /* Spacing scale, base 4. */
-  --space-4: 4px;
-  --space-8: 8px;
-  --space-12: 12px;
-  --space-16: 16px;
-  --space-24: 24px;
-  --space-32: 32px;
-  --space-48: 48px;
-  --space-64: 64px;
-
-  /* Radii: controls, cards, pills. Nothing else. */
-  --radius-control: 8px;
-  --radius-card: 12px;
-  --radius-pill: 999px;
-
-  /* The one shadow, for a panel over content. Cards use border. */
-  --shadow-panel: 0 8px 32px rgba(0, 0, 0, 0.12);
-
-  /* Motion budget. */
-  --motion-hover: 120ms;
-  --motion-panel: 200ms;
-  --ease-out: cubic-bezier(0.2, 0, 0, 1);
-
-  /* Measurements the component rules in DESIGN §2 fix. Tokens rather than
-     literals so the CSS stays free of pixel values (P-8). */
-  --border-width: 1px;
-  --border-width-active: 2px;
-  --search-height: 56px;
-  --search-height-compact: 48px;
-  --hit-target-min: 44px;
-  --card-min-inline-size: 180px;
-  --content-max-inline-size: 1200px;
-  --focus-ring-width: 2px;
-  --focus-ring-offset: 2px;
+:root{
+  --ivory-50:#FDFBF7;--ivory-100:#FAF7F2;--ivory-200:#F4EFE7;--sand-300:#EDE6DA;--sand-400:#E3DBCC;
+  --line-200:#E7E0D4;--line-300:#D8CFC0;
+  --ink-900:#1A1815;--ink-800:#2B2823;--ink-700:#443F38;--ink-600:#6B645A;--ink-500:#8C8477;--ink-400:#ADA598;
+  --white:#FFFFFF;
+  --red-700:#8E241A;--red-600:#B02F22;--red-500:#D33A2C;--red-400:#E4675A;--red-100:#FAE4E0;--red-50:#FDF2EF;
+  --green-600:#2E6B50;--green-100:#E3EDE7;--gold-600:#9A6C15;--gold-100:#F4EBD9;
+  --oxblood-700:#6E1F14;--oxblood-100:#F2E2DE;
+  --bg-page:var(--ivory-100);--bg-page-alt:var(--ivory-200);
+  --surface-card:var(--white);--surface-sunken:var(--ivory-200);--surface-inverse:var(--ink-900);--surface-accent-soft:var(--red-50);
+  --text-display:var(--ink-900);--text-body:var(--ink-800);--text-muted:var(--ink-600);--text-faint:var(--ink-500);
+  --text-inverse:var(--ivory-100);--text-accent:var(--red-600);--text-critical:var(--oxblood-700);
+  --border-hairline:var(--line-200);--border-strong:var(--line-300);--border-ink:var(--ink-900);--border-accent:var(--red-500);
+  --accent:var(--red-500);--accent-hover:var(--red-600);--accent-press:var(--red-700);--accent-soft:var(--red-100);
+  --focus-ring:var(--red-500);--overlay-scrim:rgba(26,24,21,.44);
+  --font-display:"Frank Ruhl Libre",'Times New Roman',Georgia,serif;
+  --font-sans:"Assistant",-apple-system,"Segoe UI",Helvetica,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  --size-display-2:56px;--size-display-3:42px;--size-h1:32px;--size-h2:25px;--size-h3:20px;
+  --size-body-lg:18px;--size-body:16px;--size-body-sm:14px;--size-caption:12.5px;--size-eyebrow:11.5px;
+  --lh-display:1.04;--lh-heading:1.18;--lh-body:1.6;--lh-tight:1.3;
+  --weight-light:300;--weight-regular:400;--weight-medium:500;--weight-semibold:600;--weight-bold:700;--weight-black:900;
+  --track-display:-0.02em;--track-heading:-0.01em;--track-eyebrow:0.16em;
+  --radius-xs:2px;--radius-sm:4px;--radius-md:8px;--radius-lg:14px;--radius-pill:999px;
+  --border-width:1px;--border-width-thick:1.5px;
+  --shadow-1:0 1px 2px rgba(26,24,21,.05);--shadow-2:0 2px 10px rgba(26,24,21,.06);--shadow-3:0 12px 32px rgba(26,24,21,.10);
+  --ring-focus:0 0 0 3px rgba(211,58,44,.28);
+  --space-1:4px;--space-2:8px;--space-3:12px;--space-4:16px;--space-5:24px;--space-6:32px;--space-7:48px;--space-8:64px;--space-9:96px;
+  --measure-prose:64ch;--width-container:1200px;--width-container-narrow:920px;
+  --ease-standard:cubic-bezier(.22,.61,.36,1);--dur-fast:120ms;--dur-base:180ms;--dur-slow:320ms;--dur-chip-out:200ms;
+  --motion-hover:all var(--dur-fast) var(--ease-standard);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #141414;
-    --surface: #1c1c1c;
-    --text: #f2f1ee;
-    --text-muted: #a8a5a0;
-    --border: #2e2c29;
-    --accent: #8fa5ff;
-    --accent-contrast: #141414;
-  }
+/* Measurements the §4 page spec fixes but the kit's token block does not
+   name. They are pixel values the component rules need (a 44px hit floor
+   is F-3, not taste), and P-8 forbids them anywhere but this file. Kept in
+   their own block so the kit block above stays verbatim. */
+:root {
+  /* F-3: the pointer-interactive floor, and the touch-only chip floor. */
+  --hit-target-min: 44px;
+  --hit-target-inline-min: 24px;
+  /* The hero bar's own height, desktop and ≤ 640px (kit §4 search card). */
+  --search-height: 60px;
+  --search-height-compact: 52px;
+  /* Results grid: `repeat(auto-fit, minmax(180px, 1fr))` (kit §4). */
+  --card-min-inline-size: 180px;
+  /* Focus is a ring token (--ring-focus); the outline fallback needs a
+     width and an offset of its own. */
+  --focus-ring-width: 2px;
+  --focus-ring-offset: 2px;
 }
