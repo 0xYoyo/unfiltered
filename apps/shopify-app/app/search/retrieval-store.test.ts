@@ -10,7 +10,37 @@ import {
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { createTestDb } from "../testing/helpers.server";
-import { createPgVectorRetrievalStore } from "./retrieval-store.server";
+import {
+  createPgVectorRetrievalStore,
+  FAMILY_OVERSCAN,
+} from "./retrieval-store.server";
+
+/**
+ * The SQL the store actually builds, captured through a recording client:
+ * the query text is the only place the candidate scan's bound is observable
+ * (YOY-125 AC-10), and a real run proves only its effect, not its shape.
+ */
+async function capturedQuerySql(options: { limit?: number }): Promise<string> {
+  let captured = "";
+  const recorder = {
+    async $transaction<T>(read: (tx: unknown) => Promise<T>): Promise<T> {
+      return read({
+        $executeRawUnsafe: async () => 0,
+        $queryRawUnsafe: async (sql: string) => {
+          captured = sql;
+          return [];
+        },
+      });
+    },
+  } as unknown as PrismaClient;
+  await createPgVectorRetrievalStore(recorder).query({
+    storeId: SHOP,
+    constraints: noConstraints(),
+    vector: [1, 0, 0],
+    ...(options.limit === undefined ? {} : { limit: options.limit }),
+  });
+  return captured;
+}
 
 // Store-port tests run against the embedded PGlite database with fixture
 // vectors — zero network calls (AC-6). Dimension 3 keeps the fixtures
@@ -589,6 +619,49 @@ describe("one hit per product family (YOY-117 AC-2)", () => {
       limit: 2,
     });
     expect(hits.map((hit) => hit.productId)).toEqual(["rib-black", "linen-tee"]);
+  });
+
+  it("bounds the candidate scan while the overscan still covers the family (YOY-125 AC-10)", async () => {
+    await seedFamily(db);
+    // Twenty unrelated products NEARER than the family, each with a stated
+    // non-pink primary colour: the colour inclusion filters them out of the
+    // candidate scan entirely, so the bound never spends its window on them.
+    await seed(
+      db,
+      Array.from({ length: 20 }, (_, index) => ({
+        productId: `nearer-${index}`,
+        vector: [1, 0, 0],
+        familyKey: `eval|nearer ${index}|tops`,
+        enrichment: {
+          category: "top",
+          colors: ["black"],
+          primaryColor: "black",
+        },
+      })),
+    );
+
+    const hits = await createPgVectorRetrievalStore(db).query({
+      storeId: SHOP,
+      constraints: { ...noConstraints(), colorsInclude: ["pink"] },
+      vector: [1, 0, 0],
+      limit: 2,
+    });
+    // The pink member still represents its family: the overscan
+    // (limit × FAMILY_OVERSCAN rows) covers all three colourways.
+    expect(hits.map((hit) => hit.productId)).toEqual(["rib-pink", "legacy-a"]);
+  });
+
+  it("the candidate CTE carries its own LIMIT, so the scan stays index-driven (YOY-125 AC-10)", async () => {
+    // The bound is what lets Postgres use the HNSW iterative scan; without
+    // it the CTE's unlimited `ORDER BY distance` sorts the whole tenant.
+    const sql = await capturedQuerySql({ limit: 2 });
+    const candidatesCte = sql.slice(0, sql.indexOf("families AS"));
+    expect(candidatesCte).toContain(`LIMIT ${2 * FAMILY_OVERSCAN}`);
+    // The collapse and the caller's own limit stay outside the scan.
+    expect(sql.slice(sql.indexOf("FROM families"))).toContain("LIMIT 2");
+    // A caller with no limit still scans unbounded, exactly as before.
+    const unbounded = await capturedQuerySql({});
+    expect(unbounded.slice(0, unbounded.indexOf("families AS"))).not.toContain("LIMIT");
   });
 
   it("keeps the result shape: productId, distance, and the colour flag only", async () => {

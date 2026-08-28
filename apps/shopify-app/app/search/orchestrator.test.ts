@@ -751,6 +751,62 @@ describe("close-match relaxation ladder (YOY-111 AC-1, AC-2, AC-3)", () => {
     // The ladder was exhausted before the keyword fallback answered.
     expect(response.closeMatchesRelaxed).toEqual(["priceMax", "occasion", "category"]);
   });
+
+  it("a rung error reports the FULL ladder as relaxed and logs one structured line (YOY-125 AC-9)", async () => {
+    const db = await createTestDb();
+    await seed(db, [
+      // Keyword-only, so the fallback is the one that answers.
+      {
+        productId: "ivory-match",
+        title: `${AI_QUERY} ivory`,
+        enrichment: { category: "dress", colors: ["ivory"], primaryColor: "ivory" },
+      },
+    ]);
+    // The store throws on the first RELAXED rung (the primary query, which
+    // still carries the budget, answers empty as before).
+    let queries = 0;
+    const store: RetrievalStore = {
+      async query(request) {
+        queries += 1;
+        if (queries > 1) {
+          throw new Error("store unavailable");
+        }
+        void request;
+        return [];
+      },
+    };
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const orchestrator = buildOrchestrator(db, {
+        llm: fakeLlm({
+          classification: () => ({ route: "ai" }),
+          intent: () => ({ ...DRESS_INTENT, priceMax: 100, colorsExclude: ["black"] }),
+        }),
+        retrievalStore: store,
+      });
+
+      const response = await orchestrator.runSearch({ query: AI_QUERY, shopDomain: SHOP });
+
+      expect(response.hits).toEqual([]);
+      expect(response.closeMatches.map((card) => card.productId)).toEqual(["ivory-match"]);
+      // The keyword fallback applies only the exclusion, so the heading must
+      // name EVERY relaxable constraint — not just the one rung that ran
+      // before the error, which is what it reported before AC-9.
+      expect(response.closeMatchesRelaxed).toEqual(["priceMax", "occasion", "category"]);
+      // The swallowed error is now one structured line (the YOY-109 pattern).
+      const line = warn.mock.calls.find(
+        (call) => typeof call[0] === "string" && call[0].includes("close-match rung failed"),
+      );
+      expect(line, "the rung failure is logged").toBeDefined();
+      expect(JSON.parse(String(line![1]))).toMatchObject({
+        error: "Error",
+        message: "store unavailable",
+        relaxed: ["priceMax"],
+      });
+    } finally {
+      warn.mockRestore();
+    }
+  });
 });
 
 describe("zero-hit close matches fall back to relaxed vector retrieval (YOY-52 AC-16)", () => {
