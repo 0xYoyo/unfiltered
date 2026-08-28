@@ -1,4 +1,8 @@
-Copyright 2014 The Heebo Project Authors (https://github.com/OdedEzer/heebo)
+Copyright 2016 The Frank Ruhl Libre Project Authors
+(https://github.com/alefalefalef/Frank-Ruhl-Libre)
+Copyright 2016 The Assistant Project Authors
+(https://github.com/hafontia/Assistant)
+Copyright 2017 IBM Corp. (https://github.com/IBM/plex)
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.
 This license is copied below, and is also available with a FAQ at:

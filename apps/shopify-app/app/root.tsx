@@ -26,8 +26,9 @@ import {
  *
  * The same split decides the font source (YOY-96 AC-13): the Shopify-CDN
  * Inter stylesheet is Polaris's, for the admin; the playground self-hosts
- * its own Latin + Hebrew family (playground/fonts.css) and loads nothing
- * from a third-party font CDN, so its pages stay self-contained.
+ * its own families — Latin and Hebrew in each (playground/fonts.css) — and
+ * loads nothing from a third-party font CDN, so its pages stay
+ * self-contained.
  */
 export const loader = ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);

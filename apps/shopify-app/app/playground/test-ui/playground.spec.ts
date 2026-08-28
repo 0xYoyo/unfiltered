@@ -101,27 +101,29 @@ test.describe("chrome language and direction (AC-3, verify 1)", () => {
 test.describe("the hero search bar (AC-4, verify 2)", () => {
   // The measured box is the field — the bar itself, borders included — not
   // the input inside it, which is shorter by the field's border.
-  test("is 56px tall and above the fold on desktop", async ({ page }) => {
+  test("is 60px tall and above the fold on desktop", async ({ page }) => {
     await page.setViewportSize(DESKTOP);
     await page.goto("/");
 
     const box = await page.locator(".searchField").boundingBox();
     expect(box).not.toBeNull();
-    expect(Math.round(box!.height)).toBe(56);
+    expect(Math.round(box!.height)).toBe(60);
     expect(box!.y + box!.height).toBeLessThan(DESKTOP.height);
   });
 
-  test("is 48px tall and above the fold on mobile", async ({ page }) => {
+  test("is 52px tall and above the fold on mobile", async ({ page }) => {
     await page.setViewportSize(MOBILE);
     await page.goto("/");
 
     const box = await page.locator(".searchField").boundingBox();
     expect(box).not.toBeNull();
-    expect(Math.round(box!.height)).toBe(48);
+    expect(Math.round(box!.height)).toBe(52);
     expect(box!.y + box!.height).toBeLessThan(MOBILE.height);
   });
 
-  test("borders 1px at rest and 2px accent when focused", async ({ page }) => {
+  test("takes the accent border and the focus ring when focused (P-2)", async ({
+    page,
+  }) => {
     await page.goto("/");
     const field = page.locator(".searchField");
 
@@ -130,19 +132,25 @@ test.describe("the hero search bar (AC-4, verify 2)", () => {
       return {
         width: style.borderTopWidth,
         color: style.borderTopColor,
+        shadow: style.boxShadow,
       };
     });
     expect(rest.width).toBe("1px");
+    expect(rest.shadow).toBe("none");
 
     await input(page).focus();
-    await expect(field).toHaveCSS("border-top-width", "2px");
-    // The border colour transitions over --motion-hover, so poll rather than
-    // sampling mid-interpolation.
+    // Both the border colour and the ring transition over --dur-fast, so
+    // poll rather than sampling mid-interpolation.
     await expect
       .poll(async () =>
         field.evaluate((element) => getComputedStyle(element).borderTopColor),
       )
       .not.toBe(rest.color);
+    await expect
+      .poll(async () =>
+        field.evaluate((element) => getComputedStyle(element).boxShadow),
+      )
+      .not.toBe("none");
   });
 
   test("the magnifier sits inside the field at the inline-end, mirrored under RTL", async ({
@@ -161,13 +169,14 @@ test.describe("the hero search bar (AC-4, verify 2)", () => {
     expect(rtl!.x).toBeLessThan(rtlField!.x + rtlField!.width / 2);
   });
 
-  // Runs at BOTH viewports: the bar gets shorter on mobile but its type must
-  // not drop below the display size (AC-4), and nothing else may reach it.
+  // Runs at BOTH viewports: the hero heading and the bar are the page's two
+  // display-scale elements, in that order, and nothing below the search
+  // card may reach display scale (P-3).
   for (const [device, viewport] of [
     ["desktop", DESKTOP],
     ["mobile", MOBILE],
   ] as const) {
-  test(`the input is the only display-size type on the page — ${device} (P-3, AC-4)`, async ({
+  test(`the heading and the bar are the only display-scale elements — ${device} (P-3)`, async ({
     page,
   }) => {
     await page.setViewportSize(viewport);
@@ -175,14 +184,18 @@ test.describe("the hero search bar (AC-4, verify 2)", () => {
     await submitQuery(page, "dress");
     await expect(cards(page)).toHaveCount(4);
 
-    await expect
-      .poll(async () =>
-        input(page).evaluate((element) =>
-          Number.parseFloat(getComputedStyle(element).fontSize),
-        ),
-      )
-      .toBeGreaterThanOrEqual(25);
+    // The heading is the largest thing on the page; the bar's input is the
+    // largest interactive one, and it never drops to body size.
+    const heading = await page
+      .locator(".heroHeading")
+      .evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
+    const field = await input(page).evaluate((element) =>
+      Number.parseFloat(getComputedStyle(element).fontSize),
+    );
+    expect(heading).toBeGreaterThan(field);
+    expect(field).toBeGreaterThan(16);
 
+    // Nothing else comes close: display scale starts at --size-h2 (25px).
     const oversized = await page.evaluate(() => {
       const found: string[] = [];
       document.querySelectorAll<HTMLElement>(".playground *").forEach((node) => {
@@ -196,7 +209,7 @@ test.describe("the hero search bar (AC-4, verify 2)", () => {
       });
       return found;
     });
-    expect(oversized).toEqual(["INPUT.searchInput"]);
+    expect(oversized).toEqual(["H1.heroHeading"]);
   });
   }
 });
@@ -581,19 +594,23 @@ test.describe("keyboard and focus (AC-7, verify 7)", () => {
 });
 
 /**
- * One self-hosted family for both scripts (YOY-96 AC-13). Heebo is declared
+ * The three self-hosted families (YOY-96 AC-13, re-authored by YOY-123
+ * AC-1): `Assistant` for the UI, `Frank Ruhl Libre` for display, and
+ * `IBM Plex Mono` for prices and the engine panel. All three are declared
  * by playground/fonts.css from the app's own static assets; the page must
- * actually load it — for Latin on `/` and for Hebrew on `/?lang=he` — and
- * must fetch no font from a third-party host.
+ * actually load the two text families — for Latin on `/` and for Hebrew on
+ * `/?lang=he`, both of which they cover — and must fetch no font from a
+ * third-party host.
  */
-test.describe("the playground font (YOY-96 AC-13)", () => {
-  const FAMILY = "Heebo";
+test.describe("the playground fonts (YOY-96 AC-13, YOY-123 AC-1)", () => {
+  const FAMILY = "Assistant";
+  const DISPLAY_FAMILY = "Frank Ruhl Libre";
 
   for (const [locale, path, sample] of [
     ["en", "/", "Dress"],
     ["he", "/?lang=he", "שמלה"],
   ] as const) {
-    test(`${locale}: ${FAMILY} is loaded and is the family the input and card titles render in`, async ({
+    test(`${locale}: the families load and each role renders in its own`, async ({
       page,
     }) => {
       // Anything font-shaped that leaves the app's own host is a CDN leak.
@@ -615,27 +632,36 @@ test.describe("the playground font (YOY-96 AC-13)", () => {
       await expect(cards(page)).toHaveCount(4);
       await page.evaluate(() => document.fonts.ready);
 
-      const loaded = await page.evaluate(
-        ({ family, text }) => ({
-          any: document.fonts.check(`16px ${family}`),
-          sample: document.fonts.check(`16px ${family}`, text),
-          faces: [...document.fonts]
-            .filter((face) => face.family.replace(/"/g, "") === family)
-            .map((face) => face.status),
-        }),
-        { family: FAMILY, text: sample },
-      );
-      expect(loaded.any).toBe(true);
-      expect(loaded.sample).toBe(true);
-      expect(loaded.faces).toContain("loaded");
+      for (const family of [FAMILY, DISPLAY_FAMILY]) {
+        const loaded = await page.evaluate(
+          ({ family: name, text }) => ({
+            any: document.fonts.check(`16px "${name}"`),
+            sample: document.fonts.check(`16px "${name}"`, text),
+            faces: [...document.fonts]
+              .filter((face) => face.family.replace(/"/g, "") === name)
+              .map((face) => face.status),
+          }),
+          { family, text: sample },
+        );
+        expect(loaded.any, family).toBe(true);
+        expect(loaded.sample, `${family} covers ${sample}`).toBe(true);
+        expect(loaded.faces, family).toContain("loaded");
+      }
 
-      for (const selector of [".searchInput", ".cardTitle"]) {
-        const family = await page
+      // One family per role, and the role decides — not the script.
+      for (const [selector, family] of [
+        [".searchInput", FAMILY],
+        [".cardTitle", FAMILY],
+        [".heroHeading", DISPLAY_FAMILY],
+        [".productName", DISPLAY_FAMILY],
+        [".cardPrice", "IBM Plex Mono"],
+      ] as const) {
+        const computed = await page
           .locator(selector)
           .first()
           .evaluate((element) => getComputedStyle(element).fontFamily);
-        expect(family.replace(/^"/, ""), selector).toMatch(
-          new RegExp(`^${FAMILY}\\b`),
+        expect(computed.replace(/^"/, ""), selector).toMatch(
+          new RegExp(`^${family}\\b`),
         );
       }
 

@@ -4,16 +4,22 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 /**
- * Mechanical guards on the playground's stylesheets (YOY-92 AC-2, AC-3).
+ * Mechanical guards on the playground's stylesheets (YOY-92 AC-2, AC-3;
+ * YOY-123 AC-1).
  *
- * Two invariants are cheap to state and easy to break by accident:
- * P-8 (tokens, never literals) and F-5 (logical properties, so the Hebrew
- * chrome mirrors without a second rule). Both are greppable, so they are
- * asserted here rather than left to review.
+ * Three invariants are cheap to state and easy to break by accident: P-8
+ * (tokens, never literals), F-5 (logical properties, so the Hebrew chrome
+ * mirrors without a second rule), and P-10 (one theme). All three are
+ * greppable, so they are asserted here rather than left to review.
+ *
+ * The fourth guard is AC-1 itself: `tokens.css` must be byte-identical to
+ * the CSS block in docs/DESIGN.md §2, so a token cannot drift from the
+ * direction that authorised it.
  */
 
 const PLAYGROUND_DIR = join(import.meta.dirname, ".");
 const TOKENS_FILE = "tokens.css";
+const DESIGN_DOC = join(import.meta.dirname, "../../../../docs/DESIGN.md");
 
 function playgroundStylesheets(): { name: string; source: string }[] {
   return readdirSync(PLAYGROUND_DIR)
@@ -34,6 +40,26 @@ function scannableSource(source: string): string {
   return source
     .replace(/\/\*[\s\S]*?\*\//g, "")
     .replace(/@media[^{]*\{/g, "{");
+}
+
+/** The token declarations of tokens.css: the file minus its header comment. */
+function tokenBlock(): string {
+  const tokens = readFileSync(join(PLAYGROUND_DIR, TOKENS_FILE), "utf8");
+  // The header comment only — `split` would drop everything after the
+  // SECOND `*/`, which is where half the token declarations live.
+  const end = tokens.indexOf("*/\n");
+  return tokens.slice(end + 3).trim();
+}
+
+/** The one ```css block in docs/DESIGN.md §2. */
+function designTokenBlock(): string {
+  const design = readFileSync(DESIGN_DOC, "utf8");
+  const section = design.slice(design.indexOf("\n## 2. Direction system"));
+  const blocks = [...section.matchAll(/```css\n([\s\S]*?)```/g)];
+  expect(blocks, "docs/DESIGN.md §2 holds exactly one css block").toHaveLength(
+    1,
+  );
+  return blocks[0][1].trim();
 }
 
 describe("playground stylesheets", () => {
@@ -74,38 +100,16 @@ describe("playground stylesheets", () => {
     }
   });
 
-  it("defines exactly the DESIGN §2 colour roles, and no other chromatic token", () => {
-    const tokens = readFileSync(join(PLAYGROUND_DIR, TOKENS_FILE), "utf8");
-    const roles = [
-      "--bg",
-      "--surface",
-      "--text",
-      "--text-muted",
-      "--border",
-      "--accent",
-      "--accent-contrast",
-    ];
-    for (const role of roles) {
-      // Defined twice: once for light, once under prefers-color-scheme.
-      const definitions = tokens.match(
-        new RegExp(`${role}:\\s*#[0-9a-fA-F]{3,8}`, "g"),
+  it("declares one theme and no colour-scheme switch (P-10)", () => {
+    for (const { name, source } of playgroundStylesheets()) {
+      expect(source, `${name} declares a second theme`).not.toContain(
+        "prefers-color-scheme",
       );
-      expect(definitions, `${role} is missing a theme`).toHaveLength(2);
     }
-
-    // Every hex in the file belongs to one of those roles: a new colour
-    // token is a DESIGN change, not a CSS change.
-    const assignments =
-      tokens.match(/--[a-z-]+:\s*#[0-9a-fA-F]{3,8}/g) ?? [];
-    const named = assignments.map((line) => line.split(":")[0].trim());
-    expect([...new Set(named)].sort()).toEqual([...roles].sort());
   });
 
-  it("keeps the type scale to the six DESIGN sizes", () => {
-    const tokens = readFileSync(join(PLAYGROUND_DIR, TOKENS_FILE), "utf8");
-    for (const size of [13, 16, 20, 25, 31, 39]) {
-      expect(tokens).toContain(`--type-${size}: ${size}px;`);
-    }
+  it("holds exactly the tokens docs/DESIGN.md §2 authorises (AC-1)", () => {
+    expect(tokenBlock()).toBe(designTokenBlock());
   });
 });
 
@@ -131,8 +135,16 @@ describe("the guards themselves fail on a violation", () => {
 
   it("does not flag a media query prelude or a comment", () => {
     const source = scannableSource(
-      "/* 1px note */ @media (max-width: 640px) { .card { gap: var(--space-8); } }",
+      "/* 1px note */ @media (max-width: 640px) { .card { gap: var(--space-2); } }",
     );
     expect(source.match(/\b\d+(\.\d+)?px\b/g)).toBeNull();
+  });
+
+  it("would notice a token that drifted from DESIGN §2", () => {
+    // The comparison is exact string equality, so a single changed value on
+    // either side fails. Proven here rather than asserted about.
+    expect(tokenBlock().replace("--space-1:4px", "--space-1:5px")).not.toBe(
+      designTokenBlock(),
+    );
   });
 });

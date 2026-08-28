@@ -136,6 +136,7 @@ apps/
           SearchBar.tsx
           StatusLine.tsx
           StoreLine.tsx
+        design-invariant-coverage.test.ts
         fixture-mode.server.ts
         fixture-mode.test.ts
         fixture-session-storage.server.ts
@@ -186,9 +187,11 @@ apps/
         strings.ts
         test-ui/
           ai-states.spec.ts
+          design-invariants.spec.ts
           evidence-ai.spec.ts
           evidence-classic-stages.spec.ts
           evidence-close-matches.spec.ts
+          evidence-design.spec.ts
           evidence-hardening.spec.ts
           evidence-intent-reuse.spec.ts
           evidence-intent-tier.spec.ts
@@ -199,28 +202,62 @@ apps/
           playground.spec.ts
           snapshots.spec.ts
           snapshots.spec.ts-snapshots/
-            playground-ai-en-darwin.png
-            playground-ai-en-linux.png
-            playground-ai-he-darwin.png
-            playground-ai-he-linux.png
-            playground-details-en-darwin.png
-            playground-details-en-linux.png
-            playground-initial-en-darwin.png
-            playground-initial-en-linux.png
-            playground-initial-he-darwin.png
-            playground-initial-he-linux.png
-            playground-results-en-darwin.png
-            playground-results-en-linux.png
-            playground-results-he-darwin.png
-            playground-results-he-linux.png
-            playground-store-404-en-darwin.png
-            playground-store-404-en-linux.png
-            playground-store-en-darwin.png
-            playground-store-en-linux.png
-            playground-zero-hit-en-darwin.png
-            playground-zero-hit-en-linux.png
-            playground-zero-hit-he-darwin.png
-            playground-zero-hit-he-linux.png
+            playground-ai-en-desktop-darwin.png
+            playground-ai-en-desktop-linux.png
+            playground-ai-en-mobile-darwin.png
+            playground-ai-en-mobile-linux.png
+            playground-ai-he-desktop-darwin.png
+            playground-ai-he-desktop-linux.png
+            playground-ai-he-mobile-darwin.png
+            playground-ai-he-mobile-linux.png
+            playground-details-en-desktop-darwin.png
+            playground-details-en-desktop-linux.png
+            playground-details-en-mobile-darwin.png
+            playground-details-en-mobile-linux.png
+            playground-initial-en-desktop-darwin.png
+            playground-initial-en-desktop-linux.png
+            playground-initial-en-mobile-darwin.png
+            playground-initial-en-mobile-linux.png
+            playground-initial-he-desktop-darwin.png
+            playground-initial-he-desktop-linux.png
+            playground-initial-he-mobile-darwin.png
+            playground-initial-he-mobile-linux.png
+            playground-negation-en-desktop-darwin.png
+            playground-negation-en-desktop-linux.png
+            playground-negation-en-mobile-darwin.png
+            playground-negation-en-mobile-linux.png
+            playground-negation-he-desktop-darwin.png
+            playground-negation-he-desktop-linux.png
+            playground-negation-he-mobile-darwin.png
+            playground-negation-he-mobile-linux.png
+            playground-results-en-desktop-darwin.png
+            playground-results-en-desktop-linux.png
+            playground-results-en-mobile-darwin.png
+            playground-results-en-mobile-linux.png
+            playground-results-he-desktop-darwin.png
+            playground-results-he-desktop-linux.png
+            playground-results-he-mobile-darwin.png
+            playground-results-he-mobile-linux.png
+            playground-store-404-en-desktop-darwin.png
+            playground-store-404-en-desktop-linux.png
+            playground-store-404-en-mobile-darwin.png
+            playground-store-404-en-mobile-linux.png
+            playground-store-en-desktop-darwin.png
+            playground-store-en-desktop-linux.png
+            playground-store-en-mobile-darwin.png
+            playground-store-en-mobile-linux.png
+            playground-store-he-desktop-darwin.png
+            playground-store-he-desktop-linux.png
+            playground-store-he-mobile-darwin.png
+            playground-store-he-mobile-linux.png
+            playground-zero-hit-en-desktop-darwin.png
+            playground-zero-hit-en-desktop-linux.png
+            playground-zero-hit-en-mobile-darwin.png
+            playground-zero-hit-en-mobile-linux.png
+            playground-zero-hit-he-desktop-darwin.png
+            playground-zero-hit-he-desktop-linux.png
+            playground-zero-hit-he-mobile-darwin.png
+            playground-zero-hit-he-mobile-linux.png
           store-preload.spec.ts
         tokens.css
       proxy-click.test.ts
@@ -336,9 +373,14 @@ apps/
       favicon.ico
       fonts/
         OFL.txt
-        heebo-hebrew.woff2
-        heebo-latin-ext.woff2
-        heebo-latin.woff2
+        assistant-hebrew.woff2
+        assistant-latin-ext.woff2
+        assistant-latin.woff2
+        frank-ruhl-libre-hebrew.woff2
+        frank-ruhl-libre-latin-ext.woff2
+        frank-ruhl-libre-latin.woff2
+        ibm-plex-mono-latin-400.woff2
+        ibm-plex-mono-latin-500.woff2
     scripts/
       evidence.mts
       ingest-public.mts
@@ -430,6 +472,35 @@ docs/
   SMOKE.md
   VISION-MODEL.md
   evidence/
+    M5-design/
+      desktop-en-1-initial.png
+      desktop-en-2-classic-results.png
+      desktop-en-3-ai-chips.png
+      desktop-en-4-negation-chip.png
+      desktop-en-5-zero-hit-close-matches.png
+      desktop-en-6-store-preload.png
+      desktop-en-7-engine-panel.png
+      desktop-he-1-initial.png
+      desktop-he-2-classic-results.png
+      desktop-he-3-ai-chips.png
+      desktop-he-4-negation-chip.png
+      desktop-he-5-zero-hit-close-matches.png
+      desktop-he-6-store-preload.png
+      desktop-he-7-engine-panel.png
+      mobile-en-1-initial.png
+      mobile-en-2-classic-results.png
+      mobile-en-3-ai-chips.png
+      mobile-en-4-negation-chip.png
+      mobile-en-5-zero-hit-close-matches.png
+      mobile-en-6-store-preload.png
+      mobile-en-7-engine-panel.png
+      mobile-he-1-initial.png
+      mobile-he-2-classic-results.png
+      mobile-he-3-ai-chips.png
+      mobile-he-4-negation-chip.png
+      mobile-he-5-zero-hit-close-matches.png
+      mobile-he-6-store-preload.png
+      mobile-he-7-engine-panel.png
     YOY-100/
       0-origin-home-desktop.png
       1-results-view-desktop.png

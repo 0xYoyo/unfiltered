@@ -487,7 +487,7 @@ test.describe("engine details (AC-5, verify 5)", () => {
     await expect(rows.last()).toHaveText("closeMatches · 63 ms");
   });
 
-  test("the intent block is the only monospace on the page (DESIGN §2)", async ({
+  test("monospace is confined to prices and the engine panel (DESIGN §2)", async ({
     page,
   }) => {
     await page.goto("/?details=1");
@@ -502,12 +502,19 @@ test.describe("engine details (AC-5, verify 5)", () => {
         }
         const family = getComputedStyle(node).fontFamily.toLowerCase();
         if (family.includes("mono")) {
-          found.push(node.tagName);
+          found.push(
+            node.closest(".detailsPanel") === null
+              ? (node.getAttribute("class") ?? "").split(" ")[0] ||
+                  node.tagName.toLowerCase()
+              : "engine-panel",
+          );
         }
       });
-      return found;
+      return [...new Set(found)].sort();
     });
-    expect(monospaced).toEqual(["CODE"]);
+    // The price is the one monospaced element outside the panel; the panel
+    // itself is monospace throughout (--font-mono, DESIGN §2).
+    expect(monospaced).toEqual(["bdi", "engine-panel"]);
   });
 
   test("a reload keeps the panel open", async ({ page }) => {
