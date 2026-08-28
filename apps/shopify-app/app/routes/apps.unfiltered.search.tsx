@@ -210,8 +210,16 @@ async function handleSearch(
         latencyMs,
         resultCount: response.hits.length,
         // The intent a later identical query may reuse (YOY-64 AC-4): only
-        // a served, non-degraded AI intent, keyed by the normalized query.
-        ...(response.route === "ai" && !response.degraded && response.intent !== null
+        // a served, non-degraded AI intent that was actually EXTRACTED here,
+        // keyed by the normalized query. A response served from an earlier
+        // row's intent ("intent-reuse") stores none (YOY-125 AC-3): re-storing
+        // it would re-anchor the window on the reuse, so a query searched at
+        // least once per window would never re-extract after a prompt or model
+        // change. The row still logs as a normal SearchEvent.
+        ...(response.route === "ai" &&
+        response.routeReason !== "intent-reuse" &&
+        !response.degraded &&
+        response.intent !== null
           ? { intent: response.intent, normalizedQuery: normalizeReuseQuery(body.query) }
           : {}),
       });

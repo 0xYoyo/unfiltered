@@ -168,7 +168,13 @@ export const loader = async ({
         degraded: response.degraded,
         latencyMs,
         resultCount: response.hits.length,
-        ...(response.route === "ai" && !response.degraded && response.intent !== null
+        // Only a freshly EXTRACTED intent is stored (YOY-125 AC-3): a
+        // response served under "intent-reuse" must not re-anchor the reuse
+        // window on itself.
+        ...(response.route === "ai" &&
+        response.routeReason !== "intent-reuse" &&
+        !response.degraded &&
+        response.intent !== null
           ? { intent: response.intent, normalizedQuery: normalizeReuseQuery(body.query) }
           : {}),
       });

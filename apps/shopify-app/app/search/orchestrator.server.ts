@@ -536,6 +536,14 @@ export function createSearchOrchestrator(
     };
 
     /**
+     * A settled speculative extraction (YOY-64 AC-5), carried as a value so
+     * a rejection is not an unhandled promise while the classifier runs.
+     */
+    type SpeculativeIntent =
+      | { ok: true; extracted: { intent: Intent; tier: IntentTier | null } }
+      | { ok: false; error: unknown };
+
+    /**
      * Cards for classic hits (YOY-115 AC-1/AC-3): the pg_trgm store returns
      * the card fields in its one statement, so no hydration query runs and
      * no `hydrate` stage is booked. A classic store that hands back bare
@@ -571,6 +579,7 @@ export function createSearchOrchestrator(
       degraded: boolean,
       intent: Intent | null = null,
       escalateOnEmpty = false,
+      speculative: Promise<SpeculativeIntent> | null = null,
     ): Promise<StagelessResponse> => {
       const result = await stages.time("classic", () =>
         classicStore.search({
@@ -592,7 +601,7 @@ export function createSearchOrchestrator(
         // budget decision, degraded fallbacks already failed the AI path,
         // and the escalation's own failure lands back here with
         // escalateOnEmpty unset, so there is no loop.
-        return escalatedAiPath();
+        return escalatedAiPath(speculative);
       }
       return {
         searchId,
@@ -782,12 +791,28 @@ export function createSearchOrchestrator(
      * the caller's budget accounting can see LLM spend happened. An
      * extraction failure degrades back to the (still empty) classic
      * response rather than surfacing an error.
+     *
+     * A model-decided classic route starts a speculative extraction it then
+     * does not consume (YOY-64 AC-5); when that route escalates here, the
+     * speculation is awaited instead of a second call being spent (YOY-125
+     * AC-4), so the shape pays one intent call. Its failure degrades exactly
+     * as a fresh extraction's would.
      */
-    const escalatedAiPath = async (): Promise<StagelessResponse> => {
+    const escalatedAiPath = async (
+      speculative: Promise<SpeculativeIntent> | null = null,
+    ): Promise<StagelessResponse> => {
       let intent: Intent;
       const startedAt = Date.now();
       try {
-        intent = commitIntent(await extractIntent());
+        if (speculative !== null) {
+          const speculated = await speculative;
+          if (!speculated.ok) {
+            throw speculated.error;
+          }
+          intent = commitIntent(speculated.extracted);
+        } else {
+          intent = commitIntent(await extractIntent());
+        }
       } catch (error) {
         warnIntentFailure(searchId, "classic-zero-hit", error, startedAt);
         return classicResponse("classic-zero-hit", true);
@@ -851,10 +876,12 @@ export function createSearchOrchestrator(
     // decision) the intent call starts alongside the model classification
     // instead of after it. A model-decided classic route then discards the
     // in-flight extraction — its cost lands in the ledger and is the price
-    // of the overlap on that (rare) shape; a settled decision never
-    // speculates, so heuristic-classic queries stay LLM-free.
+    // of the overlap on that (rare) shape, unless the keyword search comes
+    // back empty, in which case the escalation consumes it (YOY-125 AC-4);
+    // a settled decision never speculates, so heuristic-classic queries stay
+    // LLM-free.
     const settled = classifier.settled?.(query) ?? null;
-    const speculativeIntent =
+    const speculativeIntent: Promise<SpeculativeIntent> | null =
       settled === null
         ? extractIntent().then(
             (extracted) => ({ ok: true as const, extracted }),
@@ -878,7 +905,16 @@ export function createSearchOrchestrator(
       // when the keyword engine comes back empty (YOY-67 AC-3) — a failing
       // model is not asked to rescue its own failure.
       const degraded = decision.reason === "model-error";
-      return classicResponse(decision.reason, degraded, null, !degraded);
+      // The in-flight speculation rides along (YOY-125 AC-4): if this
+      // classic route finds nothing and escalates, it reuses that
+      // extraction rather than spending a second one.
+      return classicResponse(
+        decision.reason,
+        degraded,
+        null,
+        !degraded,
+        speculativeIntent,
+      );
     }
 
     let intent: Intent;

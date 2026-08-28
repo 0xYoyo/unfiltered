@@ -339,12 +339,21 @@ function installOrchestrator(options: {
   embeddings?: EmbeddingClient;
   /** Exact-query intent reuse window (YOY-64 AC-4); off by default. */
   intentReuseWindowMs?: number;
+  /** Clock the reuse lookup reads, so a test can age the window. */
+  intentReuseNow?: () => Date;
 }): void {
   resetProxySearchOrchestrator();
   orchestratorSeam.build = (routeDb) =>
     createSearchOrchestrator({
       ...(options.intentReuseWindowMs !== undefined
-        ? { intentReuse: { windowMs: options.intentReuseWindowMs } }
+        ? {
+            intentReuse: {
+              windowMs: options.intentReuseWindowMs,
+              ...(options.intentReuseNow !== undefined
+                ? { now: options.intentReuseNow }
+                : {}),
+            },
+          }
         : {}),
       db: routeDb as PrismaClient,
       classifier: createQueryClassifier({ llm: options.llm, timeoutMs: 500 }),
@@ -1658,6 +1667,74 @@ describe("exact-query intent reuse through the proxy (YOY-64 AC-4)", () => {
     // The throttle saw only the first submissions of each example.
     const events = await db.searchEvent.findMany({ where: { routeReason: "intent-reuse" } });
     expect(events).toHaveLength(examples.length);
+  });
+
+  it("the reuse window is anchored on the extraction, not on the last reuse (YOY-125 AC-3)", async () => {
+    // A hot query — a playground "Try:" example, a demo — is searched at
+    // least once per window forever. If a reuse row stored the intent it was
+    // served, `findReusableIntent` would keep finding a fresh row and the
+    // query would never re-extract after a prompt or model change. Anchoring
+    // on the extraction caps a served intent's staleness at exactly the
+    // window.
+    await seed([
+      { productId: "silk-gown", title: "silk gown", vector: [0.9, 0.1, 0], category: "dress" },
+    ]);
+    let intentCalls = 0;
+    const clock = { now: new Date("2026-08-28T09:00:00.000Z") };
+    installOrchestrator({
+      llm: fakeLlm({
+        classification: () => ({ route: "ai" }),
+        intent: () => {
+          intentCalls += 1;
+          return DRESS_INTENT;
+        },
+      }),
+      intentReuseWindowMs: 60 * 60_000,
+      intentReuseNow: () => clock.now,
+    });
+
+    const submit = async (sessionId: string) => {
+      const body = await (
+        await action(
+          actionArgs(proxyRequest({ payload: { query: "wedding dress", sessionId } })),
+        )
+      ).json();
+      // The rows carry a real `createdAt`; age them to the simulated clock so
+      // the window sees the same timeline the lookup does.
+      await db.searchEvent.updateMany({
+        where: { searchId: body.searchId },
+        data: { createdAt: clock.now },
+      });
+      const event = await db.searchEvent.findFirst({ where: { searchId: body.searchId } });
+      if (event === null) {
+        throw new Error("every submitted search logs one SearchEvent");
+      }
+      return event;
+    };
+
+    const first = await submit("s1");
+    expect(first.route).toBe("ai");
+    expect(first.routeReason).not.toBe("intent-reuse");
+    expect(first.intent).not.toBeNull();
+    expect(intentCalls).toBe(1);
+
+    // +40 min: inside the window, served from the extraction above.
+    clock.now = new Date("2026-08-28T09:40:00.000Z");
+    const second = await submit("s2");
+    expect(second.routeReason).toBe("intent-reuse");
+    expect(intentCalls).toBe(1);
+    // The reuse row logs as a normal SearchEvent but stores no intent, so it
+    // cannot re-anchor the window on itself.
+    expect(second.route).toBe("ai");
+    expect(second.intent).toBeNull();
+    expect(second.normalizedQuery).toBeNull();
+
+    // +100 min from the only extraction: the window has expired, so the
+    // query re-extracts even though it was searched 60 min ago.
+    clock.now = new Date("2026-08-28T10:40:00.000Z");
+    const third = await submit("s3");
+    expect(third.routeReason).not.toBe("intent-reuse");
+    expect(intentCalls).toBe(2);
   });
 
   it("stores the served intent keyed by the normalized query, and nothing for classic or degraded searches", async () => {
