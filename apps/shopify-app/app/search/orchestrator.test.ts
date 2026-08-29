@@ -2117,7 +2117,7 @@ describe("per-operation intent abort (YOY-64 AC-3)", () => {
           apiKey: "test-key-not-real",
           costRecorder: createPrismaCostRecorder(db),
           fetchImpl: hangingFetch,
-          // The production default is 8000 ms; the test uses a short one to
+          // The production default is 4500 ms; the test uses a short one to
           // prove the abort path, not to wait it out.
           requestTimeoutMs: 100,
         }),
@@ -2143,8 +2143,8 @@ describe("per-operation intent abort (YOY-64 AC-3)", () => {
 
   // The production wiring runs the lite-first ladder, not a single
   // extractor: without one budget for the ladder a hung upstream cost the
-  // lite timeout plus the accuracy timeout in series (≈16 s at the 8 s
-  // defaults) before the classic fallback — nearly twice the AC's 9 s bound
+  // lite timeout plus the accuracy timeout in series (≈16 s at the then
+  // 8 s defaults) before the classic fallback — nearly twice the AC's 9 s bound
   // (review of PR #117). Two hanging Gemini clients, short test timeouts,
   // the same `deadlineMs` wiring as `createProxySearchOrchestrator`.
   function hangingGeminiFetch() {
@@ -2165,8 +2165,9 @@ describe("per-operation intent abort (YOY-64 AC-3)", () => {
     await seed(db, [{ productId: "silk-gown", title: "silk gown", vector: [0.9, 0.1, 0], enrichment: { category: "dress" } }]);
     const { urls, impl } = hangingGeminiFetch();
     const costRecorder = createPrismaCostRecorder(db);
-    // Per-call timeouts at or above the deadline, as in production (8 s and
-    // 8 s): the deadline, not the lite timeout, is what cuts the lite call.
+    // Per-call timeouts at or above the deadline (the pre-AC-12 production
+    // wiring, 8 s and 8 s, still reachable by env override): the deadline,
+    // not the lite timeout, is what cuts the lite call.
     const perCallTimeoutMs = 400;
     const deadlineMs = 250;
     const orchestrator = createSearchOrchestrator({
@@ -2208,7 +2209,8 @@ describe("per-operation intent abort (YOY-64 AC-3)", () => {
       expect(response.route).toBe("classic");
       expect(response.degraded).toBe(true);
       // Within the ladder deadline plus slack — under even ONE per-call
-      // timeout, let alone two in series (800 ms here; 16 s in production).
+      // timeout, let alone two in series (800 ms here; 7.5 s at the
+      // production defaults, 4.5 s + 3 s).
       expect(wallMs).toBeLessThan(deadlineMs + 100);
       expect(wallMs).toBeLessThan(perCallTimeoutMs);
       // The lite call timed out with no budget left: the accuracy tier was
@@ -2222,8 +2224,10 @@ describe("per-operation intent abort (YOY-64 AC-3)", () => {
     }
   });
 
-  it("the 8000 ms budget bounds the whole ladder and sits between the widget's rescue and primary budgets", () => {
-    expect(DEFAULT_INTENT_TIMEOUT_MS).toBe(8000);
+  it("the 4500 ms budget bounds the whole ladder and sits between the widget's rescue and primary budgets", () => {
+    // YOY-124 AC-12: the shopper's worst-case wait is the ladder deadline,
+    // decided at 4500 ms on the 2026-08-28 live run (AI p95 3421 ms).
+    expect(DEFAULT_INTENT_TIMEOUT_MS).toBe(4500);
     expect(DEFAULT_FALLBACK_TIMEOUT_MS).toBe(3000);
     expect(DEFAULT_TIMEOUT_MS).toBe(30_000);
     // Classic fallback always arrives before the client gives up, and
@@ -2236,9 +2240,11 @@ describe("per-operation intent abort (YOY-64 AC-3)", () => {
     const ladderDeadlineMs = DEFAULT_INTENT_TIMEOUT_MS;
     expect(ladderDeadlineMs + 1000).toBeLessThanOrEqual(9000);
     expect(ladderDeadlineMs).toBeLessThanOrEqual(DEFAULT_TIMEOUT_MS);
-    // And the lite tier's own timeout never exceeds the ladder's budget, so
-    // the budget — not the lite timeout — is what a hung lite call costs.
-    expect(DEFAULT_INTENT_LITE_TIMEOUT_MS).toBeLessThanOrEqual(ladderDeadlineMs);
+    // And the lite tier's own timeout sits strictly below the ladder's
+    // budget (AC-12), so a hung lite call is cut with budget left and the
+    // accuracy tier still gets its rescue instead of a classic degrade.
+    expect(DEFAULT_INTENT_LITE_TIMEOUT_MS).toBe(3000);
+    expect(DEFAULT_INTENT_LITE_TIMEOUT_MS).toBeLessThan(ladderDeadlineMs);
   });
 });
 

@@ -715,8 +715,10 @@ retrieval semantics:
   recorder is what tests and the eval harness use, so ledger assertions
   stay exact.
 - **Per-operation intent abort (AC-3).** The accuracy-tier intent client
-  runs with `GEMINI_INTENT_TIMEOUT_MS` (default 8000) and the lite tier with
-  `GEMINI_INTENT_LITE_TIMEOUT_MS` (default 8000), and the same
+  runs with `GEMINI_INTENT_TIMEOUT_MS` (default 4500 — the shopper's
+  worst-case wait, YOY-124 AC-12; 8000 before) and the lite tier with
+  `GEMINI_INTENT_LITE_TIMEOUT_MS` (default 3000, strictly below the
+  deadline so a hung lite call still escalates), and the same
   `GEMINI_INTENT_TIMEOUT_MS` is the **deadline of the whole lite-first
   ladder**: `createEscalatingIntentExtractor({ deadlineMs })` arms one
   `AbortSignal` per extraction and forwards it to both tiers through

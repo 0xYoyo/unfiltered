@@ -374,9 +374,11 @@ export function createEscalatingIntentExtractor(
         // The ladder's budget is spent (or the caller gave up): a second
         // call would only add a second timeout. The elapsed check covers a
         // lite port whose own timeout equals the deadline and fires first —
-        // the production wiring, 8 s and 8 s — where the deadline signal may
-        // not have flipped yet. The lite error propagates unchanged so the
-        // caller's log names the class (GeminiTimeoutError).
+        // the pre-AC-12 production wiring, 8 s and 8 s, still reachable by
+        // env override (the defaults are now 3 s under a 4.5 s deadline) —
+        // where the deadline signal may not have flipped yet. The lite error
+        // propagates unchanged so the caller's log names the class
+        // (GeminiTimeoutError).
         throw error;
       }
       const name = error instanceof Error ? error.name : "Error";

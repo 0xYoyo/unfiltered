@@ -388,9 +388,9 @@ describe("hedged class escalation (YOY-64 AC-6)", () => {
     return slowTier(intent(), 60_000, name);
   }
 
-  it("commits a default hedge delay inside the ladder deadline the app wires (8000 ms)", () => {
+  it("commits a default hedge delay inside the ladder deadline the app wires (4500 ms, YOY-124 AC-12)", () => {
     expect(DEFAULT_INTENT_HEDGE_AFTER_MS).toBeGreaterThan(0);
-    expect(DEFAULT_INTENT_HEDGE_AFTER_MS).toBeLessThan(8000);
+    expect(DEFAULT_INTENT_HEDGE_AFTER_MS).toBeLessThan(4500);
   });
 
   it("an accuracy answer inside the hedge delay is the whole story: no lite call at all", async () => {
