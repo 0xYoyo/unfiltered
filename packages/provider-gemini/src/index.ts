@@ -133,9 +133,12 @@ export const DEFAULT_VISION_THINKING_LEVEL = "low";
  * tier exists to be fast, and a hung lite call escalates to the accuracy
  * tier, so it must give up long before the adapter's 60 s default —
  * gemini-3.5-flash-lite was observed hanging past 90 s on one refinement
- * prompt. Override with `GEMINI_INTENT_LITE_TIMEOUT_MS`.
+ * prompt. Strictly below `DEFAULT_INTENT_TIMEOUT_MS` (YOY-124 AC-12), so a
+ * hung lite call still has ladder budget left to escalate with instead of
+ * degrading to classic on the spot. Override with
+ * `GEMINI_INTENT_LITE_TIMEOUT_MS`.
  */
-export const DEFAULT_INTENT_LITE_TIMEOUT_MS = 8_000;
+export const DEFAULT_INTENT_LITE_TIMEOUT_MS = 3_000;
 /**
  * Per-request abort timeout of the accuracy-tier intent call AND the
  * wall-clock deadline of the whole lite-first ladder (YOY-64 AC-3): a
@@ -144,10 +147,12 @@ export const DEFAULT_INTENT_LITE_TIMEOUT_MS = 8_000;
  * (both asserted against the widget's constants by a test). The ladder
  * deadline is what makes the bound hold end to end — without it a hung
  * upstream costs the lite timeout plus the accuracy timeout in series. The
- * adapter's 60 s default stays for enrichment and embedding. Override with
- * `GEMINI_INTENT_TIMEOUT_MS`.
+ * adapter's 60 s default stays for enrichment and embedding. 4500 ms is the
+ * shopper's worst-case wait (YOY-124 AC-12, decided on the 2026-08-28 live
+ * run: AI p95 3421 ms, one degraded of 200, so the bound clears the measured
+ * tail by ~1 s); it was 8000 before. Override with `GEMINI_INTENT_TIMEOUT_MS`.
  */
-export const DEFAULT_INTENT_TIMEOUT_MS = 8_000;
+export const DEFAULT_INTENT_TIMEOUT_MS = 4_500;
 /**
  * `GEMINI_INTENT_THINKING_LEVEL` value that sends no thinkingConfig at all,
  * restoring the model's own default thinking (the pre-YOY-109 behaviour).

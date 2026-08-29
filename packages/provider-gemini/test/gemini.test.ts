@@ -99,8 +99,12 @@ describe("model configuration", () => {
       intentLiteTimeoutMs: DEFAULT_INTENT_LITE_TIMEOUT_MS,
       intentTimeoutMs: DEFAULT_INTENT_TIMEOUT_MS,
     });
-    expect(DEFAULT_INTENT_LITE_TIMEOUT_MS).toBe(8_000);
-    expect(DEFAULT_INTENT_TIMEOUT_MS).toBe(8_000);
+    // YOY-124 AC-12: the ladder deadline is the shopper's worst-case wait,
+    // and the lite timeout sits strictly below it so a hung lite call
+    // escalates instead of degrading.
+    expect(DEFAULT_INTENT_TIMEOUT_MS).toBe(4_500);
+    expect(DEFAULT_INTENT_LITE_TIMEOUT_MS).toBe(3_000);
+    expect(DEFAULT_INTENT_LITE_TIMEOUT_MS).toBeLessThan(DEFAULT_INTENT_TIMEOUT_MS);
     expect(DEFAULT_INTENT_THINKING_LEVEL).toBe("low");
     // The lite tier (YOY-116): the cheap model, thinking set explicitly.
     expect(DEFAULT_INTENT_LITE_MODEL).toBe("gemini-3.5-flash-lite");
