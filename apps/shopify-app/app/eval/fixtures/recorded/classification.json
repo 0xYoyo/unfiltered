@@ -498,6 +498,83 @@
       },
       "inputTokens": 184,
       "outputTokens": 11
+    },
+    "summer dress, not black": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 178,
+      "outputTokens": 11
+    },
+    "linen shirt under 300": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 180,
+      "outputTokens": 11
+    },
+    "an oversized coat that drapes well": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 180,
+      "outputTokens": 11
+    },
+    "brown boots in stock": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 177,
+      "outputTokens": 11
+    },
+    "שמלת קיץ, לא שחורה": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 182,
+      "outputTokens": 11
+    },
+    "חולצת פשתן עד 300": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 184,
+      "outputTokens": 11
+    },
+    "משהו ללבוש לחתונה": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 182,
+      "outputTokens": 11
+    },
+    "מעיל אוברסייז שנופל יפה": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 185,
+      "outputTokens": 11
+    },
+    "מגפיים חומים במלאי": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 181,
+      "outputTokens": 11
+    },
+    "same but under 400": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 180,
+      "outputTokens": 11
+    },
+    "אותו דבר אבל עד 400": {
+      "output": {
+        "route": "ai"
+      },
+      "inputTokens": 181,
+      "outputTokens": 11
     }
   }
 }

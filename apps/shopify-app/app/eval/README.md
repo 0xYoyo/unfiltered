@@ -90,6 +90,17 @@ zero network calls, identical ledger shape to a live run.
   classic, where keyword search matches titles only). Scored end to end
   like the goldens, on their own scorecard block and never blended into
   the main bars; bar: ≥ 80 % hit.
+- `fixtures/example-goldens.json` (YOY-136 AC-3) — the playground page's
+  **curated example queries**, twelve goldens mirroring `EXAMPLE_QUERIES`
+  in `app/playground/strings.ts` one-to-one: one per kind per locale, the
+  query byte-identical to the committed text (the loader refuses any
+  drift, so a curation edit fails offline until its recording lands). The
+  two `refinement` examples carry the `previousIntent` the runbook hands
+  them — the same locale's negation example — and run the full path with
+  it. `expectedProductIds` is empty by design: a suggestion the page itself
+  offers must never come back empty, so each is scored on answering at all
+  (≥ 1 primary hit) on its own scorecard block, outside every bar below
+  and outside the cost blend.
 - `fixtures/refinement-goldens.json` — 9 follow-up queries (EN, HE, mixed),
   each with the previous query's intent and the constraint outcome the merged
   intent must produce (YOY-42). They run intent extraction only: a follow-up
@@ -153,6 +164,11 @@ Vision pass bars (YOY-122, enforced as failing tests):
   zero regression, 0 violations, refinement misses 0, Constructor floor,
   blended ≤ $0.60/1K — are re-verified on the vision-enriched catalog by
   the same tests as before (AC-3).
+
+Curated-examples bar (YOY-136 AC-3, enforced as a failing test): every
+example golden returns ≥ 1 primary hit (`curated examples answered: N/12`),
+and the negation, priceCap, occasion, and colorAvailability examples route
+`ai` — the page's own suggestions never dead-end.
 
 Constructor-bar pass bar (enforced as failing tests):
 

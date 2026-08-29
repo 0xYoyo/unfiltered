@@ -170,6 +170,50 @@
       },
       "inputTokens": 725,
       "outputTokens": 89
+    },
+    "same but under 400": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [
+          "black"
+        ],
+        "attributesExclude": [],
+        "attributesInclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "summer"
+        ],
+        "confidence": 0.9,
+        "outcome": "refinement",
+        "category": "dress",
+        "priceMax": 400
+      },
+      "inputTokens": 844,
+      "outputTokens": 50
+    },
+    "אותו דבר אבל עד 400": {
+      "output": {
+        "colorsInclude": [],
+        "colorsExclude": [
+          "black"
+        ],
+        "attributesExclude": [],
+        "attributesInclude": [],
+        "availabilityRequired": false,
+        "softAttributes": [
+          "summer"
+        ],
+        "confidence": 0.9,
+        "outcome": "refinement",
+        "category": "dress",
+        "currency": null,
+        "occasion": null,
+        "priceMax": 400,
+        "priceMin": null,
+        "size": null
+      },
+      "inputTokens": 845,
+      "outputTokens": 128
     }
   }
 }

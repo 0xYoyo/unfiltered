@@ -1,0 +1,234 @@
+[
+  {
+    "id": "ex01",
+    "kind": "negation",
+    "language": "en",
+    "query": "summer dress, not black",
+    "expectedProductIds": [],
+    "hardConstraints": {
+      "category": "dress",
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [],
+      "colorsExclude": [
+        "black"
+      ],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "ex02",
+    "kind": "priceCap",
+    "language": "en",
+    "query": "linen shirt under 300",
+    "expectedProductIds": [],
+    "hardConstraints": {
+      "category": null,
+      "priceMin": null,
+      "priceMax": 300,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "ex03",
+    "kind": "occasion",
+    "language": "en",
+    "query": "something to wear to a wedding",
+    "expectedProductIds": [],
+    "hardConstraints": {
+      "category": null,
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": "wedding",
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "ex04",
+    "kind": "softAttribute",
+    "language": "en",
+    "query": "an oversized coat that drapes well",
+    "expectedProductIds": [],
+    "hardConstraints": {
+      "category": "coat",
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "ex05",
+    "kind": "colorAvailability",
+    "language": "en",
+    "query": "brown boots in stock",
+    "expectedProductIds": [],
+    "hardConstraints": {
+      "category": "boots",
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [
+        "brown"
+      ],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": true
+    }
+  },
+  {
+    "id": "ex06",
+    "kind": "refinement",
+    "language": "en",
+    "query": "same but under 400",
+    "previousIntent": {
+      "category": "dress",
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [],
+      "colorsExclude": [
+        "black"
+      ],
+      "occasion": null,
+      "availabilityRequired": false,
+      "softAttributes": [
+        "summer"
+      ]
+    },
+    "expectedProductIds": [],
+    "hardConstraints": {
+      "category": "dress",
+      "priceMin": null,
+      "priceMax": 400,
+      "colorsInclude": [],
+      "colorsExclude": [
+        "black"
+      ],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "ex07",
+    "kind": "negation",
+    "language": "he",
+    "query": "שמלת קיץ, לא שחורה",
+    "expectedProductIds": [],
+    "hardConstraints": {
+      "category": "dress",
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [],
+      "colorsExclude": [
+        "black"
+      ],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "ex08",
+    "kind": "priceCap",
+    "language": "he",
+    "query": "חולצת פשתן עד 300",
+    "expectedProductIds": [],
+    "hardConstraints": {
+      "category": null,
+      "priceMin": null,
+      "priceMax": 300,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "ex09",
+    "kind": "occasion",
+    "language": "he",
+    "query": "משהו ללבוש לחתונה",
+    "expectedProductIds": [],
+    "hardConstraints": {
+      "category": null,
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": "wedding",
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "ex10",
+    "kind": "softAttribute",
+    "language": "he",
+    "query": "מעיל אוברסייז שנופל יפה",
+    "expectedProductIds": [],
+    "hardConstraints": {
+      "category": "coat",
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  },
+  {
+    "id": "ex11",
+    "kind": "colorAvailability",
+    "language": "he",
+    "query": "מגפיים חומים במלאי",
+    "expectedProductIds": [],
+    "hardConstraints": {
+      "category": "boots",
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [
+        "brown"
+      ],
+      "colorsExclude": [],
+      "occasion": null,
+      "availabilityRequired": true
+    }
+  },
+  {
+    "id": "ex12",
+    "kind": "refinement",
+    "language": "he",
+    "query": "אותו דבר אבל עד 400",
+    "previousIntent": {
+      "category": "dress",
+      "priceMin": null,
+      "priceMax": null,
+      "colorsInclude": [],
+      "colorsExclude": [
+        "black"
+      ],
+      "occasion": null,
+      "availabilityRequired": false,
+      "softAttributes": [
+        "summer"
+      ]
+    },
+    "expectedProductIds": [],
+    "hardConstraints": {
+      "category": "dress",
+      "priceMin": null,
+      "priceMax": 400,
+      "colorsInclude": [],
+      "colorsExclude": [
+        "black"
+      ],
+      "occasion": null,
+      "availabilityRequired": false
+    }
+  }
+]
