@@ -43,17 +43,17 @@ test.describe("chrome language and direction (AC-3, verify 1)", () => {
     page,
     browser,
   }) => {
-    await page.goto("/");
+    await page.goto("/try");
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
     await expect(page.locator("html")).toHaveAttribute("dir", "ltr");
 
-    await page.goto("/?lang=he");
+    await page.goto("/try?lang=he");
     await expect(page.locator("html")).toHaveAttribute("lang", "he");
     await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
 
     const hebrew = await browser.newContext({ locale: "he-IL" });
     const hebrewPage = await hebrew.newPage();
-    await hebrewPage.goto("/");
+    await hebrewPage.goto("/try");
     await expect(hebrewPage.locator("html")).toHaveAttribute("lang", "he");
     await expect(hebrewPage.locator("html")).toHaveAttribute("dir", "rtl");
     await hebrew.close();
@@ -62,7 +62,7 @@ test.describe("chrome language and direction (AC-3, verify 1)", () => {
   test("the toggle switches language and keeps the typed query (AC-3)", async ({
     page,
   }) => {
-    await page.goto("/");
+    await page.goto("/try");
     await input(page).fill("linen");
 
     await page.getByTestId("playground-language-toggle").click();
@@ -77,21 +77,21 @@ test.describe("chrome language and direction (AC-3, verify 1)", () => {
   test("the page title and description come from the catalog (AC-1)", async ({
     page,
   }) => {
-    await page.goto("/");
+    await page.goto("/try");
     await expect(page).toHaveTitle(strings("en").pageTitle);
     await expect(page.locator('meta[name="description"]')).toHaveAttribute(
       "content",
       strings("en").metaDescription,
     );
 
-    await page.goto("/?lang=he");
+    await page.goto("/try?lang=he");
     await expect(page).toHaveTitle(strings("he").pageTitle);
   });
 
   test("the template marketing copy and login form are gone (AC-1)", async ({
     page,
   }) => {
-    await page.goto("/");
+    await page.goto("/try");
     await expect(page.locator('form[action="/auth/login"]')).toHaveCount(0);
     await expect(page.locator('input[name="shop"]')).toHaveCount(0);
     await expect(page.getByText("[your app]")).toHaveCount(0);
@@ -103,7 +103,7 @@ test.describe("the hero search bar (AC-4, verify 2)", () => {
   // the input inside it, which is shorter by the field's border.
   test("is 60px tall and above the fold on desktop", async ({ page }) => {
     await page.setViewportSize(DESKTOP);
-    await page.goto("/");
+    await page.goto("/try");
 
     const box = await page.locator(".searchField").boundingBox();
     expect(box).not.toBeNull();
@@ -113,7 +113,7 @@ test.describe("the hero search bar (AC-4, verify 2)", () => {
 
   test("is 52px tall and above the fold on mobile", async ({ page }) => {
     await page.setViewportSize(MOBILE);
-    await page.goto("/");
+    await page.goto("/try");
 
     const box = await page.locator(".searchField").boundingBox();
     expect(box).not.toBeNull();
@@ -124,7 +124,7 @@ test.describe("the hero search bar (AC-4, verify 2)", () => {
   test("takes the accent border and the focus ring when focused (P-2)", async ({
     page,
   }) => {
-    await page.goto("/");
+    await page.goto("/try");
     const field = page.locator(".searchField");
 
     const rest = await field.evaluate((element) => {
@@ -157,13 +157,13 @@ test.describe("the hero search bar (AC-4, verify 2)", () => {
     page,
   }) => {
     await page.setViewportSize(DESKTOP);
-    await page.goto("/");
+    await page.goto("/try");
     const field = await page.locator(".searchField").boundingBox();
     const ltr = await submit(page).boundingBox();
     expect(ltr!.x).toBeGreaterThan(field!.x + field!.width / 2);
     expect(ltr!.x + ltr!.width).toBeLessThanOrEqual(field!.x + field!.width + 1);
 
-    await page.goto("/?lang=he");
+    await page.goto("/try?lang=he");
     const rtlField = await page.locator(".searchField").boundingBox();
     const rtl = await submit(page).boundingBox();
     expect(rtl!.x).toBeLessThan(rtlField!.x + rtlField!.width / 2);
@@ -180,7 +180,7 @@ test.describe("the hero search bar (AC-4, verify 2)", () => {
     page,
   }) => {
     await page.setViewportSize(viewport);
-    await page.goto("/");
+    await page.goto("/try");
     await submitQuery(page, "dress");
     await expect(cards(page)).toHaveCount(4);
 
@@ -220,7 +220,7 @@ test.describe("preview and submit (AC-5, verify 3)", () => {
   }) => {
     await page.setViewportSize(DESKTOP);
     const requests = await recordSearchRequests(page);
-    await page.goto("/");
+    await page.goto("/try");
 
     // Focus first, then measure: focusing widens the field's border from 1px
     // to 2px by design (DESIGN §2), and F-8 is about state changes moving the
@@ -248,7 +248,7 @@ test.describe("preview and submit (AC-5, verify 3)", () => {
 
   test("every request carries a per-tab sessionId (AC-5)", async ({ page }) => {
     const requests = await recordSearchRequests(page);
-    await page.goto("/");
+    await page.goto("/try");
     await submitQuery(page, "dress");
     await expect(cards(page)).toHaveCount(4);
 
@@ -260,7 +260,7 @@ test.describe("preview and submit (AC-5, verify 3)", () => {
   });
 
   test("results replace rather than stack (F-8, AC-5)", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/try");
     await submitQuery(page, "dress");
     await expect(cards(page)).toHaveCount(4);
     await submitQuery(page, "another dress");
@@ -295,7 +295,7 @@ test.describe("preview cards are not attributable (YOY-96 AC-14)", () => {
         return original(url, data);
       };
     });
-    await page.goto("/");
+    await page.goto("/try");
 
     // Typing with NO Enter: the debounced preview answers with its own
     // fixture, whose searchId has no SearchEvent behind it.
@@ -324,7 +324,7 @@ test.describe("preview cards are not attributable (YOY-96 AC-14)", () => {
 
 test.describe("result cards (AC-6, verify 4)", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/try");
     await submitQuery(page, "dress");
     await expect(cards(page)).toHaveCount(4);
   });
@@ -394,7 +394,7 @@ test.describe("result cards (AC-6, verify 4)", () => {
     // baseline is the second half of this guard: it shows where the ellipsis
     // actually lands.
     await page.setViewportSize(DESKTOP);
-    await page.goto("/?lang=he");
+    await page.goto("/try?lang=he");
     await submitQuery(page, "dress");
     await expect(cards(page)).toHaveCount(4);
 
@@ -420,7 +420,7 @@ test.describe("result cards (AC-6, verify 4)", () => {
 
 test.describe("states (AC-7, verify 5 and 6)", () => {
   test("initial shows a quiet hint and no cards", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/try");
     await expect(status(page)).toHaveText(strings("en").initialHint);
     await expect(cards(page)).toHaveCount(0);
   });
@@ -428,7 +428,7 @@ test.describe("states (AC-7, verify 5 and 6)", () => {
   test("an empty result is one muted sentence and no cards", async ({
     page,
   }) => {
-    await page.goto("/");
+    await page.goto("/try");
     await submitQuery(page, "empty");
     await expect(status(page)).toHaveText(strings("en").emptyResults);
     await expect(cards(page)).toHaveCount(0);
@@ -437,7 +437,7 @@ test.describe("states (AC-7, verify 5 and 6)", () => {
   test("a failure keeps the previous results and says try again", async ({
     page,
   }) => {
-    await page.goto("/");
+    await page.goto("/try");
     await submitQuery(page, "dress");
     await expect(cards(page)).toHaveCount(4);
 
@@ -450,7 +450,7 @@ test.describe("states (AC-7, verify 5 and 6)", () => {
   test("loading is one status line and never a spinner (X-4)", async ({
     page,
   }) => {
-    await page.goto("/");
+    await page.goto("/try");
     await input(page).fill("delayed");
     await input(page).press("Enter");
 
@@ -464,7 +464,7 @@ test.describe("states (AC-7, verify 5 and 6)", () => {
   test("the status line reserves its space so nothing moves (F-8)", async ({
     page,
   }) => {
-    await page.goto("/");
+    await page.goto("/try");
     // Measured focused throughout, for the reason given in the preview spec.
     await input(page).focus();
     const before = await input(page).boundingBox();
@@ -481,8 +481,8 @@ test.describe("layout holds at every viewport (AC-4, F-5)", () => {
   // RTL. Nothing else on the page moved, which is exactly why it needs a
   // test rather than an eye.
   for (const [locale, path] of [
-    ["en", "/"],
-    ["he", "/?lang=he"],
+    ["en", "/try"],
+    ["he", "/try?lang=he"],
   ] as const) {
     test(`never scrolls horizontally on a 360px screen — ${locale}`, async ({
       page,
@@ -505,7 +505,7 @@ test.describe("keyboard and focus (AC-7, verify 7)", () => {
   test("tab order runs input → magnifier → examples → details → cards", async ({
     page,
   }) => {
-    await page.goto("/");
+    await page.goto("/try");
     await submitQuery(page, "dress");
     await expect(cards(page)).toHaveCount(4);
 
@@ -538,7 +538,7 @@ test.describe("keyboard and focus (AC-7, verify 7)", () => {
   });
 
   test("focused elements draw a visible ring", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/try");
     await submit(page).focus();
     const outline = await submit(page).evaluate((element) => {
       const style = getComputedStyle(element);
@@ -558,7 +558,7 @@ test.describe("keyboard and focus (AC-7, verify 7)", () => {
     // ~20px tall because the original spec only checked the magnifier and
     // the language toggle. The one carve-out F-3 allows is a chip-remove
     // affordance at 24×24, and here the whole chip is the control.
-    await page.goto("/");
+    await page.goto("/try");
     await submitQuery(page, "ai elegant dress");
     await expect(page.getByTestId("playground-chip")).toHaveCount(3);
 
@@ -598,8 +598,8 @@ test.describe("keyboard and focus (AC-7, verify 7)", () => {
  * AC-1): `Assistant` for the UI, `Frank Ruhl Libre` for display, and
  * `IBM Plex Mono` for prices and the engine panel. All three are declared
  * by playground/fonts.css from the app's own static assets; the page must
- * actually load the two text families — for Latin on `/` and for Hebrew on
- * `/?lang=he`, both of which they cover — and must fetch no font from a
+ * actually load the two text families — for Latin on `/try` and for Hebrew on
+ * `/try?lang=he`, both of which they cover — and must fetch no font from a
  * third-party host.
  */
 test.describe("the playground fonts (YOY-96 AC-13, YOY-123 AC-1)", () => {
@@ -607,8 +607,8 @@ test.describe("the playground fonts (YOY-96 AC-13, YOY-123 AC-1)", () => {
   const DISPLAY_FAMILY = "Frank Ruhl Libre";
 
   for (const [locale, path, sample] of [
-    ["en", "/", "Dress"],
-    ["he", "/?lang=he", "שמלה"],
+    ["en", "/try", "Dress"],
+    ["he", "/try?lang=he", "שמלה"],
   ] as const) {
     test(`${locale}: the families load and each role renders in its own`, async ({
       page,

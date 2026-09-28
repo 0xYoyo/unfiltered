@@ -38,8 +38,8 @@ test.describe("@evidence", () => {
     ["mobile", MOBILE],
   ] as const) {
     for (const [locale, base] of [
-      ["en", "/"],
-      ["he", "/?lang=he"],
+      ["en", "/try"],
+      ["he", "/try?lang=he"],
     ] as const) {
       test(`playground ${device} ${locale}`, async ({ page }) => {
         await page.setViewportSize(viewport);
@@ -72,7 +72,7 @@ test.describe("@evidence", () => {
       test(`engine panel ${device} ${locale}`, async ({ page }) => {
         await page.setViewportSize(viewport);
         await page.goto(
-          locale === "en" ? "/?details=1" : "/?lang=he&details=1",
+          locale === "en" ? "/try?details=1" : "/try?lang=he&details=1",
         );
         await submit(page, "ai elegant dress");
         await page.getByTestId("playground-details-panel").waitFor();

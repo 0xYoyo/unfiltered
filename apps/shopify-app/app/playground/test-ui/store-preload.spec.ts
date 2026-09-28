@@ -55,7 +55,7 @@ test.describe("the store's page (AC-1, AC-2, verify 1)", () => {
   test("the seed playground stays indexable and has no store line", async ({
     page,
   }) => {
-    await page.goto("/");
+    await page.goto("/try");
     await expect(page.locator('meta[name="robots"]')).toHaveCount(0);
     await expect(storeLine(page)).toHaveCount(0);
   });
@@ -82,7 +82,7 @@ test.describe("the store's page (AC-1, AC-2, verify 1)", () => {
     };
 
     expect(await inventory("/s/demo-store", "store")).toEqual(
-      await inventory("/", "hero"),
+      await inventory("/try", "hero"),
     );
   });
 });
@@ -139,7 +139,7 @@ test.describe("an unknown slug (AC-1, verify 3)", () => {
     expect(response?.status()).toBe(404);
 
     await expect(page.getByText(strings("en").catalogNotFound)).toBeVisible();
-    await expect(page.locator('a[href="/"]')).toBeVisible();
+    await expect(page.locator('a[href="/try"]')).toBeVisible();
     // The playground's own shell, not a framework error screen.
     await expect(page.locator(".playground")).toBeVisible();
     await expect(page.getByText(/stack|Unexpected Server Error/i)).toHaveCount(
@@ -201,8 +201,8 @@ test.describe("an unknown slug (AC-1, verify 3)", () => {
 
   test("the link goes back to the seed playground", async ({ page }) => {
     await page.goto("/s/nope");
-    await page.locator('a[href="/"]').click();
-    await expect(page).toHaveURL(/\/$/);
+    await page.locator('a[href="/try"]').click();
+    await expect(page).toHaveURL(/\/try$/);
     await expect(input(page)).toBeVisible();
   });
 });
@@ -237,7 +237,7 @@ test.describe("lang and details work as on / (AC-3, verify 4)", () => {
   test("the sessionId is shared with / in the same tab", async ({ page }) => {
     const urls = recordSearchRequests(page);
 
-    await page.goto("/");
+    await page.goto("/try");
     await submit(page, "dress");
     await expect(cards(page)).toHaveCount(4);
 

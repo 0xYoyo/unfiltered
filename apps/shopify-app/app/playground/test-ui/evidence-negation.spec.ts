@@ -27,8 +27,8 @@ test.describe("@evidence", () => {
     ["mobile", MOBILE],
   ] as const) {
     for (const [locale, path] of [
-      ["en", "/"],
-      ["he", "/?lang=he"],
+      ["en", "/try"],
+      ["he", "/try?lang=he"],
     ] as const) {
       test(`negation ${device} ${locale}`, async ({ page }) => {
         await page.setViewportSize(viewport);
@@ -47,7 +47,7 @@ test.describe("@evidence", () => {
 
   test("details panel desktop en", async ({ page }) => {
     await page.setViewportSize(DESKTOP);
-    await page.goto("/?details=1");
+    await page.goto("/try?details=1");
     await submit(page, "ai winter coat not wool");
     await page.getByTestId("playground-details-panel").waitFor();
     await shot(page, "desktop-en-3-details-open");

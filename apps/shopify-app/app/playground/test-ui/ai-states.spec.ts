@@ -48,7 +48,7 @@ test.describe("chips are the applied constraints (AC-1, verify 1)", () => {
   test("an AI response renders one removable pill per constraint", async ({
     page,
   }) => {
-    await page.goto("/");
+    await page.goto("/try");
     await submit(page, "ai elegant dress");
     await expect(chips(page)).toHaveCount(3);
     // The remove glyph is part of the chip's text content, hence the ×.
@@ -68,7 +68,7 @@ test.describe("chips are the applied constraints (AC-1, verify 1)", () => {
   test("chip labels are localized to the chrome language (Hebrew parity)", async ({
     page,
   }) => {
-    await page.goto("/?lang=he");
+    await page.goto("/try?lang=he");
     await submit(page, "ai elegant dress");
     await expect(chips(page)).toHaveCount(3);
     // The currency rides the label exactly as it does in the widget, because
@@ -81,7 +81,7 @@ test.describe("chips are the applied constraints (AC-1, verify 1)", () => {
   test("chips never render on a preview or a classic response (W-7)", async ({
     page,
   }) => {
-    await page.goto("/");
+    await page.goto("/try");
 
     // Preview: typing only, never submitted.
     await input(page).fill("ai elegant dress");
@@ -100,7 +100,7 @@ test.describe("refinement (AC-2, AC-3, verify 2 and 3)", () => {
     page,
   }) => {
     const urls = recordSearchRequests(page);
-    await page.goto("/");
+    await page.goto("/try");
     await submit(page, "ai elegant dress");
     await expect(chips(page)).toHaveCount(3);
     await expect(cards(page)).toHaveCount(3);
@@ -127,7 +127,7 @@ test.describe("refinement (AC-2, AC-3, verify 2 and 3)", () => {
     page,
   }) => {
     const urls = recordSearchRequests(page);
-    await page.goto("/");
+    await page.goto("/try");
     await submit(page, "ai elegant dress");
     await expect(chips(page)).toHaveCount(3);
 
@@ -156,7 +156,7 @@ test.describe("refinement (AC-2, AC-3, verify 2 and 3)", () => {
     // original spec missed it because fill() + immediate Enter never lets
     // the debounce fire.
     const urls = recordSearchRequests(page);
-    await page.goto("/");
+    await page.goto("/try");
     await submit(page, "ai elegant dress");
     await expect(chips(page)).toHaveCount(3);
 
@@ -184,7 +184,7 @@ test.describe("refinement (AC-2, AC-3, verify 2 and 3)", () => {
     page,
   }) => {
     const urls = recordSearchRequests(page);
-    await page.goto("/");
+    await page.goto("/try");
     await submit(page, "ai elegant dress");
     await expect(chips(page)).toHaveCount(3);
     expect(submitted(urls)[0].searchParams.get("previousIntent")).toBeNull();
@@ -194,7 +194,7 @@ test.describe("refinement (AC-2, AC-3, verify 2 and 3)", () => {
     page,
   }) => {
     const urls = recordSearchRequests(page);
-    await page.goto("/");
+    await page.goto("/try");
 
     // Not offered until there is an understanding to drop.
     await expect(page.getByTestId("playground-new-search")).toHaveCount(0);
@@ -218,7 +218,7 @@ test.describe("refinement (AC-2, AC-3, verify 2 and 3)", () => {
   test("it is the only secondary button on the page (P-2)", async ({
     page,
   }) => {
-    await page.goto("/");
+    await page.goto("/try");
     await submit(page, "ai elegant dress");
     await expect(page.getByTestId("playground-new-search")).toBeVisible();
 
@@ -246,7 +246,7 @@ test.describe("negated attributes are chips too (YOY-133 AC-5, verify 2)", () =>
     page,
   }) => {
     const urls = recordSearchRequests(page);
-    await page.goto("/");
+    await page.goto("/try");
     await submit(page, "ai winter coat not wool");
     await expect(chips(page)).toHaveCount(2);
     await expect(chips(page)).toHaveText(["coat×", "Not wool×"]);
@@ -272,7 +272,7 @@ test.describe("negated attributes are chips too (YOY-133 AC-5, verify 2)", () =>
   });
 
   test("the negation chip is localized in Hebrew chrome, RTL", async ({ page }) => {
-    await page.goto("/?lang=he");
+    await page.goto("/try?lang=he");
     await submit(page, "ai winter coat not wool");
     await expect(chips(page)).toHaveCount(2);
     await expect(chips(page).nth(0)).toContainText("מעיל");
@@ -285,7 +285,7 @@ test.describe("zero hit, degraded, and colorUnknown (AC-4, verify 4)", () => {
   test("an AI zero hit names what did not match and offers close matches", async ({
     page,
   }) => {
-    await page.goto("/");
+    await page.goto("/try");
     await submit(page, "ai zero hit");
 
     await expect(status(page)).toHaveText(strings("en").zeroHit);
@@ -303,7 +303,7 @@ test.describe("zero hit, degraded, and colorUnknown (AC-4, verify 4)", () => {
   test("the Hebrew close-matches heading names the relaxed constraint in Hebrew, RTL (YOY-111 AC-4)", async ({
     page,
   }) => {
-    await page.goto("/?lang=he");
+    await page.goto("/try?lang=he");
     await submit(page, "ai zero hit");
 
     await expect(status(page)).toHaveText(strings("he").zeroHit);
@@ -320,7 +320,7 @@ test.describe("zero hit, degraded, and colorUnknown (AC-4, verify 4)", () => {
   test("a degraded response is plain classic cards with no chips and no error language", async ({
     page,
   }) => {
-    await page.goto("/");
+    await page.goto("/try");
     await submit(page, "degraded");
 
     await expect(cards(page)).toHaveCount(3);
@@ -333,7 +333,7 @@ test.describe("zero hit, degraded, and colorUnknown (AC-4, verify 4)", () => {
   test("a colorUnknown card is labelled and de-emphasised (widget parity)", async ({
     page,
   }) => {
-    await page.goto("/");
+    await page.goto("/try");
     await submit(page, "ai color beige");
 
     const first = cards(page).nth(0);
@@ -356,7 +356,7 @@ test.describe("zero hit, degraded, and colorUnknown (AC-4, verify 4)", () => {
 
 test.describe("engine details (AC-5, verify 5)", () => {
   test("is off by default and absent from the DOM", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/try");
     await submit(page, "ai elegant dress");
     await expect(chips(page)).toHaveCount(3);
 
@@ -371,7 +371,7 @@ test.describe("engine details (AC-5, verify 5)", () => {
     // page — discarding the response, the chips, and the memory-only held
     // intent, and showing an empty panel until the visitor searched again.
     const urls = recordSearchRequests(page);
-    await page.goto("/");
+    await page.goto("/try");
     await submit(page, "ai elegant dress");
     await expect(chips(page)).toHaveCount(3);
 
@@ -395,7 +395,7 @@ test.describe("engine details (AC-5, verify 5)", () => {
   });
 
   test("shows route, reason, latency, and the intent", async ({ page }) => {
-    await page.goto("/?details=1");
+    await page.goto("/try?details=1");
     await submit(page, "ai elegant dress");
     const panel = page.getByTestId("playground-details-panel");
     await expect(panel).toBeVisible();
@@ -411,7 +411,7 @@ test.describe("engine details (AC-5, verify 5)", () => {
   test("lists one row per stage the search ran, in pipeline order (YOY-114 AC-2)", async ({
     page,
   }) => {
-    await page.goto("/?details=1");
+    await page.goto("/try?details=1");
     await submit(page, "ai elegant dress");
     const rows = page.getByTestId("playground-details-stages").locator("li");
     // The AI fixture ran classify → intent → embed → retrieve → hydrate; no
@@ -441,7 +441,7 @@ test.describe("engine details (AC-5, verify 5)", () => {
   test("names the intent tier: lite on the AI fixture, none on a classic response (YOY-116 AC-3)", async ({
     page,
   }) => {
-    await page.goto("/?details=1");
+    await page.goto("/try?details=1");
     await submit(page, "ai elegant dress");
     const panel = page.getByTestId("playground-details-panel");
     await expect(panel).toContainText(`${strings("en").detailsIntentTier}lite`);
@@ -456,7 +456,7 @@ test.describe("engine details (AC-5, verify 5)", () => {
   test("a reused intent reads reason intent-reuse with no classify or intent row (YOY-64 AC-4)", async ({
     page,
   }) => {
-    await page.goto("/?details=1");
+    await page.goto("/try?details=1");
     await submit(page, "ai reuse elegant dress");
     const panel = page.getByTestId("playground-details-panel");
     await expect(panel).toContainText("intent-reuse");
@@ -469,7 +469,7 @@ test.describe("engine details (AC-5, verify 5)", () => {
   });
 
   test("the stage rows exist only while the panel is open", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/try");
     await submit(page, "ai elegant dress");
     await expect(chips(page)).toHaveCount(3);
     await expect(page.getByTestId("playground-details-stages")).toHaveCount(0);
@@ -484,7 +484,7 @@ test.describe("engine details (AC-5, verify 5)", () => {
   test("a zero-hit response adds the closeMatches row last", async ({
     page,
   }) => {
-    await page.goto("/?details=1");
+    await page.goto("/try?details=1");
     await submit(page, "ai zero hit dress");
     const rows = page.getByTestId("playground-details-stages").locator("li");
     await expect(rows).toHaveCount(5);
@@ -494,7 +494,7 @@ test.describe("engine details (AC-5, verify 5)", () => {
   test("monospace is confined to prices and the engine panel (DESIGN §2)", async ({
     page,
   }) => {
-    await page.goto("/?details=1");
+    await page.goto("/try?details=1");
     await submit(page, "ai elegant dress");
     await expect(page.getByTestId("playground-details-panel")).toBeVisible();
 
@@ -522,7 +522,7 @@ test.describe("engine details (AC-5, verify 5)", () => {
   });
 
   test("a reload keeps the panel open", async ({ page }) => {
-    await page.goto("/?details=1");
+    await page.goto("/try?details=1");
     await submit(page, "ai elegant dress");
     await expect(page.getByTestId("playground-details-panel")).toBeVisible();
 
@@ -532,7 +532,7 @@ test.describe("engine details (AC-5, verify 5)", () => {
   });
 
   test("switching language keeps it open", async ({ page }) => {
-    await page.goto("/?details=1");
+    await page.goto("/try?details=1");
     await page.getByTestId("playground-language-toggle").click();
     await expect(page).toHaveURL(/lang=he/);
     await expect(page).toHaveURL(/details=1/);
@@ -543,7 +543,7 @@ test.describe("example queries (AC-6, verify 6)", () => {
   test("shows six — four in the chrome language, two in the other", async ({
     page,
   }) => {
-    await page.goto("/");
+    await page.goto("/try");
     const examples = page.getByTestId("playground-example");
     await expect(examples).toHaveCount(6);
 
@@ -568,8 +568,8 @@ test.describe("example queries (AC-6, verify 6)", () => {
     // exactly these strings, so a rendered text that drifts from the set
     // is a suggestion nobody has proven answerable.
     for (const [locale, path] of [
-      ["en", "/"],
-      ["he", "/?lang=he"],
+      ["en", "/try"],
+      ["he", "/try?lang=he"],
     ] as const) {
       await page.goto(path);
       const examples = page.getByTestId("playground-example");
@@ -590,7 +590,7 @@ test.describe("example queries (AC-6, verify 6)", () => {
   });
 
   test("mirrors the split under Hebrew chrome", async ({ page }) => {
-    await page.goto("/?lang=he");
+    await page.goto("/try?lang=he");
     const locales = await page
       .getByTestId("playground-example")
       .evaluateAll((nodes) =>
@@ -602,7 +602,7 @@ test.describe("example queries (AC-6, verify 6)", () => {
 
   test("clicking one fills the input and submits it", async ({ page }) => {
     const urls = recordSearchRequests(page);
-    await page.goto("/");
+    await page.goto("/try");
 
     const first = page.getByTestId("playground-example").nth(0);
     const text = (await first.textContent()) ?? "";
@@ -622,7 +622,7 @@ test.describe("example queries (AC-6, verify 6)", () => {
     // AI answer with classic preview cards. Any search slower than the
     // debounce lost, which is every AI search the examples exist to show.
     const urls = recordSearchRequests(page);
-    await page.goto("/");
+    await page.goto("/try");
 
     await page.getByTestId("playground-example").nth(0).click();
     await expect.poll(() => submitted(urls).length).toBe(1);
@@ -640,7 +640,7 @@ test.describe("example queries (AC-6, verify 6)", () => {
     page,
   }) => {
     await page.setViewportSize(DESKTOP);
-    await page.goto("/");
+    await page.goto("/try");
     const examples = page.getByTestId("playground-examples");
     await expect(examples).toHaveAttribute("data-collapsed", "false");
 
@@ -654,7 +654,7 @@ test.describe("example queries (AC-6, verify 6)", () => {
     page,
   }) => {
     await page.setViewportSize(MOBILE);
-    await page.goto("/");
+    await page.goto("/try");
     const examples = page.getByTestId("playground-examples");
     await submit(page, "ai elegant dress");
     await expect(chips(page)).toHaveCount(3);
@@ -676,7 +676,7 @@ test.describe("example queries (AC-6, verify 6)", () => {
   });
 
   test("they are links, never pills (P-2)", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/try");
     const radius = await page
       .getByTestId("playground-example")
       .nth(0)

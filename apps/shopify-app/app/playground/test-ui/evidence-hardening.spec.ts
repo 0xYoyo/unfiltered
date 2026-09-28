@@ -43,7 +43,7 @@ test.describe("@evidence", () => {
         await shot(page, `${device}-${locale}-1-store-line`);
 
         // AC-14: preview cards (typed, no Enter) — a click sends no beacon.
-        await page.goto(`/${suffix}`);
+        await page.goto(`/try${suffix}`);
         await input(page).fill("dress");
         // Full page: on mobile the two states share a fold, and the
         // evidence has to show the 2-card preview set against the 4-card
@@ -67,7 +67,7 @@ test.describe("@evidence", () => {
         // AC-13: the same self-hosted family renders both scripts — the
         // initial page (input placeholder, examples) and a results page
         // (card titles, prices) with Heebo loaded.
-        await page.goto(`/${suffix}`);
+        await page.goto(`/try${suffix}`);
         await shot(page, `${device}-${locale}-4-font-initial`);
         await input(page).fill("dress");
         await input(page).press("Enter");

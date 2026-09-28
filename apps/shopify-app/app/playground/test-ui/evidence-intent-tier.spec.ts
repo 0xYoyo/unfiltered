@@ -39,7 +39,7 @@ test.describe("@evidence", () => {
     ] as const) {
       test(`intent tier ${device} ${locale}`, async ({ page }) => {
         await page.setViewportSize(viewport);
-        await page.goto(`/?details=1${suffix}`);
+        await page.goto(`/try?details=1${suffix}`);
         await submit(page, "ai elegant dress");
         await shot(page, `${device}-${locale}-1-lite-tier`);
         await submit(page, "ai zero hit dress");

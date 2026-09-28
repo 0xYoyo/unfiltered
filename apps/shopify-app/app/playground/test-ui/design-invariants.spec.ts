@@ -78,7 +78,7 @@ test.describe("F — floors", () => {
   test("F-1 contrast: body, muted, faint, accent and critical text all clear AA on their own ground", async ({
     page,
   }) => {
-    await page.goto("/");
+    await page.goto("/try");
     await submit(page, "ai elegant dress");
     await expect(cards(page)).toHaveCount(3);
 
@@ -110,7 +110,7 @@ test.describe("F — floors", () => {
     page,
   }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
-    await page.goto("/");
+    await page.goto("/try");
     await submit(page, "ai elegant dress");
     await expect(page.getByTestId("playground-chip")).toHaveCount(3);
 
@@ -134,7 +134,7 @@ test.describe("F — floors", () => {
     page,
   }) => {
     await page.setViewportSize(MOBILE);
-    await page.goto("/");
+    await page.goto("/try");
     await submit(page, "ai elegant dress");
     await expect(page.getByTestId("playground-chip")).toHaveCount(3);
 
@@ -165,9 +165,13 @@ test.describe("F — floors", () => {
   test("F-4 keyboard: the bar is reachable by tab and every focus draws a visible ring", async ({
     page,
   }) => {
-    await page.goto("/");
-    await page.keyboard.press("Tab");
-    await page.keyboard.press("Tab");
+    await page.goto("/try");
+    // The site nav's links come first on /try; then the playground's own
+    // two stops (the language toggle, then the bar), as before.
+    const navStops = await page.locator(".site-nav a").count();
+    for (let stop = 0; stop < navStops + 2; stop++) {
+      await page.keyboard.press("Tab");
+    }
     await expect(input(page)).toBeFocused();
 
     // The field itself carries the focus treatment for the input (the ring
@@ -191,7 +195,7 @@ test.describe("F — floors", () => {
     page,
   }) => {
     await page.setViewportSize(DESKTOP);
-    await page.goto("/?lang=he");
+    await page.goto("/try?lang=he");
     await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
 
     const toggle = await page
@@ -209,7 +213,7 @@ test.describe("F — floors", () => {
   test("F-6 designed loading, empty and error states — never a spinner, a blank, or a raw error", async ({
     page,
   }) => {
-    await page.goto("/");
+    await page.goto("/try");
 
     // Loading: skeleton cards at the card's own proportion, no spinner.
     await input(page).fill("delayed");
@@ -240,7 +244,7 @@ test.describe("F — floors", () => {
   test("F-7 localized chrome: the Hebrew page carries no English chrome string", async ({
     page,
   }) => {
-    await page.goto("/?lang=he");
+    await page.goto("/try?lang=he");
     const chrome = await page.evaluate(
       () => document.querySelector(".playground")?.textContent ?? "",
     );
@@ -259,7 +263,7 @@ test.describe("F — floors", () => {
     page,
   }) => {
     await page.setViewportSize(DESKTOP);
-    await page.goto("/");
+    await page.goto("/try");
     const before = await input(page).boundingBox();
 
     await input(page).fill("delayed");
@@ -280,7 +284,7 @@ test.describe("P — the playground", () => {
   test("P-1 storefront-quiet: the page is ivory, with no gradient and no decorative image", async ({
     page,
   }) => {
-    await page.goto("/");
+    await page.goto("/try");
     const ground = await page
       .locator(".playground")
       .evaluate((element) => getComputedStyle(element).backgroundColor);
@@ -293,9 +297,11 @@ test.describe("P — the playground", () => {
     );
     expect(gradients).toEqual([]);
 
-    // The only images on the page are product photographs.
+    // The only images in the playground are product photographs. The site
+    // nav and footer around it on /try carry the wordmark, which is the
+    // marketing site's chrome, not the playground's.
     const images = await page.evaluate(() =>
-      Array.from(document.querySelectorAll("img")).map(
+      Array.from(document.querySelectorAll(".playground img")).map(
         (node) => node.getAttribute("class") ?? "",
       ),
     );
@@ -305,7 +311,7 @@ test.describe("P — the playground", () => {
   test("P-2 one accent: only the submit control is filled with it", async ({
     page,
   }) => {
-    await page.goto("/");
+    await page.goto("/try");
     await submit(page, "ai elegant dress");
     await expect(page.getByTestId("playground-chip")).toHaveCount(3);
 
@@ -332,7 +338,7 @@ test.describe("P — the playground", () => {
   }) => {
     for (const viewport of [DESKTOP, MOBILE]) {
       await page.setViewportSize(viewport);
-      await page.goto("/");
+      await page.goto("/try");
       const heading = await page.locator(".heroHeading").boundingBox();
       const field = await page.locator(".searchField").boundingBox();
       expect(heading!.y).toBeLessThan(field!.y);
@@ -351,7 +357,7 @@ test.describe("P — the playground", () => {
   test("P-4 engine details are opt-in: the panel is absent until asked for", async ({
     page,
   }) => {
-    await page.goto("/");
+    await page.goto("/try");
     await submit(page, "ai elegant dress");
     await expect(page.getByTestId("playground-chip")).toHaveCount(3);
     await expect(page.getByTestId("playground-details-panel")).toHaveCount(0);
@@ -363,7 +369,7 @@ test.describe("P — the playground", () => {
   test("P-5 same widget anatomy: image, title, price, availability, and nothing else", async ({
     page,
   }) => {
-    await page.goto("/");
+    await page.goto("/try");
     await submit(page, "dress");
     await expect(cards(page)).toHaveCount(4);
 
@@ -385,7 +391,7 @@ test.describe("P — the playground", () => {
   test("P-6 fashion-only content: examples appear in both languages", async ({
     page,
   }) => {
-    await page.goto("/");
+    await page.goto("/try");
     const locales = await page.evaluate(() =>
       Array.from(
         document.querySelectorAll("[data-example-locale]"),
@@ -410,7 +416,7 @@ test.describe("P — the playground", () => {
   test("P-8 tokens, not literals: every served playground rule paints through a token", async ({
     page,
   }) => {
-    await page.goto("/");
+    await page.goto("/try");
     const literals = await page.evaluate(() => {
       const found: string[] = [];
       for (const sheet of Array.from(document.styleSheets)) {
@@ -446,7 +452,7 @@ test.describe("P — the playground", () => {
   test("P-9 negation is visible: an excluded constraint's chip is tinted, an inclusion's is not", async ({
     page,
   }) => {
-    await page.goto("/");
+    await page.goto("/try");
     await submit(page, "ai negation");
     const negated = page.locator("[data-chip-negated='true']");
     await expect(negated).not.toHaveCount(0);
@@ -468,7 +474,7 @@ test.describe("P — the playground", () => {
     page,
   }) => {
     await page.emulateMedia({ colorScheme: "dark" });
-    await page.goto("/");
+    await page.goto("/try");
     const ground = await page
       .locator(".playground")
       .evaluate((element) => getComputedStyle(element).backgroundColor);

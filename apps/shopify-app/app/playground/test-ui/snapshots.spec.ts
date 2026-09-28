@@ -38,7 +38,7 @@ async function submit(page: Page, query: string): Promise<void> {
 test.describe("visual baselines", () => {
   for (const [device, viewport] of VIEWPORTS) {
     for (const locale of ["en", "he"] as const) {
-      const base = locale === "en" ? "/" : "/?lang=he";
+      const base = locale === "en" ? "/try" : "/try?lang=he";
 
       test(`initial state — ${locale} ${device}`, async ({ page }) => {
         await page.setViewportSize(viewport);
@@ -120,7 +120,7 @@ test.describe("visual baselines", () => {
 
     test(`details open — en ${device}`, async ({ page }) => {
       await page.setViewportSize(viewport);
-      await page.goto("/?details=1");
+      await page.goto("/try?details=1");
       await submit(page, "ai elegant dress");
       await page.getByTestId("playground-details-panel").waitFor();
       await settle(page);
