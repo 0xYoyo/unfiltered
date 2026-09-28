@@ -1,16 +1,17 @@
 # Unfiltered — PRD
-Version: 2 · Date: 2026-08-07
-v2: vision enrichment promoted to a core capability and its own milestone; catalog-size caps added to tiers; cost & pricing operations codified. Decisions from the 2026-08-07 planning session, informed by measured M2 economics.
+Version: 3 · Date: 2026-09-28
+Supersedes v2; decisions in docs/RESET-2026-09-27.md.
 
-Product type: B2B web SaaS, delivered as a Shopify app (self-serve). The
-engine is catalog-agnostic by design (feed + JS snippet) to keep a future
-direct-sales door open, but v1 sells only through the Shopify App Store.
+Product type: B2B web SaaS, delivered first as a native Shopify app
+(self-serve). The engine is catalog-agnostic by design: a universal script
+tag serves any site, and other platforms become real integrations when a
+paying store asks (docs/RESET-2026-09-27.md §8).
 
 ## 1. One-liner
 Unfiltered replaces rigid filter-based product search on fashion Shopify
 stores with free-text search that understands how humans actually describe
 what they want ("elegant summer wedding dress, not black, under ₪400, hides
-my belly") — in English and Hebrew — and proves its value to the merchant in
+my belly") — in any language — and proves its value to the merchant in
 attributed orders.
 
 ## 2. Problem & audience
@@ -20,8 +21,14 @@ bar immediately, yet ~80% abandon due to unsatisfactory search results.
 Incumbent fixes are either enterprise-gated (Algolia NeuralSearch, Elevate
 tier only), filter-suite-first with AI sprinkled on (Boost, 1,900+ reviews,
 the category incumbent), or young and unproven (Cartally, launched Nov 2025).
-Nobody owns fashion specifically; nobody treats Hebrew/multilingual
-seriously; nobody leads with revenue attribution.
+Shopify's own free Search & Discovery app offers meaning-based (semantic)
+search on the Shopify and Advanced plans, in "multiple languages" (list not
+published); its handling of constraints — negation, price, size — is not
+documented. Nobody owns fashion specifically; nobody treats multilingual
+search seriously; nobody leads with revenue attribution.
+
+Positioning against Shopify Search & Discovery: shop-assistant behaviour
+with honest labels, chips, any language, every plan, attributed revenue.
 
 Audience: fashion/apparel Shopify stores with large catalogs (roughly 500+
 products), where scrolling and filters genuinely break down. Buyer: the
@@ -34,31 +41,40 @@ AI economically viable at SMB price points for the first time.
 ## 3. v1 scope
 Numbered capabilities, each observable behavior:
 
-1. **Hybrid search ladder, one search bar.** The app replaces/augments the
-   store's search box. Simple queries ("nike air max 90", typos included)
-   are answered by instant classic keyword search (target: results render
-   <150ms, no LLM call). Queries classified as natural-language ("something
-   for a beach wedding that hides my arms") escalate automatically to the
-   AI pipeline (target: results <2s). The shopper never chooses a mode.
-2. **AI understanding pipeline.** An LLM extracts structured intent from
-   the free-text query (category, price cap, color inclusions/exclusions,
-   occasion, fit/soft attributes); hard constraints (price, size,
-   availability) are applied as database filters; soft attributes are
-   matched via embedding similarity over the catalog. Works for English
-   and Hebrew queries, including mixed-language queries.
-3. **Filters as output, not input.** AI results arrive with the implied
-   filters visibly applied as removable chips (e.g. "Dresses × · Under
-   ₪400 × · Not black ×"). The shopper can remove or adjust chips and
-   results update using the store's normal filtering.
+1. **One search bar: previews while typing, find-then-judge on submit.**
+   The app replaces/augments the store's search box. While the shopper
+   types, keyword search returns previews (~50 ms, no LLM call). On submit,
+   every search — short or long, any language — runs the one engine
+   (find-then-judge, see "Engine v2" below). There is no classic-vs-AI
+   switch; the shopper never chooses a mode. Results appear once, when
+   ready — no "show classic then swap".
+2. **Understanding at load time, comparison at search time.** The engine
+   understands the products when they are loaded (a dossier per product)
+   and, at search time, compares the shopper's actual words against each
+   product's actual facts: find by vector + keyword, then a judge model
+   reads the sentence and each candidate together. No fixed intent form,
+   no invented category/occasion/attribute lists, no filters on anything a
+   model guessed. All languages from day one, with no per-language code.
+   Full design: "Engine v2" below.
+3. **Filters as output, not input.** Results arrive with the facts the
+   shopper stated visibly applied as removable chips (e.g. "Dresses × ·
+   Under ₪400 × · Not black ×"). Chips come from a small parallel
+   extraction of only what the shopper stated (price + currency, size, in
+   stock, explicit "not X"); it is not on the critical path. The shopper
+   can remove or adjust chips and results update using the store's normal
+   filtering.
 4. **Follow-up refinement in the bar.** After a result set, typing a
    refinement ("same but cheaper", "בלי שרוולים") modifies the previous
-   intent instead of starting over. Single-session memory only; this is
+   search instead of starting over. Single-session memory only; this is
    not a chatbot.
 5. **Catalog ingestion & sync.** On install, the app ingests the store's
    Shopify catalog (titles, descriptions, tags, attributes, price, stock,
-   images' alt text), embeds it, and stays in sync with product changes
-   (target: updates reflected within 15 minutes). One-time embedding cost
-   ~$1–5 per store at typical catalog sizes.
+   images' alt text) and every variant (the merchant's own option
+   name/value pairs, per-variant price and stock), writes a dossier per
+   product, builds the multi-vector index, and stays in sync with product
+   changes (target: updates reflected within 15 minutes). A changed or
+   created product is re-analysed and re-embedded automatically (a "Run
+   alone" requirement, milestone 7). One-time indexing cost: see section 8.
 6. **Instant fallback.** If the AI pipeline errors, times out, or a store
    exceeds caps, the search bar silently serves classic search results.
    The shopper never sees an error state caused by us.
@@ -72,7 +88,9 @@ Numbered capabilities, each observable behavior:
    catalog indexed → merchant runs one successful AI search on their own
    products, in under 10 minutes, guided. First-session searches use the
    best (most expensive) model tier so the merchant's own test queries
-   feel like magic; routing economics apply afterwards.
+   feel like magic; routing economics apply afterwards. Paste-URL
+   onboarding: paste a store URL → crawl → playground with the store's
+   real variants → install for live sync (webhooks).
 9. **Review-ask trigger.** The dashboard requests a Shopify review exactly
    once, at the moment the merchant first views a nonzero
    search-attributed-orders figure.
@@ -101,13 +119,11 @@ Numbered capabilities, each observable behavior:
     keyed on image content hash). Extraction is anchored: the prompt
     receives the product's title, type, and text, and must describe ONLY
     the item being sold, ignoring other garments, footwear, and jewelry
-    worn by models in the photos. Vision output merges into the same
-    enrichment schema (category, colors, occasions, fit, styleTags) plus
-    vision-only attributes (coverage — e.g. sleeve length, neckline,
-    garment length —, pattern, material appearance); text-derived values
-    win conflicts on factual fields, vision fills gaps. Changed
-    enrichment re-embeds automatically via the composed-text freshness
-    hash. This capability is standard on every plan — it is the
+    worn by models in the photos. Vision output feeds the product's
+    dossier: merchant-stated material comes first; "looks like" from the
+    photo is used only when the merchant said nothing, and is marked as
+    such. Changed enrichment re-embeds automatically via the composed-text
+    freshness hash. This capability is standard on every plan — it is the
     differentiator, not an add-on — with no setup fee; one-time indexing
     cost is absorbed as COGS (measured ceiling: single-digit dollars per
     1,000 products). **Measured 2026-08-27 (YOY-121 AC-7)** on the live
@@ -134,7 +150,7 @@ itself is broken in a way that impairs a store's ability to search at
 all, the widget must be able to fully disable itself — per store,
 remotely, and automatically on repeated hard failures — restoring the
 store's native search untouched, without a theme edit or reinstall.
-Merchants never inherit our downtime. Mechanism specced with M6's
+Merchants never inherit our downtime. Mechanism specced with M7's
 operational work.
 
 **Interaction model (decided 2026-08-10, implemented in YOY-68,
@@ -152,6 +168,126 @@ adapter around a generic mechanism, never the mechanism itself. A design
 whose generic analog cannot be stated is rejected at spec time. The
 pre-Door-2 adapter-boundary audit is tracked as YOY-81.
 
+### Engine v2 (v3, 2026-09-28, binding; capabilities 1–3, 5, 14)
+
+Principle: stop understanding the shopper at search time; understand the
+products at load time, then compare. A store has finite products; people
+ask in infinite ways. The thinking is spent once per product; each search
+is a comparison of the shopper's actual words against each product's
+actual facts. (docs/RESET-2026-09-27.md §2–§3.)
+
+**Two kinds of product information — and no invented lists.**
+- Merchant facts: price, the merchant's own option names and values
+  (colour, size, strap length, whatever the store defined), stock per
+  variant. Closed by nature, defined by the store. Stored as generic
+  name–value pairs.
+- Model prose: a free-text dossier per product — what the item is, what
+  it looks like, what is printed on it, who buys it, when it is worn;
+  merchant-stated material first, "looks like" from the photo only when
+  the merchant said nothing, marked as such; plus 20–40 natural ways
+  people would ask for it, in several languages.
+- The system invents no category list, no occasion list, no attribute
+  list. "Skulls" is a word in the prose that the judge reads.
+
+**The query path.**
+- Typing previews: keyword search, ~50 ms, unchanged.
+- Submit → Find: the raw sentence (any language) becomes one vector; top
+  50–150 by vector + keyword matches, merged. Hard filters only on facts
+  that can never be a guess: store, active, published. Nothing the model
+  guessed removes a product.
+- Judge: a model reads the shopper's sentence and each candidate's dossier
+  + variants together, and returns per product a typed answer: verdict
+  (exact / same item, other colour or size / close alternative / not
+  relevant), which wishes are met or missed, and one label from a fixed
+  list ("in grey, not black"; "no M — S and L in stock"; "₪319, slightly
+  over 300"). Runs per page (~40 candidates); page 2 is judged in the
+  background as soon as page 1 renders. Judge answers are cached per
+  (search text, product version). Product rows sent to the judge are
+  compact (~80 tokens each).
+- Chips: a small parallel extraction pulls out only facts the shopper
+  stated (price + currency, size, in stock, explicit "not X") for
+  removable chips. Not on the critical path.
+- Deleted: the classic-vs-AI switch, the fixed form as source of truth,
+  the drop-one-filter ladder, the bridal special case, the colour special
+  cases, the Hebrew-specific word lists.
+- Results appear once, when ready. No "show classic then swap".
+
+**Three kinds of wishes** (replaces "hard vs soft").
+- A number (price, size): never a wall. In-budget first; items within
+  ~10 % after them, with the fact shown. Adjacent sizes shown with the
+  fact. A wall only on "max", "no more than", "only".
+- An exclusion ("not black", "no wool"): firm.
+- A description (everything else): judged, never filtered.
+Topics are infinite; kinds are three. A new topic never adds code.
+
+**The shop-assistant rule.**
+- The judge decides from the prose whether the item is the same kind of
+  thing the shopper asked for. Brown pants never answer "brown shirt".
+- Merchant facts decide whether it comes in what they asked; misses on
+  colour/size/stock are shown on the same item with a label.
+- "Only black" / "must be M" moves that wish into the firm set for this
+  search.
+
+**Two meanings.**
+- Most ambiguity resolves from what the store sells (no bridal gowns →
+  guest dresses).
+- When both meanings have stock: show the likelier meaning; one tappable
+  chip at the top switches ("Bridal gowns instead?"). No popup, no
+  blocking question.
+
+**Scale and server-side pages.**
+- Vector find is sub-100 ms at millions of products.
+- Judge cost scales with pages viewed, not catalog size.
+- Result counts and pagination come from the server (replaces holding the
+  full match set in the browser).
+
+**Languages.** All languages from day one. No per-language code. The
+hidden test set carries at least EN, HE, AR, RU, FR, ES, each scored
+separately so no language hides in an average.
+
+**Image search.** After the multi-vector index exists: one image vector
+per product photo; the shopper uploads/pastes a photo → nearest products;
+the judge may compare images. Milestone 8.
+
+**The judge — decision (prices verified 28 Sep 2026).**
+- Baseline: Gemini 3.5 Flash-Lite, one call with all page candidates
+  inside, fixed JSON output. Known multilingual, already in the engine.
+  List price $0.30/M input, $2.50/M output. With 40 compact rows (~3–6k
+  tokens) ≈ $0.002–0.004 per uncached search → $2–4 per 1,000 searches.
+  Typically 0.7–1.2 s.
+- Challenger: Jev (TypeSafe) — typed answers (yes/no with confidence;
+  multi-class choice; numeric score), ~0.2 s reported, $0.042/M input,
+  output free (via OpenRouter `typesafe/jev-1.13` and Cloudflare Workers
+  AI `typesafe/jev`). ≈ $0.30–0.40 per 1,000 searches. Pointwise
+  (parallel questions), labels via multiple choice. Multilingual quality
+  unpublished. Direct signup paused since 22 Sep 2026. Jev is the margin
+  option as well as the speed option — if quality holds.
+- Not first choice: dedicated rerankers (score only, no verdict/labels).
+  Cohere Rerank 3.5 ≈ $1 per 1,000 searches (third-party listing).
+- Measured on the hidden score: quality, per-language quality, speed,
+  stability (same search ×5). Winner takes page 1; the other is fallback.
+  One swap point in code.
+- Speed fallback: if the judge misses ~1.5 s, page 1 shows the find-stage
+  ranking without labels; labels arrive with page 2.
+
+### Quality gate (v3, 2026-09-28, binding)
+
+The hidden human-style score is the release gate (docs/RESET-2026-09-27.md
+§5).
+- Per catalog, per language: real query logs and friends-and-family
+  searches (weighted most) + model-written filler shaped like reality
+  (~60 % 1–3 words, 30 % medium, 10 % long/vague). No fanciful phrasings.
+- A strong model grades the top six of each search: would a real shopper
+  be happy?
+- Half the set is hidden from the builder; CI scores every PR on it.
+- Rule: no fix for a single search; a change ships only if the hidden
+  score goes up.
+- The 90 % rule — "90 % before pitching": hidden score ≥ 90 % in every
+  language, half of searches under 1 s, plus a friends-and-family round.
+- Every engine issue names the score it must move (outcome AC); the
+  reviewer runs and reads it.
+- The Constructor-bar set stays as a regression suite, not the gate.
+
 ### Amendment (2026-08-22) — Colour exclusion, close matches, colourway families (binding; capabilities 2 and 3)
 
 Decided 2026-08-22; recorded here by YOY-114 so the law lives in the PRD
@@ -160,20 +296,17 @@ how a constraint is applied) and capability 3 (filters as output: what the
 chips and the result set promise):
 
 (a) **A colour exclusion applies to the product's primary (displayed)
-colour, not its colourway list.** "Not black" excludes products whose
-primary colour is black. A pink dress that also comes in black is a
-CORRECT answer to "not black": the shopper is looking at a pink dress.
-Filtering on the colourway list would silently remove most of a catalog
-whose every family ships a black variant. (Implementation: YOY-110.)
+colour, not its colourway list.**
+Superseded in v3 by §3 Engine v2, "Three kinds of wishes".
+Colour is no longer an SQL filter on a model-assigned field: the exclusion
+rule survives inside "exclusions are firm", and other colour misses show on
+the same item with a label.
 
 (b) **Close matches never violate an explicit exclusion, and relax
-constraints one at a time, price first.** The zero-hit rescue may loosen
-what the shopper asked for, but never by returning what they excluded —
-a "not black" query never rescues with a black product. Relaxation is
-stepwise, and each step says which constraint it dropped: price cap
-first, then the remaining hard constraints one by one. A close-match set
-that relaxes two things at once, or relaxes silently, is a defect.
-(Implementation: YOY-111.)
+constraints one at a time, price first.**
+Superseded in v3 by §3 Engine v2, "Three kinds of wishes".
+Numbers are never a wall and descriptions are judged rather than filtered,
+so there is no ladder of dropped filters left to relax.
 
 (c) **Colourway near-duplicates render as one card per product family,
 showing the variant that matches the query colour.** A family sold as
@@ -182,34 +315,25 @@ query asked for (or the primary colourway when the query named none).
 (Implementation: YOY-117.)
 
 (d) **A negated attribute is a hard exclusion, and "dress for a wedding ≠
-wedding dress".** (Added 2026-08-27 by YOY-133.) "No sleeves", "not
-wool", "not leather", "בלי שרוולים", "לא מצמר" exclude every product
-whose evidence — its title, tags, description, or enrichment — carries
-the negated attribute, in any language the catalog is written in; a
-product with no evidence of the attribute stays (unknown passes), and a
-product whose only mention is itself a negation ("ללא צמר", "wool-free")
-stays too. The negation is a filter, never a ranking preference, it shows
-as a removable chip ("Not wool ×") like a colour exclusion, and no
-close-match rescue ever violates it. "Dress for a wedding" is the guest's
-query — dresses for the occasion, bridal gowns excluded — while "wedding
-dress" is the bridal gown itself; the engine keeps the two apart with a
-closed set of category-like attributes (today: bridal) that an intent may
-require or exclude. A purpose phrase — "sneakers for running", "שמלה
-לחתונה" — is natural-language intent by definition and always takes the
-AI path, deterministically, because keyword search cannot read purpose.
-Measured on the Constructor-bar set: 19 mustNot leaks → 0, 30 of 30
-goldens clean. (Implementation: YOY-133.)
+wedding dress".**
+Superseded in v3 by §3 Engine v2, "Two meanings".
+The closed attribute set (attributesInclude = bridal only) and the
+14-category / 7-occasion taxonomy it sat in give way to the dossier, the
+judge and the two-meanings chip, while the negation survives inside
+"exclusions are firm".
 
 ## 4. Explicitly out of v1 (Later)
 1. Image-input search ("a shoe like this Prada" + photo). Reuses the
-   vision infrastructure built in the vision milestone.
+   vision infrastructure built in the vision milestone. v3: scheduled in
+   milestone 8 once the multi-vector index exists (see §3 Engine v2,
+   "Image search").
 2. Conversational AI chat mode / sales-assistant widget (Cartally-style).
 3. Merchandising suite: pin/boost/demote/hide, bundles, recommendations
    (Boost's territory; consciously skipped).
 4. Rigorous attribution: A/B testing vs. native search, multi-touch models.
-5. Languages beyond EN+HE (architecture is language-agnostic; adding
-   Spanish/French/Arabic/Chinese is config-and-QA later).
-6. Door 2 self-serve product: no self-serve generic-store admin, billing portal, or marketing site in v1. REVISED 2026-08-15: a Door 2 MVP (generic feed adapter + embeddable snippet + manual design-partner onboarding) is scheduled as milestone 8, run during the App Store review-wait window — architecture portability is already binding (see PRD portability constraint and docs/PORTABILITY.md); the playground's store-preload mode (capability 10) must ingest arbitrary public catalogs, not only Shopify stores, making it the first generic-ingestion consumer.
+5. (Removed in v3: all languages ship from day one, with no per-language
+   code — see §3 Engine v2, "Languages".)
+6. Door 2 self-serve product: no self-serve generic-store admin, billing portal, or marketing site in v1. REVISED 2026-08-15: a Door 2 MVP (generic feed adapter + embeddable snippet + manual design-partner onboarding) — architecture portability is already binding (see PRD portability constraint and docs/PORTABILITY.md); the playground's store-preload mode (capability 10) must ingest arbitrary public catalogs, not only Shopify stores, making it the first generic-ingestion consumer. REVISED 2026-09-28 (v3): integration shape is a native Shopify app first; a universal script tag for any site; other platforms as real integrations when a paying store asks.
 7. Personalization from shopper history.
 8. Voice input.
 9. Permanent free tier.
@@ -217,11 +341,12 @@ goldens clean. (Implementation: YOY-133.)
     marketing, tuning, and demo content are fashion-only).
 
 ## 5. User experience
-**Shopper flow:** taps the store's search bar → types anything → simple
-query: instant classic results in the store's normal results layout → NL
-query: brief loading state, then results grid with filter chips on top →
-optionally edits chips or types a refinement → clicks a product (click
-recorded) → buys or not. Mobile-first rendering; the widget's presence must feel
+**Shopper flow:** taps the store's search bar → types anything → keyword
+previews as they type in the store's normal results layout → submits →
+brief loading state, then results grid with filter chips on top and
+honest labels on items that miss a wish ("in grey, not black") →
+optionally edits chips, taps the two-meanings chip, or types a refinement
+→ clicks a product (click recorded) → buys or not. Mobile-first rendering; the widget's presence must feel
 native to the store, not like a foreign takeover. Product intent
 (sharpened 2026-08-10): Unfiltered intercepts the query and returns
 better matches — it does not replace or redesign the store's results
@@ -238,7 +363,8 @@ shopper-visible footprint may not exceed chips-level additions; the
 store's existing design is preserved at a 90–95% minimum. Harming a
 store's design is treated as a defect, not a trade-off.
 
-**Merchant flow:** finds app via App Store search → listing → install →
+**Merchant flow:** finds app via App Store search (or pastes their store
+URL into the playground) → listing → install →
 OAuth + billing consent (trial) → guided onboarding: indexing progress →
 "try these searches on your catalog" prompts → live storefront widget
 enabled → dashboard over the following days → trial-end conversion →
@@ -249,45 +375,54 @@ dashboard (overview, queries, attribution, settings: widget appearance,
 language toggle, cap visibility); onboarding wizard; public playground
 page; App Store listing.
 
-**Languages & RTL:** shopper-facing widget fully supports EN and HE
-including proper RTL layout, specced from day one. Merchant dashboard and
-onboarding: English only in v1. Playground supports both query languages.
+**Languages & RTL:** shopper-facing widget supports every language from
+day one, including proper RTL layout (e.g. Hebrew, Arabic), specced from
+day one. Merchant dashboard and onboarding: English only in v1. Playground
+accepts queries in any language.
 
 ### Amendment (2026-08-16) — The Mirror Bar (binding, platform-agnostic)
 
 The shopper-facing search experience is a complete mirror of the host store's own design — layout, grid, card markup, sizing, spacing, colors, typography, price formatting, page structure and copy furniture (e.g. the results-count heading) — indistinguishable from the store's native results page, on every platform: Shopify (Door 1) and the generic engine (Door 2) alike. The only permitted owned elements are the filter chips and their immediate controls, inherit-first per docs/DESIGN.md. Any mechanism that cannot meet the bar is a fallback, never the shipped default.
 
 ## 6. Data & accounts
-Stored per store: Shopify OAuth tokens; catalog snapshot + embeddings;
-query log (query text, classification, latency, cost, results shown,
-clicks); attribution events (click→order joins); plan/usage counters;
-dashboard aggregates. No shopper accounts and no shopper PII beyond
+Stored per store: Shopify OAuth tokens; catalog snapshot; a variants table
+(the merchant's own option name/value pairs, per-variant price and stock);
+a dossier per product; the multi-vector index (text, and one image vector
+per product photo once image search ships); judge answers cached per
+(search text, product version); query log (query text, latency, cost,
+results shown, clicks); attribution events (click→order joins);
+plan/usage counters; dashboard aggregates. No shopper accounts and no shopper PII beyond
 transient session identifiers for rate-limiting and session attribution;
 order data is used only in aggregate for the merchant's own dashboard.
 Merchant accounts are Shopify-native (OAuth); no separate password system.
 Data deleted on uninstall per Shopify mandatory webhooks (GDPR endpoints
-are a Shopify app requirement). Seed data: one public fashion catalog for
-the playground.
+are a Shopify app requirement): uninstall and shop/redact delete every
+per-shop record, not sessions only (a "Run alone" requirement, milestone
+7). Seed data: one public fashion catalog for the playground.
 
 ## 7. Integrations & services
-- **Shopify** — platform, catalog API, webhooks (products, orders,
-  uninstall/GDPR), OAuth, Billing API, App Store distribution. Partner
-  account is free. No fallback; the product is a Shopify app.
-- **LLM API (intent extraction + query classification)** — provider/model
-  chosen at spec phase from the nano/flash tier (current market
-  ~$0.10–0.40 per 1M tokens); requirement: blended cost ≤ $2 per 1,000 AI
-  searches, with routing (cheap model for most queries, better model for
-  hard ones and for first-session magic). Fallback: second provider
-  configured; on total LLM failure, classic search serves. The provider
-  mix must include an accuracy-tier vision-capable model for ingestion
-  enrichment (capability 14); vision runs at ingestion only, never at
-  query time, so it does not affect per-search cost.
+- **Shopify** — platform, catalog API (the public products.json exposes
+  every variant with price, option values and stock), webhooks (products,
+  orders, uninstall/GDPR), OAuth, Billing API, App Store distribution.
+  Partner account is free. Integration shape: native Shopify app first; a
+  universal script tag for any site (schema.org offers give price and
+  availability, sizes sometimes); other platforms as real integrations
+  when a paying store asks.
+- **LLM API (dossiers + judge + chip extraction)** — judge per §3 Engine
+  v2, "The judge — decision": baseline Gemini 3.5 Flash-Lite, challenger
+  Jev (TypeSafe); measured on the hidden score, winner takes page 1, the
+  other is fallback, one swap point in code. On total LLM failure, classic
+  search serves. The provider mix must include an accuracy-tier
+  vision-capable model for ingestion enrichment (capability 14); vision
+  runs at ingestion only, never at query time, so it does not affect
+  per-search cost.
 - **Embeddings API** — same-provider or dedicated embedding model;
   cost negligible (~$0.02–0.13 per 1M tokens range).
 - **Vector store** — chosen at spec phase (managed with a free tier that
   covers early scale, e.g. pgvector-on-managed-Postgres-class or
   equivalent; decision is the factory's). Requirement: per-store
-  isolation and sub-300ms similarity lookups.
+  isolation, a multi-vector index, and vector find sub-100 ms at millions
+  of products; every storefront scan is bounded.
 - **Hosting/DB** — low-ops managed platform, factory's choice. Estimated
   fixed infra ≤ $50/month at launch scale.
 - **Email (transactional)** — trial/usage notifications; free tier
@@ -305,19 +440,21 @@ searches; hard cap + fallback beyond a store-configurable ceiling. 14-day trial,
 trial cap. Anchors: Boost $29–299 (product-count based, free plan),
 Cartally $59/$209/$499 (+$1/1K overage), Searchanise from $19. Pricing is
 an experiment: v1 measures real cost-per-search, and tier limits/prices
-may be revised at version bumps.
+may be revised at version bumps. Tiers are re-validated after the M6
+judge comparison and scale with catalog size and search volume.
 
-Unit economics (stated assumptions, to be validated by measurement):
-- Cost per AI search: $0.0005–0.002 blended with routing/caching
-  (~$0.5–2 per 1,000). Classic search ≈ $0.
-  *Measured (YOY-116, 2026-08-26, eval harness on the routed blend at real
-  prices — `gemini-3.6-flash` $0.75 / $3.75 per 1M tokens through
-  2026-12-31):* blended **$0.52 per 1,000 AI searches** on the eval blend (lite-first intent extraction with class/confidence escalation to the accuracy tier: escalation rate 56% of AI searches, 11% of follow-ups; refinement follow-ups $0.60 per 1,000; one-time indexing $0.013 for the 61-product fixture catalog). The M4 live figure of $0.98 per 1,000 (YOY-95 step 8) was metered at the 2027 accuracy-tier price and reads $0.49 at the price in force; both sit inside the stated $0.5–2 band. The
-  target for the intent tier is ≤ $0.60 per 1,000 AI searches, asserted by
-  the harness.
-- Typical store volumes: ~10–30% of searches classify as AI-tier.
-  A store on the $99 plan using 50K AI searches costs us ~$25–100;
-  routing discipline targets the low end. One-time embedding: $1–5/store.
+Unit economics (typical store: 10k products, 20k searches/month; to be
+validated by measurement):
+- Dossiers ≈ $0.003/product → ~$30 once; cents/month for changes. Lazy
+  option: cheap version at load, full version on first search hit.
+- Judge, uncached: Gemini $40–80/month; Jev ≈ $7/month. The answer cache
+  cuts both substantially; the real cache hit rate is measured in M6.
+- Hosting share $5–10.
+- At $99/month: Gemini judge ≈ 45–60 % margin before cache; Jev judge ≈
+  80 %+. At $149 both are healthy. 500-product store ≈ $3–10/month cost.
+  200k-product/500k-search store → enterprise tier. Pricing tiers by
+  catalog size and search volume. The M6 judge comparison decides on
+  quality first, cost second.
 - Gross margin target: ≥60% per tier; measured, not assumed.
 - Monthly profit scenarios at avg. $60/store revenue and 65% margin:
   pessimistic (30 stores): ~$1.2K; realistic (150 stores): ~$5.9K; good
@@ -328,22 +465,21 @@ Unit economics (stated assumptions, to be validated by measurement):
 Tier limits and prices are revised only against measured evidence, at PRD
 version bumps. The machinery that makes revision evidence-based ships in
 v1:
-1. **Confidence-based routing (lite-first).** Intent extraction runs on the
-   lite tier first and escalates the same query to the accuracy tier on low
-   confidence or known-weak query classes (e.g. occasion-bearing queries,
-   per eval data). Target blended cost ≤ $0.60 per 1,000 AI searches. Any
-   routing change must pass the eval quality bar before shipping.
-2. **Semantic caching.** Beyond identical-query caching, intent results are
-   cached keyed on query-embedding similarity above a threshold, so
-   paraphrases of recent queries cost $0.
+1. **Judge comparison, quality first.** The judge (Gemini baseline vs Jev
+   challenger) is chosen on the hidden score first and cost second; the
+   loser is the fallback behind one swap point. Any engine change must
+   raise the hidden score before shipping.
+2. **Answer caching.** Judge answers are cached per (search text, product
+   version); the real cache hit rate is measured in M6.
 3. **Required internal metrics from day one:** per-store cap-utilization
    distribution, cache hit rate, blended cost per 1K per tier, and the
    AI-vs-classic CTR delta per store (the guardrail that cost tuning never
    degrades result quality).
 4. **Cap placement is an upsell mechanism, not a usage limit.** Overage
-   ($2 per 1K against ~$0.60–1.10 cost) means heavy users are profitable;
-   caps are positioned so growing stores hit them naturally, verified
-   against the utilization distribution at each revision.
+   ($2 per 1K; judge cost per the unit economics above) means heavy users
+   are profitable; caps are positioned so growing stores hit them
+   naturally, verified against the utilization distribution at each
+   revision.
 
 ## 9. Validation & go-to-market
 Channel research findings baked in: ~70% of app discovery starts with App
@@ -386,6 +522,9 @@ catalog-agnostic architecture and playground were kept for exactly this.
 4. Across active stores: AI-search click-through rate exceeds classic-
    search CTR on the same stores (the engine visibly outperforms).
 5. ≥10 Shopify reviews at ≥4.5 average within 6 months.
+6. Before pitching and before Shopify submission: hidden score ≥ 90 % in
+   every language, half of searches under 1 s, plus a friends-and-family
+   round (§3 Quality gate).
 All measurable from our own query/attribution logs and Shopify admin — no
 external analytics platform required.
 
@@ -400,12 +539,18 @@ external analytics platform required.
   sparse catalogs be tested in milestone 2 against a deliberately
   low-quality test catalog. The strategic answer to sparse product text
   is vision enrichment (capability 14, its own milestone): images carry
-  the attributes the text omits.
+  the attributes the text omits. v3: the hidden human-style score is the
+  release gate (§3 Quality gate).
 - **Cost drift**: heavy AI usage at $249-tier scale can squeeze margin if
   routing is lazy. Mitigated by required cost measurement + caps.
 - **Platform dependence**: Shopify policy/API changes; accepted for v1.
 - **Incumbent response**: Boost adding a true free-text layer would
   compress our window. No mitigation other than speed and fashion depth.
+- **Shopify Search & Discovery**: Shopify's free app already offers
+  meaning-based search on the Shopify and Advanced plans, in "multiple
+  languages", with no documented constraint handling (negation, price,
+  size). Unfiltered positions on shop-assistant behaviour with honest
+  labels, chips, any language, every plan, attributed revenue.
 - **Deferred questions**: exact model/provider mix (spec phase, milestone
   2); whether Hebrew demand materializes (review at 6-month checkpoint);
   final tier prices (revisit after 60 days of margin data).
@@ -430,30 +575,29 @@ external analytics platform required.
       listing goes live.
 
 ## 13. Milestone sketch
-1. **Skeleton, test suite, CI on pull_request** — repo, app scaffold with
-   Shopify OAuth against a dev store, green checks. (~5–8 issues)
-2. **Catalog ingestion + AI pipeline core** — ingest/sync/embed a catalog;
-   query classification; intent extraction; vector + filter retrieval;
-   cost metering; sparse-catalog quality test. (~10–14 issues)
-3. **Classic search + hybrid ladder + storefront widget** — instant
-   keyword/typo search, escalation logic, results UI with filter chips,
-   refinement, fallback, EN+HE+RTL. (~10–14 issues)
-4. **Playground** — public page, seeded catalog, store-catalog-preload
-   mode. (~4–6 issues)
-5. **Vision enrichment + cost routing** — vision analysis at ingestion
-   (all images, cap 4, accuracy tier, anchored anti-contamination prompt),
-   merge into enrichment schema + vision-only coverage attributes,
-   image-hash-keyed re-analysis, automatic re-embedding; contamination
-   test cases added to the eval harness (e.g. a hoodie shot with visible
-   sneakers and jewelry must not emit footwear/jewelry attributes);
-   confidence-based lite-first intent routing with accuracy-tier
-   escalation, eval bar re-verified on the routed blend; measured
-   vision cost per image recorded. (~6–10 issues)
-6. **Merchant dashboard + attribution + billing** — usage/query/CTR
-   views, order attribution via webhooks, review-ask trigger, Shopify
-   Billing tiers/trial/caps, abuse limits. (~10–14 issues)
-7. **Onboarding + listing + launch hardening** — activation-milestone
-   onboarding flow, first-session best-model behavior, Built-for-Shopify
-   compliance pass, listing assets, GDPR webhooks, submission. (~8–12
-   issues)
-8. **Outreach tooling + Door 2 MVP** (post-submission, parallel with App Store review wait) — fashion-store identification + per-store playground link generation for BOTH Shopify and non-Shopify stores; generic feed adapter + embeddable snippet + manual onboarding path for first non-Shopify design partners (Israeli fashion brands as warm leads). (~6–10 issues)
+Milestones 1–5 (skeleton, ingestion + AI pipeline core, classic search +
+widget, playground, vision enrichment + cost routing) are shipped as
+sketched in v2. From v3 the plan is:
+
+6. **Engine v2** — one spec session, one chain (~10–12 issues): the
+   score; variants table + dossiers + multi-vector index; find-then-judge
+   behind the current API; shop-assistant labels; server-side pages +
+   prefetch; judge comparison (Gemini vs Jev); delete the old switch and
+   ladder; copy pass on the site (tiers) once the PRD fixes them.
+7. **Run alone** — requirements:
+   - Automatic re-analysis on product change: webhook sync re-enriches
+     and re-embeds changed products; retrieval checks content freshness
+     so edited products are never served with stale vectors or
+     attributes; webhook-created products get their vector without a
+     manual ingest.
+   - A real health check that touches the database and search, not the
+     engine stub only.
+   - Uninstall data deletion: shop/redact and app/uninstalled delete every
+     per-shop record (catalog products, enrichments, embeddings, images,
+     search events, click events, AI calls), not sessions only.
+   - Bounded scans: every storefront vector scan carries a limit.
+   - Kill switch; billing; dashboard/attribution.
+8. **Surfaces and onboarding** — image search, thumbs up/down on the
+   playground, paste-URL onboarding, listing assets, GDPR webhooks.
+
+Shopify submission after the 90 % gate. Revenue is a Q1 2027 goal.

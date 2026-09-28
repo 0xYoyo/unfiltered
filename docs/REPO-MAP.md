@@ -481,6 +481,7 @@ docs/
   M5-LIVE-RUN.md
   PORTABILITY.md
   PRD.md
+  RESET-2026-09-27.md
   SMOKE.md
   VISION-MODEL.md
   evidence/
