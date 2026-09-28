@@ -6,6 +6,7 @@
     "dev": "shopify app dev --path .",
     "config:link": "shopify app config link --path .",
     "generate": "shopify app generate --path .",
+    "predeploy": "npm run build:widget",
     "deploy": "shopify app deploy --path .",
     "config:use": "shopify app config use --path .",
     "env": "shopify app env --path .",
