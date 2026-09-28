@@ -61,8 +61,8 @@ Numbered capabilities, each observable behavior:
    Under ₪400 × · Not black ×"). Chips come from a small parallel
    extraction of only what the shopper stated (price + currency, size, in
    stock, explicit "not X"); it is not on the critical path. The shopper
-   can remove or adjust chips and results update using the store's normal
-   filtering.
+   can remove or adjust chips; each change re-queries the server, which
+   returns the counts and pages (server-side counts and pages).
 4. **Follow-up refinement in the bar.** After a result set, typing a
    refinement ("same but cheaper", "בלי שרוולים") modifies the previous
    search instead of starting over. Single-session memory only; this is
@@ -74,21 +74,19 @@ Numbered capabilities, each observable behavior:
    product, builds the multi-vector index, and stays in sync with product
    changes (target: updates reflected within 15 minutes). A changed or
    created product is re-analysed and re-embedded automatically (a "Run
-   alone" requirement, milestone 7). One-time indexing cost: see section 8.
-6. **Instant fallback.** If the AI pipeline errors, times out, or a store
-   exceeds caps, the search bar silently serves classic search results.
-   The shopper never sees an error state caused by us.
-7. **Merchant dashboard.** Shows: total searches (split classic/AI), top
-   queries, zero-results queries rescued by AI (queries where classic
-   search found nothing but AI returned results), click-through rate on
-   our results, and the hero metric: search-attributed orders (shopper
+   alone" requirement, milestone 7). One-time indexing cost: see §8 (dossier cost).
+6. **Instant fallback.** If the judge misses its deadline or errors, or a
+   store exceeds caps, the search bar silently serves the find-stage
+   results without labels — never a failure state. The shopper never sees
+   an error state caused by us.
+7. **Merchant dashboard.** Shows: total searches, searches where the
+   judge missed its deadline, zero-result searches, top queries,
+   click-through rate on our results, and the hero metric: search-attributed orders (shopper
    clicked one of our results → purchased that product within the session
    or 24h, via Shopify order webhooks) with currency value.
 8. **Onboarding engineered to an activation milestone.** Install →
-   catalog indexed → merchant runs one successful AI search on their own
-   products, in under 10 minutes, guided. First-session searches use the
-   best (most expensive) model tier so the merchant's own test queries
-   feel like magic; routing economics apply afterwards. Paste-URL
+   catalog indexed → merchant runs one successful search on their own
+   products, in under 10 minutes, guided. Paste-URL
    onboarding: paste a store URL → crawl → playground with the store's
    real variants → install for live sync (webhooks).
 9. **Review-ask trigger.** The dashboard requests a Shopify review exactly
@@ -99,13 +97,15 @@ Numbered capabilities, each observable behavior:
     results — no install, no login. Supports a mode where a specific
     store's public catalog can be pre-loaded via URL parameter (for
     outreach: "here is YOUR catalog answering human questions").
-11. **Cost & abuse controls.** Per-IP/session rate limits on AI searches;
-    identical-query caching; per-store monthly AI-search caps by plan with
-    automatic fallback to classic search when exceeded; a global per-store
-    LLM spend ceiling on our side. Real cost-per-search is measured and
-    visible in our internal admin from day one.
+11. **Cost & abuse controls.** Per-IP/session rate limits on submitted
+    searches; identical-query caching; per-store monthly caps on submitted
+    searches by plan — when exceeded, the fallback is the find-stage
+    results without labels; a global per-store LLM spend ceiling on our
+    side. Real cost-per-search is measured and visible in our internal
+    admin from day one.
+    Model spend: Gemini first; every spend ceiling is proposed with its expected cost and approved by the founder.
 12. **Billing.** Shopify-native billing: 14-day free trial (card required,
-    capped at 1,000 AI searches), then tiers per section 8.
+    capped at 1,000 submitted searches), then tiers per section 8.
 13. **App Store listing as a deliverable.** Keyword-researched title/copy
     targeting niche terms ("AI search", "natural language search",
     "fashion search", Hebrew equivalents — not "search", which Boost
@@ -143,6 +143,8 @@ baseline; it never gates, degrades, or replaces it with something worse.
 A regression against the stock experience on a simple query is a launch
 blocker, and every milestone touching the shopper path verifies this in
 its live-run tail.
+v3 note: 'classification, AI understanding, chips, refinement, rescue' now
+means the single judged path of §3 Engine v2; 'the AI tier' means that path.
 
 **Self-removal kill switch (added 2026-08-10).** Capability 6 covers
 AI-call failures; this covers genuine application bugs. If Unfiltered
@@ -160,6 +162,8 @@ instant. The full Unfiltered pipeline (classification, AI understanding,
 chips, refinement, rescue) fires only on explicit submit (Enter or the
 magnifier). Keystroke previews consume no AI budget and are not logged
 as searches.
+v3 note: 'classification, AI understanding, chips, refinement, rescue' now
+means the single judged path of §3 Engine v2; 'the AI tier' means that path.
 
 **Portability constraint (binding, 2026-08-13):** v1 is built
 Shopify-first, but every shopper-facing mechanism must state its
@@ -291,9 +295,9 @@ The hidden human-style score is the release gate (docs/RESET-2026-09-27.md
 ### Amendment (2026-08-22) — Colour exclusion, close matches, colourway families (binding; capabilities 2 and 3)
 
 Decided 2026-08-22; recorded here by YOY-114 so the law lives in the PRD
-and not only on Linear. Three rules bind capability 2 (AI understanding:
-how a constraint is applied) and capability 3 (filters as output: what the
-chips and the result set promise):
+and not only on Linear. Rule (c) still binds capability 3 (filters as
+output: what the result set promises); rules (a), (b) and (d) are
+superseded in v3:
 
 (a) **A colour exclusion applies to the product's primary (displayed)
 colour, not its colourway list.**
@@ -357,7 +361,7 @@ Unfiltered-branded results page is explicitly rejected, as is per-store
 manual styling as an ongoing operating model. The exact mechanism (theme
 component reuse vs. Section Rendering API vs. deep CSS inheritance, and
 what is technically reachable per theme generation) is an open engineering
-question requiring a research spike, specced no later than M6; its
+question requiring a research spike, shipped (Mirror Bar, M3); its
 conclusion may adjust this section. Hard bar (2026-08-10): the
 shopper-visible footprint may not exceed chips-level additions; the
 store's existing design is preserved at a 90–95% minimum. Harming a
@@ -411,8 +415,8 @@ per-shop record, not sessions only (a "Run alone" requirement, milestone
 - **LLM API (dossiers + judge + chip extraction)** — judge per §3 Engine
   v2, "The judge — decision": baseline Gemini 3.5 Flash-Lite, challenger
   Jev (TypeSafe); measured on the hidden score, winner takes page 1, the
-  other is fallback, one swap point in code. On total LLM failure, classic
-  search serves. The provider mix must include an accuracy-tier
+  other is fallback, one swap point in code. On total LLM failure, the
+  find-stage results serve. The provider mix must include an accuracy-tier
   vision-capable model for ingestion enrichment (capability 14); vision
   runs at ingestion only, never at query time, so it does not affect
   per-search cost.
@@ -429,14 +433,15 @@ per-shop record, not sessions only (a "Run alone" requirement, milestone
   suffices at launch.
 
 ## 8. Monetization
-Model: subscription via Shopify Billing, priced on monthly AI searches
-(classic searches unlimited and free — honest because they cost ~nothing,
-and it reads well against Cartally's structure).
+Model: subscription via Shopify Billing, priced on monthly submitted
+searches (typing previews unlimited and free — honest because they cost
+~nothing, and it reads well against Cartally's structure).
+Model spend: Gemini first; every spend ceiling is proposed with its expected cost and approved by the founder.
 
 Tiers: **$39** (10K AI searches, catalogs up to 1K products) / **$99**
 (50K, up to 5K products) / **$249** (200K, up to 20K products); larger
 catalogs are enterprise inquiries. Overage $2 per additional 1,000 AI
-searches; hard cap + fallback beyond a store-configurable ceiling. 14-day trial, card required, 1,000 AI-search
+searches — re-validated after the M6 judge comparison (RESET §4); hard cap + fallback beyond a store-configurable ceiling. 14-day trial, card required, 1,000 AI-search
 trial cap. Anchors: Boost $29–299 (product-count based, free plan),
 Cartally $59/$209/$499 (+$1/1K overage), Searchanise from $19. Pricing is
 an experiment: v1 measures real cost-per-search, and tier limits/prices
@@ -455,7 +460,7 @@ validated by measurement):
   200k-product/500k-search store → enterprise tier. Pricing tiers by
   catalog size and search volume. The M6 judge comparison decides on
   quality first, cost second.
-- Gross margin target: ≥60% per tier; measured, not assumed.
+- Gross margin target: ≥60% per tier — re-validated after the M6 judge comparison (RESET §4); measured, not assumed.
 - Monthly profit scenarios at avg. $60/store revenue and 65% margin:
   pessimistic (30 stores): ~$1.2K; realistic (150 stores): ~$5.9K; good
   (500 stores): ~$19.5K — plus enterprise upsell path outside v1.
@@ -473,7 +478,7 @@ v1:
    version); the real cache hit rate is measured in M6.
 3. **Required internal metrics from day one:** per-store cap-utilization
    distribution, cache hit rate, blended cost per 1K per tier, and the
-   AI-vs-classic CTR delta per store (the guardrail that cost tuning never
+   judged-vs-fallback CTR delta per store (the guardrail that cost tuning never
    degrades result quality).
 4. **Cap placement is an upsell mechanism, not a usage limit.** Overage
    ($2 per 1K; judge cost per the unit economics above) means heavy users
@@ -518,9 +523,11 @@ catalog-agnostic architecture and playground were kept for exactly this.
 1. ≥100 installs and ≥30 paying stores within 6 months of App Store
    listing going live.
 2. Trial→paid conversion ≥25%.
-3. Measured blended AI cost ≤ $2 per 1,000 AI searches; gross margin ≥60%.
-4. Across active stores: AI-search click-through rate exceeds classic-
-   search CTR on the same stores (the engine visibly outperforms).
+3. Measured blended AI cost ≤ $2 per 1,000 AI searches — re-validated
+   after the M6 judge comparison (RESET §4); gross margin ≥60%.
+4. Across active stores: judged-search click-through rate exceeds the
+   store's previous search CTR on the same stores (the engine visibly
+   outperforms).
 5. ≥10 Shopify reviews at ≥4.5 average within 6 months.
 6. Before pitching and before Shopify submission: hidden score ≥ 90 % in
    every language, half of searches under 1 s, plus a friends-and-family
@@ -534,15 +541,14 @@ external analytics platform required.
   engine; checkpoint at 6 months (section 9).
 - **Result-quality risk**: if AI results are mediocre on real messy
   catalogs (thin product descriptions are common), the pitch collapses.
-  Mitigated by enrichment at ingestion (LLM-generated attribute tags per
-  product) — factory decides technique; PRD requires that quality on
+  Mitigated by dossiers at load time (§3 Engine v2) — factory decides technique; PRD requires that quality on
   sparse catalogs be tested in milestone 2 against a deliberately
   low-quality test catalog. The strategic answer to sparse product text
   is vision enrichment (capability 14, its own milestone): images carry
   the attributes the text omits. v3: the hidden human-style score is the
   release gate (§3 Quality gate).
-- **Cost drift**: heavy AI usage at $249-tier scale can squeeze margin if
-  routing is lazy. Mitigated by required cost measurement + caps.
+- **Cost drift**: heavy AI usage at $249-tier scale can squeeze margin.
+  Mitigated by required cost measurement + caps.
 - **Platform dependence**: Shopify policy/API changes; accepted for v1.
 - **Incumbent response**: Boost adding a true free-text layer would
   compress our window. No mitigation other than speed and fashion depth.
@@ -552,8 +558,7 @@ external analytics platform required.
   size). Unfiltered positions on shop-assistant behaviour with honest
   labels, chips, any language, every plan, attributed revenue.
 - **Deferred questions**: exact model/provider mix (spec phase, milestone
-  2); whether Hebrew demand materializes (review at 6-month checkpoint);
-  final tier prices (revisit after 60 days of margin data).
+  2); final tier prices (revisit after 60 days of margin data).
 
 ## 12. Human checklist
 - [ ] Create Shopify Partner account (blocks milestone 1 testing on a dev
@@ -564,11 +569,13 @@ external analytics platform required.
       method (blocks milestone 2 deploy).
 - [ ] Register a domain for the product + playground (blocks milestone 4;
       buy early, it's cheap).
-- [ ] Transactional email service account (blocks milestone 6).
+- [ ] Transactional email service account (blocks milestone 7).
 - [ ] Shopify App Store listing assets you must approve: app name check,
-      final copy, screenshots, demo video (blocks milestone 7 submission).
+      final copy, screenshots, demo video (blocks milestone 8 and the
+      90 % gate before submission).
 - [ ] App Store review submission + responding to Shopify's review
-      feedback (days-to-weeks; start as soon as milestone 7 is ready).
+      feedback (days-to-weeks; start as soon as milestone 8 is done and the
+      90 % gate is met).
 - [ ] Send the cold-outreach emails from your own address once tooling
       hands you the list + links (ongoing, post-launch).
 - [ ] Approve pricing tiers as configured in Shopify Billing before
@@ -601,3 +608,6 @@ sketched in v2. From v3 the plan is:
    playground, paste-URL onboarding, listing assets, GDPR webhooks.
 
 Shopify submission after the 90 % gate. Revenue is a Q1 2027 goal.
+
+Post-M8 backlog: review-ask trigger, abuse limits, Built-for-Shopify
+compliance pass, outreach tooling, Door 2 MVP.
