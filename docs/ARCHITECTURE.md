@@ -1031,9 +1031,11 @@ live services.
 The storefront search widget (YOY-43 scaffold, YOY-48 takeover) is plain
 TypeScript + CSS in `apps/shopify-app/widget/src/`, built by Vite
 (`apps/shopify-app/widget/vite.config.ts`) into one self-contained IIFE
-bundle emitted — and committed — under the theme app extension's assets
-(`apps/shopify-app/extensions/unfiltered-widget/assets/`; rebuild with
-`npm run build:widget` from the root). The stylesheet ships inside the
+bundle emitted by `npm run build:widget` under the theme app extension's
+assets (`apps/shopify-app/extensions/unfiltered-widget/assets/`). The bundle
+is not committed (YOY-102): CI builds it, and the `predev`/`predeploy`
+scripts build it before `npm run dev` and `npm run deploy`. The stylesheet
+ships inside the
 bundle: all widget DOM lives in an open shadow root and the CSS is injected
 there as a `<style>` element, so theme CSS cannot break the overlay layout
 and widget CSS cannot leak onto host elements, while inheritable typography
