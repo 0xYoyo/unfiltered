@@ -25,6 +25,11 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export const meta: MetaFunction = () => [
   { title: "Unfiltered — Your shoppers don't think in filters." },
+  {
+    name: "description",
+    content:
+      "Unfiltered replaces your filter sidebar with a search box that reads whole sentences and shows you the orders it earned.",
+  },
 ];
 
 export default function LandingRoute() {

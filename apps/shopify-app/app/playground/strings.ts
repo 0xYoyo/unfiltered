@@ -378,12 +378,16 @@ const SITE_PATHS: ReadonlySet<string> = new Set([
  * resolves a chrome language — the marketing site is English and LTR.
  * Everything else is `null`: A-4 fixes the merchant admin (and its Polaris
  * login page) at English and LTR, and a JSON response has no direction.
+ *
+ * A trailing slash does not change the page — the router serves `/pricing/`
+ * as `/pricing` — so it does not change the answer either.
  */
 export function ownedPageKind(pathname: string): "playground" | "site" | null {
-  if (pathname === "/try" || pathname === "/s" || pathname.startsWith("/s/")) {
+  const path = pathname.replace(/\/+$/, "") || "/";
+  if (path === "/try" || path === "/s" || path.startsWith("/s/")) {
     return "playground";
   }
-  return SITE_PATHS.has(pathname) ? "site" : null;
+  return SITE_PATHS.has(path) ? "site" : null;
 }
 
 /**

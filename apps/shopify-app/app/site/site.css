@@ -109,6 +109,12 @@ body:has(.site-chrome) {
   color: var(--text-accent);
 }
 
+/* An email address is one unbreakable word; let it wrap rather than push
+   a narrow column wider than the viewport. */
+.site-link-accent {
+  overflow-wrap: anywhere;
+}
+
 /* The one entrance animation: chips and results rising into the hero demo.
    Off under reduced motion, as the export has it. */
 @keyframes unf-rise {
@@ -809,6 +815,14 @@ body:has(.site-chrome) {
 .site-nav__install {
   display: inline-flex;
   cursor: not-allowed;
+}
+
+/* On /try the site nav stands in for the playground's own top bar, so the
+   playground's wordmark would repeat the nav's. It is hidden, not removed:
+   the language toggle keeps its place in the bar. /s/<slug> has no site nav
+   and keeps its wordmark. */
+.site-nav ~ .playground .productName {
+  visibility: hidden;
 }
 
 @media (max-width: 780px) {
@@ -1632,6 +1646,14 @@ body:has(.site-chrome) {
 
 .site-qa__row:last-child {
   border-bottom: 1px solid var(--border-hairline);
+}
+
+/* The export's question | answer columns need ~420px; below that the answer
+   stacks under its question. */
+@media (max-width: 600px) {
+  .site-qa__row {
+    grid-template-columns: 1fr;
+  }
 }
 
 .site-qa__q {

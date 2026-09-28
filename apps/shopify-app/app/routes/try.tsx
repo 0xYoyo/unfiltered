@@ -58,7 +58,7 @@ export default function PlaygroundRoute() {
 
   return (
     <>
-      <SiteNav />
+      <SiteNav installVariant="secondary" />
       <PlaygroundPage
         locale={locale}
         pathname={pathname}

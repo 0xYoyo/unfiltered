@@ -322,8 +322,10 @@ test.describe("P — the playground", () => {
       );
     expect(accent).toBe("#D33A2C");
 
+    // The whole page, not only the playground: on /try the site nav and
+    // footer frame it, and their install button must not add a second fill.
     const filled = await page.evaluate(() =>
-      Array.from(document.querySelectorAll<HTMLElement>(".playground *"))
+      Array.from(document.querySelectorAll<HTMLElement>("body *"))
         .filter(
           (node) =>
             getComputedStyle(node).backgroundColor === "rgb(211, 58, 44)",

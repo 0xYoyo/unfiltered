@@ -8,6 +8,11 @@ import "../site/site.css";
 
 export const meta: MetaFunction = () => [
   { title: "Privacy policy — Unfiltered" },
+  {
+    name: "description",
+    content:
+      "This is a structural draft covering what a Shopify app of this kind must disclose. It has not been reviewed by counsel and is not yet binding on anyone.",
+  },
 ];
 
 export default function PrivacyRoute() {

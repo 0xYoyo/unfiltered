@@ -1,6 +1,6 @@
 import { SITE_ASSETS, SITE_ROUTES } from "../paths";
 
-import { Button } from "./Button";
+import { Button, type ButtonVariant } from "./Button";
 
 /**
  * The nav (and the footer) are English-only site chrome, so they pin
@@ -10,8 +10,16 @@ import { Button } from "./Button";
  * The sticky top bar: the one place the site uses transparency and blur
  * (86% ivory + 10px blur, readme "Backgrounds"). Below 780px the text links
  * drop out and only the wordmark and the install button remain.
+ *
+ * `installVariant` is "secondary" on /try: there the playground's search
+ * button is the page's one accent fill (DESIGN P-2), so the install button
+ * gives up its red.
  */
-export function SiteNav() {
+export function SiteNav({
+  installVariant = "primary",
+}: {
+  installVariant?: ButtonVariant;
+} = {}) {
   return (
     <header className="site-nav site-chrome" dir="ltr" lang="en">
       <a
@@ -33,7 +41,7 @@ export function SiteNav() {
           <a href={SITE_ROUTES.faq}>FAQ</a>
         </span>
         <span title="Coming to the App Store" className="site-nav__install">
-          <Button size="sm" disabled>
+          <Button size="sm" variant={installVariant} disabled>
             Add to Shopify
           </Button>
         </span>

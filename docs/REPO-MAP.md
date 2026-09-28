@@ -175,6 +175,7 @@ apps/
         jsonld-crawl.test.ts
         jsonld-images.test.ts
         jsonld.server.ts
+        owned-page-kind.test.ts
         playground-css.test.ts
         playground-examples.test.ts
         playground-strings.test.ts
@@ -988,6 +989,7 @@ vitest.setup.ts
 - apps/shopify-app/app/playground/jsonld-crawl.test.ts → apps/shopify-app/app/playground/fixtures/crawl/crawl-store.ts, apps/shopify-app/app/playground/ingest-public-cli.server.ts, apps/shopify-app/app/playground/ingest-public.server.ts, apps/shopify-app/app/playground/jsonld-crawl-source.server.ts, apps/shopify-app/app/playground/jsonld.server.ts, apps/shopify-app/app/playground/polite-fetch.server.ts, apps/shopify-app/app/playground/sitemap.server.ts, apps/shopify-app/app/testing/fake-store.server.ts, apps/shopify-app/app/testing/helpers.server.ts
 - apps/shopify-app/app/playground/jsonld-images.test.ts → apps/shopify-app/app/playground/jsonld.server.ts
 - apps/shopify-app/app/playground/jsonld.server.ts → apps/shopify-app/app/catalog/mapping.server.ts, apps/shopify-app/app/playground/catalog-source.server.ts
+- apps/shopify-app/app/playground/owned-page-kind.test.ts → apps/shopify-app/app/playground/strings.ts
 - apps/shopify-app/app/playground/playground-examples.test.ts → apps/shopify-app/app/playground/strings.ts, apps/shopify-app/widget/src/format.ts
 - apps/shopify-app/app/playground/playground-strings.test.ts → apps/shopify-app/app/playground/strings.ts
 - apps/shopify-app/app/playground/polite-fetch.test.ts → apps/shopify-app/app/playground/polite-fetch.server.ts, apps/shopify-app/app/testing/fake-store.server.ts
