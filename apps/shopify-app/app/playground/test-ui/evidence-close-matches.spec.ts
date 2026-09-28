@@ -31,7 +31,7 @@ test.describe("@evidence", () => {
     ] as const) {
       test(`close matches heading ${device} ${locale}`, async ({ page }) => {
         await page.setViewportSize(viewport);
-        await page.goto(`/${suffix}`);
+        await page.goto(`/try${suffix}`);
         await input(page).fill("ai zero hit");
         await input(page).press("Enter");
         await expect(page.getByRole("heading", { name: heading })).toBeVisible();

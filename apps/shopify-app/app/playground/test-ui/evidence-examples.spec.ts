@@ -22,8 +22,8 @@ test.describe("@evidence", () => {
     ["mobile", MOBILE],
   ] as const) {
     for (const [locale, path] of [
-      ["en", "/"],
-      ["he", "/?lang=he"],
+      ["en", "/try"],
+      ["he", "/try?lang=he"],
     ] as const) {
       test(`examples ${device} ${locale}`, async ({ page }) => {
         await page.setViewportSize(viewport);

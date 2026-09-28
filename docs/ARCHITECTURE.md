@@ -1304,16 +1304,33 @@ is mechanically enforced by `packages/engine/test/boundary.test.ts`, which
 fails the suite if the engine's manifest or source ever references a
 `@shopify/*` package.
 
-## Playground pages and UI lane (YOY-92)
+## Marketing site, playground pages and UI lane (YOY-92)
 
-`GET /` is the playground — Unfiltered's only owned page (docs/DESIGN.md
-"Owned pages"), and the surface a merchant judges the product on before
-installing anything. It replaced the Shopify template's landing page; the
-template's `?shop=` redirect into the embedded admin is preserved, because
-that is how Shopify opens the app.
+The app serves Unfiltered's owned pages (docs/DESIGN.md "Owned pages") —
+the marketing site and the playground — alongside the embedded admin, from
+one app, one design, one deploy:
 
-**Where the code lives.** `app/routes/_index/route.tsx` is the route (loader,
-meta, and nothing else); `app/playground/` holds the page: `tokens.css` and
+| Route | Route file | Page |
+|---|---|---|
+| `GET /` | `app/routes/_index/route.tsx` | Landing page; also keeps the `?shop=` → `/app` redirect |
+| `GET /about`, `/how-it-works`, `/pricing`, `/faq`, `/privacy`, `/terms` | `app/routes/<name>.tsx` | Marketing pages |
+| `GET /try` | `app/routes/try.tsx` | The playground, framed by the site nav and footer |
+| `GET /s/<slug>` | `app/routes/s.$slug.tsx` | The playground over one store's catalog (below) |
+
+**The marketing site** was ported from the founder's Claude-Design export
+into `app/site/`: `components/` (SiteNav, SiteFooter, and React
+re-implementations of the export's design-system components), `pages/` (one
+per route), `paths.ts` (the site's URLs and the `public/site/` assets), and
+`site.css`. It styles on the same `playground/tokens.css` and self-hosted
+`playground/fonts.css` as the playground, and every rule in `site.css` hangs
+off a `site-`/`unf-` class so it cannot reach into `.playground` on `/try`.
+
+**The playground** is at `/try` — the surface a merchant judges the product
+on before installing anything. The `?shop=` redirect into the embedded admin
+stays on `/`, because that is the URL Shopify opens the app on.
+
+**Where the code lives.** `app/routes/try.tsx` is the route (loader, meta,
+and the site chrome around the page); `app/playground/` holds the page: `tokens.css` and
 `playground.css`, the `strings.ts` catalog, the components, and
 `search-client.ts`. The playground shares no DOM rendering with the
 storefront widget — the two surfaces answer to different design cases (the
@@ -1324,10 +1341,12 @@ two.
 **Chrome language is resolved server-side.** `resolveChromeLocale` reads
 `?lang=`, then `Accept-Language`, then falls back to English, and `root.tsx`
 stamps `<html lang dir>` from it: a client-side flip would paint one frame of
-LTR before mirroring. Only the playground's own paths participate —
-`isPlaygroundPath` — because the merchant admin is English-only and LTR by
-design (DESIGN A-4), and a Hebrew browser must not flip Polaris into RTL just
-by visiting.
+LTR before mirroring. `ownedPageKind` sorts paths: only the playground's own
+(`/try`, `/s/<slug>`) resolve a language; the marketing site is English and
+LTR; the merchant admin is English-only and LTR by design (DESIGN A-4), and a
+Hebrew browser must not flip Polaris into RTL just by visiting. Owned pages —
+site and playground — load no Shopify-CDN stylesheet (YOY-96 AC-13); every
+other path keeps Polaris's Inter stylesheet.
 
 **The interaction model is the widget's** (YOY-68): typing issues debounced
 `mode=preview` requests that are classic-only, spend no AI budget, and write
@@ -1395,14 +1414,14 @@ every search, preview, and click request from that page carries
 above the bar with a muted product count. No logo, no colours, no per-store
 copy — the page is visibly the store's because it names the store, not
 because it dresses up as it. A Playwright spec enumerates every class on
-`/s/<slug>` and on `/` and asserts the two lists are identical apart from the
+`/s/<slug>` and on `/try` (inside `.playground`) and asserts the two lists are identical apart from the
 store line, so per-store chrome cannot creep in later.
 
 An unknown slug answers a real **404** with a designed page in the
-playground's own shell — one sentence and a link back to `/`. It never falls
+playground's own shell — one sentence and a link back to `/try`. It never falls
 back to the seed catalog: an outreach link with a typo would otherwise demo
 somebody else's catalog under that store's name. These pages are `noindex`
-(`/` stays indexable); a search engine indexing a demo of someone else's
+(`/try` stays indexable); a search engine indexing a demo of someone else's
 catalog helps nobody.
 
 ### The UI lane
@@ -1412,6 +1431,10 @@ entry point: `widget` against the Vite harness, and `playground` against the
 REAL built app with `PLAYGROUND_FIXTURES=1`. The built app rather than a dev
 server is the point — SSR `lang`/`dir` and the meta tags cannot be proven any
 other way — so CI's `ui` job builds the app first.
+
+The same project covers the marketing site: `site.spec.ts` opens each site
+route and `/try`, and asserts the page renders, every nav and footer link
+answers 200, and nothing is logged as a console error.
 
 In fixture mode `/api/playground/*` answers from committed JSON chosen by the
 query text (`results`, `empty`, `error`, `timeout`, `delayed`, `preview`), so

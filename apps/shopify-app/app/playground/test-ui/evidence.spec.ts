@@ -29,8 +29,8 @@ test.describe("@evidence", () => {
     ["mobile", MOBILE],
   ] as const) {
     for (const [locale, path] of [
-      ["en", "/"],
-      ["he", "/?lang=he"],
+      ["en", "/try"],
+      ["he", "/try?lang=he"],
     ] as const) {
       test(`${device} ${locale}`, async ({ page }) => {
         await page.setViewportSize(viewport);
@@ -64,7 +64,7 @@ test.describe("@evidence", () => {
     const context = await browser.newContext({ colorScheme: "dark" });
     const page = await context.newPage();
     await page.setViewportSize(DESKTOP);
-    await page.goto("/");
+    await page.goto("/try");
     await shot(page, "desktop-en-6-dark-initial");
     await input(page).fill("dress");
     await input(page).press("Enter");

@@ -25,7 +25,7 @@ test.describe("@evidence", () => {
     ] as const) {
       test(`intent reuse ${device} ${locale}`, async ({ page }) => {
         await page.setViewportSize(viewport);
-        await page.goto(`/?details=1${suffix}`);
+        await page.goto(`/try?details=1${suffix}`);
         await input(page).fill("ai reuse elegant dress");
         await input(page).press("Enter");
         await panel(page).waitFor();

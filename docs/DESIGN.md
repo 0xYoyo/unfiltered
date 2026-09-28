@@ -19,13 +19,14 @@ marketing landing page" via the binding YOY-123 design comment.
 
 ## Surfaces and which case applies
 
-Unfiltered has three UI surfaces, and they do not share a case:
+Unfiltered has four UI surfaces, and they do not share a case:
 
 | Surface | Paths | Case | Governing idea |
 |---|---|---|---|
 | Storefront widget | `apps/shopify-app/extensions/`, `apps/shopify-app/widget/` | **Widget-class (inherits)** | The host store's design IS the design. |
 | Merchant admin (dashboard, onboarding, settings) | `apps/shopify-app/app/routes/app.*` | **Platform-inherits** | Shopify Polaris IS the design ("Built for Shopify" is a PRD constraint). |
-| Public playground | `apps/shopify-app/app/playground/`, `apps/shopify-app/app/routes/_index/` | **Owned pages** | The only surface Unfiltered draws itself; the direction system below applies. |
+| Public playground | `apps/shopify-app/app/playground/`, `apps/shopify-app/app/routes/try.tsx`, `apps/shopify-app/app/routes/s.$slug.tsx` | **Owned pages** | Drawn by Unfiltered; the direction system below applies. |
+| Marketing site | `apps/shopify-app/app/site/`, `apps/shopify-app/app/routes/_index/` and the site page routes (`about`, `how-it-works`, `pricing`, `faq`, `privacy`, `terms`) | **Owned pages** | Drawn by Unfiltered on the same §2 tokens as the playground; its nav and footer also frame the playground at `/try`. |
 
 Rationale: PRD §5 rejects an Unfiltered-branded results page and caps the
 shopper-visible footprint at chips-level; PRD §3 cap. 13 makes Built for
@@ -203,7 +204,9 @@ Unfiltered brand.
 
 ## 2. Direction system
 
-Revision **2026-08-28**. Applies to the **playground only** (owned pages).
+Revision **2026-08-28**. Applies to the **owned pages** — the playground
+and the marketing site, which share `tokens.css` as their one token source.
+The P-* invariants remain the playground's.
 The widget deliberately has none — writing a type scale for a surface that
 must disappear into its host would violate W-1. The admin's system is
 Polaris.
@@ -246,14 +249,14 @@ token is an edit to this section first.
   --font-display:"Frank Ruhl Libre",'Times New Roman',Georgia,serif;
   --font-sans:"Assistant",-apple-system,"Segoe UI",Helvetica,sans-serif;
   --font-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
-  --size-display-2:56px;--size-display-3:42px;--size-h1:32px;--size-h2:25px;--size-h3:20px;
+  --size-display-1:76px;--size-display-2:56px;--size-display-3:42px;--size-h1:32px;--size-h2:25px;--size-h3:20px;
   --size-body-lg:18px;--size-body:16px;--size-body-sm:14px;--size-caption:12.5px;--size-eyebrow:11.5px;
   --lh-display:1.04;--lh-heading:1.18;--lh-body:1.6;--lh-tight:1.3;
   --weight-light:300;--weight-regular:400;--weight-medium:500;--weight-semibold:600;--weight-bold:700;--weight-black:900;
   --track-display:-0.02em;--track-heading:-0.01em;--track-eyebrow:0.16em;
   --radius-xs:2px;--radius-sm:4px;--radius-md:8px;--radius-lg:14px;--radius-pill:999px;
   --border-width:1px;--border-width-thick:1.5px;
-  --shadow-1:0 1px 2px rgba(26,24,21,.05);--shadow-2:0 2px 10px rgba(26,24,21,.06);--shadow-3:0 12px 32px rgba(26,24,21,.10);
+  --shadow-1:0 1px 2px rgba(26,24,21,.05);--shadow-2:0 2px 10px rgba(26,24,21,.06);--shadow-3:0 12px 32px rgba(26,24,21,.10);--shadow-lift:0 6px 20px rgba(26,24,21,.09);
   --ring-focus:0 0 0 3px rgba(211,58,44,.28);
   --space-1:4px;--space-2:8px;--space-3:12px;--space-4:16px;--space-5:24px;--space-6:32px;--space-7:48px;--space-8:64px;--space-9:96px;
   --measure-prose:64ch;--width-container:1200px;--width-container-narrow:920px;

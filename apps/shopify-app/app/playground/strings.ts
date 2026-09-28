@@ -360,13 +360,34 @@ export function localeFromAcceptLanguage(
   return "en";
 }
 
+/** The marketing site's pages (app/site/). English-only, LTR. */
+const SITE_PATHS: ReadonlySet<string> = new Set([
+  "/",
+  "/about",
+  "/how-it-works",
+  "/pricing",
+  "/faq",
+  "/privacy",
+  "/terms",
+]);
+
 /**
- * Which paths render the playground and therefore resolve a chrome
- * language. The merchant admin and the API routes are excluded: A-4 fixes
- * the admin at English and LTR, and a JSON response has no direction.
+ * Which owned page a path renders, if any. Owned pages self-host their
+ * fonts and never load the admin's Shopify-CDN stylesheet; of them, only
+ * the playground (`/try` and the store-preload pages at `/s/<slug>`)
+ * resolves a chrome language — the marketing site is English and LTR.
+ * Everything else is `null`: A-4 fixes the merchant admin (and its Polaris
+ * login page) at English and LTR, and a JSON response has no direction.
+ *
+ * A trailing slash does not change the page — the router serves `/pricing/`
+ * as `/pricing` — so it does not change the answer either.
  */
-export function isPlaygroundPath(pathname: string): boolean {
-  return pathname === "/" || pathname === "/s" || pathname.startsWith("/s/");
+export function ownedPageKind(pathname: string): "playground" | "site" | null {
+  const path = pathname.replace(/\/+$/, "") || "/";
+  if (path === "/try" || path === "/s" || path.startsWith("/s/")) {
+    return "playground";
+  }
+  return SITE_PATHS.has(path) ? "site" : null;
 }
 
 /**

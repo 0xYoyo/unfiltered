@@ -10,7 +10,7 @@ export function CatalogNotFound({ strings }: { strings: PlaygroundStrings }) {
   return (
     <div className="catalogNotFound">
       <p className="catalogNotFoundText">{strings.catalogNotFound}</p>
-      <a className="catalogNotFoundLink" href="/">
+      <a className="catalogNotFoundLink" href="/try">
         {strings.backToPlayground}
       </a>
     </div>
