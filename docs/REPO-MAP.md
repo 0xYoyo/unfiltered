@@ -322,8 +322,6 @@ apps/
     extensions/
       .gitkeep
       unfiltered-widget/
-        assets/
-          unfiltered-widget.js
         blocks/
           unfiltered-search.liquid
         locales/

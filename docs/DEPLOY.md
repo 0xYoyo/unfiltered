@@ -14,6 +14,10 @@ tunnel or app configuration they already use. This service exists to give the
 playground a public, stable URL; nothing here runs `shopify app deploy` or
 edits `shopify.app.toml`.
 
+- The theme app extension's widget bundle (`unfiltered-widget.js`) is no longer committed (YOY-102).
+- `npm run deploy` (`shopify app deploy`) builds it first via the `predeploy` script.
+- CI builds it and uploads it as the `unfiltered-widget` artifact.
+
 ## What gets deployed
 
 `Dockerfile` (multi-stage, Node 22 Alpine) installs the whole workspace tree,

@@ -47,12 +47,16 @@ jobs:
         with:
           node-version: 22
       - run: npm ci
-      # Bundle-drift guard (YOY-52 AC-3): the widget's built assets are
-      # committed and byte-reproducible; a PR that edits widget/src/ without
-      # running build:widget would ship stale assets to themes. Rebuilding
-      # here and failing on any diff makes drift impossible to merge.
+      # Widget bundle (YOY-102): built in CI and before deploy (predeploy),
+      # not committed. Fail if the build left no bundle, then keep it as an
+      # artifact.
       - run: npm run build:widget
-      - run: git diff --exit-code -- apps/shopify-app/extensions/unfiltered-widget/assets/
+      - run: test -s apps/shopify-app/extensions/unfiltered-widget/assets/unfiltered-widget.js
+      - uses: actions/upload-artifact@v4
+        with:
+          name: unfiltered-widget
+          path: apps/shopify-app/extensions/unfiltered-widget/assets/unfiltered-widget.js
+          retention-days: 7
       # The playground project (YOY-92 AC-8) drives the BUILT app in fixture
       # mode, not a dev server: SSR lang/dir and the meta tags are what its
       # acceptance criteria are about, and only a real build can prove them.
