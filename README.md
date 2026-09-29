@@ -8,7 +8,7 @@
 Unfiltered replaces rigid filter-based product search on fashion Shopify
 stores with free-text search that understands how shoppers actually describe
 what they want ("elegant summer wedding dress, not black, under ₪400"), in
-English and Hebrew, and proves its value to the merchant in attributed
+any language, and proves its value to the merchant in attributed
 orders. It ships as a self-serve Shopify app backed by a catalog-agnostic
 search engine.
 
