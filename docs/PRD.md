@@ -248,8 +248,7 @@ the judge may compare images. Milestone 8.
 - Baseline: Gemini 3.5 Flash-Lite, one call with all page candidates inside, fixed short-code JSON output. Known multilingual, already in the engine. List price $0.30/M input, $2.50/M output. With 24 compact rows (~2–4k tokens in, ~120 tokens out) ≈ $0.001 per uncached search → ≈ $1 per 1,000 searches (estimate; measured in M6). Typically 0.7–1.2 s (measured on our own calls, thinking level low).
 - Challenger: Jev (TypeSafe) — typed answers (yes/no with confidence;
   multi-class choice; numeric score), ~0.2 s reported, $0.042/M input,
-  output free (via OpenRouter `typesafe/jev-1.13` and Cloudflare Workers
-  AI `typesafe/jev`). ≈ $0.30–0.40 per 1,000 searches. Pointwise
+  output free (via OpenRouter `typesafe/jev-1.13`; Cloudflare Workers AI also lists `typesafe/jev`, not used). ≈ $0.30–0.40 per 1,000 searches. Pointwise
   (parallel questions), labels via multiple choice. Multilingual quality
   unpublished. Available through OpenRouter as `typesafe/jev-1.13`; direct signup paused since 22 Sep 2026. Jev is the margin
   option as well as the speed option — if quality holds.
@@ -407,8 +406,7 @@ judge and the two-meanings chip, while the negation survives inside
 3. Merchandising suite: pin/boost/demote/hide, bundles, recommendations
    (Boost's territory; consciously skipped).
 4. Rigorous attribution: A/B testing vs. native search, multi-touch models.
-5. (Removed in v3: all languages ship from day one, with no per-language
-   code — see §3 Engine v2, "Languages".)
+5. (Removed in v3: all languages ship from day one, with no per-language code; the label templates of §3 Refinement 4 are the one per-language asset — see §3 Engine v2, "Languages".)
 6. Door 2 self-serve product: no self-serve generic-store admin, billing portal, or marketing site in v1. REVISED 2026-08-15: a Door 2 MVP (generic feed adapter + embeddable snippet + manual design-partner onboarding) — architecture portability is already binding (see PRD portability constraint and docs/PORTABILITY.md); the playground's store-preload mode (capability 10) must ingest arbitrary public catalogs, not only Shopify stores, making it the first generic-ingestion consumer. REVISED 2026-09-28 (v3): integration shape is a native Shopify app first; a universal script tag for any site; other platforms as real integrations when a paying store asks.
 7. Personalization from shopper history.
 8. Voice input.
@@ -464,8 +462,7 @@ The shopper-facing search experience is a complete mirror of the host store's ow
 Stored per store: Shopify OAuth tokens; catalog snapshot; a variants table
 (the merchant's own option name/value pairs, per-variant price and stock);
 a dossier per product; the multi-vector index (text, and one image vector
-per product photo once image search ships); judge answers cached per
-(search text, product version); query log (query text, latency, cost,
+per product photo once image search ships); judge answers cached per (normalized search text, candidate product ids, card versions), merchant facts outside the key; query log (query text, latency, cost,
 results shown, clicks); attribution events (click→order joins);
 plan/usage counters; dashboard aggregates. No shopper accounts and no shopper PII beyond
 transient session identifiers for rate-limiting and session attribution;
@@ -543,8 +540,7 @@ v1:
    challenger) is chosen on the hidden score first and cost second; the
    loser is the fallback behind one swap point. Any engine change must
    raise the hidden score before shipping.
-2. **Answer caching.** Judge answers are cached per (search text, product
-   version); the real cache hit rate is measured in M6.
+2. **Answer caching.** Judge answers are cached per (normalized search text, candidate product ids, card versions); merchant facts are outside the key, so stock and price changes do not evict answers. The real cache hit rate is measured in M6.
 3. **Required internal metrics from day one:** per-store cap-utilization
    distribution, cache hit rate, blended cost per 1K per tier, and the
    judged-vs-fallback CTR delta per store (the guardrail that cost tuning never
@@ -657,8 +653,7 @@ sketched in v2. From v3 the plan is:
 
 6. **Engine v2** — one spec session, one chain (~10–12 issues): the
    score; variants table + dossiers + multi-vector index; find-then-judge
-   behind the current API; shop-assistant labels; server-side pages +
-   prefetch; judge comparison (Gemini vs Jev); delete the old switch and
+   behind the current API; shop-assistant labels; server-side pages and counts (page 2 judged when the shopper nears it, never pre-judged); judge comparison (Gemini vs Jev); delete the old switch and
    ladder; copy pass on the site (tiers) once the PRD fixes them.
 7. **Run alone** — requirements:
    - Automatic re-analysis on product change: webhook sync re-enriches
