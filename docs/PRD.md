@@ -54,7 +54,7 @@ Numbered capabilities, each observable behavior:
    product's actual facts: find by vector + keyword, then a judge model
    reads the sentence and each candidate together. No fixed intent form,
    no invented category/occasion/attribute lists, no filters on anything a
-   model guessed. All languages from day one, with no per-language code.
+   model guessed. All languages from day one, with no per-language code; the label templates of Refinement 4 are the one per-language asset.
    Full design: "Engine v2" below.
 3. **Filters as output, not input.** Results arrive with the facts the
    shopper stated visibly applied as removable chips (e.g. "Dresses × ·
@@ -199,15 +199,7 @@ actual facts. (docs/RESET-2026-09-27.md §2–§3.)
   50–150 by vector + keyword matches, merged. Hard filters only on facts
   that can never be a guess: store, active, published. Nothing the model
   guessed removes a product.
-- Judge: a model reads the shopper's sentence and each candidate's dossier
-  + variants together, and returns per product a typed answer: verdict
-  (exact / same item, other colour or size / close alternative / not
-  relevant), which wishes are met or missed, and one label from a fixed
-  list ("in grey, not black"; "no M — S and L in stock"; "₪319, slightly
-  over 300"). Runs per page (~40 candidates); page 2 is judged in the
-  background as soon as page 1 renders. Judge answers are cached per
-  (search text, product version). Product rows sent to the judge are
-  compact (~80 tokens each).
+- Judge: a model reads the shopper's sentence and each candidate's dossier + variants together, and returns per product a short-code answer: verdict (exact / same item, other colour or size / close alternative / not relevant), missed-wish flags, and a label template id with one parameter. The label text a shopper sees comes from about five templates ("in grey, not black"; "no M — S and L in stock"; "₪319, slightly over 300"); size, stock and price labels are computed by code from the variants table, not by the judge. Runs on the page being viewed, at the store's page size (24 candidates on page 1 by default); page 2 is judged when the shopper nears the end of page 1, never in the background. Judge answers are cached per (normalized search text, candidate product ids, card versions); merchant facts are outside the key. Product rows sent to the judge are compact (~80 tokens each).
 - Chips: a small parallel extraction pulls out only facts the shopper
   stated (price + currency, size, in stock, explicit "not X") for
   removable chips. Not on the critical path.
@@ -245,8 +237,7 @@ Topics are infinite; kinds are three. A new topic never adds code.
 - Result counts and pagination come from the server (replaces holding the
   full match set in the browser).
 
-**Languages.** All languages from day one. No per-language code. The
-hidden test set carries at least EN, HE, AR, RU, FR, ES, each scored
+**Languages.** All languages from day one. No per-language code; the label templates of Refinement 4 are the one per-language asset. The hidden test set carries at least EN, HE, AR, RU, FR, ES, each scored
 separately so no language hides in an average.
 
 **Image search.** After the multi-vector index exists: one image vector
@@ -254,11 +245,7 @@ per product photo; the shopper uploads/pastes a photo → nearest products;
 the judge may compare images. Milestone 8.
 
 **The judge — decision (prices verified 28 Sep 2026).**
-- Baseline: Gemini 3.5 Flash-Lite, one call with all page candidates
-  inside, fixed JSON output. Known multilingual, already in the engine.
-  List price $0.30/M input, $2.50/M output. With 40 compact rows (~3–6k
-  tokens) ≈ $0.002–0.004 per uncached search → $2–4 per 1,000 searches.
-  Typically 0.7–1.2 s.
+- Baseline: Gemini 3.5 Flash-Lite, one call with all page candidates inside, fixed short-code JSON output. Known multilingual, already in the engine. List price $0.30/M input, $2.50/M output. With 24 compact rows (~2–4k tokens in, ~120 tokens out) ≈ $0.001 per uncached search → ≈ $1 per 1,000 searches (estimate; measured in M6). Typically 0.7–1.2 s (measured on our own calls, thinking level low).
 - Challenger: Jev (TypeSafe) — typed answers (yes/no with confidence;
   multi-class choice; numeric score), ~0.2 s reported, $0.042/M input,
   output free (via OpenRouter `typesafe/jev-1.13` and Cloudflare Workers
@@ -266,13 +253,11 @@ the judge may compare images. Milestone 8.
   (parallel questions), labels via multiple choice. Multilingual quality
   unpublished. Available through OpenRouter as `typesafe/jev-1.13`; direct signup paused since 22 Sep 2026. Jev is the margin
   option as well as the speed option — if quality holds.
-- Not first choice: dedicated rerankers (score only, no verdict/labels).
-  Cohere Rerank 3.5 ≈ $1 per 1,000 searches (third-party listing).
+- Not used: dedicated rerankers (score only, no verdict or labels, and a third vendor). Considered and rejected on 2026-09-30.
 - Measured on the hidden score: quality, per-language quality, speed,
   stability (same search ×5). Winner takes page 1; the other is fallback.
   One swap point in code.
-- Speed fallback: if the judge misses ~1.5 s, page 1 shows the find-stage
-  ranking without labels; labels arrive with page 2.
+- Speed fallback: if the judge misses ~1.5 s, page 1 shows the find-stage ranking at once; labels are added when the judge answers; positions never move.
 
 #### Refinements (2026-09-30, binding; override the Engine v2 text above where they differ)
 
@@ -358,9 +343,8 @@ The hidden human-style score is the release gate (docs/RESET-2026-09-27.md
 - Per catalog, per language: real query logs and friends-and-family
   searches (weighted most) + model-written filler shaped like reality
   (~60 % 1–3 words, 30 % medium, 10 % long/vague). No fanciful phrasings.
-- A strong model grades the top six of each search: would a real shopper
-  be happy?
-- Half the set is hidden from the builder; CI scores every PR on it.
+- A grader model (Gemini 3.5 Flash-Lite with a fixed rubric) marks each of the top six results of each search 0–3: would a real shopper be happy?
+- Half the set is hidden from the builder, in a repository folder the builder's guard denies to agents; the score runs when an engine PR merges and on demand.
 - Rule: no fix for a single search; a change ships only if the hidden
   score goes up.
 - The 90 % rule — "90 % before pitching": hidden score ≥ 90 % in every
@@ -538,12 +522,10 @@ judge comparison and scale with catalog size and search volume.
 
 Unit economics (typical store: 10k products, 20k searches/month; to be
 validated by measurement):
-- Dossiers ≈ $0.003/product → ~$30 once; cents/month for changes. Lazy
-  option: cheap version at load, full version on first search hit.
+- Dossiers ≈ $0.003/product → ~$30 once; cents/month for changes. Cards are written in priority order with raw-text find until a card exists (Refinement 9); a lazy full-card-on-first-hit variant stays an option if card cost matters.
 - Judge, uncached, short-code answers (estimate): Gemini ≈ $20/month; Jev ≈ $7/month. The answer cache cuts both; the real cache hit rate is measured in M6.
 - Hosting share $5–10.
-- At $99/month: Gemini judge ≈ 45–60 % margin before cache; Jev judge ≈
-  80 %+. At $149 both are healthy. 500-product store ≈ $3–10/month cost.
+- At $99/month for the typical store above (20k searches): Gemini judge with short codes ≈ 70–75 % margin before cache (estimate: ≈ $20 judge + $5–10 hosting); Jev judge ≈ 85 %. At the tier's full allowance (50k searches) the Gemini judge margin falls to ≈ 45 % before cache — the answer cache hit rate and the judge comparison decide the tier limits. 500-product store ≈ $3–10/month cost.
   200k-product/500k-search store → enterprise tier. Pricing tiers by
   catalog size and search volume. The M6 judge comparison decides on
   quality first, cost second.
