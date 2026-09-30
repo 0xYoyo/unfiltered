@@ -1,6 +1,6 @@
 # Unfiltered — PRD
 Version: 3 · Date: 2026-09-28
-Supersedes v2; decisions in docs/RESET-2026-09-27.md.
+Supersedes v2; decisions in docs/RESET-2026-09-27.md. Refinements of 2026-09-30 in §3 Engine v2 (binding where they differ from the text above them).
 
 Product type: B2B web SaaS, delivered first as a native Shopify app
 (self-serve). The engine is catalog-agnostic by design: a universal script
@@ -264,7 +264,7 @@ the judge may compare images. Milestone 8.
   output free (via OpenRouter `typesafe/jev-1.13` and Cloudflare Workers
   AI `typesafe/jev`). ≈ $0.30–0.40 per 1,000 searches. Pointwise
   (parallel questions), labels via multiple choice. Multilingual quality
-  unpublished. Direct signup paused since 22 Sep 2026. Jev is the margin
+  unpublished. Available through OpenRouter as `typesafe/jev-1.13`; direct signup paused since 22 Sep 2026. Jev is the margin
   option as well as the speed option — if quality holds.
 - Not first choice: dedicated rerankers (score only, no verdict/labels).
   Cohere Rerank 3.5 ≈ $1 per 1,000 searches (third-party listing).
@@ -273,6 +273,83 @@ the judge may compare images. Milestone 8.
   One swap point in code.
 - Speed fallback: if the judge misses ~1.5 s, page 1 shows the find-stage
   ranking without labels; labels arrive with page 2.
+
+#### Refinements (2026-09-30, binding; override the Engine v2 text above where they differ)
+
+Agreed in the co-manager plan review of 29–30 Sep 2026. Numbers marked
+"estimate" are the chat's estimates and are measured in M6.
+
+1. **One judge model.** Gemini 3.5 Flash-Lite, thinking level low, behind one
+   swap point in code. The M6 judge comparison tests exactly one challenger:
+   Jev via OpenRouter (`typesafe/jev-1.13`; $0.042 per million input tokens,
+   output free; 32,000-token context; answers yes/no, pick-one and score
+   questions with confidence; no free text; one item per question, so a
+   page's candidates are asked in parallel). GPT-5 nano was considered and
+   is not tested. No reranker vendor. Winner takes page 1 on the hidden
+   score; the other is fallback.
+2. **Short-code answers.** The judge answers per product with codes, never
+   prose: a verdict (exact / same item, other colour or size / close / not
+   relevant), a set of missed-wish flags, and a label template id with one
+   parameter. Estimate: ≈ $1 per 1,000 uncached searches (replaces the $2–4
+   figure, which assumed prose output).
+3. **Labels from code where the fact is the merchant's.** Size, stock and
+   price labels are computed by code from the variants table, never by the
+   judge. The judge judges the description side only. A stock or price
+   change therefore does not invalidate a cached judge answer.
+4. **Label templates per kind of miss.** About five templates in total: a
+   number missed ("₪319, over your 300"; "no M — S and L in stock"), a
+   merchant fact missed ("in grey, not black"), a description missed (one
+   generic "close match" line). Exclusions are filtered out, never labelled.
+   Templates are translated once per shipped language and are the one
+   permitted per-language asset (amends "no per-language code"); a language
+   without templates shows no label.
+5. **Card (dossier) content.** Facts and visible details from the text and
+   the photos are stored as facts; merchant-stated material first, "looks
+   like" from the photo only when the merchant said nothing, marked as such.
+   Style, occasion and "who wears it" are the model's read: used to find
+   candidates and read by the judge, never shown to the shopper, never used
+   to reject a product. There is no separate verification pass.
+6. **Card writer.** Gemini 3.5 Flash-Lite (estimate ≈ $3 per 1,000 products
+   for the text card, plus the measured $1.90 per 1,000 for images). A
+   bigger card writer is adopted only after a 200-product comparison on the
+   hidden score shows the cards are the weak point.
+7. **Paging.** The judge runs on the page being viewed, at the store's own
+   page size. Page 2 is judged when the shopper nears the end of page 1,
+   never pre-judged in the background. The find set is 150 candidates by
+   default (a configuration number); beyond the find set, results are
+   keyword-ordered. Judged depth is raised if the search log shows shoppers
+   going deeper.
+8. **Reject-all fallback.** If the judge marks every candidate on a page
+   "not relevant", the page shows the find order with the generic label. An
+   empty page is never the model's decision alone.
+9. **Cold start.** Cards are written in priority order (in stock and recently
+   updated first). Until a product's card exists, the find step uses the
+   merchant's raw text, so search works from the first minute of onboarding
+   and improves as cards land.
+10. **Speed knobs, in order, before any new vendor.** Judge 24 candidates on
+    page 1; if the judge passes 1.5 s, show the find order at once and add
+    labels when they arrive — positions never move. First-build estimate:
+    median 1.1–1.3 s; the "half under 1 s" gate is measured, then decided.
+11. **Cache key.** Judge answers are cached per (normalized search text,
+    candidate product ids, card versions). Merchant facts are outside the
+    key (see 3).
+12. **Judge log.** Every judge verdict per product per search is stored with
+    the click, in one table. Nothing reads it in M6; it exists so the judge
+    can later be checked against real shopper clicks.
+13. **Refinement.** "Same but cheaper" sends the previous sentence and the
+    new one together to the judge and to the chip extraction. No intent
+    form.
+14. **Multi-vector index.** The one-card-per-colourway-family collapse and
+    the small-tenant recall fix (iterative HNSW scan) are re-verified for
+    several vectors per product before the index ships.
+15. **Old engine recoverable.** The score is measured on the current (M5)
+    engine first, as the baseline to beat. `main` is tagged `engine-v1-last`
+    before the delete issue merges. The delete issue is last in the engine
+    chain and ships only after Engine v2 beats the baseline on the same
+    hidden score.
+16. **Theme-native label placement** is a docs/DESIGN.md decision inside M6
+    (a small muted line under the price, inheriting the theme; nothing when
+    it does not fit).
 
 ### Quality gate (v3, 2026-09-28, binding)
 
@@ -291,6 +368,17 @@ The hidden human-style score is the release gate (docs/RESET-2026-09-27.md
 - Every engine issue names the score it must move (outcome AC); the
   reviewer runs and reads it.
 - The Constructor-bar set stays as a regression suite, not the gate.
+
+**Refinements (2026-09-30, binding).** The grader is Gemini 3.5 Flash-Lite
+with a fixed marking rubric, graded relevance 0–3 per product (same-model
+bias is accepted; the friends-and-family round is the human check). The
+score runs when an engine PR merges and on demand, not on every push
+(estimate ≈ $0.17 per run). The hidden half of the set lives in a repository
+folder the builder's guard denies to agents. The first real queries come
+from the live search log (every submitted playground search since August),
+weighted most; model-written filler fills the rest. Arabic, Russian, French
+and Spanish scores are marked model-written until real queries in those
+languages exist.
 
 ### Amendment (2026-08-22) — Colour exclusion, close matches, colourway families (binding; capabilities 2 and 3)
 
@@ -452,8 +540,7 @@ Unit economics (typical store: 10k products, 20k searches/month; to be
 validated by measurement):
 - Dossiers ≈ $0.003/product → ~$30 once; cents/month for changes. Lazy
   option: cheap version at load, full version on first search hit.
-- Judge, uncached: Gemini $40–80/month; Jev ≈ $7/month. The answer cache
-  cuts both substantially; the real cache hit rate is measured in M6.
+- Judge, uncached, short-code answers (estimate): Gemini ≈ $20/month; Jev ≈ $7/month. The answer cache cuts both; the real cache hit rate is measured in M6.
 - Hosting share $5–10.
 - At $99/month: Gemini judge ≈ 45–60 % margin before cache; Jev judge ≈
   80 %+. At $149 both are healthy. 500-product store ≈ $3–10/month cost.
