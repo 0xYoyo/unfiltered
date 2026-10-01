@@ -48,7 +48,10 @@ on the combined AI set but missed in one language is missed.
    p50, p95, the mean per pipeline stage, and the count of `degraded` and
    `limited` responses. A degraded or limited response is a classic
    answer wearing the AI route's request; it is counted and shown, never
-   folded silently into an AI percentile's story.
+   folded silently into an AI percentile's story. Each row also reports
+   `under-1s`: the share of the set's responses under 1,000 ms server-side
+   — the "half of searches under 1 s" line of the 90 % rule (docs/PRD.md
+   §3 Quality gate; YOY-141).
 
 Per-stage means come from `details.stages` (the orchestrator's ledger:
 `classify | intent | embed | retrieve | classic | hydrate | closeMatches`,

@@ -1,0 +1,70 @@
+name: Score
+
+# The hidden score (YOY-141; docs/SCORE.md): the hidden half of the score set
+# lives only in the HIDDEN_SET_B64 repository secret, where the builder cannot
+# read it, and is scored here. Dispatch only (NG-1): never on push or pull
+# request, never a job in ci.yml — each run is paid and the six M6 runs are
+# budgeted (docs/PRD.md §3 Quality gate).
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch, tag or SHA to score
+        required: true
+        default: main
+
+permissions:
+  contents: read
+
+jobs:
+  hidden:
+    runs-on: ubuntu-latest
+    # A hidden run is 72 searches plus 72 grades: minutes, not hours.
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      # The secret holds the hidden half exactly as score-build-set.mts wrote
+      # it (base64); the runner decodes it. It goes to the runner's temp dir,
+      # never into the checkout.
+      - name: Write the hidden set
+        env:
+          HIDDEN_SET_B64: ${{ secrets.HIDDEN_SET_B64 }}
+        run: |
+          test -n "$HIDDEN_SET_B64" || { echo "HIDDEN_SET_B64 is not set"; exit 1; }
+          printf '%s' "$HIDDEN_SET_B64" > "$RUNNER_TEMP/hidden.b64"
+      # Every byte the runner writes is captured, checked for hidden query
+      # text (AC-3), and only then printed — a leak fails the job before it
+      # can reach the log, and the check prints a count, never a query.
+      - name: Score the hidden half
+        working-directory: apps/shopify-app
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          # Through env, never interpolated into the script: a ref is input.
+          SCORE_REF: ${{ inputs.ref }}
+        run: |
+          set +e
+          npx tsx scripts/score-run.mts --hidden-set "$RUNNER_TEMP/hidden.b64" \
+            > "$RUNNER_TEMP/score-output.txt" 2>&1
+          run_status=$?
+          set -e
+          npx tsx scripts/score-leak-check.mts \
+            --hidden-set "$RUNNER_TEMP/hidden.b64" \
+            --output "$RUNNER_TEMP/score-output.txt"
+          cat "$RUNNER_TEMP/score-output.txt"
+          {
+            echo "### Hidden score — \`$SCORE_REF\`"
+            echo
+            echo '```'
+            cat "$RUNNER_TEMP/score-output.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$run_status"
+      - name: Remove the hidden set
+        if: always()
+        run: rm -f "$RUNNER_TEMP/hidden.b64" "$RUNNER_TEMP/score-output.txt"

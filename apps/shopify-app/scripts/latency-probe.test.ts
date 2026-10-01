@@ -13,6 +13,7 @@ import {
   percentile,
   ProbeUsageError,
   summarize,
+  UNDER_ONE_SECOND_MS,
   visibleQueryText,
   type ProbeSample,
 } from "./latency-probe.mjs";
@@ -107,7 +108,21 @@ describe("set summaries", () => {
     expect(summary!.meanStages.closeMatches).toBeUndefined();
     expect(summary!.meanStages.intent).toBe(Math.round((600 + 400 + 900) / 3));
     expect(summary!.meanStages.classic).toBe(20);
-    expect(formatSummary(summary!)).toContain("p50=300 ms p95=1100 ms degraded=2 limited=1 reused=1");
+    expect(summary!.underOneSecond).toBe(0.75);
+    expect(formatSummary(summary!)).toContain(
+      "p50=300 ms p95=1100 ms under-1s=75% degraded=2 limited=1 reused=1",
+    );
+  });
+
+  it("counts a search as under 1 s only below 1,000 ms (YOY-141 AC-9)", () => {
+    const summary = summarize("classic", [
+      sample({ set: "classic", latencyMs: 999 }),
+      sample({ set: "classic", latencyMs: 1000 }),
+      sample({ set: "classic", latencyMs: 1001 }),
+    ])!;
+    expect(UNDER_ONE_SECOND_MS).toBe(1000);
+    expect(summary.underOneSecond).toBeCloseTo(1 / 3);
+    expect(formatSummary(summary)).toContain("under-1s=33%");
   });
 
   it("is null for an empty set rather than a fake zero", () => {

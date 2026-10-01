@@ -218,6 +218,11 @@ export interface SetSummary {
   n: number;
   p50: number;
   p95: number;
+  /**
+   * Share of samples answered in under 1,000 ms server-side, 0–1 (YOY-141
+   * AC-9): the 90 % rule's "half of searches under 1 s", per set.
+   */
+  underOneSecond: number;
   degraded: number;
   limited: number;
   /** Responses served by exact-query intent reuse: a masked sample (AC-6). */
@@ -226,6 +231,9 @@ export interface SetSummary {
   /** Mean ms per stage over the samples that ran it; absent when none did. */
   meanStages: Record<string, number>;
 }
+
+/** The "under 1 s" line of the 90 % rule (docs/PRD.md §3 Quality gate). */
+export const UNDER_ONE_SECOND_MS = 1000;
 
 export function summarize(
   set: SetSummary["set"],
@@ -252,6 +260,8 @@ export function summarize(
     n: samples.length,
     p50: percentile(latencies, 50),
     p95: percentile(latencies, 95),
+    underOneSecond:
+      latencies.filter((latency) => latency < UNDER_ONE_SECOND_MS).length / latencies.length,
     degraded: samples.filter((sample) => sample.degraded).length,
     limited: samples.filter((sample) => sample.limited !== null).length,
     reused: samples.filter((sample) => sample.routeReason === "intent-reuse").length,
@@ -310,6 +320,7 @@ export function formatSummary(summary: SetSummary): string {
   ).join(" · ");
   return [
     `[${summary.set}] n=${summary.n} p50=${summary.p50} ms p95=${summary.p95} ms` +
+      ` under-1s=${Math.round(summary.underOneSecond * 100)}%` +
       ` degraded=${summary.degraded} limited=${summary.limited} reused=${summary.reused} routes: ${routes}`,
     `  mean per stage: ${stages === "" ? "(none)" : stages}`,
   ].join("\n");

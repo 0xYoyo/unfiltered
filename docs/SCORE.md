@@ -45,10 +45,33 @@ only if the hidden score goes up. The tooling lives in
    reaches the output.
 
 `npm run score:public` runs the public half against
-`app/score/data/seed-fixture.json` (`--set`, `--fixture` and
-`--hidden-set <file>` override). Every command takes `--synthetic` where it
-reads data: a synthetic catalog, a synthetic search log and replay clients —
-offline, $0, for tests and dry runs.
+`app/score/data/seed-fixture.json.gz` (`--set`, `--fixture` and
+`--hidden-set <file>` override). Fixtures whose name ends in `.gz` are
+written and read gzipped; the seed fixture is committed that way, its size
+cap applies to the compressed file, and it always holds every product.
+Every command takes `--synthetic` where it reads data: a synthetic catalog,
+a synthetic search log and replay clients — offline, $0, for tests and dry
+runs.
+
+## The hidden run
+
+The hidden half lives only in the `HIDDEN_SET_B64` repository secret — the
+base64 file `score-build-set.mts` wrote to `--hidden-out` — and is scored by
+`.github/workflows/score.yml`:
+
+```bash
+gh workflow run score.yml -f ref=main   # ref: any branch, tag or SHA
+gh run view --log
+```
+
+The workflow runs on `workflow_dispatch` only — never on push or pull
+request, never inside `ci.yml`. It checks out `ref`, writes the secret to
+the runner's temp directory, runs `score-run.mts --hidden-set` with
+`GEMINI_API_KEY`, and captures every byte the runner writes.
+`score-leak-check.mts` then fails the job if any hidden query appears in
+that output as whole words (score-table lines excepted: they hold only
+language codes and numbers), printing a count and never the query. Only a
+clean output is printed to the log and written to the job summary.
 
 ## Rubric
 
