@@ -1054,7 +1054,7 @@ vitest.setup.ts
 - apps/shopify-app/app/score/leak.server.ts → apps/shopify-app/app/score/set.server.ts
 - apps/shopify-app/app/score/run.server.ts → apps/shopify-app/app/score/grade.server.ts, apps/shopify-app/app/score/set.server.ts, apps/shopify-app/app/search/orchestrator.server.ts, apps/shopify-app/app/search/playground-search.server.ts
 - apps/shopify-app/app/score/score.test.ts → apps/shopify-app/app/score/cli.server.ts, apps/shopify-app/app/score/fixture.server.ts, apps/shopify-app/app/score/grade.server.ts, apps/shopify-app/app/score/leak.server.ts, apps/shopify-app/app/score/run.server.ts, apps/shopify-app/app/score/set.server.ts, apps/shopify-app/app/score/synthetic.server.ts, apps/shopify-app/app/testing/helpers.server.ts
-- apps/shopify-app/app/score/set.server.ts → apps/shopify-app/app/search/events.server.ts
+- apps/shopify-app/app/score/set.server.ts → apps/shopify-app/app/search/events.server.ts, apps/shopify-app/scripts/latency-probe-queries.json (unresolved)
 - apps/shopify-app/app/score/synthetic.server.ts → apps/shopify-app/app/eval/replay.server.ts, apps/shopify-app/app/score/fixture.server.ts, apps/shopify-app/app/score/grade.server.ts, apps/shopify-app/app/score/run.server.ts, apps/shopify-app/app/score/set.server.ts, apps/shopify-app/app/search/classic-store.server.ts, apps/shopify-app/app/search/orchestrator.server.ts, apps/shopify-app/app/search/playground-search.server.ts, apps/shopify-app/app/search/retrieval-store.server.ts
 - apps/shopify-app/app/search/classic-store.server.ts → apps/shopify-app/app/search/retrieval-store.server.ts
 - apps/shopify-app/app/search/classic-store.test.ts → apps/shopify-app/app/search/classic-store.server.ts, apps/shopify-app/app/testing/helpers.server.ts
