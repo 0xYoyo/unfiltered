@@ -2,6 +2,7 @@ node_modules/
 dist/
 test-results/
 playwright-report/
+.playwright-mcp/
 .env
 .env.*
 # Real env-file location, declared explicitly so docs/REPO-MAP.md's key
