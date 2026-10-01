@@ -25,7 +25,7 @@ import {
   searchScore,
 } from "./grade.server";
 import { findLeaks } from "./leak.server";
-import { formatScoreTable, runScoreSet } from "./run.server";
+import { descriptionExcerpt, formatScoreTable, graderDetails, runScoreSet } from "./run.server";
 import {
   buildScoreSet,
   decodeHiddenSet,
@@ -35,6 +35,8 @@ import {
   fillerShapeCounts,
   HIDDEN_MAX_BYTES,
   isInsideDirectory,
+  isShopperShaped,
+  LOG_SINCE,
   SCORE_LANGUAGES,
   ScoreSetRefusal,
   splitScoreSet,
@@ -153,13 +155,99 @@ describe("the set builder (AC-1, AC-2)", () => {
       logQueries: Array.from({ length: 23 }, (_, index) => ({
         query: index === 0 ? "Linen Shirt" : `log search ${index}`,
         storeKey: SYNTHETIC_STORE_KEY,
-        date: new Date(0),
+        date: new Date(Date.UTC(2026, 8, 1)),
       })),
       llm,
     });
     const en = set.filter((entry) => entry.language === "en").map((entry) => entry.query);
     expect(en.slice(23)).toEqual(["wool coat", "silk scarf"]);
     expect(shortAnswers).toEqual([]);
+  });
+});
+
+describe("shopper-shaped log selection (YOY-141 AC-12)", () => {
+  const inEra = new Date(Date.UTC(2026, 8, 1));
+
+  it("keeps a playground-era search of three or more plain characters", () => {
+    expect(isShopperShaped({ query: "linen shirt", date: inEra })).toBe(true);
+    expect(isShopperShaped({ query: "  top  ", date: LOG_SINCE })).toBe(true);
+  });
+
+  it("drops a search submitted before 2026-08-10", () => {
+    expect(isShopperShaped({ query: "snowboard", date: new Date(Date.UTC(2026, 7, 9, 23, 59)) })).toBe(false);
+  });
+
+  it("drops a search shorter than three characters after trimming", () => {
+    for (const query of ["b", "s ", "  xy  "]) {
+      expect(isShopperShaped({ query, date: inEra })).toBe(false);
+    }
+  });
+
+  it("drops a search carrying a zero-width format character", () => {
+    for (const character of ["\u200B", "\u200C", "\u200D", "\u2060"]) {
+      expect(isShopperShaped({ query: `black dress ${character}`, date: inEra })).toBe(false);
+    }
+  });
+
+  it("drops the latency probe's committed queries", () => {
+    expect(isShopperShaped({ query: "comfortable sneakers for running", date: inEra })).toBe(false);
+    expect(isShopperShaped({ query: "Black  Shirt", date: inEra })).toBe(false);
+    expect(isShopperShaped({ query: "שמלת קיץ, לא שחורה", date: inEra })).toBe(false);
+  });
+
+  it("exports only shopper-shaped searches from the log", async () => {
+    const db = await createTestDb();
+    const rows: [string, Date][] = [
+      ["snowbar", new Date(Date.UTC(2026, 5, 1))],
+      ["b", inEra],
+      ["jacket", inEra],
+      ["linen shirt\u200B\u200C", inEra],
+      ["wide leg trousers", inEra],
+    ];
+    for (const [index, [query, createdAt]] of rows.entries()) {
+      await db.searchEvent.create({
+        data: {
+          searchId: `ac12-${index}`,
+          shopDomain: SYNTHETIC_STORE_KEY,
+          sessionId: "ac12",
+          query,
+          route: "classic",
+          degraded: false,
+          latencyMs: 100,
+          resultCount: 1,
+          createdAt,
+        },
+      });
+    }
+    const queries = await exportLogQueries(db, [SYNTHETIC_STORE_KEY]);
+    expect(queries.map((entry) => entry.query)).toEqual(["wide leg trousers"]);
+  });
+
+  it("takes a language's newest 25 searches, not its oldest", async () => {
+    const logQueries = Array.from({ length: 30 }, (_, index) => ({
+      query: `log search ${index}`,
+      storeKey: SYNTHETIC_STORE_KEY,
+      date: new Date(Date.UTC(2026, 8, 1, 0, index)),
+    }));
+    const set = await buildScoreSet({ logQueries, llm: createSyntheticFillerLlm() });
+    const en = set.filter((entry) => entry.language === "en");
+    expect(en).toHaveLength(25);
+    expect(en.every((entry) => entry.source === "log")).toBe(true);
+    expect(new Set(en.map((entry) => entry.query))).toEqual(
+      new Set(Array.from({ length: 25 }, (_, index) => `log search ${index + 5}`)),
+    );
+  });
+
+  it("fills only from shopper-shaped searches", async () => {
+    const logQueries = [
+      { query: "snowbar", date: new Date(Date.UTC(2026, 5, 1)) },
+      { query: "s", date: inEra },
+      { query: "dress", date: inEra },
+      { query: "linen shirt", date: inEra },
+    ].map((entry) => ({ ...entry, storeKey: SYNTHETIC_STORE_KEY }));
+    const set = await buildScoreSet({ logQueries, llm: createSyntheticFillerLlm() });
+    const fromLog = set.filter((entry) => entry.source === "log").map((entry) => entry.query);
+    expect(fromLog).toEqual(["linen shirt"]);
   });
 });
 
@@ -268,6 +356,69 @@ describe("the grader (AC-4)", () => {
     expect(doc).toContain(SCORE_RUBRIC);
     expect(SCORE_RUBRIC).toMatch(/Example, grade 1:/);
     expect(SCORE_RUBRIC).toMatch(/Example, grade 0:/);
+  });
+});
+
+describe("the grader's shopper view (YOY-141 AC-11)", () => {
+  it("strips HTML, collapses whitespace and keeps the first 300 characters", () => {
+    expect(descriptionExcerpt("<p>Soft&nbsp;linen,\n\n <b>relaxed</b> cut &amp; long sleeves.</p>")).toBe(
+      "Soft linen, relaxed cut & long sleeves.",
+    );
+    expect(descriptionExcerpt(`<div>${"a".repeat(400)}</div>`)).toBe("a".repeat(300));
+    expect(descriptionExcerpt("caf&#233; &#x2014; &#99999999; &bogus;")).toBe("café — &#99999999; &bogus;");
+    expect(descriptionExcerpt("")).toBe("");
+  });
+
+  it("puts the description excerpt, fit, style tags and vision attributes in the grading prompt", async () => {
+    const fixture = buildSyntheticFixture();
+    const described = fixture.products.find((product) => product.productId === "syn-1")!;
+    described.description = `<p>Breathable  <em>linen</em> shirt.</p><ul><li>Relaxed fit</li></ul>${" more".repeat(80)}`;
+    const enriched = fixture.enrichments.find((row) => row.productId === "syn-1")!;
+    Object.assign(enriched, {
+      occasions: ["beach"],
+      fit: "relaxed",
+      styleTags: ["minimal", "summer"],
+      sleeveLength: "long",
+      neckline: "collared",
+      garmentLength: "hip",
+      pattern: "solid",
+      materialAppearance: "linen",
+    });
+    // A product with neither a description nor the added attributes.
+    const plain = fixture.products.find((product) => product.productId === "syn-5")!;
+    plain.description = "";
+
+    const db = await createTestDb();
+    await importScoreFixture(db, fixture);
+    const set: ScoreSetEntry[] = [
+      { query: "linen shirt", language: "en", source: "log", modelWritten: false },
+    ];
+    const { llm, requests } = fakeGrader();
+    await runScoreSet({
+      db,
+      orchestrator: createSyntheticOrchestrator(db, set),
+      grader: llm,
+      storeKey: SYNTHETIC_STORE_KEY,
+      set,
+    });
+    expect(requests).toHaveLength(1);
+    const lines = requests[0]!.prompt.split("\n");
+    const detailsAfter = (title: string) =>
+      lines[lines.findIndex((line) => new RegExp(`^\\d+\\. ${title} \\(`).test(line)) + 1];
+
+    const excerpt = descriptionExcerpt(described.description);
+    expect(excerpt).toHaveLength(300);
+    expect(excerpt.startsWith("Breathable linen shirt. Relaxed fit more")).toBe(true);
+    expect(detailsAfter("Linen Shirt")).toBe(
+      `   shirt · white · beach · fit: relaxed · style: minimal, summer · sleeve length: long · neckline: collared · garment length: hip · pattern: solid · material appearance: linen · description: ${excerpt}`,
+    );
+    // Today's shape: category · colours (no occasions, nothing added).
+    expect(detailsAfter("Black Linen Shirt")).toBe("   shirt · black");
+  });
+
+  it("grades a product with nothing to show without a details line", () => {
+    expect(graderDetails("", undefined)).toBeUndefined();
+    expect(graderDetails("<p> </p>", undefined)).toBeUndefined();
   });
 });
 

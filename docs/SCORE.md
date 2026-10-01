@@ -12,11 +12,15 @@ only if the hidden score goes up. The tooling lives in
 1. **Build the set** — `npx tsx scripts/score-build-set.mts --hidden-out <path outside the repo>`.
    Every submitted search of the playground store keys is read from
    `SearchEvent` (query, store key, date) and de-duplicated on its normalized
-   text. Each is filed under a language by script alone: Hebrew → `he`,
+   text. Only shopper-shaped searches are kept: submitted on or after
+   2026-08-10 (the playground era — earlier rows are M1 test searches), at
+   least three characters after trimming, no zero-width format character
+   (the latency probe's marker), and not one of the probe's committed
+   queries in `scripts/latency-probe-queries.json`. Each is filed under a language by script alone: Hebrew → `he`,
    Arabic → `ar`, Cyrillic → `ru`, everything else → `en`. French and Spanish
    are never taken from the log.
 2. **Fill** — each of `en, he, ar, ru, fr, es` is filled to exactly 25
-   searches: log queries first (oldest first), then Flash-Lite filler shaped
+   searches: log queries first (the newest 25 when there are more), then Flash-Lite filler shaped
    60 % one to three words, 30 % medium, 10 % long or vague. Each entry
    carries `source: "log" | "model"`; a language with no log entry is marked
    `modelWritten: true`.
@@ -35,7 +39,12 @@ only if the hidden score goes up. The tooling lives in
    top six.
 5. **Grade** — one Flash-Lite call per search (temperature 0, thinking level
    low, ledger operation `score-grade`), a grade 0–3 per result against the
-   rubric below. `GEMINI_SCORE_MODEL` overrides the model.
+   rubric below. `GEMINI_SCORE_MODEL` overrides the model. The grader sees
+   what a shopper sees: per result its title, type, vendor and price, then
+   the enrichment's category, colours and occasions, its fit, style tags and
+   five vision attributes (sleeve length, neckline, garment length, pattern,
+   material appearance) where present, and the description's first 300
+   characters, HTML stripped and whitespace collapsed.
 6. **Score** — a search's score is the mean of six grades divided by 3, a
    missing result slot graded 0. A language's score is the mean over its
    searches.
