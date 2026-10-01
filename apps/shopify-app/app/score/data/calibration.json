@@ -57,7 +57,14 @@
         "details": "dress · black · evening · fit: sheath · style: tie neck, empire waist, knee length, elegant, minimal · sleeve length: short · neckline: high-neck · garment length: knee · pattern: solid · material appearance: wool · description: A softly draped silk tie sweeps across the neckline of this sleeve, knee length sheath dress. Empire waist line. Amelia Toro. Color Black. 100% Wool, Collar 100% Silk. Made in Columbia. Lana is wearing a size 4."
       }
     ],
-    "grades": []
+    "grades": [
+      1,
+      2,
+      2,
+      1,
+      1,
+      1
+    ]
   },
   {
     "query": "midi dress with long sleeves under 300",
@@ -117,7 +124,14 @@
         "details": "dress · black · casual, work · fit: tunic-like silhouette · style: tunic, long sleeves, side slits, modal, silk, minimal, basic · sleeve length: three-quarter · neckline: crew · garment length: thigh · pattern: solid · material appearance: jersey · description: This is a demonstration store. You can purchase products like this from Baby & CompanyThe Minerva radiates summer time elegance as your new staple piece. Tunic-like silhouette, side slits, and long sleeves. Drifter. Color Black. 90% Modal, 10% Silk. Made in U.S.A. Ashley is wearing a Small. Shop our"
       }
     ],
-    "grades": []
+    "grades": [
+      2,
+      1,
+      2,
+      2,
+      2,
+      1
+    ]
   },
   {
     "query": "black dress",
@@ -177,7 +191,14 @@
         "details": "dress · black · casual, evening · fit: natural fitting silhouette through the knee · style: net, draped, mesh sleeves, unique, chic, avant-garde, elegant · sleeve length: long · neckline: crew · garment length: knee · pattern: solid · material appearance: synthetic · description: The Net Dress by Maria Calderera is eye catching and unique. With front draped accents and mesh sleeves, one is bound to stand out. Natural fitting silhouette through the knee. Color Black. 40% Polyester, 30% Polyamide, 26% Viscose, 4% Elastane. Made in Italy. Lana is wearing a Size 1."
       }
     ],
-    "grades": []
+    "grades": [
+      3,
+      3,
+      3,
+      3,
+      3,
+      3
+    ]
   },
   {
     "query": "blue dress under 500",
@@ -237,7 +258,14 @@
         "details": "dress · navy, pink, black, blue · casual · fit: true to size · style: edgy, basic, mesh, t-shirt dress, minimal, contemporary · sleeve length: short · neckline: crew · garment length: knee · pattern: solid · material appearance: synthetic · description: An edgy basic to layer over and under all of your current closet items. Bold and rectangular in shape the stiff material won't stretch out or lose its shape. The dress falls just below the knee if wearing true to your size. Maria Calderara. Color Navy. 100% Polyamide. Lana is wearing a size 2. Also"
       }
     ],
-    "grades": []
+    "grades": [
+      3,
+      3,
+      3,
+      3,
+      3,
+      3
+    ]
   },
   {
     "query": "a midi dress with long sleeves",
@@ -297,7 +325,14 @@
         "details": "top · navy, blue · work, casual · fit: regular · style: cashmere, cotton, crewneck, longsleeve, shirt, t-shirt, top, minimal, basic, casual · sleeve length: long · neckline: crew · garment length: hip · pattern: solid · material appearance: jersey · description: This Cashmere and Cotton Tee is an essential work, travel, and life staple for men who like versatility and quality. Color Navy. 90% Cotton, 10% Cashmere. Matt is wearing a size Large. Matt is 6’2”, Chest 38”, Waist 31”, Inseam 34.5”."
       }
     ],
-    "grades": []
+    "grades": [
+      3,
+      1,
+      2,
+      1,
+      0,
+      0
+    ]
   },
   {
     "query": "dress for a wedding",
@@ -357,7 +392,14 @@
         "details": "dress · blue, ondee · evening, wedding, casual · fit: tea-length · style: v-neckline, capped mesh sleeves, elegant, chic, classic · sleeve length: short · neckline: scoop · garment length: midi · pattern: solid · material appearance: synthetic · description: The Relax Dress tea-length with a full skirt. Reinvented v-neckline. Capped mesh sleeves. Lilith. Color Ondee. 100% Cotton, Mesh Overlay 100% Polyester. Ashley is wearing an X-Small. Shop our collection of Lilith."
       }
     ],
-    "grades": []
+    "grades": [
+      3,
+      3,
+      3,
+      3,
+      3,
+      3
+    ]
   },
   {
     "query": "t-shirt",
@@ -417,7 +459,14 @@
         "details": "top · white · casual, work · fit: tailored to fit naturally and immaculately · style: button up, pinstripe, classic, button down, minimal, smart · sleeve length: long · neckline: collar · garment length: hip · pattern: stripe · material appearance: cotton · description: This is a demonstration store. You can purchase products like this from Baby & CompanyThe Hempel Shirt is the all-purpose classic button down. Tailored to fit naturally and immaculately. Front button down placket, clean collar, standard cuff with button closure. Woven stripe detail. Hannes Roether."
       }
     ],
-    "grades": []
+    "grades": [
+      3,
+      3,
+      1,
+      1,
+      1,
+      1
+    ]
   },
   {
     "query": "same but under 300",
@@ -477,7 +526,14 @@
         "details": "shoes · blue, lime, yellow, orange, grey · casual · fit: regular · style: classic, contemporary, wingtip, loafer, slip on, casual, minimal · pattern: colour-block · material appearance: canvas · description: This is a demonstration store. You can purchase products like this from Baby & CompanyNot your Grandfather’s house shoes. These Loafers from Verba are classic in silhouette, yet contemporary with a canvas body and neon soles. Leather trim. Color Blue. Made in Italy. Also available in Lime, Yellow, a"
       }
     ],
-    "grades": []
+    "grades": [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+    ]
   },
   {
     "query": "summer dress, not black under 400 dollars",
@@ -537,7 +593,14 @@
         "details": "dress · navy · casual, evening, work · fit: regular · style: sleeveless, pleated, wool, elegant, minimal, classic · sleeve length: sleeveless · neckline: crew · garment length: knee · pattern: solid · material appearance: wool · description: Fine pleats gather the sleeveless bodice and release the sweeping skirt of this wool dress. Silken sash ties at natural waist giving way to a back zip closure. Hache. Color Navy. 97% Wool, 100% Viscose. Lana is wearing an Italian 40."
       }
     ],
-    "grades": []
+    "grades": [
+      3,
+      2,
+      2,
+      3,
+      3,
+      2
+    ]
   },
   {
     "query": "Mesh Over Dress",
@@ -597,6 +660,13 @@
         "details": "dress · black · casual, work, evening · fit: shapely · style: floral, sleeveless, neoprene, minimal, modern, chic · sleeve length: sleeveless · neckline: crew · garment length: knee · pattern: solid · material appearance: synthetic · description: This is a demonstration store. You can purchase products like this from Baby & CompanyEmerging apparel textile neoprene is uniquely ideal for spring. Comfort in the material, neoprene offers flattering stretch for shapely fit. This sleeveless piece incorporates contrast trimming and floral appliqué."
       }
     ],
-    "grades": []
+    "grades": [
+      3,
+      2,
+      2,
+      0,
+      1,
+      0
+    ]
   }
 ]
