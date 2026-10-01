@@ -9,7 +9,10 @@ import { createTestDb } from "../testing/helpers.server";
 import {
   calibrate,
   calibrateCommand,
+  DEFAULT_CALIBRATION_PATH,
   DEFAULT_FIXTURE_PATH,
+  DEFAULT_PUBLIC_SET_PATH,
+  type CalibrationEntry,
   leakCheckCommand,
   readFixtureFile,
   REPO_ROOT,
@@ -717,6 +720,28 @@ describe("failures by stage and class (YOY-141 AC-13)", () => {
     });
     expect(report.failures).toEqual([]);
     expect(formatScoreTable(report).split("\n").at(-1)).toMatch(/^cost /);
+  });
+});
+
+describe("the committed calibration set (YOY-141 AC-6)", () => {
+  it("holds ten public-half en searches with six graded-view results each", () => {
+    const calibration = JSON.parse(readFileSync(DEFAULT_CALIBRATION_PATH, "utf8")) as CalibrationEntry[];
+    const publicSet = JSON.parse(readFileSync(DEFAULT_PUBLIC_SET_PATH, "utf8")) as ScoreSetEntry[];
+    const english = publicSet.filter((entry) => entry.language === "en").map((entry) => entry.query);
+    expect(calibration).toHaveLength(10);
+    // Public-half en searches, in file order.
+    const positions = calibration.map((entry) => english.indexOf(entry.query));
+    expect(positions.every((position) => position >= 0)).toBe(true);
+    expect([...positions].sort((a, b) => a - b)).toEqual(positions);
+    for (const entry of calibration) {
+      expect(entry.results).toHaveLength(6);
+      for (const result of entry.results) {
+        expect(typeof result.title).toBe("string");
+      }
+      // Empty until the outside reader's grades are filled in; then 0–3 each.
+      expect([0, 6]).toContain(entry.grades.length);
+      expect(entry.grades.every((grade) => Number.isInteger(grade) && grade >= 0 && grade <= 3)).toBe(true);
+    }
   });
 });
 
