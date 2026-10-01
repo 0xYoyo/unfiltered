@@ -27,7 +27,9 @@ import {
 import { findLeaks } from "./leak.server";
 import {
   descriptionExcerpt,
+  failureClassName,
   formatCostLine,
+  formatFailureLine,
   formatScoreTable,
   graderDetails,
   readRunCost,
@@ -637,6 +639,87 @@ describe("the fixture (AC-8)", () => {
   });
 });
 
+describe("failures by stage and class (YOY-141 AC-13)", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  class GeminiTimeoutError extends Error {}
+
+  it("names a failure by its constructor, never by its message", () => {
+    expect(failureClassName(new GeminiTimeoutError("timed out on: linen shirt"))).toBe("GeminiTimeoutError");
+    expect(failureClassName(new TypeError("x"))).toBe("TypeError");
+    expect(failureClassName("a thrown string with the query")).toBe("string");
+    expect(failureClassName(Object.assign(Object.create(null), { message: "q" }))).toBe("Unnamed");
+    const renamed = new Error("q");
+    renamed.name = "linen shirt";
+    expect(failureClassName(renamed)).toBe("Error");
+    expect(formatFailureLine({ stage: "grade", className: "Error", count: 3 })).toBe("failed grade Error 3");
+  });
+
+  it("counts failures per (stage, class) and prints them under the cost line, without the message", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const marker = "ZQX-MARKER-141";
+    const db = await createTestDb();
+    await importScoreFixture(db, buildSyntheticFixture());
+    const set: ScoreSetEntry[] = [
+      { query: `${marker} linen shirt`, language: "en", source: "log", modelWritten: false },
+      { query: `${marker} black dress`, language: "en", source: "log", modelWritten: false },
+      { query: `${marker} shirt`, language: "he", source: "log", modelWritten: false },
+    ];
+    const orchestrator = createSyntheticOrchestrator(db, set);
+    vi.spyOn(orchestrator, "runSearch").mockImplementation(async (request) => {
+      throw new GeminiTimeoutError(`timed out on ${request.query}`);
+    });
+    const failingGrader: LlmClient = {
+      completeStructured: async (request: StructuredCompletionRequest) => {
+        throw new Error(`bad grades for ${request.prompt}`);
+      },
+    } as unknown as LlmClient;
+    const report = await runScoreSet({
+      db,
+      orchestrator,
+      grader: failingGrader,
+      storeKey: SYNTHETIC_STORE_KEY,
+      set,
+    });
+    expect(report.failures).toEqual([{ stage: "search", className: "GeminiTimeoutError", count: 3 }]);
+    const table = formatScoreTable(report);
+    expect(table.split("\n").at(-1)).toBe("failed search GeminiTimeoutError 3");
+    expect(table).not.toContain(marker);
+    expect(findLeaks(table, set)).toEqual({ leaked: 0 });
+
+    // The search succeeds and the grader throws: the stage is "grade".
+    vi.restoreAllMocks();
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const graded = await runScoreSet({
+      db,
+      orchestrator: createSyntheticOrchestrator(db, set),
+      grader: failingGrader,
+      storeKey: SYNTHETIC_STORE_KEY,
+      set: set.slice(0, 1).map((entry) => ({ ...entry, query: "linen shirt" })),
+    });
+    expect(graded.failures).toEqual([{ stage: "grade", className: "Error", count: 1 }]);
+  });
+
+  it("prints no failure line when nothing failed", async () => {
+    const db = await createTestDb();
+    await importScoreFixture(db, buildSyntheticFixture());
+    const set: ScoreSetEntry[] = [
+      { query: "linen shirt", language: "en", source: "log", modelWritten: false },
+    ];
+    const report = await runScoreSet({
+      db,
+      orchestrator: createSyntheticOrchestrator(db, set),
+      grader: fakeGrader(3).llm,
+      storeKey: SYNTHETIC_STORE_KEY,
+      set,
+    });
+    expect(report.failures).toEqual([]);
+    expect(formatScoreTable(report).split("\n").at(-1)).toMatch(/^cost /);
+  });
+});
+
 describe("calibration (AC-9)", () => {
   it("computes exact and within-one agreement as percentages", () => {
     expect(
@@ -687,10 +770,18 @@ describe("the hidden run's leak check (YOY-141 AC-3)", () => {
       { language: "he", score: 0.25, searches: 12, modelWritten: false, underOneSecond: 1, failed: 1 },
     ],
     cost: { usd: 0.0812, calls: 96 },
+    failures: [
+      { stage: "search", className: "GeminiTimeoutError", count: 2 },
+      { stage: "grade", className: "Error", count: 1 },
+    ],
   });
 
   it("passes a clean score table, even when hidden searches are table words", () => {
-    expect(table.split("\n").at(-1)).toBe("cost $0.0812 over 96 model calls");
+    expect(table.split("\n").slice(-3)).toEqual([
+      "cost $0.0812 over 96 model calls",
+      "failed search GeminiTimeoutError 2",
+      "failed grade Error 1",
+    ]);
     expect(findLeaks(`${table}\n`, hidden)).toEqual({ leaked: 0 });
   });
 
@@ -700,6 +791,15 @@ describe("the hidden run's leak check (YOY-141 AC-3)", () => {
     ];
     expect(findLeaks("cost $0.0812 over 96 model calls\n", hiddenCost)).toEqual({ leaked: 0 });
     expect(findLeaks("cost $0.0812 over 96 model calls for cost\n", hiddenCost)).toEqual({ leaked: 1 });
+  });
+
+  it("skips only a strict failure line: a query in its place is still found", () => {
+    const hiddenWord: ScoreSetEntry[] = [
+      { query: "linen", language: "en", source: "model", modelWritten: false },
+    ];
+    expect(findLeaks("failed grade linen 1\n", hiddenWord)).toEqual({ leaked: 0 });
+    expect(findLeaks("failed grade linen shirt 1\n", hiddenWord)).toEqual({ leaked: 1 });
+    expect(findLeaks("failed linen Error 1\n", hiddenWord)).toEqual({ leaked: 1 });
   });
 
   it("counts every hidden query found outside the table, case-insensitively", () => {
@@ -779,5 +879,11 @@ describe("the score workflow (YOY-141 AC-1, AC-2)", () => {
     expect(workflow).toContain("GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}");
     expect(workflow).toContain("HIDDEN_SET_B64: ${{ secrets.HIDDEN_SET_B64 }}");
     expect(workflow).toContain("GITHUB_STEP_SUMMARY");
+  });
+
+  it("prints the GEMINI_ and INTENT_ env names before the run, never their values (YOY-141 AC-13)", () => {
+    const names = workflow.indexOf("env | cut -d= -f1 | grep -E '^(GEMINI|INTENT)_'");
+    expect(names).toBeGreaterThan(-1);
+    expect(names).toBeLessThan(workflow.indexOf("scripts/score-run.mts --hidden-set"));
   });
 });
