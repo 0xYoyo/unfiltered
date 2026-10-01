@@ -8,12 +8,14 @@
  * and nothing else. All logic lives in app/playground/ingest-public-cli
  * .server.ts, tested offline; this file only wires the process.
  *
- * Usage, from apps/shopify-app:
+ * Usage, from apps/shopify-app (the script loads .env itself):
  *
- *   set -a && source .env && set +a
  *   npm run ingest:public -- --url https://store.example --slug store [--name "Store"] [--max 2000] [--source shopify-public|jsonld-crawl] [--pages 3000]
  *   npm run ingest:public -- --delete --slug store
  */
+
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { PrismaClient } from "@prisma/client";
 
@@ -28,6 +30,17 @@ import {
   CRAWL_MIN_SPACING_MS,
 } from "../app/playground/jsonld-crawl-source.server";
 import { createPoliteFetch } from "../app/playground/polite-fetch.server";
+
+// Env loading is in-process (YOY-142 AC-11), the `render-migrate.mts`
+// pattern: Node's built-in `process.loadEnvFile` reads apps/shopify-app/.env,
+// so no `source .env` in the shell; nothing here prints a value. A missing
+// file is ignored (the env may already be exported), and an already-exported
+// variable wins over the file.
+try {
+  process.loadEnvFile(resolve(dirname(fileURLToPath(import.meta.url)), "..", ".env"));
+} catch (error) {
+  if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+}
 
 const db = new PrismaClient();
 
