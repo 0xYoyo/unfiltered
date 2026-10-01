@@ -30,6 +30,40 @@ export interface SearchOutcome {
   latencyMs: number;
   /** The search or its grading threw; scored 0. */
   failed: boolean;
+  /** Where and what threw, for a failed search (YOY-141 AC-13). */
+  failure?: FailureClass;
+}
+
+/** The stage of a scored search that can throw. */
+export type FailureStage = "search" | "grade";
+
+/**
+ * A failure as the run may print it (YOY-141 AC-13): the stage and the
+ * error's class name only — never its message, which can carry the query.
+ */
+export interface FailureClass {
+  stage: FailureStage;
+  className: string;
+}
+
+/** Failed searches per distinct (stage, class) pair. */
+export interface FailureCount extends FailureClass {
+  count: number;
+}
+
+const CLASS_NAME = /^[A-Za-z_$][\w$]{0,63}$/;
+
+/**
+ * The thrown value's class name, read from its constructor — code-defined,
+ * never from the error's own fields, so no message text can pass through.
+ * Anything that is not a plain identifier prints as `Unnamed`.
+ */
+export function failureClassName(thrown: unknown): string {
+  const name =
+    typeof thrown === "object" && thrown !== null
+      ? (thrown as { constructor?: { name?: unknown } }).constructor?.name
+      : typeof thrown;
+  return typeof name === "string" && CLASS_NAME.test(name) ? name : "Unnamed";
 }
 
 export interface LanguageScore {
@@ -46,6 +80,8 @@ export interface ScoreReport {
   languages: LanguageScore[];
   /** The run's spend, read from the cost ledger (YOY-141 AC-10). */
   cost: { usd: number; calls: number };
+  /** Failed searches per (stage, class), most frequent first (YOY-141 AC-13). */
+  failures: FailureCount[];
 }
 
 /**
@@ -185,19 +221,28 @@ export async function runScoreSet({
 }): Promise<ScoreReport> {
   const outcomes: SearchOutcome[] = [];
   for (const entry of set) {
+    let stage: FailureStage = "search";
     try {
       const { response, latencyMs } = await runPlaygroundSearch(orchestrator, {
         query: entry.query,
         storeKey,
         limit: SCORE_RESULT_LIMIT,
       });
+      stage = "grade";
       const top = response.hits.slice(0, GRADED_RESULTS).map((hit) => hit.productId);
       const results = await gradedResults(db, storeKey, top);
       const grades = await gradeSearch({ llm: grader, query: entry.query, results });
       outcomes.push({ language: entry.language, score: searchScore(grades), latencyMs, failed: false });
-    } catch {
-      // A failure is scored, never printed: its message may carry the query.
-      outcomes.push({ language: entry.language, score: 0, latencyMs: Infinity, failed: true });
+    } catch (error) {
+      // A failure is scored and counted by stage and class, never printed:
+      // its message may carry the query.
+      outcomes.push({
+        language: entry.language,
+        score: 0,
+        latencyMs: Infinity,
+        failed: true,
+        failure: { stage, className: failureClassName(error) },
+      });
     }
   }
 
@@ -216,7 +261,24 @@ export async function runScoreSet({
     });
   }
   await flushLedger();
-  return { languages, cost: await readRunCost(db) };
+  return { languages, cost: await readRunCost(db), failures: countFailures(outcomes) };
+}
+
+function countFailures(outcomes: readonly SearchOutcome[]): FailureCount[] {
+  const counts = new Map<string, FailureCount>();
+  for (const { failure } of outcomes) {
+    if (failure === undefined) continue;
+    const key = `${failure.stage} ${failure.className}`;
+    const current = counts.get(key) ?? { ...failure, count: 0 };
+    current.count += 1;
+    counts.set(key, current);
+  }
+  return [...counts.values()].sort(
+    (a, b) =>
+      b.count - a.count ||
+      a.stage.localeCompare(b.stage) ||
+      a.className.localeCompare(b.className),
+  );
 }
 
 /** The score table: the only thing a run prints (AC-5, AC-7). */
@@ -236,7 +298,13 @@ export function formatScoreTable(report: ScoreReport): string {
   return [
     ...rows.map((row) => row.map((cell, column) => cell.padEnd(widths[column]!)).join("  ").trimEnd()),
     formatCostLine(report.cost),
+    ...report.failures.map(formatFailureLine),
   ].join("\n");
+}
+
+/** One line per (stage, class) under the cost line (YOY-141 AC-13). */
+export function formatFailureLine(failure: FailureCount): string {
+  return `failed ${failure.stage} ${failure.className} ${failure.count}`;
 }
 
 /** The ledger line under the table: numbers only, like every table row. */

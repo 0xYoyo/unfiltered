@@ -53,7 +53,10 @@ only if the hidden score goes up. The tooling lives in
    share of searches under 1 s, and failed searches, then one cost line —
    `cost $N over N model calls`, the run's spend read from its own cost
    ledger (every search call and every grade) before the scratch database
-   is discarded. Query text never reaches the output.
+   is discarded — then, when any search failed, one line per distinct
+   stage and error class, `failed <search|grade> <ClassName> <count>`. A
+   failure is named by its error's class only, never its message, which can
+   carry the query. Query text never reaches the output.
 
 `npm run score:public` runs the public half against
 `app/score/data/seed-fixture.json.gz` (`--set`, `--fixture` and
@@ -78,10 +81,16 @@ gh run view --log
 The workflow runs on `workflow_dispatch` only — never on push or pull
 request, never inside `ci.yml`. It checks out `ref`, writes the secret to
 the runner's temp directory, runs `score-run.mts --hidden-set` with
-`GEMINI_API_KEY`, and captures every byte the runner writes.
-`score-leak-check.mts` then fails the job if any hidden query appears in
-that output as whole words (score-table lines excepted: they hold only
-language codes and numbers), printing a count and never the query. Only a
+`GEMINI_API_KEY`, and captures every byte the runner writes. Before the
+run it prints the names — never the values — of the `GEMINI_*` and
+`INTENT_*` variables it has. `score-leak-check.mts` then fails the job if
+any hidden query appears in that output as whole words (the score table,
+the cost line and the failure lines excepted: each is matched by its exact
+shape and holds only language codes, numbers, a stage or a class name),
+printing a count and never the query.
+
+A run with more than 2 failed searches of 72 is not a baseline: its cause
+is fixed first and the run is dispatched again. Only a
 clean output is printed to the log and written to the job summary.
 
 ## Rubric
@@ -143,8 +152,8 @@ searches in those languages).
 
 Read from each run's cost ledger (the run's cost line): one public run —
 78 searches, 268 model calls including the grades — costs **$0.0595**
-(runs: $0.0597, $0.0595, $0.0594). Hidden run 1 — 72 searches, 157 model
-calls — costs **$0.0391**, read from the cost line in its workflow log.
+(runs: $0.0597, $0.0595, $0.0594). Hidden run 1 — 72 searches, 255 model
+calls — costs **$0.0571**, read from the cost line in its workflow log.
 
 ## Results
 
@@ -156,12 +165,17 @@ deployment's.
 
 | Run | Engine | en | he | ar | ru | fr | es | Under 1 s | Cost |
 |-----|--------|----|----|----|----|----|----|-----------|------|
-| 1 | M5 engine | 0.306 | 0.032 | 0.181 | 0.083 | 0.167 | 0.106 | classic 96 % · AI 34 % (EN 40 %, HE 28 %), 2026-10-01 | $0.0391 |
+| 1 | M5 engine | 0.472 | 0.269 | 0.398 | 0.431 | 0.324 | 0.306 | classic 96 % · AI 34 % (EN 40 %, HE 28 %), 2026-10-01 | $0.0571 |
+| 1 (invalid: 18 failures) | M5 engine | 0.306 | 0.032 | 0.181 | 0.083 | 0.167 | 0.106 | — | $0.0391 |
 
-Run 1 — M5 engine: `gh workflow run score.yml -f ref=main` at `bdcc41e`,
-2026-10-01, [run 36905483201](https://github.com/0xYoyo/unfiltered/actions/runs/36905483201),
-green, leak check clean (72 checked). 18 of the 72 hidden searches failed
-and were scored 0 — en 2, he 2, ar 3, ru 2, fr 5, es 4 of 12 each — against
-none in the three local public runs. The runner prints no failure text (it
-could carry query text), so the cause is not in the log; the scores above
-include those zeros.
+Run 1 — M5 engine: [run 36908656314](https://github.com/0xYoyo/unfiltered/actions/runs/36908656314),
+2026-10-01, dispatched on the branch that added the failure lines
+(`f94f374`; the engine is `main` at `c94880c` unchanged — the branch
+touches only the score tooling and the workflow). Green, leak check clean
+(72 checked), **0 failed searches**. Env settings present:
+`GEMINI_API_KEY` only.
+
+Run 1 (invalid): [run 36905483201](https://github.com/0xYoyo/unfiltered/actions/runs/36905483201)
+at `bdcc41e`, 18 of 72 searches failed and scored 0 (en 2, he 2, ar 3,
+ru 2, fr 5, es 4 of 12). It predates the failure lines, so its causes were
+not recorded; the re-run under the same environment had none.

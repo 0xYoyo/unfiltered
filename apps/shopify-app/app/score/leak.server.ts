@@ -6,9 +6,9 @@ import { SCORE_LANGUAGES, type ScoreSetEntry } from "./set.server";
  * appears in it — before anything is printed, and without ever printing the
  * query that leaked.
  *
- * Score-table lines and the cost line are matched strictly and skipped: their
- * every cell is a language code, a number, or yes/no, so they cannot carry
- * query text, and
+ * Score-table lines, the cost line and the failure lines are matched strictly
+ * and skipped: their every cell is a language code, a number, yes/no, a
+ * stage or an error class name, so they cannot carry query text, and
  * skipping them keeps a one-word hidden search such as "score" from failing
  * a clean run on the table's own header. Elsewhere a query counts as found
  * when it appears as whole words, case-insensitively.
@@ -18,6 +18,8 @@ const LANGUAGE = `(?:${SCORE_LANGUAGES.join("|")})`;
 const TABLE_HEADER = /^language\s+score\s+searches\s+model-written\s+under 1 s\s+failed$/;
 const TABLE_ROW = new RegExp(`^${LANGUAGE}\\s+\\d+\\.\\d{3}\\s+\\d+\\s+(?:yes|no)\\s+\\d+%\\s+\\d+$`);
 const COST_LINE = /^cost \$\d+\.\d{4} over \d+ model calls$/;
+const FAILURE_LINE = /^failed (?:search|grade) [A-Za-z_$][\w$]{0,63} \d+$/;
+const STRICT_LINES = [TABLE_HEADER, TABLE_ROW, COST_LINE, FAILURE_LINE];
 
 /**
  * The query as whole words: not preceded or followed by a letter or digit,
@@ -40,7 +42,7 @@ export function findLeaks(
   const free = output
     .split("\n")
     .map((line) => line.trimEnd())
-    .filter((line) => !TABLE_HEADER.test(line) && !TABLE_ROW.test(line) && !COST_LINE.test(line))
+    .filter((line) => !STRICT_LINES.some((shape) => shape.test(line)))
     .join("\n")
     .toLowerCase();
   let leaked = 0;

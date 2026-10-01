@@ -48,6 +48,9 @@ jobs:
           # Through env, never interpolated into the script: a ref is input.
           SCORE_REF: ${{ inputs.ref }}
         run: |
+          # Which env settings the run has (AC-13): names only, never values.
+          echo "env settings present:"
+          env | cut -d= -f1 | grep -E '^(GEMINI|INTENT)_' | sort | sed 's/^/  /'
           set +e
           npx tsx scripts/score-run.mts --hidden-set "$RUNNER_TEMP/hidden.b64" \
             > "$RUNNER_TEMP/score-output.txt" 2>&1
