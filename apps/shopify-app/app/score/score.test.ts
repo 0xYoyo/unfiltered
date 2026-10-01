@@ -6,7 +6,16 @@ import type { LlmClient, StructuredCompletionRequest } from "@unfiltered/engine"
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createTestDb } from "../testing/helpers.server";
-import { calibrate, calibrateCommand, REPO_ROOT, runScoreCommand } from "./cli.server";
+import {
+  calibrate,
+  calibrateCommand,
+  DEFAULT_FIXTURE_PATH,
+  leakCheckCommand,
+  readFixtureFile,
+  REPO_ROOT,
+  runScoreCommand,
+  writeFixtureFile,
+} from "./cli.server";
 import { exportScoreFixture, importScoreFixture } from "./fixture.server";
 import {
   gradeAgreement,
@@ -15,6 +24,7 @@ import {
   SCORE_RUBRIC,
   searchScore,
 } from "./grade.server";
+import { findLeaks } from "./leak.server";
 import { formatScoreTable, runScoreSet } from "./run.server";
 import {
   buildScoreSet,
@@ -467,5 +477,104 @@ describe("calibration (AC-9)", () => {
     expect(lines).toEqual([
       "calibration: 2 graded results · exact agreement 50.0% · within one 50.0%",
     ]);
+  });
+});
+
+describe("the hidden run's leak check (YOY-141 AC-3)", () => {
+  const hidden: ScoreSetEntry[] = [
+    { query: "ZQX hidden linen shirt", language: "en", source: "log", modelWritten: false },
+    { query: "שמלה סודית", language: "he", source: "log", modelWritten: false },
+    // One-word searches that collide with the table's own words.
+    { query: "score", language: "en", source: "model", modelWritten: false },
+    { query: "en", language: "en", source: "model", modelWritten: false },
+  ];
+  const table = formatScoreTable({
+    languages: [
+      { language: "en", score: 0.5, searches: 12, modelWritten: false, underOneSecond: 0.5, failed: 0 },
+      { language: "he", score: 0.25, searches: 12, modelWritten: false, underOneSecond: 1, failed: 1 },
+    ],
+  });
+
+  it("passes a clean score table, even when hidden searches are table words", () => {
+    expect(findLeaks(`${table}\n`, hidden)).toEqual({ leaked: 0 });
+  });
+
+  it("counts every hidden query found outside the table, case-insensitively", () => {
+    const output = `${table}\n[search] intent extraction failed {"query":"zqx HIDDEN linen shirt"}\nשמלה סודית\n`;
+    expect(findLeaks(output, hidden)).toEqual({ leaked: 2 });
+  });
+
+  it("fails the command on a leak and prints no query text", () => {
+    const dir = mkdtempSync(join(tmpdir(), "score-leak-"));
+    const hiddenPath = join(dir, "hidden.b64");
+    const outputPath = join(dir, "output.txt");
+    writeFileSync(hiddenPath, encodeHiddenSet(hidden));
+
+    const lines: string[] = [];
+    const sinks = { out: (text: string) => lines.push(text), err: (text: string) => lines.push(text) };
+
+    writeFileSync(outputPath, `warning: ZQX hidden linen shirt\n${table}\n`);
+    expect(leakCheckCommand(["--hidden-set", hiddenPath, "--output", outputPath], sinks)).toBe(1);
+    writeFileSync(outputPath, `${table}\n`);
+    expect(leakCheckCommand(["--hidden-set", hiddenPath, "--output", outputPath], sinks)).toBe(0);
+
+    const printed = lines.join("\n");
+    for (const entry of hidden.slice(0, 2)) {
+      expect(printed).not.toContain(entry.query);
+    }
+    expect(lines[0]).toMatch(/^leak check FAILED: 1 hidden query appears/);
+    expect(lines[1]).toBe("leak check: no hidden query in the output (4 checked)");
+  });
+
+  it("fails when the inputs are unreadable", () => {
+    const lines: string[] = [];
+    expect(
+      leakCheckCommand(["--hidden-set", "/nonexistent/h.b64", "--output", "/nonexistent/o.txt"], {
+        err: (text) => lines.push(text),
+      }),
+    ).toBe(1);
+    expect(leakCheckCommand([], { err: (text) => lines.push(text) })).toBe(2);
+  });
+});
+
+describe("gzipped fixtures (YOY-141 AC-4)", () => {
+  it("writes and reads a .json.gz fixture, and plain JSON otherwise", () => {
+    const fixture = buildSyntheticFixture();
+    const dir = mkdtempSync(join(tmpdir(), "score-fixture-"));
+    writeFixtureFile(join(dir, "seed.json.gz"), fixture);
+    writeFixtureFile(join(dir, "seed.json"), fixture);
+    expect(readFileSync(join(dir, "seed.json.gz")).subarray(0, 2)).toEqual(Buffer.from([0x1f, 0x8b]));
+    expect(readFixtureFile(join(dir, "seed.json.gz"))).toEqual(fixture);
+    expect(readFixtureFile(join(dir, "seed.json"))).toEqual(fixture);
+    expect(DEFAULT_FIXTURE_PATH.endsWith("seed-fixture.json.gz")).toBe(true);
+  });
+});
+
+describe("the score workflow (YOY-141 AC-1, AC-2)", () => {
+  const workflow = readFileSync(join(REPO_ROOT, ".github", "workflows", "score.yml"), "utf8");
+  const triggers = workflow.slice(workflow.indexOf("\non:"), workflow.indexOf("\npermissions:"));
+
+  it("triggers on workflow_dispatch only, with a ref input defaulting to main", () => {
+    expect(triggers).toMatch(/^\s+workflow_dispatch:$/m);
+    expect(triggers).not.toMatch(/^\s+(push|pull_request|pull_request_target|schedule|workflow_run):/m);
+    expect(triggers).toMatch(/ref:\n(?:\s+.*\n)*?\s+default: main/);
+  });
+
+  it("leaves ci.yml on pull_request with no score job", () => {
+    const ci = readFileSync(join(REPO_ROOT, ".github", "workflows", "ci.yml"), "utf8");
+    expect(ci).toMatch(/^on:\n\s+pull_request:/m);
+    expect(ci).not.toContain("score-run");
+  });
+
+  it("checks for leaks before it prints, and runs on the hidden half with the API key", () => {
+    const run = workflow.indexOf("scripts/score-run.mts --hidden-set");
+    const check = workflow.indexOf("scripts/score-leak-check.mts");
+    const print = workflow.indexOf('cat "$RUNNER_TEMP/score-output.txt"');
+    expect(run).toBeGreaterThan(-1);
+    expect(check).toBeGreaterThan(run);
+    expect(print).toBeGreaterThan(check);
+    expect(workflow).toContain("GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}");
+    expect(workflow).toContain("HIDDEN_SET_B64: ${{ secrets.HIDDEN_SET_B64 }}");
+    expect(workflow).toContain("GITHUB_STEP_SUMMARY");
   });
 });

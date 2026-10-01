@@ -15,6 +15,7 @@ does not match a fresh generation. -->
 .github/
   workflows/
     ci.yml
+    score.yml
 .gitignore
 Dockerfile
 README.md
@@ -310,6 +311,7 @@ apps/
         cli.server.ts
         fixture.server.ts
         grade.server.ts
+        leak.server.ts
         run.server.ts
         score.test.ts
         set.server.ts
@@ -449,6 +451,7 @@ apps/
       score-build-set.mts
       score-calibrate.mts
       score-export-fixture.mts
+      score-leak-check.mts
       score-run.mts
     shopify.app.toml
     shopify.web.toml
@@ -939,7 +942,7 @@ vitest.setup.ts
 
 ## Key locations
 
-- **Config files**: .claude/yoyo.md, .github/workflows/ci.yml, apps/shopify-app/package.json, apps/shopify-app/tsconfig.json, apps/shopify-app/vite.config.ts, apps/shopify-app/widget/src/native-render.config.ts, apps/shopify-app/widget/vite.config.ts, package.json, packages/engine/package.json, packages/engine/tsconfig.json, packages/provider-gemini/package.json, packages/provider-gemini/tsconfig.json, playwright.config.ts, vitest.config.ts, vitest.dist-seam.config.ts
+- **Config files**: .claude/yoyo.md, .github/workflows/ci.yml, .github/workflows/score.yml, apps/shopify-app/package.json, apps/shopify-app/tsconfig.json, apps/shopify-app/vite.config.ts, apps/shopify-app/widget/src/native-render.config.ts, apps/shopify-app/widget/vite.config.ts, package.json, packages/engine/package.json, packages/engine/tsconfig.json, packages/provider-gemini/package.json, packages/provider-gemini/tsconfig.json, playwright.config.ts, vitest.config.ts, vitest.dist-seam.config.ts
 - **Env files (paths only — contents never read)**: .env (declared in .gitignore), .env.* (declared in .gitignore), .env.example, apps/shopify-app/.env (declared in .gitignore), apps/shopify-app/.env.example
 - **Entrypoints**: apps/shopify-app/app/routes/app.tsx, apps/shopify-app/widget/src/main.ts, packages/engine/src/index.ts, packages/provider-gemini/src/index.ts
 - **Scripts**: scripts/repo-map.mjs
@@ -1047,9 +1050,10 @@ vitest.setup.ts
 - apps/shopify-app/app/routes/webhooks.products.update.tsx → apps/shopify-app/app/catalog/webhook-sync.server.ts, apps/shopify-app/app/db.server.ts, apps/shopify-app/app/shopify.server.ts
 - apps/shopify-app/app/routes/webhooks.shop.redact.tsx → apps/shopify-app/app/shopify.server.ts
 - apps/shopify-app/app/routes/webhooks.test.ts → apps/shopify-app/app/db.server.ts, apps/shopify-app/app/routes/webhooks.app.uninstalled.tsx, apps/shopify-app/app/routes/webhooks.customers.data_request.tsx, apps/shopify-app/app/routes/webhooks.customers.redact.tsx, apps/shopify-app/app/routes/webhooks.shop.redact.tsx, apps/shopify-app/app/testing/helpers.server.ts
-- apps/shopify-app/app/score/cli.server.ts → apps/shopify-app/app/ai/cost-recorder.server.ts, apps/shopify-app/app/db.server.ts, apps/shopify-app/app/playground/api.server.ts, apps/shopify-app/app/score/fixture.server.ts, apps/shopify-app/app/score/grade.server.ts, apps/shopify-app/app/score/run.server.ts, apps/shopify-app/app/score/set.server.ts, apps/shopify-app/app/score/synthetic.server.ts, apps/shopify-app/app/search/orchestrator.server.ts, apps/shopify-app/app/search/proxy.server.ts, apps/shopify-app/app/testing/helpers.server.ts
+- apps/shopify-app/app/score/cli.server.ts → apps/shopify-app/app/ai/cost-recorder.server.ts, apps/shopify-app/app/db.server.ts, apps/shopify-app/app/playground/api.server.ts, apps/shopify-app/app/score/fixture.server.ts, apps/shopify-app/app/score/grade.server.ts, apps/shopify-app/app/score/leak.server.ts, apps/shopify-app/app/score/run.server.ts, apps/shopify-app/app/score/set.server.ts, apps/shopify-app/app/score/synthetic.server.ts, apps/shopify-app/app/search/orchestrator.server.ts, apps/shopify-app/app/search/proxy.server.ts, apps/shopify-app/app/testing/helpers.server.ts
+- apps/shopify-app/app/score/leak.server.ts → apps/shopify-app/app/score/set.server.ts
 - apps/shopify-app/app/score/run.server.ts → apps/shopify-app/app/score/grade.server.ts, apps/shopify-app/app/score/set.server.ts, apps/shopify-app/app/search/orchestrator.server.ts, apps/shopify-app/app/search/playground-search.server.ts
-- apps/shopify-app/app/score/score.test.ts → apps/shopify-app/app/score/cli.server.ts, apps/shopify-app/app/score/fixture.server.ts, apps/shopify-app/app/score/grade.server.ts, apps/shopify-app/app/score/run.server.ts, apps/shopify-app/app/score/set.server.ts, apps/shopify-app/app/score/synthetic.server.ts, apps/shopify-app/app/testing/helpers.server.ts
+- apps/shopify-app/app/score/score.test.ts → apps/shopify-app/app/score/cli.server.ts, apps/shopify-app/app/score/fixture.server.ts, apps/shopify-app/app/score/grade.server.ts, apps/shopify-app/app/score/leak.server.ts, apps/shopify-app/app/score/run.server.ts, apps/shopify-app/app/score/set.server.ts, apps/shopify-app/app/score/synthetic.server.ts, apps/shopify-app/app/testing/helpers.server.ts
 - apps/shopify-app/app/score/set.server.ts → apps/shopify-app/app/search/events.server.ts
 - apps/shopify-app/app/score/synthetic.server.ts → apps/shopify-app/app/eval/replay.server.ts, apps/shopify-app/app/score/fixture.server.ts, apps/shopify-app/app/score/grade.server.ts, apps/shopify-app/app/score/run.server.ts, apps/shopify-app/app/score/set.server.ts, apps/shopify-app/app/search/classic-store.server.ts, apps/shopify-app/app/search/orchestrator.server.ts, apps/shopify-app/app/search/playground-search.server.ts, apps/shopify-app/app/search/retrieval-store.server.ts
 - apps/shopify-app/app/search/classic-store.server.ts → apps/shopify-app/app/search/retrieval-store.server.ts
@@ -1091,6 +1095,7 @@ vitest.setup.ts
 - apps/shopify-app/scripts/score-build-set.mts → apps/shopify-app/app/score/cli.server.ts
 - apps/shopify-app/scripts/score-calibrate.mts → apps/shopify-app/app/score/cli.server.ts
 - apps/shopify-app/scripts/score-export-fixture.mts → apps/shopify-app/app/score/cli.server.ts
+- apps/shopify-app/scripts/score-leak-check.mts → apps/shopify-app/app/score/cli.server.ts
 - apps/shopify-app/scripts/score-run.mts → apps/shopify-app/app/score/cli.server.ts
 - apps/shopify-app/widget/src/format.ts → apps/shopify-app/widget/src/strings.ts
 - apps/shopify-app/widget/src/main.ts → apps/shopify-app/widget/src/native-page.ts, apps/shopify-app/widget/src/native-render.config.ts, apps/shopify-app/widget/src/native-render.ts, apps/shopify-app/widget/src/overlay.ts, apps/shopify-app/widget/src/search-client.ts, apps/shopify-app/widget/src/session.ts, apps/shopify-app/widget/src/strings.ts

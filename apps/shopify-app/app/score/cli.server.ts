@@ -1,4 +1,5 @@
 import { readFileSync, writeFileSync } from "node:fs";
+import { gunzipSync, gzipSync } from "node:zlib";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
@@ -13,6 +14,7 @@ import {
   type ScoreFixture,
 } from "./fixture.server";
 import { gradeAgreement, gradeSearch, type GradedResult } from "./grade.server";
+import { findLeaks } from "./leak.server";
 import { formatScoreTable, runScoreSet, withCapturedConsole } from "./run.server";
 import {
   buildScoreSet,
@@ -43,8 +45,12 @@ import {
 export const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const REPO_ROOT = resolve(APP_ROOT, "..", "..");
 export const DEFAULT_PUBLIC_SET_PATH = join(APP_ROOT, "app", "score", "data", "public-set.json");
-/** The seed catalog the public half is scored against by default. */
-export const DEFAULT_FIXTURE_PATH = join(APP_ROOT, "app", "score", "data", "seed-fixture.json");
+/**
+ * The seed catalog the public half is scored against by default. Committed
+ * gzipped: the size cap applies to the compressed file, and the fixture
+ * always holds every product (YOY-141 AC-4).
+ */
+export const DEFAULT_FIXTURE_PATH = join(APP_ROOT, "app", "score", "data", "seed-fixture.json.gz");
 export const DEFAULT_CALIBRATION_PATH = join(APP_ROOT, "app", "score", "data", "calibration.json");
 /** Grader model override; Flash-Lite by default (AC-4). */
 export const SCORE_MODEL_ENV = "GEMINI_SCORE_MODEL";
@@ -57,6 +63,19 @@ const stdout: Output = (text) => {
 const stderr: Output = (text) => {
   process.stderr.write(`${text}\n`);
 };
+
+/** A fixture file, gzipped when its name ends in `.gz`. */
+export function readFixtureFile(path: string): ScoreFixture {
+  const bytes = readFileSync(path);
+  return JSON.parse(
+    (path.endsWith(".gz") ? gunzipSync(bytes) : bytes).toString("utf8"),
+  ) as ScoreFixture;
+}
+
+export function writeFixtureFile(path: string, fixture: ScoreFixture): void {
+  const json = `${JSON.stringify(fixture)}\n`;
+  writeFileSync(path, path.endsWith(".gz") ? gzipSync(json, { level: 9 }) : json);
+}
 
 const noCost: CostRecorder = { record: async () => {} };
 
@@ -160,7 +179,7 @@ export async function runScoreCommand(
   try {
     fixture = values.synthetic
       ? buildSyntheticFixture()
-      : (JSON.parse(readFileSync(values.fixture ?? DEFAULT_FIXTURE_PATH, "utf8")) as ScoreFixture);
+      : readFixtureFile(values.fixture ?? DEFAULT_FIXTURE_PATH);
   } catch {
     err("score run: the fixture is missing or unreadable — export one with score-export-fixture.mts, or pass --fixture");
     return 1;
@@ -207,13 +226,13 @@ export async function exportFixtureCommand(
   });
   const [storeKey] = positionals;
   if (storeKey === undefined || values.out === undefined) {
-    err("usage: score-export-fixture.mts <storeKey> --out <fixture.json>");
+    err("usage: score-export-fixture.mts <storeKey> --out <fixture.json[.gz]>");
     return 2;
   }
   const db = await liveDb();
   try {
     const fixture = await exportScoreFixture(db, storeKey);
-    writeFileSync(values.out, `${JSON.stringify(fixture)}\n`);
+    writeFixtureFile(values.out, fixture);
     out(
       `fixture: ${fixture.products.length} products, ${fixture.enrichments.length} enrichments, ${fixture.embeddings.length} embeddings (ingested ${fixture.ingestedAt})`,
     );
@@ -271,5 +290,44 @@ export async function calibrateCommand(
   out(
     `calibration: ${agreement.pairs} graded results · exact agreement ${agreement.exact.toFixed(1)}% · within one ${agreement.withinOne.toFixed(1)}%`,
   );
+  return 0;
+}
+
+// --- score-leak-check (the score workflow, YOY-141 AC-3) ----------------------
+
+/**
+ * Fail when any hidden query appears in a run's captured output. Prints a
+ * count, never a query, so the check itself cannot leak what it guards.
+ */
+export function leakCheckCommand(
+  argv: readonly string[],
+  { out = stdout, err = stderr }: { out?: Output; err?: Output } = {},
+): number {
+  const { values } = parseArgs({
+    args: [...argv],
+    options: {
+      "hidden-set": { type: "string" },
+      output: { type: "string" },
+    },
+  });
+  if (values["hidden-set"] === undefined || values.output === undefined) {
+    err("usage: score-leak-check.mts --hidden-set <hidden.b64> --output <captured.txt>");
+    return 2;
+  }
+  let hiddenSet: ScoreSetEntry[];
+  let output: string;
+  try {
+    hiddenSet = decodeHiddenSet(readFileSync(values["hidden-set"], "utf8"));
+    output = readFileSync(values.output, "utf8");
+  } catch {
+    err("leak check: the hidden set or the captured output is missing or unreadable");
+    return 1;
+  }
+  const { leaked } = findLeaks(output, hiddenSet);
+  if (leaked > 0) {
+    err(`leak check FAILED: ${leaked} hidden ${leaked === 1 ? "query appears" : "queries appear"} in the output — it is not printed`);
+    return 1;
+  }
+  out(`leak check: no hidden query in the output (${hiddenSet.length} checked)`);
   return 0;
 }
