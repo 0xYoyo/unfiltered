@@ -113,8 +113,14 @@ Example, grade 0: search "dress not in red", result "Red wrap dress" — the sho
 `npx tsx scripts/score-calibrate.mts` reads `app/score/data/calibration.json`
 — an array of `{ "query", "results": [{ "title", "productType"?, "vendor"?,
 "priceMin"?, "priceMax"?, "currencyCode"?, "details"? }], "grades": [0–3 per
-result] }` hand-graded by a person — grades the same results, and prints exact
+result] }` graded by a reader outside the grader's model family (the
+co-manager chat in M6) — grades the same results, and prints exact
 agreement and within-one agreement as percentages.
+
+The M6 set is the first ten `en` searches of `public-set.json`, in file
+order, that return six results on the seed fixture — "beige boots in stock"
+returns none and is skipped — each with its top six results exactly as the
+grader sees them (the same fields and `details` line as a scored run).
 
 ## Budget rules
 

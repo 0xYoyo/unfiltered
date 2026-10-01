@@ -310,6 +310,7 @@ apps/
       score/
         cli.server.ts
         data/
+          calibration.json
           public-set.json
           score-baseline.json
           seed-fixture.json.gz
