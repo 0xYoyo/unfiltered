@@ -143,8 +143,8 @@ searches in those languages).
 
 Read from each run's cost ledger (the run's cost line): one public run —
 78 searches, 268 model calls including the grades — costs **$0.0595**
-(runs: $0.0597, $0.0595, $0.0594). Hidden run 1: recorded in the run-1 row
-from its workflow log.
+(runs: $0.0597, $0.0595, $0.0594). Hidden run 1 — 72 searches, 157 model
+calls — costs **$0.0391**, read from the cost line in its workflow log.
 
 ## Results
 
@@ -156,4 +156,12 @@ deployment's.
 
 | Run | Engine | en | he | ar | ru | fr | es | Under 1 s | Cost |
 |-----|--------|----|----|----|----|----|----|-----------|------|
-| 1 | M5 engine | pending | pending | pending | pending | pending | pending | classic 96 % · AI 34 % (EN 40 %, HE 28 %), 2026-10-01 | pending |
+| 1 | M5 engine | 0.306 | 0.032 | 0.181 | 0.083 | 0.167 | 0.106 | classic 96 % · AI 34 % (EN 40 %, HE 28 %), 2026-10-01 | $0.0391 |
+
+Run 1 — M5 engine: `gh workflow run score.yml -f ref=main` at `bdcc41e`,
+2026-10-01, [run 36905483201](https://github.com/0xYoyo/unfiltered/actions/runs/36905483201),
+green, leak check clean (72 checked). 18 of the 72 hidden searches failed
+and were scored 0 — en 2, he 2, ar 3, ru 2, fr 5, es 4 of 12 each — against
+none in the three local public runs. The runner prints no failure text (it
+could carry query text), so the cause is not in the log; the scores above
+include those zeros.
