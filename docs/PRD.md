@@ -1,6 +1,10 @@
 # Unfiltered — PRD
 Version: 3 · Date: 2026-09-28
-Supersedes v2; decisions in docs/RESET-2026-09-27.md. Refinements of 2026-09-30 in §3 Engine v2 (binding where they differ from the text above them).
+Supersedes v2; decisions in docs/RESET-2026-09-27.md. Refinements of
+2026-09-30 in §3 Engine v2 (binding where they differ from the text above
+them). Amendments of 2026-10-01 (budget rules, hidden-set home, label values,
+"in stock", code labels on fallback) are marked inline and bind where they
+differ.
 
 Product type: B2B web SaaS, delivered first as a native Shopify app
 (self-serve). The engine is catalog-agnostic by design: a universal script
@@ -76,8 +80,9 @@ Numbered capabilities, each observable behavior:
    created product is re-analysed and re-embedded automatically (a "Run
    alone" requirement, milestone 7). One-time indexing cost: see §8 (dossier cost).
 6. **Instant fallback.** If the judge misses its deadline or errors, or a
-   store exceeds caps, the search bar silently serves the find-stage
-   results without labels — never a failure state. The shopper never sees
+   store exceeds caps, the search bar silently serves the find-stage results
+   with the code-computed price, size and stock labels and without the judge's
+   labels — never a failure state (amended 2026-10-01). The shopper never sees
    an error state caused by us.
 7. **Merchant dashboard.** Shows: total searches, searches where the
    judge missed its deadline, zero-result searches, top queries,
@@ -99,10 +104,11 @@ Numbered capabilities, each observable behavior:
     outreach: "here is YOUR catalog answering human questions").
 11. **Cost & abuse controls.** Per-IP/session rate limits on submitted
     searches; identical-query caching; per-store monthly caps on submitted
-    searches by plan — when exceeded, the fallback is the find-stage
-    results without labels; a global per-store LLM spend ceiling on our
-    side. Real cost-per-search is measured and visible in our internal
-    admin from day one.
+    searches by plan — when exceeded, the fallback is the find-stage results
+    without the judge's labels (code-computed labels remain; amended
+    2026-10-01); a global per-store LLM spend ceiling on our side. Real
+    cost-per-search is measured and visible in our internal admin from day
+    one.
     Model spend: Gemini first; every spend ceiling is proposed with its expected cost and approved by the founder.
 12. **Billing.** Shopify-native billing: 14-day free trial (card required,
     capped at 1,000 submitted searches), then tiers per section 8.
@@ -199,7 +205,21 @@ actual facts. (docs/RESET-2026-09-27.md §2–§3.)
   50–150 by vector + keyword matches, merged. Hard filters only on facts
   that can never be a guess: store, active, published. Nothing the model
   guessed removes a product.
-- Judge: a model reads the shopper's sentence and each candidate's dossier + variants together, and returns per product a short-code answer: verdict (exact / same item, other colour or size / close alternative / not relevant), missed-wish flags, and a label template id with one parameter. The label text a shopper sees comes from about five templates ("in grey, not black"; "no M — S and L in stock"; "₪319, slightly over 300"); size, stock and price labels are computed by code from the variants table, not by the judge. Runs on the page being viewed, at the store's page size (24 candidates on page 1 by default); page 2 is judged when the shopper nears the end of page 1, never in the background. Judge answers are cached per (normalized search text, candidate product ids, card versions); merchant facts are outside the key. Product rows sent to the judge are compact (~80 tokens each).
+- Judge: a model reads the shopper's sentence and each candidate's dossier +
+  variants together, and returns per product a short-code answer: verdict
+  (exact / same item, other colour or size / close alternative / not
+  relevant), missed-wish flags, and a label template id with its values — one
+  value, or two for the merchant-fact label (the product's value and the asked
+  value, each at most three words, in the language of the shopper's sentence;
+  amended 2026-10-01). The label text a shopper sees comes from about five
+  templates ("in grey, not black"; "no M — S and L in stock"; "₪319, slightly
+  over 300"); size, stock and price labels are computed by code from the
+  variants table, not by the judge. Runs on the page being viewed, at the
+  store's page size (24 candidates on page 1 by default); page 2 is judged
+  when the shopper nears the end of page 1, never in the background. Judge
+  answers are cached per (normalized search text, candidate product ids, card
+  versions); merchant facts are outside the key. Product rows sent to the
+  judge are compact (~80 tokens each).
 - Chips: a small parallel extraction pulls out only facts the shopper
   stated (price + currency, size, in stock, explicit "not X") for
   removable chips. Not on the critical path.
@@ -213,6 +233,9 @@ actual facts. (docs/RESET-2026-09-27.md §2–§3.)
   ~10 % after them, with the fact shown. Adjacent sizes shown with the
   fact. A wall only on "max", "no more than", "only".
 - An exclusion ("not black", "no wool"): firm.
+- A stated "in stock": a firm filter — sold-out items are removed from the
+  results and the count; removing the chip brings them back (amended
+  2026-10-01).
 - A description (everything else): judged, never filtered.
 Topics are infinite; kinds are three. A new topic never adds code.
 
@@ -256,7 +279,10 @@ the judge may compare images. Milestone 8.
 - Measured on the hidden score: quality, per-language quality, speed,
   stability (same search ×5). Winner takes page 1; the other is fallback.
   One swap point in code.
-- Speed fallback: if the judge misses ~1.5 s, page 1 shows the find-stage ranking at once; labels are added when the judge answers; positions never move.
+- Speed fallback: if the judge misses ~1.5 s, page 1 shows the find-stage
+  ranking with the code-computed price, size and stock labels at once; the
+  judge's labels are added when it answers (amended 2026-10-01); positions
+  never move.
 
 #### Refinements (2026-09-30, binding; override the Engine v2 text above where they differ)
 
@@ -273,9 +299,10 @@ Agreed in the co-manager plan review of 29–30 Sep 2026. Numbers marked
    score; the other is fallback.
 2. **Short-code answers.** The judge answers per product with codes, never
    prose: a verdict (exact / same item, other colour or size / close / not
-   relevant), a set of missed-wish flags, and a label template id with one
-   parameter. Estimate: ≈ $1 per 1,000 uncached searches (replaces the $2–4
-   figure, which assumed prose output).
+   relevant), a set of missed-wish flags, and a label template id with its
+   values (one, or two for the merchant-fact label; see "The query path",
+   amended 2026-10-01). Estimate: ≈ $1 per 1,000 uncached searches (replaces
+   the $2–4 figure, which assumed prose output).
 3. **Labels from code where the fact is the merchant's.** Size, stock and
    price labels are computed by code from the variants table, never by the
    judge. The judge judges the description side only. A stock or price
@@ -293,10 +320,11 @@ Agreed in the co-manager plan review of 29–30 Sep 2026. Numbers marked
    Style, occasion and "who wears it" are the model's read: used to find
    candidates and read by the judge, never shown to the shopper, never used
    to reject a product. There is no separate verification pass.
-6. **Card writer.** Gemini 3.5 Flash-Lite (estimate ≈ $3 per 1,000 products
-   for the text card, plus the measured $1.90 per 1,000 for images). A
-   bigger card writer is adopted only after a 200-product comparison on the
-   hidden score shows the cards are the weak point.
+6. **Card writer.** Gemini 3.5 Flash-Lite (estimate ≈ $4 per 1,000 products
+   for the text card — revised 2026-10-01 from ≈ $3, the card output is long,
+   plus the measured $1.90 per 1,000 for images). A bigger card writer is
+   adopted only after a 200-product comparison on the hidden score shows the
+   cards are the weak point.
 7. **Paging.** The judge runs on the page being viewed, at the store's own
    page size. Page 2 is judged when the shopper nears the end of page 1,
    never pre-judged in the background. The find set is 150 candidates by
@@ -343,7 +371,11 @@ The hidden human-style score is the release gate (docs/RESET-2026-09-27.md
   searches (weighted most) + model-written filler shaped like reality
   (~60 % 1–3 words, 30 % medium, 10 % long/vague). No fanciful phrasings.
 - A grader model (Gemini 3.5 Flash-Lite with a fixed rubric) marks each of the top six results of each search 0–3: would a real shopper be happy?
-- Half the set is hidden from the builder, in a repository folder the builder's guard denies to agents; the score runs when an engine PR merges and on demand.
+- Half the set is hidden from the builder: it lives in a GitHub Actions
+  repository secret and is scored by a dispatch-only workflow that prints
+  scores and never query text; the builder never holds the file (amended
+  2026-10-01; a repository folder cannot be hidden from a shell read). The
+  score runs on demand at fixed points, not on every push or every PR.
 - Rule: no fix for a single search; a change ships only if the hidden
   score goes up.
 - The 90 % rule — "90 % before pitching": hidden score ≥ 90 % in every
@@ -353,15 +385,19 @@ The hidden human-style score is the release gate (docs/RESET-2026-09-27.md
 - The Constructor-bar set stays as a regression suite, not the gate.
 
 **Refinements (2026-09-30, binding).** The grader is Gemini 3.5 Flash-Lite
-with a fixed marking rubric, graded relevance 0–3 per product (same-model
-bias is accepted; the friends-and-family round is the human check). The
-score runs when an engine PR merges and on demand, not on every push
-(estimate ≈ $0.17 per run). The hidden half of the set lives in a repository
-folder the builder's guard denies to agents. The first real queries come
-from the live search log (every submitted playground search since August),
-weighted most; model-written filler fills the rest. Arabic, Russian, French
-and Spanish scores are marked model-written until real queries in those
-languages exist.
+with a fixed marking rubric, graded relevance 0–3 per product (same-model bias
+is accepted; the friends-and-family round is the human check). Budget rules
+(2026-10-01, binding): the set is 150 searches, 25 per language, half public
+and half hidden; the hidden score runs at six fixed points in M6 (baseline on
+the M5 engine; after the find step; after the judge; after chips; the judge
+comparison, once per judge; before the delete), triggered on demand, never on
+every push or PR; one run is ≈ $0.05 on the M5 engine and ≈ $0.20 with the
+judge (estimates, measured on the first runs; the earlier ≈ $0.17 counted the
+grader only). The hidden half lives in a GitHub Actions repository secret, not
+a repository folder. The first real queries come from the live search log
+(every submitted playground search since August), weighted most; model-written
+filler fills the rest. Arabic, Russian, French and Spanish scores are marked
+model-written until real queries in those languages exist.
 
 ### Amendment (2026-08-22) — Colour exclusion, close matches, colourway families (binding; capabilities 2 and 3)
 
@@ -519,7 +555,10 @@ judge comparison and scale with catalog size and search volume.
 
 Unit economics (typical store: 10k products, 20k searches/month; to be
 validated by measurement):
-- Dossiers ≈ $0.003/product → ~$30 once; cents/month for changes. Cards are written in priority order with raw-text find until a card exists (Refinement 9); a lazy full-card-on-first-hit variant stays an option if card cost matters.
+- Dossiers ≈ $0.004/product (estimate, revised 2026-10-01) → ~$40 once for 10k
+  products; cents/month for changes. Cards are written in priority order with
+  raw-text find until a card exists (Refinement 9); a lazy
+  full-card-on-first-hit variant stays an option if card cost matters.
 - Judge, uncached, short-code answers (estimate): Gemini ≈ $20/month; Jev ≈ $7/month. The answer cache cuts both; the real cache hit rate is measured in M6.
 - Hosting share $5–10.
 - At $99/month for the typical store above (20k searches): Gemini judge with short codes ≈ 70–75 % margin before cache (estimate: ≈ $20 judge + $5–10 hosting); Jev judge ≈ 85 %. At the tier's full allowance (50k searches) the Gemini judge margin falls to ≈ 45 % before cache — the answer cache hit rate and the judge comparison decide the tier limits. 500-product store ≈ $3–10/month cost.
