@@ -28,7 +28,8 @@ npm-workspaces monorepo (`apps/*`, `packages/*`) with three workspaces:
   every call metered through the `CostRecorder` port. Model IDs come only
   from configuration/env (`geminiModelsFromEnv()`; defaults
   `gemini-3.5-flash-lite` for classification/enrichment and for the vision
-  enrichment pass (YOY-121, `GEMINI_VISION_MODEL`), `gemini-3.6-flash`
+  enrichment pass (YOY-121, `GEMINI_VISION_MODEL`) and the card writer
+  (YOY-143, `GEMINI_CARD_MODEL`), `gemini-3.6-flash`
   for intent, `gemini-embedding-001` for embeddings); the API key comes from
   `GEMINI_API_KEY`. Fixture tests only by default; live round-trips run
   solely under `LIVE_LLM_TESTS=1` locally, never in CI.
@@ -290,6 +291,58 @@ product, **$1.90 per 1,000 products at 4 images each**; the text
 re-enrichment and re-embedding of the same run cost $0.41 and $0.02 per
 1,000, so a full first-time index is ≈ $2.33 per 1,000 products. The
 whole 465-product run — images, text, vision, embed — cost $1.047.
+
+### Product cards at ingestion (YOY-143; PRD §3 Engine v2, Refinements 5, 6, 9)
+
+Engine v2 understands the product once, at load time: a model writes a
+plain-text **card** per product, which later steps find and judge against.
+`app/catalog/card.server.ts` (`writeCatalogCards`) runs after enrichment,
+which it reads, and before embedding; cards are not embedded yet and no
+search reads them yet.
+
+**The table.** `ProductCard`, one row per `(shopDomain, productId)`:
+`facts` (what the item is and the merchant's stated details, material
+first; a detail only a photo shows is written "looks like …"), `look`,
+`read` (style, occasion, who wears it — the model's read, never shown to a
+shopper and never used to reject a product), `summary` (≤ 300 characters),
+`asks` (JSON `{ "<lang>": [10–20 ways to ask] }`), `cardText` (the whole card
+as one text) with `cardTextHash` (SHA-256 of it, so it moves only when the
+text does), `inputHash`, `cardVersion`, `modelId`, `writtenAt`, and
+`status` (`written` | `failed`). No FK cascade, like the enrichment rows:
+every product delete removes the card in the same transaction.
+
+**The call.** One structured call per product, operation `card`, through
+`createCardWriter` (`GEMINI_CARD_MODEL`, default `gemini-3.5-flash-lite`, at
+`GEMINI_CARD_THINKING_LEVEL`, default `low`, set explicitly), metered in the
+cost ledger. It carries the merchant's text, the enrichment's merged
+attributes as hints ("the merchant's text wins") and up to four images,
+re-read through the vision pass's own fetch (`loadVisionImages`,
+`fetchInlineImages`). Prose is written in the language of the product's own
+text; `asks` covers each configured language (`CARD_ASK_LANGUAGES`, a
+comma-separated list of codes, default `en,he`). An answer missing a
+section or a language, or with fewer than 10 distinct asks in a language,
+is invalid; over 20 asks keeps the first 20, and a long summary is cut at a
+word boundary.
+
+**The key.** `inputHash` covers the product's `contentHash`, its enrichment,
+its image hashes in position order and the ask languages; variants (stock,
+price per size) are outside it. A row whose `inputHash` and `cardVersion`
+(`CARD_VERSION`) are current — written or failed — makes zero calls. An
+invalid answer or a call error is retried once; two failures write a
+`failed` row with the input hash, so the product is retried only when its
+inputs change. A product with images none of which can be fetched makes no
+call and keeps its row, so the next run tries again. Cards are written in
+priority order — in stock first, then most recently updated — one row at a
+time, so a run that stops part-way never pays twice for cards it finished.
+
+**Reports.** `npm run ingest` prints `cards: written N, cached M, failed K,
+cost $X` after the `vision:` line (cost = the run's `card` ledger rows for
+the store); `/internal/costs` shows the `card` operation. `ingest:public`
+writes cards only with `--cards`, so the existing playground catalogs get
+no paid card calls unless an operator asks; without it the line reads
+`cards: written 0, … (off: pass --cards to write cards)`. Estimate ≈ $4 per
+1,000 products for the card text plus the images (PRD §3 Refinement 6);
+measured on the seed catalog in the slice after merge.
 
 ### Multi-tenant vector search on one shared index (YOY-105)
 

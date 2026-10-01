@@ -552,7 +552,7 @@ export interface VisionResult {
 }
 
 /** The `ProductImage` slice the vision pass reads: URL and hash, position order. */
-interface VisionImage {
+export interface VisionImage {
   url: string;
   contentHash: string;
 }
@@ -566,8 +566,12 @@ function imageMimeType(response: Response): string {
   return contentType.startsWith("image/") ? contentType : "image/jpeg";
 }
 
-/** Re-read the product's images as inline bytes; a failed fetch drops that image. */
-async function fetchInlineImages(
+/**
+ * Re-read the product's images as inline bytes; a failed fetch drops that
+ * image. Shared with the card writer (YOY-143 AC-2), which reads images
+ * through this same fetch.
+ */
+export async function fetchInlineImages(
   fetchImage: ImageFetch,
   images: VisionImage[],
 ): Promise<InlineImage[]> {
@@ -593,8 +597,8 @@ function sameStrings(a: readonly string[], b: readonly string[]): boolean {
   return a.length === b.length && a.every((value, index) => value === b[index]);
 }
 
-/** Group the shop's `ProductImage` rows by product, in position order. */
-async function loadVisionImages(
+/** Group the shop's `ProductImage` rows by product, in position order (also read by the card writer). */
+export async function loadVisionImages(
   db: PrismaClient,
   shopDomain: string,
 ): Promise<Map<string, VisionImage[]>> {

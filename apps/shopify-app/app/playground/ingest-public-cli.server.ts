@@ -1,6 +1,8 @@
 import type { PrismaClient } from "@prisma/client";
 import type { EmbeddingClient, LlmClient } from "@unfiltered/engine";
 
+import type { CardWriter } from "../catalog/card.server";
+import { formatCardReport } from "../catalog/card.server";
 import { formatVisionReport } from "../catalog/enrich.server";
 
 import type { CatalogSource } from "./catalog-source.server";
@@ -35,7 +37,7 @@ import {
  */
 
 export const INGEST_PUBLIC_USAGE = [
-  "usage: npm run ingest:public -- --url <store URL> --slug <slug> [--name \"<Store>\"] [--max <N>] [--source shopify-public|jsonld-crawl] [--pages <N>] [--path-prefix </locale/>]",
+  "usage: npm run ingest:public -- --url <store URL> --slug <slug> [--name \"<Store>\"] [--max <N>] [--source shopify-public|jsonld-crawl] [--pages <N>] [--path-prefix </locale/>] [--cards]",
   "       npm run ingest:public -- --delete --slug <slug>",
 ].join("\n");
 
@@ -60,6 +62,12 @@ export interface IngestPublicArgs {
    * leading slash and no trailing slash; null when not given.
    */
   pathPrefix: string | null;
+  /**
+   * Write product cards (`--cards`, YOY-143): off by default, so the
+   * existing playground catalogs get no paid card calls (NG-3) unless an
+   * operator asks for them.
+   */
+  cards: boolean;
 }
 
 /** Thrown for a malformed command line; the message is the whole report. */
@@ -81,6 +89,7 @@ export function parseIngestPublicArgs(argv: string[]): IngestPublicArgs {
     source: null,
     pages: DEFAULT_CRAWL_PAGE_BUDGET,
     pathPrefix: null,
+    cards: false,
   };
   for (let index = 0; index < argv.length; index += 1) {
     const flag = argv[index];
@@ -142,6 +151,9 @@ export function parseIngestPublicArgs(argv: string[]): IngestPublicArgs {
       }
       case "--delete":
         args.delete = true;
+        break;
+      case "--cards":
+        args.cards = true;
         break;
       default:
         throw new IngestPublicUsageError(`unknown argument "${flag}"`);
@@ -244,7 +256,13 @@ export async function runIngestPublicCli({
    * need GEMINI_API_KEY at construction, which `--delete` and a failed
    * detection must not require.
    */
-  aiClients: () => { llm: LlmClient; vision: LlmClient; embeddings: EmbeddingClient };
+  aiClients: () => {
+    llm: LlmClient;
+    vision: LlmClient;
+    embeddings: EmbeddingClient;
+    /** The card writer (YOY-143), used only on `--cards`. */
+    cards?: CardWriter;
+  };
   log?: (line: string) => void;
   error?: (line: string) => void;
   now?: Date;
@@ -285,7 +303,11 @@ export async function runIngestPublicCli({
     log(`catalog: ${args.slug} (${playgroundStoreKey(args.slug)})`);
     log(`source: ${detected.source.kind} at ${url}`);
     log(`name: ${detected.name}`);
-    const { llm, vision, embeddings } = aiClients();
+    const { llm, vision, embeddings, cards } = aiClients();
+    if (args.cards && cards === undefined) {
+      error("--cards was given but no card writer is configured");
+      return 1;
+    }
     const result = await ingestPublicCatalog({
       db,
       slug: args.slug,
@@ -296,6 +318,7 @@ export async function runIngestPublicCli({
       llm,
       vision,
       embeddings,
+      ...(args.cards ? { cards } : {}),
       imageFetch: (imageUrl) => fetch.fetch(imageUrl),
       now,
       onProgress: ({ fetched, stage }) => log(`fetched ${fetched} (${stage})`),
@@ -331,6 +354,11 @@ export async function runIngestPublicCli({
     if (result.enrich.vision !== undefined) {
       log(formatVisionReport(result.enrich.vision));
     }
+    log(
+      result.cards !== undefined
+        ? formatCardReport(result.cards)
+        : `${formatCardReport({ written: 0, cached: 0, failed: 0, costUsd: 0 })} (off: pass --cards to write cards)`,
+    );
     log(
       `embed: embedded ${result.embed.embedded}, cached ${result.embed.cached}, deleted ${result.embed.deleted}`,
     );

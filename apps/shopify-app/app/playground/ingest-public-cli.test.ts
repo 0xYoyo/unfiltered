@@ -2,6 +2,7 @@ import type { PrismaClient } from "@prisma/client";
 import type { EmbeddingClient, LlmClient } from "@unfiltered/engine";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
+import type { CardWriter } from "../catalog/card.server";
 import type { FakeRoute } from "../testing/fake-store.server";
 import { createFakeStore } from "../testing/fake-store.server";
 import { createTestDb } from "../testing/helpers.server";
@@ -37,8 +38,30 @@ const fixtureRoutes = () => ({
   "/meta.json": FIXTURE_META,
 });
 
+const fixtureAsks = (prefix: string) => Array.from({ length: 10 }, (_, i) => `${prefix} ${i + 1}`);
+
 /** Fixture AI clients: no ledger rows here — the CLI's cost line is proven at $0. */
-const fixtureAi = (): { llm: LlmClient; vision: LlmClient; embeddings: EmbeddingClient } => ({
+const fixtureAi = (): {
+  llm: LlmClient;
+  vision: LlmClient;
+  embeddings: EmbeddingClient;
+  cards: CardWriter;
+} => ({
+  // The card writer (YOY-143), used only on --cards.
+  cards: {
+    modelId: "fixture-card-model",
+    llm: {
+      async completeStructured() {
+        return {
+          facts: "A dress.",
+          look: "Black.",
+          read: "Evening wear.",
+          summary: "A black evening dress.",
+          asks: { en: fixtureAsks("black dress"), he: fixtureAsks("שמלה שחורה") },
+        };
+      },
+    },
+  },
   vision: {
     // The fixture store serves no image bytes, so no ProductImage row
     // exists and the vision pass never reaches the model (YOY-121 AC-6).
@@ -78,6 +101,7 @@ beforeEach(async () => {
   await db.$executeRawUnsafe(`DELETE FROM "ProductEmbedding"`);
   await db.productEnrichment.deleteMany();
   await db.productImage.deleteMany();
+  await db.productCard.deleteMany();
   await db.catalogProduct.deleteMany();
   await db.playgroundCatalog.deleteMany();
 });
@@ -120,7 +144,12 @@ describe("argument parsing (AC-6)", () => {
       source: null,
       pages: DEFAULT_CRAWL_PAGE_BUDGET,
       pathPrefix: null,
+      // YOY-143: cards are opt-in (NG-3).
+      cards: false,
     });
+    expect(
+      parseIngestPublicArgs(["--url", "https://s.example", "--slug", "s", "--cards"]),
+    ).toMatchObject({ cards: true });
     // YOY-117 AC-4: the locale hint, normalised to /prefix with no trailing slash.
     expect(
       parseIngestPublicArgs(["--url", "https://s.example", "--slug", "s", "--path-prefix", "/uk/"]),
@@ -258,6 +287,8 @@ describe("runIngestPublicCli", () => {
         // The vision report line (YOY-121 AC-6): no product has an image
         // row, so nothing is analysed, cached, or failed.
         "vision: analysed 0, cached 0, failed 0, cost $0.000000",
+        // Cards are opt-in (YOY-143 NG-3): without --cards none is written.
+        "cards: written 0, cached 0, failed 0, cost $0.000000 (off: pass --cards to write cards)",
         "embed: embedded 3, cached 0, deleted 0",
         expect.stringMatching(/^ai cost this run: \$0\.000000 over 0 call\(s\)$/),
         expect.stringMatching(/^requests: \d+, retries: 0, robots-skipped: 0$/),
@@ -283,6 +314,17 @@ describe("runIngestPublicCli", () => {
     );
     expect(second.out.some((line) => line.startsWith("skipped") && line.includes("beyond --max"))).toBe(false);
     expect((await db.playgroundCatalog.findUniqueOrThrow({ where: { slug: "demo" } })).name).toBe("Renamed");
+  });
+
+  it("--cards writes a card per product, then caches them on the re-run (YOY-143 AC-9)", async () => {
+    const { run, out } = harness();
+    expect(await run(["--url", FIXTURE_ORIGIN, "--slug", "demo", "--max", "4", "--cards"])).toBe(0);
+    expect(out).toContain("cards: written 3, cached 0, failed 0, cost $0.000000");
+    expect(await db.productCard.count({ where: { shopDomain: "playground:demo", status: "written" } })).toBe(3);
+
+    const second = harness();
+    expect(await second.run(["--url", FIXTURE_ORIGIN, "--slug", "demo", "--cards"])).toBe(0);
+    expect(second.out).toContain("cards: written 0, cached 3, failed 0, cost $0.000000");
   });
 
   it("--delete removes the catalog and reports the counts (verify step 7)", async () => {

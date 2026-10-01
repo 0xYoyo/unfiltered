@@ -10,7 +10,7 @@
  *
  * Usage, from apps/shopify-app (the script loads .env itself):
  *
- *   npm run ingest:public -- --url https://store.example --slug store [--name "Store"] [--max 2000] [--source shopify-public|jsonld-crawl] [--pages 3000]
+ *   npm run ingest:public -- --url https://store.example --slug store [--name "Store"] [--max 2000] [--source shopify-public|jsonld-crawl] [--pages 3000] [--cards]
  *   npm run ingest:public -- --delete --slug store
  */
 
@@ -19,6 +19,7 @@ import { fileURLToPath } from "node:url";
 
 import { PrismaClient } from "@prisma/client";
 
+import { createCardWriter } from "../app/catalog/card.server";
 import { createCatalogEmbeddingClient } from "../app/catalog/embed.server";
 import {
   createEnrichmentLlmClient,
@@ -61,6 +62,9 @@ try {
       llm: createEnrichmentLlmClient(db),
       vision: createVisionLlmClient(db),
       embeddings: createCatalogEmbeddingClient(db),
+      // Used only on --cards (YOY-143; NG-3: no cards for the existing
+      // playground catalogs unless asked).
+      cards: createCardWriter(db),
     }),
   });
 } finally {

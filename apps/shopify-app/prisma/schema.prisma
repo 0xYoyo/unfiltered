@@ -240,6 +240,44 @@ model ProductVariant {
   @@index([shopDomain, productId])
 }
 
+// The product card (YOY-143; PRD §3 Engine v2, Refinements 5–6): a
+// plain-text dossier a model writes once per product at load time, which
+// later steps find and judge against. `facts` (what the item is and the
+// merchant's stated details, material first; a photo-only detail reads
+// "looks like …"), `look` (what it looks like), `read` (style, occasion,
+// who wears it — the model's read, never shown to shoppers), `summary`
+// (≤ 300 characters) and `asks` ({ "<lang>": [10–20 ways to ask] }).
+// `cardText` is the whole card as one text and `cardTextHash` its SHA-256,
+// so the hash moves only when the text does. `inputHash` covers what the
+// card was written from (the product's text, its enrichment, its image
+// hashes, the ask languages): a row whose inputHash and cardVersion are
+// current is never rewritten. status is "written" or "failed"; a failed
+// row keeps its inputHash so it is retried only when the inputs change.
+// Keyed by tenant + product with no FK cascade, like the enrichment rows:
+// every product delete removes it in the same transaction.
+model ProductCard {
+  id           String   @id @default(uuid())
+  shopDomain   String
+  productId    String
+  status       String
+  facts        String   @default("")
+  look         String   @default("")
+  read         String   @default("")
+  summary      String   @default("")
+  asks         Json
+  cardText     String   @default("")
+  cardTextHash String   @default("")
+  inputHash    String
+  cardVersion  Int
+  modelId      String
+  writtenAt    DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([shopDomain, productId])
+  @@index([shopDomain])
+}
+
 // Shopper search log (YOY-47): exactly one row per proxy search request —
 // including degraded, zero-hit, and throttled searches — for the dashboard
 // and attribution work of later milestones. Write-only in this milestone.

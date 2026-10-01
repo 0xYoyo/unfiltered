@@ -397,11 +397,12 @@ export async function syncProductFromWebhook({
     (payload.status !== undefined && payload.status !== "active") ||
     payload.published_at === null
   ) {
-    const [, , , , { count }] = await db.$transaction([
+    const [, , , , , { count }] = await db.$transaction([
       db.productEnrichment.deleteMany({ where: { shopDomain, productId } }),
       db.productEmbedding.deleteMany({ where: { shopDomain, productId } }),
       db.productImage.deleteMany({ where: { shopDomain, productId } }),
       db.productVariant.deleteMany({ where: { shopDomain, productId } }),
+      db.productCard.deleteMany({ where: { shopDomain, productId } }),
       db.catalogProduct.deleteMany({ where: { shopDomain, productId } }),
     ]);
     return count > 0 ? "deleted" : "not_found";
@@ -514,11 +515,12 @@ export async function deleteProductFromWebhook({
   // FK cascade, so they must go in the same operation as the product
   // (YOY-29 AC-5, YOY-61 AC-2).
   const productId = productGid(payload);
-  const [, , , , { count }] = await db.$transaction([
+  const [, , , , , { count }] = await db.$transaction([
     db.productEnrichment.deleteMany({ where: { shopDomain, productId } }),
     db.productEmbedding.deleteMany({ where: { shopDomain, productId } }),
     db.productImage.deleteMany({ where: { shopDomain, productId } }),
     db.productVariant.deleteMany({ where: { shopDomain, productId } }),
+    db.productCard.deleteMany({ where: { shopDomain, productId } }),
     db.catalogProduct.deleteMany({ where: { shopDomain, productId } }),
   ]);
   return count > 0 ? "deleted" : "not_found";
