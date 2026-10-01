@@ -1,6 +1,8 @@
 import type { PrismaClient } from "@prisma/client";
 import type { EmbeddingClient, LlmClient } from "@unfiltered/engine";
 
+import type { CardResult, CardWriter } from "../catalog/card.server";
+import { writeCatalogCards } from "../catalog/card.server";
 import type { EmbedResult } from "../catalog/embed.server";
 import { embedCatalog } from "../catalog/embed.server";
 import type { EnrichResult } from "../catalog/enrich.server";
@@ -83,6 +85,8 @@ export interface PublicIngestResult {
   storeKey: string;
   ingest: PublicIngestCounts;
   enrich: EnrichResult;
+  /** Present exactly when a card writer was given (YOY-143 AC-9). */
+  cards?: CardResult;
   embed: EmbedResult;
 }
 
@@ -285,7 +289,7 @@ export async function snapshotPublicCatalog({
     // with no FK cascade: they go in the same transaction as the product,
     // exactly like the Shopify ingest, so no orphan vector keeps a gone
     // product retrievable.
-    const [, , , , { count }] = await db.$transaction([
+    const [, , , , , { count }] = await db.$transaction([
       db.productEnrichment.deleteMany({
         where: { shopDomain: storeKey, productId: { in: stale } },
       }),
@@ -296,6 +300,9 @@ export async function snapshotPublicCatalog({
         where: { shopDomain: storeKey, productId: { in: stale } },
       }),
       db.productVariant.deleteMany({
+        where: { shopDomain: storeKey, productId: { in: stale } },
+      }),
+      db.productCard.deleteMany({
         where: { shopDomain: storeKey, productId: { in: stale } },
       }),
       db.catalogProduct.deleteMany({
@@ -323,6 +330,7 @@ export async function ingestPublicCatalog({
   llm,
   vision,
   embeddings,
+  cards,
   imageFetch,
   onProgress,
   now = new Date(),
@@ -341,6 +349,12 @@ export async function ingestPublicCatalog({
    */
   vision?: LlmClient;
   embeddings: EmbeddingClient;
+  /**
+   * The card writer (YOY-143). Absent writes no cards: the CLI passes it
+   * only on `--cards`, so the existing playground catalogs get no cards
+   * (NG-3) unless an operator asks.
+   */
+  cards?: CardWriter;
   /** The polite fetcher's `.fetch` (YOY-120 AC-1): image bytes are read through it and hashed. */
   imageFetch: ImageFetch;
   onProgress?: SourceProgress;
@@ -364,6 +378,17 @@ export async function ingestPublicCatalog({
       ? { vision: { llm: vision, fetchImage: imageFetch } }
       : {}),
   });
+  // Cards read the enrichment, so they follow it; images are re-read
+  // through the polite fetcher, like the vision pass.
+  const cardResult =
+    cards === undefined
+      ? undefined
+      : await writeCatalogCards({
+          db,
+          shopDomain: storeKey,
+          writer: cards,
+          fetchImage: imageFetch,
+        });
   const embed = await embedCatalog({ db, shopDomain: storeKey, embeddings });
   const productCount = await db.catalogProduct.count({
     where: { shopDomain: storeKey },
@@ -387,7 +412,13 @@ export async function ingestPublicCatalog({
       lastIngestedAt: now,
     },
   });
-  return { storeKey, ingest, enrich, embed };
+  return {
+    storeKey,
+    ingest,
+    enrich,
+    ...(cardResult !== undefined ? { cards: cardResult } : {}),
+    embed,
+  };
 }
 
 /** Rows removed by `deletePublicCatalog`, per table. */
@@ -398,6 +429,7 @@ export interface PublicCatalogDeletion {
   embeddings: number;
   images: number;
   variants: number;
+  cards: number;
   registry: number;
 }
 
@@ -414,11 +446,12 @@ export async function deletePublicCatalog({
   slug: string;
 }): Promise<PublicCatalogDeletion> {
   const storeKey = playgroundStoreKey(slug);
-  const [enrichments, embeddings, images, variants, products, registry] = await db.$transaction([
+  const [enrichments, embeddings, images, variants, cards, products, registry] = await db.$transaction([
     db.productEnrichment.deleteMany({ where: { shopDomain: storeKey } }),
     db.productEmbedding.deleteMany({ where: { shopDomain: storeKey } }),
     db.productImage.deleteMany({ where: { shopDomain: storeKey } }),
     db.productVariant.deleteMany({ where: { shopDomain: storeKey } }),
+    db.productCard.deleteMany({ where: { shopDomain: storeKey } }),
     db.catalogProduct.deleteMany({ where: { shopDomain: storeKey } }),
     db.playgroundCatalog.deleteMany({ where: { slug } }),
   ]);
@@ -429,6 +462,7 @@ export async function deletePublicCatalog({
     embeddings: embeddings.count,
     images: images.count,
     variants: variants.count,
+    cards: cards.count,
     registry: registry.count,
   };
 }

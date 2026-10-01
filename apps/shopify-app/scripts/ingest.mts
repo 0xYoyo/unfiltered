@@ -31,6 +31,11 @@ import { fileURLToPath } from "node:url";
 import { PrismaClient } from "@prisma/client";
 
 import {
+  createCardWriter,
+  formatCardReport,
+  writeCatalogCards,
+} from "../app/catalog/card.server";
+import {
   createCatalogEmbeddingClient,
   embedCatalog,
 } from "../app/catalog/embed.server";
@@ -115,6 +120,15 @@ try {
   if (enrich.vision !== undefined) {
     console.log(formatVisionReport(enrich.vision));
   }
+  // Cards (YOY-143): one Flash-Lite call per product whose card is missing
+  // or stale, in priority order; written after enrichment, which they read.
+  // Cards are not embedded yet (NG-1), so the embed step below is unchanged.
+  const cards = await writeCatalogCards({
+    db,
+    shopDomain: shop,
+    writer: createCardWriter(db),
+  });
+  console.log(formatCardReport(cards));
   const embed = await embedCatalog({
     db,
     shopDomain: shop,

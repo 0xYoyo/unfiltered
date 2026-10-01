@@ -112,6 +112,13 @@ export const DEFAULT_EMBEDDING_MODEL = "gemini-embedding-001";
  * `GEMINI_VISION_MODEL`.
  */
 export const DEFAULT_VISION_MODEL = "gemini-3.5-flash-lite";
+/**
+ * The card writer's model (YOY-143 AC-2; PRD §3 Refinement 6): Flash-Lite
+ * writes one plain-text card per product at load time. A bigger writer is
+ * adopted only after the comparison the PRD names (NG-4). Override with
+ * `GEMINI_CARD_MODEL`.
+ */
+export const DEFAULT_CARD_MODEL = "gemini-3.5-flash-lite";
 export const DEFAULT_EMBEDDING_DIMENSION = 768;
 /** Thinking level the intent client runs at unless the env overrides it. */
 export const DEFAULT_INTENT_THINKING_LEVEL = "low";
@@ -128,6 +135,12 @@ export const DEFAULT_INTENT_LITE_THINKING_LEVEL = "low";
  * `GEMINI_VISION_THINKING_LEVEL` (`model-default` sends no thinkingConfig).
  */
 export const DEFAULT_VISION_THINKING_LEVEL = "low";
+/**
+ * Thinking level of the card writer (YOY-143): explicit, never the model
+ * default (the YOY-109 lesson). Override with `GEMINI_CARD_THINKING_LEVEL`
+ * (`model-default` sends no thinkingConfig).
+ */
+export const DEFAULT_CARD_THINKING_LEVEL = "low";
 /**
  * Per-request abort timeout of the lite intent call (YOY-116): the lite
  * tier exists to be fast, and a hung lite call escalates to the accuracy
@@ -175,6 +188,13 @@ export interface GeminiModelConfig {
    * at its own default (`GEMINI_VISION_THINKING_LEVEL=model-default`).
    */
   visionThinkingLevel: string | undefined;
+  /** For the card writer at ingestion (YOY-143). */
+  cardModel: string;
+  /**
+   * Thinking level for the card writer, or undefined to leave the model at
+   * its own default (`GEMINI_CARD_THINKING_LEVEL=model-default`).
+   */
+  cardThinkingLevel: string | undefined;
   /**
    * Thinking level for the intent client, or undefined to leave the model at
    * its own default (`GEMINI_INTENT_THINKING_LEVEL=model-default`).
@@ -197,7 +217,8 @@ export interface GeminiModelConfig {
  * GEMINI_EMBEDDING_DIMENSION, GEMINI_INTENT_THINKING_LEVEL,
  * GEMINI_INTENT_LITE_MODEL, GEMINI_INTENT_LITE_THINKING_LEVEL,
  * GEMINI_INTENT_LITE_TIMEOUT_MS, GEMINI_INTENT_TIMEOUT_MS,
- * GEMINI_VISION_MODEL, GEMINI_VISION_THINKING_LEVEL.
+ * GEMINI_VISION_MODEL, GEMINI_VISION_THINKING_LEVEL, GEMINI_CARD_MODEL,
+ * GEMINI_CARD_THINKING_LEVEL.
  */
 export function geminiModelsFromEnv(
   env: Record<string, string | undefined> = process.env,
@@ -214,6 +235,12 @@ export function geminiModelsFromEnv(
       "GEMINI_VISION_THINKING_LEVEL",
       env.GEMINI_VISION_THINKING_LEVEL,
       DEFAULT_VISION_THINKING_LEVEL,
+    ),
+    cardModel: env.GEMINI_CARD_MODEL ?? DEFAULT_CARD_MODEL,
+    cardThinkingLevel: parseThinkingLevel(
+      "GEMINI_CARD_THINKING_LEVEL",
+      env.GEMINI_CARD_THINKING_LEVEL,
+      DEFAULT_CARD_THINKING_LEVEL,
     ),
     intentThinkingLevel: parseThinkingLevel(
       "GEMINI_INTENT_THINKING_LEVEL",
