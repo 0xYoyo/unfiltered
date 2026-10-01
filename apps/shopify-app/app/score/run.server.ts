@@ -46,15 +46,78 @@ export interface ScoreReport {
   languages: LanguageScore[];
 }
 
-function detailsOf(
-  enrichment: { category: string | null; colors: string[]; occasions: string[] } | undefined,
+/** Description characters the grader sees (YOY-141 AC-11). */
+export const DESCRIPTION_EXCERPT_CHARS = 300;
+
+const HTML_ENTITIES: Record<string, string> = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  nbsp: " ",
+};
+
+/**
+ * A product description as a shopper reads it: HTML stripped, whitespace
+ * collapsed, the first 300 characters (YOY-141 AC-11).
+ */
+export function descriptionExcerpt(html: string): string {
+  const text = html
+    .replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, " ")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&(#\d+|#x[0-9a-f]+|[a-z]+);/gi, (entity, name: string) => {
+      const lower = name.toLowerCase();
+      if (!lower.startsWith("#")) return HTML_ENTITIES[lower] ?? entity;
+      const code = lower.startsWith("#x")
+        ? Number.parseInt(lower.slice(2), 16)
+        : Number.parseInt(lower.slice(1), 10);
+      return code <= 0x10ffff ? String.fromCodePoint(code) : entity;
+    })
+    .replace(/\s+/g, " ")
+    .trim();
+  return Array.from(text).slice(0, DESCRIPTION_EXCERPT_CHARS).join("").trimEnd();
+}
+
+interface GraderEnrichment {
+  category: string | null;
+  colors: string[];
+  occasions: string[];
+  fit: string | null;
+  styleTags: string[];
+  sleeveLength: string | null;
+  neckline: string | null;
+  garmentLength: string | null;
+  pattern: string | null;
+  materialAppearance: string | null;
+}
+
+/**
+ * What the grader sees besides title, type, vendor and price (YOY-140 AC-4,
+ * YOY-141 AC-11): the enrichment's category, colours and occasions; its fit,
+ * style tags and five vision attributes where present; and the description
+ * excerpt. A product with none of the additions grades with today's shape.
+ */
+export function graderDetails(
+  description: string,
+  enrichment: GraderEnrichment | undefined,
 ): string | undefined {
-  if (enrichment === undefined) return undefined;
+  const labelled = (label: string, value: string | null | undefined) =>
+    value ? `${label}: ${value}` : "";
+  const excerpt = descriptionExcerpt(description);
   const parts = [
-    enrichment.category,
-    enrichment.colors.join(", "),
-    enrichment.occasions.join(", "),
-  ].filter((part): part is string => part !== null && part !== "");
+    enrichment?.category ?? "",
+    enrichment?.colors.join(", ") ?? "",
+    enrichment?.occasions.join(", ") ?? "",
+    labelled("fit", enrichment?.fit),
+    labelled("style", enrichment?.styleTags.join(", ")),
+    labelled("sleeve length", enrichment?.sleeveLength),
+    labelled("neckline", enrichment?.neckline),
+    labelled("garment length", enrichment?.garmentLength),
+    labelled("pattern", enrichment?.pattern),
+    labelled("material appearance", enrichment?.materialAppearance),
+    labelled("description", excerpt),
+  ].filter((part) => part !== "");
   return parts.length === 0 ? undefined : parts.join(" · ");
 }
 
@@ -85,7 +148,7 @@ async function gradedResults(
         priceMin: product.priceMin,
         priceMax: product.priceMax,
         currencyCode: product.currencyCode,
-        details: detailsOf(enrichmentById.get(productId)),
+        details: graderDetails(product.description, enrichmentById.get(productId)),
       },
     ];
   });

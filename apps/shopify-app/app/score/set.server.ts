@@ -5,6 +5,7 @@ import type { PrismaClient } from "@prisma/client";
 import type { LlmClient } from "@unfiltered/engine";
 
 import { normalizeReuseQuery } from "../search/events.server";
+import latencyProbeQueries from "../../scripts/latency-probe-queries.json";
 
 /**
  * The score set builder (YOY-140 AC-1..AC-3): real shopper phrasing from the
@@ -56,9 +57,46 @@ export function detectLanguage(text: string): "en" | "he" | "ar" | "ru" {
 }
 
 /**
- * Every submitted search of the given store keys (AC-1): SearchEvent holds
- * one row per submitted search and none for previews. De-duplicated on the
- * normalized text, keeping each query's first occurrence, oldest first.
+ * The first day of the playground era (YOY-141 AC-12): log searches before
+ * it are M1-era test searches against a snowboard test catalog, not shopper
+ * phrasing.
+ */
+export const LOG_SINCE = new Date(Date.UTC(2026, 7, 10));
+/** A log search shorter than this after trimming is a keystroke, not a wish. */
+export const LOG_MIN_LENGTH = 3;
+/**
+ * Zero-width format characters: the latency probe's invisible per-request
+ * marker is built from U+200B, U+200C, U+200D and U+2060, so a log search
+ * carrying any of them is a probe's, not a shopper's.
+ */
+const ZERO_WIDTH = /[\u200B-\u200D\u2060\uFEFF]/u;
+
+const PROBE_QUERIES = new Set(
+  Object.values(latencyProbeQueries as Record<string, string[]>)
+    .flat()
+    .map((query) => normalizeReuseQuery(query)),
+);
+
+/**
+ * Whether a logged search is shopper-shaped (YOY-141 AC-12): submitted in
+ * the playground era, at least three characters after trimming, no
+ * zero-width format characters, and not one of the latency probe's
+ * committed queries.
+ */
+export function isShopperShaped(entry: { query: string; date: Date }): boolean {
+  return (
+    entry.date.getTime() >= LOG_SINCE.getTime() &&
+    entry.query.trim().length >= LOG_MIN_LENGTH &&
+    !ZERO_WIDTH.test(entry.query) &&
+    !PROBE_QUERIES.has(normalizeReuseQuery(entry.query))
+  );
+}
+
+/**
+ * Every shopper-shaped submitted search of the given store keys (AC-1,
+ * YOY-141 AC-12): SearchEvent holds one row per submitted search and none
+ * for previews. De-duplicated on the normalized text, keeping each query's
+ * first occurrence, oldest first.
  */
 export async function exportLogQueries(
   db: PrismaClient,
@@ -68,7 +106,7 @@ export async function exportLogQueries(
     return [];
   }
   const rows = await db.searchEvent.findMany({
-    where: { shopDomain: { in: [...storeKeys] } },
+    where: { shopDomain: { in: [...storeKeys] }, createdAt: { gte: LOG_SINCE } },
     select: { query: true, shopDomain: true, createdAt: true },
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
   });
@@ -77,6 +115,7 @@ export async function exportLogQueries(
   for (const row of rows) {
     const key = normalizeReuseQuery(row.query);
     if (key === "" || seen.has(key)) continue;
+    if (!isShopperShaped({ query: row.query, date: row.createdAt })) continue;
     seen.add(key);
     queries.push({ query: row.query.trim(), storeKey: row.shopDomain, date: row.createdAt });
   }
@@ -177,9 +216,9 @@ async function fillShape(
 }
 
 /**
- * Fill every language to exactly 25 searches (AC-2): its log queries first
- * (the oldest 25 when there are more), then model filler in the 60 / 30 / 10
- * shape mix for the remainder.
+ * Fill every language to exactly 25 searches (AC-2): its shopper-shaped log
+ * queries first (the newest 25 when there are more — YOY-141 AC-12), then
+ * model filler in the 60 / 30 / 10 shape mix for the remainder.
  */
 export async function buildScoreSet({
   logQueries,
@@ -194,7 +233,8 @@ export async function buildScoreSet({
       language === "fr" || language === "es"
         ? []
         : logQueries
-            .filter((entry) => detectLanguage(entry.query) === language)
+            .filter((entry) => isShopperShaped(entry) && detectLanguage(entry.query) === language)
+            .sort((a, b) => b.date.getTime() - a.date.getTime())
             .slice(0, SEARCHES_PER_LANGUAGE);
     const modelWritten = fromLog.length === 0;
     const taken = new Set(fromLog.map((entry) => normalizeReuseQuery(entry.query)));
