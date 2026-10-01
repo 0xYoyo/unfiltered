@@ -95,7 +95,7 @@ describe("catalog ingestion", () => {
 
     const result = await ingestCatalog({ db, shopDomain: SHOP, graphql });
 
-    expect(result).toEqual({ created: 3, updated: 0, unchanged: 0, deleted: 0, images: { fetched: 0, unchanged: 0, failed: 0 } });
+    expect(result).toEqual({ created: 3, updated: 0, unchanged: 0, deleted: 0, images: { fetched: 0, unchanged: 0, failed: 0 }, variants: { written: 0, unchanged: 0, deleted: 0 } });
     // 3 nodes at page size 2 → exactly two requests, cursor threaded through.
     expect(calls).toHaveLength(2);
     expect(calls[1]?.after).toBe("2");
@@ -193,7 +193,7 @@ describe("catalog ingestion", () => {
       ]).graphql,
     });
 
-    expect(rerun).toEqual({ created: 0, updated: 0, unchanged: 1, deleted: 0, images: { fetched: 0, unchanged: 0, failed: 0 } });
+    expect(rerun).toEqual({ created: 0, updated: 0, unchanged: 1, deleted: 0, images: { fetched: 0, unchanged: 0, failed: 0 }, variants: { written: 0, unchanged: 0, deleted: 0 } });
     const after = (await db.catalogProduct.findMany())[0]!;
     expect(after.id).toBe(before.id);
     expect(after.url).toBe("https://shop.example/products/linen-summer-dress");
@@ -304,7 +304,7 @@ describe("catalog ingestion", () => {
     });
 
     // Searchable content unchanged: no update/create counted, no duplicates.
-    expect(rerun).toEqual({ created: 0, updated: 0, unchanged: 1, deleted: 0, images: { fetched: 0, unchanged: 0, failed: 0 } });
+    expect(rerun).toEqual({ created: 0, updated: 0, unchanged: 1, deleted: 0, images: { fetched: 0, unchanged: 0, failed: 0 }, variants: { written: 0, unchanged: 0, deleted: 0 } });
     const after = await db.catalogProduct.findMany();
     expect(after).toHaveLength(1);
     expect(after[0]?.id).toBe(before.id);
@@ -330,7 +330,7 @@ describe("catalog ingestion", () => {
       graphql: graphqlStub(fixtureCatalog()).graphql,
     });
 
-    expect(rerun).toEqual({ created: 0, updated: 0, unchanged: 3, deleted: 0, images: { fetched: 0, unchanged: 0, failed: 0 } });
+    expect(rerun).toEqual({ created: 0, updated: 0, unchanged: 3, deleted: 0, images: { fetched: 0, unchanged: 0, failed: 0 }, variants: { written: 0, unchanged: 0, deleted: 0 } });
     const after = await db.catalogProduct.findMany({ orderBy: { productId: "asc" } });
     // Untouched means untouched: same row identity and same updatedAt.
     expect(after.map((row) => row.id)).toEqual(before.map((row) => row.id));
@@ -364,7 +364,7 @@ describe("catalog ingestion", () => {
       graphql: graphqlStub(mutated).graphql,
     });
 
-    expect(result).toEqual({ created: 1, updated: 1, unchanged: 1, deleted: 1, images: { fetched: 0, unchanged: 0, failed: 0 } });
+    expect(result).toEqual({ created: 1, updated: 1, unchanged: 1, deleted: 1, images: { fetched: 0, unchanged: 0, failed: 0 }, variants: { written: 0, unchanged: 0, deleted: 0 } });
     const rows = await db.catalogProduct.findMany({ orderBy: { productId: "asc" } });
     expect(rows.map((row) => [row.productId, row.title])).toEqual([
       ["gid://shopify/Product/1", "Renamed dress"],
@@ -595,7 +595,7 @@ describe("catalog ingestion", () => {
       shopDomain: SHOP,
       graphql: graphqlStub([]).graphql,
     });
-    expect(wipe).toEqual({ created: 0, updated: 0, unchanged: 0, deleted: 3, images: { fetched: 0, unchanged: 0, failed: 0 } });
+    expect(wipe).toEqual({ created: 0, updated: 0, unchanged: 0, deleted: 3, images: { fetched: 0, unchanged: 0, failed: 0 }, variants: { written: 0, unchanged: 0, deleted: 0 } });
     expect(await db.catalogProduct.findMany({ where: { shopDomain: OTHER_SHOP } })).toHaveLength(1);
   });
 

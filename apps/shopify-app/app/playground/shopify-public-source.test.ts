@@ -63,6 +63,8 @@ describe("mapping (AC-4)", () => {
         `${FIXTURE_ORIGIN}/cdn/black-dress-back.jpg`,
         `${FIXTURE_ORIGIN}/cdn/black-dress-detail.jpg`,
       ],
+      // The fixture's variants carry no ids (YOY-142): nothing to key.
+      variants: [],
       url: `${FIXTURE_ORIGIN}/products/black-evening-dress`,
       sourceUpdatedAt: new Date("2026-08-01T10:00:00Z"),
     });

@@ -208,6 +208,38 @@ model ProductImage {
   @@index([shopDomain, productId])
 }
 
+// Product variants (YOY-142 AC-1): every variant as the merchant defined it
+// — size, stock and per-variant price, which the snapshot row collapses to
+// min/max price and "any variant available". Option names and values are
+// stored verbatim, in the merchant's order (AC-6). Outside the product's
+// contentHash (NG-4): a variant change never re-enriches or re-embeds.
+// Keyed by tenant + product + variant with no FK cascade, like the image,
+// enrichment and embedding rows: every product delete removes these in the
+// same transaction (AC-7). At most the first 100 variants per product (NG-3).
+model ProductVariant {
+  id              String    @id @default(uuid())
+  shopDomain      String
+  productId       String
+  // The source's own variant identifier (an Admin GID, a feed id, a sku).
+  variantId       String
+  // 1-based position among the product's variants, in source order.
+  position        Int
+  // [{ "name": "Size", "value": "M" }, ...] — verbatim, merchant order.
+  options         Json
+  price           Float
+  available       Boolean
+  // Stock on hand when the source exposes it; null otherwise.
+  quantity        Int?
+  // The source's own updated-at for this variant (or its product); null
+  // when the source carries none.
+  sourceUpdatedAt DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([shopDomain, productId, variantId])
+  @@index([shopDomain, productId])
+}
+
 // Shopper search log (YOY-47): exactly one row per proxy search request —
 // including degraded, zero-hit, and throttled searches — for the dashboard
 // and attribution work of later milestones. Write-only in this milestone.

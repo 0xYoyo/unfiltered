@@ -306,6 +306,9 @@ export async function runIngestPublicCli({
     log(
       `images: fetched ${result.ingest.images.fetched}, unchanged ${result.ingest.images.unchanged}, failed ${result.ingest.images.failed}`,
     );
+    log(
+      `variants: written ${result.ingest.variants.written}, unchanged ${result.ingest.variants.unchanged}, deleted ${result.ingest.variants.deleted}`,
+    );
     if (result.ingest.skippedOverMax > 0) {
       log(
         `skipped ${result.ingest.skippedOverMax} product(s) beyond --max ${args.max} (paging stopped at the first page past the bound; more may exist)`,

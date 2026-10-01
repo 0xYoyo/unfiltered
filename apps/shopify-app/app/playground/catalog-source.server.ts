@@ -9,6 +9,8 @@
  * this port and are the only place platform knowledge is allowed.
  */
 
+import type { VariantRecord } from "../catalog/variants.server";
+
 /** One product as a source hands it to the pipeline: no DB identity, no tenant. */
 export interface SourceProduct {
   /** The source's own stable product identifier; becomes `productId`. */
@@ -32,6 +34,11 @@ export interface SourceProduct {
    * source lists none.
    */
   imageUrls: string[];
+  /**
+   * Every variant the source lists (YOY-142 AC-4/AC-5), in source order,
+   * option pairs verbatim; [] when the source carries no per-variant data.
+   */
+  variants: VariantRecord[];
   /** The product's public page, resolved by the source; null when unknown. */
   url: string | null;
   sourceUpdatedAt: Date | null;

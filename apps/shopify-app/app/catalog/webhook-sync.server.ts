@@ -5,6 +5,8 @@ import type { ImageFetch } from "./images.server";
 import { globalImageFetch, syncProductImages } from "./images.server";
 import type { ShopifyProductNode, SnapshotProduct } from "./mapping.server";
 import { usableImageUrls, mapProductNode } from "./mapping.server";
+import type { VariantRecord } from "./variants.server";
+import { syncProductVariants } from "./variants.server";
 
 /**
  * Shape of a product webhook payload (`products/create` / `products/update`)
@@ -36,12 +38,28 @@ export interface ProductWebhookPayload {
    */
   published_at?: string | null;
   updated_at: string;
+  /**
+   * The identity and option fields (YOY-142 AC-3) are absent in older
+   * fixtures; only variants carrying an `id` become `ProductVariant` rows.
+   */
   variants: Array<{
+    id?: number;
+    admin_graphql_api_id?: string;
+    position?: number | null;
+    option1?: string | null;
+    option2?: string | null;
+    option3?: string | null;
+    updated_at?: string | null;
     price: string;
     inventory_quantity: number | null;
     inventory_policy: string | null;
     inventory_management: string | null;
   }>;
+  /**
+   * The product's option names; `option1`/`option2`/`option3` on a variant
+   * are the values of options 1–3 in this order (YOY-142 AC-3).
+   */
+  options?: Array<{ name: string; position?: number | null }>;
   /** `src` feeds image capture (YOY-120 AC-1); absent in older payloads. */
   images: Array<{ src?: string | null; alt: string | null }>;
   /** The product's featured image, when it has one. */
@@ -281,6 +299,53 @@ export function webhookImageUrls(
 }
 
 /**
+ * The variants a product webhook carries (YOY-142 AC-3): each variant's
+ * `option1`/`option2`/`option3` paired, in order, with the product's option
+ * names — both verbatim (AC-6) — its price, availability by the same
+ * `variantAvailable` rule the snapshot's `available` uses, and
+ * `inventory_quantity` as given. The variant id is its Admin GID, the same
+ * key the Admin ingest stores, so a product synced by either path keeps one
+ * row per variant.
+ */
+export function webhookVariants(
+  payload: Pick<ProductWebhookPayload, "variants" | "options">,
+): VariantRecord[] {
+  const names = [...(payload.options ?? [])]
+    .map((option, index) => ({ name: option.name, position: option.position ?? index + 1 }))
+    .sort((a, b) => a.position - b.position)
+    .map((option) => option.name);
+  const variants: VariantRecord[] = [];
+  payload.variants.forEach((variant, index) => {
+    const variantId =
+      variant.admin_graphql_api_id ??
+      (variant.id !== undefined ? `gid://shopify/ProductVariant/${variant.id}` : null);
+    const price = Number(variant.price);
+    if (variantId === null || !Number.isFinite(price)) {
+      return;
+    }
+    const options = [variant.option1, variant.option2, variant.option3].flatMap(
+      (value, optionIndex) => {
+        const name = names[optionIndex];
+        return typeof value === "string" && name !== undefined ? [{ name, value }] : [];
+      },
+    );
+    variants.push({
+      variantId,
+      position: variant.position ?? index + 1,
+      options,
+      price,
+      available: variantAvailable(variant),
+      quantity: typeof variant.inventory_quantity === "number" ? variant.inventory_quantity : null,
+      sourceUpdatedAt:
+        typeof variant.updated_at === "string" && variant.updated_at !== ""
+          ? new Date(variant.updated_at)
+          : null,
+    });
+  });
+  return variants;
+}
+
+/**
  * Apply a `products/create` or `products/update` webhook to the shop's
  * snapshot. Idempotent and tolerant of out-of-order delivery: a payload whose
  * `updated_at` is older than the stored row's `sourceUpdatedAt` is dropped,
@@ -301,10 +366,10 @@ export async function syncProductFromWebhook({
   fetchImage?: ImageFetch;
 }): Promise<WebhookSyncOutcome> {
   const productId = productGid(payload);
-  // Image capture (YOY-120) runs after every outcome that leaves the
-  // product in the snapshot — created, updated, unchanged — because images
-  // sit outside the content hash; a stale or deleted product captures
-  // nothing.
+  // Image capture (YOY-120) and variant capture (YOY-142 AC-3) run after
+  // every outcome that leaves the product in the snapshot — created,
+  // updated, unchanged — because both sit outside the content hash; a stale
+  // or deleted product captures nothing.
   const withImages = async (outcome: WebhookSyncOutcome): Promise<WebhookSyncOutcome> => {
     await syncProductImages({
       db,
@@ -312,6 +377,12 @@ export async function syncProductFromWebhook({
       productId,
       imageUrls: webhookImageUrls(payload),
       fetchImage,
+    });
+    await syncProductVariants({
+      db,
+      shopDomain,
+      productId,
+      variants: webhookVariants(payload),
     });
     return outcome;
   };
@@ -326,10 +397,11 @@ export async function syncProductFromWebhook({
     (payload.status !== undefined && payload.status !== "active") ||
     payload.published_at === null
   ) {
-    const [, , , { count }] = await db.$transaction([
+    const [, , , , { count }] = await db.$transaction([
       db.productEnrichment.deleteMany({ where: { shopDomain, productId } }),
       db.productEmbedding.deleteMany({ where: { shopDomain, productId } }),
       db.productImage.deleteMany({ where: { shopDomain, productId } }),
+      db.productVariant.deleteMany({ where: { shopDomain, productId } }),
       db.catalogProduct.deleteMany({ where: { shopDomain, productId } }),
     ]);
     return count > 0 ? "deleted" : "not_found";
@@ -442,10 +514,11 @@ export async function deleteProductFromWebhook({
   // FK cascade, so they must go in the same operation as the product
   // (YOY-29 AC-5, YOY-61 AC-2).
   const productId = productGid(payload);
-  const [, , , { count }] = await db.$transaction([
+  const [, , , , { count }] = await db.$transaction([
     db.productEnrichment.deleteMany({ where: { shopDomain, productId } }),
     db.productEmbedding.deleteMany({ where: { shopDomain, productId } }),
     db.productImage.deleteMany({ where: { shopDomain, productId } }),
+    db.productVariant.deleteMany({ where: { shopDomain, productId } }),
     db.catalogProduct.deleteMany({ where: { shopDomain, productId } }),
   ]);
   return count > 0 ? "deleted" : "not_found";
