@@ -309,6 +309,9 @@ apps/
         webhooks.test.ts
       score/
         cli.server.ts
+        data/
+          public-set.json
+          seed-fixture.json.gz
         fixture.server.ts
         grade.server.ts
         leak.server.ts
