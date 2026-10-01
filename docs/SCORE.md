@@ -122,6 +122,20 @@ order, that return six results on the seed fixture — "beige boots in stock"
 returns none and is skipped — each with its top six results exactly as the
 grader sees them (the same fields and `details` line as a scored run).
 
+### Agreement — M6
+
+The grades were posted by the co-manager chat (Fable 5.1) on 2026-10-01 and
+filled into `calibration.json` by exact query match.
+`npx tsx scripts/score-calibrate.mts` with the default grader (Flash-Lite,
+thinking level low), 2026-10-01:
+
+| Graded results | Exact agreement | Within one |
+|----------------|-----------------|------------|
+| 60 | **58.3 %** | **88.3 %** |
+
+"same but under 300" has no earlier turn to refer to, so the reader graded
+every result 1 (related only).
+
 ## Budget rules
 
 - The set is 150 searches: 25 per language, 13 public and 12 hidden each.
