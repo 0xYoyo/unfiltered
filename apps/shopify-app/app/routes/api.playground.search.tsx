@@ -13,13 +13,13 @@ import {
   getPlaygroundIpThrottle,
   playgroundLimitsFromEnv,
   PLAYGROUND_RESPONSE_HEADERS,
-  PLAYGROUND_RESULT_LIMIT,
   remoteAddressFromContext,
   resolveCatalog,
   resolveLimit,
   serializePlaygroundSearchResponse,
 } from "../playground/api.server";
 import { normalizeReuseQuery, writeSearchEvent } from "../search/events.server";
+import { runPlaygroundSearch } from "../search/playground-search.server";
 import {
   getProxySearchOrchestrator,
   parseProxySearchParams,
@@ -119,24 +119,17 @@ export const loader = async ({
 
   try {
     const orchestrator = getProxySearchOrchestrator(db);
-    const startedAt = Date.now();
-    const response = await orchestrator.runSearch({
+    // The shared search call (YOY-140 AC-6): the score runner searches
+    // through this same function.
+    const { response, latencyMs } = await runPlaygroundSearch(orchestrator, {
       query: body.query,
-      shopDomain: catalog.storeKey,
-      limit: PLAYGROUND_RESULT_LIMIT,
-      ...(preview
-        ? { preview: true }
-        : classic
-          ? { forceClassic: true, forceClassicReason: "client-timeout-rescue" }
-          : limited !== null
-          ? { forceClassic: true }
-          : resolvedIntent !== undefined
-            ? { resolvedIntent }
-            : body.previousIntent !== undefined
-              ? { previousIntent: body.previousIntent }
-              : {}),
+      storeKey: catalog.storeKey,
+      preview,
+      classic,
+      limited: limited !== null,
+      resolvedIntent,
+      previousIntent: body.previousIntent,
     });
-    const latencyMs = Date.now() - startedAt;
 
     // Budget is consumed whenever the classifier actually took the AI route,
     // mirroring the proxy's accounting: a degraded response that still spent

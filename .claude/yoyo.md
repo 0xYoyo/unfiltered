@@ -18,6 +18,8 @@ sensitive_paths:
   - "**/auth/**"
   - "**/webhooks/**"
   - ".claude/**"
+  - apps/shopify-app/app/score/**
+  - apps/shopify-app/scripts/score-*
 
 ui_paths:
   - apps/shopify-app/extensions/

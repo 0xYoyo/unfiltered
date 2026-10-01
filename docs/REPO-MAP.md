@@ -306,12 +306,21 @@ apps/
         webhooks.products.update.tsx
         webhooks.shop.redact.tsx
         webhooks.test.ts
+      score/
+        cli.server.ts
+        fixture.server.ts
+        grade.server.ts
+        run.server.ts
+        score.test.ts
+        set.server.ts
+        synthetic.server.ts
       search/
         classic-store.server.ts
         classic-store.test.ts
         events.server.ts
         orchestrator.server.ts
         orchestrator.test.ts
+        playground-search.server.ts
         proxy-contract.test.ts
         proxy.server.ts
         retrieval-store.server.ts
@@ -437,6 +446,10 @@ apps/
       native-render-template.mts
       render-migrate.mts
       render-migrate.test.ts
+      score-build-set.mts
+      score-calibrate.mts
+      score-export-fixture.mts
+      score-run.mts
     shopify.app.toml
     shopify.web.toml
     tsconfig.json
@@ -525,6 +538,7 @@ docs/
   PORTABILITY.md
   PRD.md
   RESET-2026-09-27.md
+  SCORE.md
   SMOKE.md
   VISION-MODEL.md
   evidence/
@@ -1006,7 +1020,7 @@ vitest.setup.ts
 - apps/shopify-app/app/routes/_index/route.tsx → apps/shopify-app/app/playground/fonts.css (unresolved), apps/shopify-app/app/playground/tokens.css (unresolved), apps/shopify-app/app/site/pages/LandingPage.tsx, apps/shopify-app/app/site/site.css (unresolved)
 - apps/shopify-app/app/routes/about.tsx → apps/shopify-app/app/playground/fonts.css (unresolved), apps/shopify-app/app/playground/tokens.css (unresolved), apps/shopify-app/app/site/pages/AboutPage.tsx, apps/shopify-app/app/site/site.css (unresolved)
 - apps/shopify-app/app/routes/api.playground.click.tsx → apps/shopify-app/app/db.server.ts, apps/shopify-app/app/playground/api.server.ts, apps/shopify-app/app/playground/fixture-mode.server.ts, apps/shopify-app/app/search/events.server.ts, apps/shopify-app/app/search/proxy.server.ts
-- apps/shopify-app/app/routes/api.playground.search.tsx → apps/shopify-app/app/db.server.ts, apps/shopify-app/app/playground/api.server.ts, apps/shopify-app/app/playground/fixture-mode.server.ts, apps/shopify-app/app/search/events.server.ts, apps/shopify-app/app/search/proxy.server.ts
+- apps/shopify-app/app/routes/api.playground.search.tsx → apps/shopify-app/app/db.server.ts, apps/shopify-app/app/playground/api.server.ts, apps/shopify-app/app/playground/fixture-mode.server.ts, apps/shopify-app/app/search/events.server.ts, apps/shopify-app/app/search/playground-search.server.ts, apps/shopify-app/app/search/proxy.server.ts
 - apps/shopify-app/app/routes/app._index.tsx → apps/shopify-app/app/shopify.server.ts
 - apps/shopify-app/app/routes/app.auth.test.ts → apps/shopify-app/app/routes/app.tsx, apps/shopify-app/app/testing/helpers.server.ts
 - apps/shopify-app/app/routes/app.tsx → apps/shopify-app/app/shopify.server.ts
@@ -1033,10 +1047,16 @@ vitest.setup.ts
 - apps/shopify-app/app/routes/webhooks.products.update.tsx → apps/shopify-app/app/catalog/webhook-sync.server.ts, apps/shopify-app/app/db.server.ts, apps/shopify-app/app/shopify.server.ts
 - apps/shopify-app/app/routes/webhooks.shop.redact.tsx → apps/shopify-app/app/shopify.server.ts
 - apps/shopify-app/app/routes/webhooks.test.ts → apps/shopify-app/app/db.server.ts, apps/shopify-app/app/routes/webhooks.app.uninstalled.tsx, apps/shopify-app/app/routes/webhooks.customers.data_request.tsx, apps/shopify-app/app/routes/webhooks.customers.redact.tsx, apps/shopify-app/app/routes/webhooks.shop.redact.tsx, apps/shopify-app/app/testing/helpers.server.ts
+- apps/shopify-app/app/score/cli.server.ts → apps/shopify-app/app/ai/cost-recorder.server.ts, apps/shopify-app/app/db.server.ts, apps/shopify-app/app/playground/api.server.ts, apps/shopify-app/app/score/fixture.server.ts, apps/shopify-app/app/score/grade.server.ts, apps/shopify-app/app/score/run.server.ts, apps/shopify-app/app/score/set.server.ts, apps/shopify-app/app/score/synthetic.server.ts, apps/shopify-app/app/search/orchestrator.server.ts, apps/shopify-app/app/search/proxy.server.ts, apps/shopify-app/app/testing/helpers.server.ts
+- apps/shopify-app/app/score/run.server.ts → apps/shopify-app/app/score/grade.server.ts, apps/shopify-app/app/score/set.server.ts, apps/shopify-app/app/search/orchestrator.server.ts, apps/shopify-app/app/search/playground-search.server.ts
+- apps/shopify-app/app/score/score.test.ts → apps/shopify-app/app/score/cli.server.ts, apps/shopify-app/app/score/fixture.server.ts, apps/shopify-app/app/score/grade.server.ts, apps/shopify-app/app/score/run.server.ts, apps/shopify-app/app/score/set.server.ts, apps/shopify-app/app/score/synthetic.server.ts, apps/shopify-app/app/testing/helpers.server.ts
+- apps/shopify-app/app/score/set.server.ts → apps/shopify-app/app/search/events.server.ts
+- apps/shopify-app/app/score/synthetic.server.ts → apps/shopify-app/app/eval/replay.server.ts, apps/shopify-app/app/score/fixture.server.ts, apps/shopify-app/app/score/grade.server.ts, apps/shopify-app/app/score/run.server.ts, apps/shopify-app/app/score/set.server.ts, apps/shopify-app/app/search/classic-store.server.ts, apps/shopify-app/app/search/orchestrator.server.ts, apps/shopify-app/app/search/playground-search.server.ts, apps/shopify-app/app/search/retrieval-store.server.ts
 - apps/shopify-app/app/search/classic-store.server.ts → apps/shopify-app/app/search/retrieval-store.server.ts
 - apps/shopify-app/app/search/classic-store.test.ts → apps/shopify-app/app/search/classic-store.server.ts, apps/shopify-app/app/testing/helpers.server.ts
 - apps/shopify-app/app/search/orchestrator.server.ts → apps/shopify-app/app/search/classic-store.server.ts, apps/shopify-app/app/search/events.server.ts, apps/shopify-app/app/search/stages.ts
 - apps/shopify-app/app/search/orchestrator.test.ts → apps/shopify-app/app/ai/cost-recorder.server.ts, apps/shopify-app/app/search/classic-store.server.ts, apps/shopify-app/app/search/orchestrator.server.ts, apps/shopify-app/app/search/retrieval-store.server.ts, apps/shopify-app/app/testing/helpers.server.ts, apps/shopify-app/widget/src/search-client.ts
+- apps/shopify-app/app/search/playground-search.server.ts → apps/shopify-app/app/playground/api.server.ts, apps/shopify-app/app/search/orchestrator.server.ts
 - apps/shopify-app/app/search/proxy-contract.test.ts → apps/shopify-app/app/search/orchestrator.server.ts, apps/shopify-app/app/search/proxy.server.ts, apps/shopify-app/widget/src/search-client.ts
 - apps/shopify-app/app/search/proxy.server.ts → apps/shopify-app/app/ai/cost-recorder.server.ts, apps/shopify-app/app/search/classic-store.server.ts, apps/shopify-app/app/search/orchestrator.server.ts, apps/shopify-app/app/search/retrieval-store.server.ts
 - apps/shopify-app/app/search/retrieval-store.server.ts → apps/shopify-app/app/catalog/hnsw.server.ts
@@ -1068,6 +1088,10 @@ vitest.setup.ts
 - apps/shopify-app/scripts/live-smoke.test.ts → apps/shopify-app/app/testing/fake-store.server.ts, apps/shopify-app/scripts/live-smoke.mts
 - apps/shopify-app/scripts/native-render-template.mts → apps/shopify-app/widget/src/native-render.config.ts
 - apps/shopify-app/scripts/render-migrate.test.ts → apps/shopify-app/scripts/render-migrate.mts
+- apps/shopify-app/scripts/score-build-set.mts → apps/shopify-app/app/score/cli.server.ts
+- apps/shopify-app/scripts/score-calibrate.mts → apps/shopify-app/app/score/cli.server.ts
+- apps/shopify-app/scripts/score-export-fixture.mts → apps/shopify-app/app/score/cli.server.ts
+- apps/shopify-app/scripts/score-run.mts → apps/shopify-app/app/score/cli.server.ts
 - apps/shopify-app/widget/src/format.ts → apps/shopify-app/widget/src/strings.ts
 - apps/shopify-app/widget/src/main.ts → apps/shopify-app/widget/src/native-page.ts, apps/shopify-app/widget/src/native-render.config.ts, apps/shopify-app/widget/src/native-render.ts, apps/shopify-app/widget/src/overlay.ts, apps/shopify-app/widget/src/search-client.ts, apps/shopify-app/widget/src/session.ts, apps/shopify-app/widget/src/strings.ts
 - apps/shopify-app/widget/src/native-page.ts → apps/shopify-app/widget/src/native-render.config.ts
