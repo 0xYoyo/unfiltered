@@ -19,6 +19,7 @@ import {
 import {
   createPrismaCostRecorder,
   createQueuedCostRecorder,
+  type CostRecorder,
 } from "../ai/cost-recorder.server";
 import { createPgTrgmClassicStore } from "./classic-store.server";
 import {
@@ -526,11 +527,15 @@ export function intentReuseWindowMsFromEnv(
  */
 export function createProxySearchOrchestrator(
   db: PrismaClient,
+  {
+    // The ledger write leaves the hot path (YOY-64 AC-1): every metered call
+    // resolves as soon as its row is queued; a failed insert is logged. A
+    // caller that reads the ledger afterwards passes its own queued recorder
+    // and flushes it first (the score run, YOY-141 AC-10).
+    costRecorder = createQueuedCostRecorder(createPrismaCostRecorder(db)),
+  }: { costRecorder?: CostRecorder } = {},
 ): SearchOrchestrator {
   const models = geminiModelsFromEnv();
-  // The ledger write leaves the hot path (YOY-64 AC-1): every metered call
-  // resolves as soon as its row is queued; a failed insert is logged.
-  const costRecorder = createQueuedCostRecorder(createPrismaCostRecorder(db));
   const reuseWindowMs = intentReuseWindowMsFromEnv();
   return createSearchOrchestrator({
     ...(reuseWindowMs > 0 ? { intentReuse: { windowMs: reuseWindowMs } } : {}),

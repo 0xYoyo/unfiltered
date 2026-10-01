@@ -44,6 +44,19 @@ export interface LanguageScore {
 
 export interface ScoreReport {
   languages: LanguageScore[];
+  /** The run's spend, read from the cost ledger (YOY-141 AC-10). */
+  cost: { usd: number; calls: number };
+}
+
+/**
+ * The run's spend from the cost ledger (YOY-141 AC-10). The scratch database
+ * is discarded when the run ends, so the run reads its own ledger before
+ * that. The caller flushes any queued ledger writes first: the search
+ * pipeline queues them off the hot path (YOY-64 AC-1).
+ */
+export async function readRunCost(db: PrismaClient): Promise<ScoreReport["cost"]> {
+  const { _sum, _count } = await db.aiCall.aggregate({ _sum: { costUsd: true }, _count: true });
+  return { usd: _sum.costUsd ?? 0, calls: _count };
 }
 
 /** Description characters the grader sees (YOY-141 AC-11). */
@@ -160,12 +173,15 @@ export async function runScoreSet({
   grader,
   storeKey,
   set,
+  flushLedger = async () => {},
 }: {
   db: PrismaClient;
   orchestrator: SearchOrchestrator;
   grader: LlmClient;
   storeKey: string;
   set: readonly ScoreSetEntry[];
+  /** Settles the search pipeline's queued ledger writes before the cost is read. */
+  flushLedger?: () => Promise<void>;
 }): Promise<ScoreReport> {
   const outcomes: SearchOutcome[] = [];
   for (const entry of set) {
@@ -199,7 +215,8 @@ export async function runScoreSet({
       failed: scored.filter((outcome) => outcome.failed).length,
     });
   }
-  return { languages };
+  await flushLedger();
+  return { languages, cost: await readRunCost(db) };
 }
 
 /** The score table: the only thing a run prints (AC-5, AC-7). */
@@ -216,9 +233,15 @@ export function formatScoreTable(report: ScoreReport): string {
     ]),
   ];
   const widths = rows[0]!.map((_, column) => Math.max(...rows.map((row) => row[column]!.length)));
-  return rows
-    .map((row) => row.map((cell, column) => cell.padEnd(widths[column]!)).join("  ").trimEnd())
-    .join("\n");
+  return [
+    ...rows.map((row) => row.map((cell, column) => cell.padEnd(widths[column]!)).join("  ").trimEnd()),
+    formatCostLine(report.cost),
+  ].join("\n");
+}
+
+/** The ledger line under the table: numbers only, like every table row. */
+export function formatCostLine(cost: ScoreReport["cost"]): string {
+  return `cost $${cost.usd.toFixed(4)} over ${cost.calls} model calls`;
 }
 
 const CONSOLE_METHODS = ["log", "info", "warn", "error", "debug", "trace"] as const;

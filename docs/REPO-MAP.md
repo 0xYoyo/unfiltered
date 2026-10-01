@@ -311,6 +311,7 @@ apps/
         cli.server.ts
         data/
           public-set.json
+          score-baseline.json
           seed-fixture.json.gz
         fixture.server.ts
         grade.server.ts

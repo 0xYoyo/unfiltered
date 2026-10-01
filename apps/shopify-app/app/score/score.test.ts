@@ -25,7 +25,14 @@ import {
   searchScore,
 } from "./grade.server";
 import { findLeaks } from "./leak.server";
-import { descriptionExcerpt, formatScoreTable, graderDetails, runScoreSet } from "./run.server";
+import {
+  descriptionExcerpt,
+  formatCostLine,
+  formatScoreTable,
+  graderDetails,
+  readRunCost,
+  runScoreSet,
+} from "./run.server";
 import {
   buildScoreSet,
   decodeHiddenSet,
@@ -462,6 +469,40 @@ describe("the scoring math (AC-5)", () => {
     expect(report.languages.map((row) => row.language)).toEqual(["en", "fr"]);
     expect(formatScoreTable(report).split("\n")[0]).toMatch(/^language\s+score\s+searches\s+model-written/);
   });
+
+  it("reads the run's spend from the cost ledger after flushing queued writes (YOY-141 AC-10)", async () => {
+    const db = await createTestDb();
+    await importScoreFixture(db, buildSyntheticFixture());
+    const set: ScoreSetEntry[] = [
+      { query: "linen shirt", language: "en", source: "log", modelWritten: false },
+    ];
+    const row = (costUsd: number) => ({
+      provider: "gemini",
+      modelId: "m",
+      operation: "score-grade",
+      inputTokens: 1,
+      outputTokens: 1,
+      costUsd,
+    });
+    await db.aiCall.create({ data: row(0.0125) });
+    let flushed = false;
+    const report = await runScoreSet({
+      db,
+      orchestrator: createSyntheticOrchestrator(db, set),
+      grader: fakeGrader(3).llm,
+      storeKey: SYNTHETIC_STORE_KEY,
+      set,
+      // A write still queued off the hot path when the searches end.
+      flushLedger: async () => {
+        await db.aiCall.create({ data: row(0.0075) });
+        flushed = true;
+      },
+    });
+    expect(flushed).toBe(true);
+    expect(report.cost).toEqual({ usd: expect.closeTo(0.02, 10), calls: 2 });
+    expect(await readRunCost(await createTestDb())).toEqual({ usd: 0, calls: 0 });
+    expect(formatCostLine(report.cost)).toBe("cost $0.0200 over 2 model calls");
+  });
 });
 
 describe("the runner (AC-6, AC-7)", () => {
@@ -514,7 +555,8 @@ describe("the runner (AC-6, AC-7)", () => {
     const output = written.join("");
     expect(output).not.toContain(marker);
     expect(output).toMatch(/^language\s+score/);
-    expect(output.trim().split("\n")).toHaveLength(4);
+    // Header, three language rows, the cost line.
+    expect(output.trim().split("\n")).toHaveLength(5);
   });
 
   it("captures the query-bearing warnings a degraded search logs", async () => {
@@ -644,10 +686,20 @@ describe("the hidden run's leak check (YOY-141 AC-3)", () => {
       { language: "en", score: 0.5, searches: 12, modelWritten: false, underOneSecond: 0.5, failed: 0 },
       { language: "he", score: 0.25, searches: 12, modelWritten: false, underOneSecond: 1, failed: 1 },
     ],
+    cost: { usd: 0.0812, calls: 96 },
   });
 
   it("passes a clean score table, even when hidden searches are table words", () => {
+    expect(table.split("\n").at(-1)).toBe("cost $0.0812 over 96 model calls");
     expect(findLeaks(`${table}\n`, hidden)).toEqual({ leaked: 0 });
+  });
+
+  it("skips only a strict cost line: a query after it is still found", () => {
+    const hiddenCost: ScoreSetEntry[] = [
+      { query: "cost", language: "en", source: "model", modelWritten: false },
+    ];
+    expect(findLeaks("cost $0.0812 over 96 model calls\n", hiddenCost)).toEqual({ leaked: 0 });
+    expect(findLeaks("cost $0.0812 over 96 model calls for cost\n", hiddenCost)).toEqual({ leaked: 1 });
   });
 
   it("counts every hidden query found outside the table, case-insensitively", () => {

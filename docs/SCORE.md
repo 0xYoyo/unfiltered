@@ -50,8 +50,10 @@ only if the hidden score goes up. The tooling lives in
    searches.
 7. **Print** — the run captures all console output and prints the score
    table only: per language its score, search count, `modelWritten` flag,
-   share of searches under 1 s, and failed searches. Query text never
-   reaches the output.
+   share of searches under 1 s, and failed searches, then one cost line —
+   `cost $N over N model calls`, the run's spend read from its own cost
+   ledger (every search call and every grade) before the scratch database
+   is discarded. Query text never reaches the output.
 
 `npm run score:public` runs the public half against
 `app/score/data/seed-fixture.json.gz` (`--set`, `--fixture` and
@@ -116,7 +118,42 @@ agreement and within-one agreement as percentages.
   (estimates until measured).
 - The hidden half never enters the repository.
 
+## Baseline — the public half on the M5 engine
+
+The public half run three times on the current engine (`origin/main` at
+`5584566`, 2026-10-01, `npm run score:public`). Each language's mean is the
+baseline Engine v2 must beat; its noise band — highest minus lowest of the
+three runs — is how far a score moves with no change at all, so a gain
+smaller than the band is not a gain. The numbers are in
+`apps/shopify-app/app/score/data/score-baseline.json`.
+
+| Language | Run 1 | Run 2 | Run 3 | Mean | Noise band |
+|----------|-------|-------|-------|------|------------|
+| en | 0.462 | 0.573 | 0.491 | 0.509 | 0.111 |
+| he | 0.222 | 0.231 | 0.141 | 0.198 | 0.090 |
+| ar | 0.440 | 0.449 | 0.432 | 0.440 | 0.017 |
+| ru | 0.338 | 0.308 | 0.363 | 0.336 | 0.055 |
+| fr | 0.269 | 0.265 | 0.265 | 0.266 | 0.004 |
+| es | 0.385 | 0.325 | 0.355 | 0.355 | 0.060 |
+
+No search failed in any run. `ar, ru, fr, es` are model-written (no log
+searches in those languages).
+
+## Measured cost
+
+Read from each run's cost ledger (the run's cost line): one public run —
+78 searches, 268 model calls including the grades — costs **$0.0595**
+(runs: $0.0597, $0.0595, $0.0594). Hidden run 1: recorded in the run-1 row
+from its workflow log.
+
 ## Results
+
+Hidden-half scores per language. "Under 1 s" is the latency probe's share
+of searches under 1,000 ms server-side against the deployment
+(`scripts/latency-probe.mts --runs 5 --set all`, docs/LATENCY.md); the
+score runner's own under-1-s column times a local run and is not the
+deployment's.
 
 | Run | Engine | en | he | ar | ru | fr | es | Under 1 s | Cost |
 |-----|--------|----|----|----|----|----|----|-----------|------|
+| 1 | M5 engine | pending | pending | pending | pending | pending | pending | classic 96 % · AI 34 % (EN 40 %, HE 28 %), 2026-10-01 | pending |
