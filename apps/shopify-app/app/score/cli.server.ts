@@ -191,16 +191,23 @@ export async function runScoreCommand(
       await importScoreFixture(db, fixture);
       let orchestrator: SearchOrchestrator;
       let grader: LlmClient;
+      let flushLedger: (() => Promise<void>) | undefined;
       if (values.synthetic) {
         orchestrator = createSyntheticOrchestrator(db, set);
         grader = await createSyntheticGrader(orchestrator, set);
       } else {
         const { createProxySearchOrchestrator } = await import("../search/proxy.server");
-        const { createPrismaCostRecorder } = await import("../ai/cost-recorder.server");
-        orchestrator = createProxySearchOrchestrator(db);
+        const { createPrismaCostRecorder, createQueuedCostRecorder } = await import(
+          "../ai/cost-recorder.server"
+        );
+        // The run reads its spend from this ledger (AC-10): it owns the
+        // pipeline's queued recorder so it can flush it first.
+        const searchLedger = createQueuedCostRecorder(createPrismaCostRecorder(db));
+        orchestrator = createProxySearchOrchestrator(db, { costRecorder: searchLedger });
         grader = await flashLite(createPrismaCostRecorder(db));
+        flushLedger = searchLedger.flush;
       }
-      return runScoreSet({ db, orchestrator, grader, storeKey: fixture.storeKey, set });
+      return runScoreSet({ db, orchestrator, grader, storeKey: fixture.storeKey, set, flushLedger });
     });
     out(formatScoreTable(report));
     return 0;
