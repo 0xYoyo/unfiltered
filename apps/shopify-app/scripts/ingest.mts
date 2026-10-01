@@ -19,12 +19,14 @@
  * catalog ingest may reuse this. Re-running is idempotent — content hashes
  * make a second pass report `unchanged`/`cached`.
  *
- * Usage, from apps/shopify-app:
+ * Usage, from apps/shopify-app (the script loads .env itself):
  *
- *   set -a && source .env && set +a
  *   npm run ingest                        # default dev shop
  *   npm run ingest -- other.myshopify.com # any shop with an offline session
  */
+
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { PrismaClient } from "@prisma/client";
 
@@ -44,6 +46,17 @@ import {
   rejectUnauthenticated,
   resolveOfflineAccessToken,
 } from "../app/catalog/offline-token.server";
+
+// Env loading is in-process (YOY-142 AC-11), the `render-migrate.mts`
+// pattern: Node's built-in `process.loadEnvFile` reads apps/shopify-app/.env,
+// so no `source .env` in the shell; nothing here prints a value. A missing
+// file is ignored (the env may already be exported), and an already-exported
+// variable wins over the file.
+try {
+  process.loadEnvFile(resolve(dirname(fileURLToPath(import.meta.url)), "..", ".env"));
+} catch (error) {
+  if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+}
 
 /** Keep in sync with `api_version` in shopify.app.toml. */
 const ADMIN_API_VERSION = "2025-10";

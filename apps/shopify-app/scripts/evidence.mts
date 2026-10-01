@@ -1,11 +1,11 @@
 /**
  * Prisma-based evidence queries for the live-run runbooks (YOY-52 AC-8):
  * the psql-free way to read the same rows the runbook's SQL snippets show.
- * Reads DATABASE_URL from the environment (source apps/shopify-app/.env).
+ * Reads DATABASE_URL from the environment, loading apps/shopify-app/.env
+ * itself (YOY-142 AC-11).
  *
  * Usage, from apps/shopify-app:
  *
- *   set -a && source .env && set +a
  *   npx tsx scripts/evidence.mts counts             # index size per store
  *   npx tsx scripts/evidence.mts searches [limit]   # latest SearchEvent rows
  *   npx tsx scripts/evidence.mts costs SEARCH_ID    # AiCall rows for one search
@@ -15,7 +15,21 @@
  *   npx tsx scripts/evidence.mts variants ID        # one product's variants
  */
 
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
 import { PrismaClient } from "@prisma/client";
+
+// Env loading is in-process (YOY-142 AC-11), the `render-migrate.mts`
+// pattern: Node's built-in `process.loadEnvFile` reads apps/shopify-app/.env,
+// so no `source .env` in the shell; nothing here prints a value. A missing
+// file is ignored (the env may already be exported), and an already-exported
+// variable wins over the file.
+try {
+  process.loadEnvFile(resolve(dirname(fileURLToPath(import.meta.url)), "..", ".env"));
+} catch (error) {
+  if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+}
 
 const SHOP = process.env.EVIDENCE_SHOP ?? "unfiltered-dev.myshopify.com";
 
