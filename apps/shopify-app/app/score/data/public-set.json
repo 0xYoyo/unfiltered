@@ -1,0 +1,470 @@
+[
+  {
+    "query": "snowbar",
+    "language": "en",
+    "source": "log",
+    "modelWritten": false
+  },
+  {
+    "query": "snob",
+    "language": "en",
+    "source": "log",
+    "modelWritten": false
+  },
+  {
+    "query": "jacket",
+    "language": "en",
+    "source": "log",
+    "modelWritten": false
+  },
+  {
+    "query": "snowboard",
+    "language": "en",
+    "source": "log",
+    "modelWritten": false
+  },
+  {
+    "query": "snowbarod",
+    "language": "en",
+    "source": "log",
+    "modelWritten": false
+  },
+  {
+    "query": "xbuc",
+    "language": "en",
+    "source": "log",
+    "modelWritten": false
+  },
+  {
+    "query": "snowbao",
+    "language": "en",
+    "source": "log",
+    "modelWritten": false
+  },
+  {
+    "query": "snowbrad",
+    "language": "en",
+    "source": "log",
+    "modelWritten": false
+  },
+  {
+    "query": "probe",
+    "language": "en",
+    "source": "log",
+    "modelWritten": false
+  },
+  {
+    "query": "b",
+    "language": "en",
+    "source": "log",
+    "modelWritten": false
+  },
+  {
+    "query": "sno",
+    "language": "en",
+    "source": "log",
+    "modelWritten": false
+  },
+  {
+    "query": "snowbr",
+    "language": "en",
+    "source": "log",
+    "modelWritten": false
+  },
+  {
+    "query": "s",
+    "language": "en",
+    "source": "log",
+    "modelWritten": false
+  },
+  {
+    "query": "אותו דבר אבל יותר זול",
+    "language": "he",
+    "source": "log",
+    "modelWritten": false
+  },
+  {
+    "query": "סנובורד כחו",
+    "language": "he",
+    "source": "log",
+    "modelWritten": false
+  },
+  {
+    "query": "סנובורד ירוק מתחת למאתיים",
+    "language": "he",
+    "source": "log",
+    "modelWritten": false
+  },
+  {
+    "query": "סנובורד",
+    "language": "he",
+    "source": "log",
+    "modelWritten": false
+  },
+  {
+    "query": "ס",
+    "language": "he",
+    "source": "log",
+    "modelWritten": false
+  },
+  {
+    "query": "סנובורד כחול מתחת ל-",
+    "language": "he",
+    "source": "log",
+    "modelWritten": false
+  },
+  {
+    "query": "סנובורד אדום מתחת למאתיים",
+    "language": "he",
+    "source": "log",
+    "modelWritten": false
+  },
+  {
+    "query": "סנובורד סגול מתחת למאתיים",
+    "language": "he",
+    "source": "log",
+    "modelWritten": false
+  },
+  {
+    "query": "סנוב",
+    "language": "he",
+    "source": "log",
+    "modelWritten": false
+  },
+  {
+    "query": "שמלת כלה ורודה",
+    "language": "he",
+    "source": "log",
+    "modelWritten": false
+  },
+  {
+    "query": "סנובורד כחול מתחת ל-90",
+    "language": "he",
+    "source": "log",
+    "modelWritten": false
+  },
+  {
+    "query": "bסובור",
+    "language": "he",
+    "source": "log",
+    "modelWritten": false
+  },
+  {
+    "query": "סנובור",
+    "language": "he",
+    "source": "log",
+    "modelWritten": false
+  },
+  {
+    "query": "تنورة طويلة",
+    "language": "ar",
+    "source": "model",
+    "modelWritten": true
+  },
+  {
+    "query": "فستان سهرة طويل أحمر فخم",
+    "language": "ar",
+    "source": "model",
+    "modelWritten": true
+  },
+  {
+    "query": "ابحث عن فستان سهرة طويل ومناسب لحفل زفاف قريب يكون أنيق وبسعر مناسب",
+    "language": "ar",
+    "source": "model",
+    "modelWritten": true
+  },
+  {
+    "query": "ساعة نسائية",
+    "language": "ar",
+    "source": "model",
+    "modelWritten": true
+  },
+  {
+    "query": "عايز ملابس صيفية خفيفة ومريحة للبحر والسفر وتكون ألوانها زاهية",
+    "language": "ar",
+    "source": "model",
+    "modelWritten": true
+  },
+  {
+    "query": "جاكيت جينز رجالي واسع شتوي",
+    "language": "ar",
+    "source": "model",
+    "modelWritten": true
+  },
+  {
+    "query": "بيجامة نوم",
+    "language": "ar",
+    "source": "model",
+    "modelWritten": true
+  },
+  {
+    "query": "عباية سوداء",
+    "language": "ar",
+    "source": "model",
+    "modelWritten": true
+  },
+  {
+    "query": "جاكيت شتوي",
+    "language": "ar",
+    "source": "model",
+    "modelWritten": true
+  },
+  {
+    "query": "قميص رجالي",
+    "language": "ar",
+    "source": "model",
+    "modelWritten": true
+  },
+  {
+    "query": "حقيبة يد نسائية جلد أسود صغيرة",
+    "language": "ar",
+    "source": "model",
+    "modelWritten": true
+  },
+  {
+    "query": "حذاء رسمي",
+    "language": "ar",
+    "source": "model",
+    "modelWritten": true
+  },
+  {
+    "query": "فستان سهرة",
+    "language": "ar",
+    "source": "model",
+    "modelWritten": true
+  },
+  {
+    "query": "черное платье миди для вечернего выхода",
+    "language": "ru",
+    "source": "model",
+    "modelWritten": true
+  },
+  {
+    "query": "зимняя теплая куртка с капюшоном недорого",
+    "language": "ru",
+    "source": "model",
+    "modelWritten": true
+  },
+  {
+    "query": "красный шелковый топ на тонких бретелях",
+    "language": "ru",
+    "source": "model",
+    "modelWritten": true
+  },
+  {
+    "query": "синие джинсы с высокой посадкой стрейч",
+    "language": "ru",
+    "source": "model",
+    "modelWritten": true
+  },
+  {
+    "query": "хочу теплое уютное худи оверсайз которо носить с джинсами осенью",
+    "language": "ru",
+    "source": "model",
+    "modelWritten": true
+  },
+  {
+    "query": "белая хлопковая рубашка оверсайз на лето",
+    "language": "ru",
+    "source": "model",
+    "modelWritten": true
+  },
+  {
+    "query": "удобные кроссовки для бега со скидкой",
+    "language": "ru",
+    "source": "model",
+    "modelWritten": true
+  },
+  {
+    "query": "шерстяное пальто классического кроя бежевое",
+    "language": "ru",
+    "source": "model",
+    "modelWritten": true
+  },
+  {
+    "query": "сумка через плечо",
+    "language": "ru",
+    "source": "model",
+    "modelWritten": true
+  },
+  {
+    "query": "брюки классические",
+    "language": "ru",
+    "source": "model",
+    "modelWritten": true
+  },
+  {
+    "query": "ремень кожаный",
+    "language": "ru",
+    "source": "model",
+    "modelWritten": true
+  },
+  {
+    "query": "кардиган вязаный",
+    "language": "ru",
+    "source": "model",
+    "modelWritten": true
+  },
+  {
+    "query": "юбка миди",
+    "language": "ru",
+    "source": "model",
+    "modelWritten": true
+  },
+  {
+    "query": "pull en cachemire bleu marine",
+    "language": "fr",
+    "source": "model",
+    "modelWritten": true
+  },
+  {
+    "query": "veste en cuir",
+    "language": "fr",
+    "source": "model",
+    "modelWritten": true
+  },
+  {
+    "query": "manteau chaud d hiver imperméable",
+    "language": "fr",
+    "source": "model",
+    "modelWritten": true
+  },
+  {
+    "query": "je voudrais des vêtements confortables mais élégants pour travailler de la maison",
+    "language": "fr",
+    "source": "model",
+    "modelWritten": true
+  },
+  {
+    "query": "pull en laine",
+    "language": "fr",
+    "source": "model",
+    "modelWritten": true
+  },
+  {
+    "query": "guitare t-shirt",
+    "language": "fr",
+    "source": "model",
+    "modelWritten": true
+  },
+  {
+    "query": "baskets blanches",
+    "language": "fr",
+    "source": "model",
+    "modelWritten": true
+  },
+  {
+    "query": "chemise blanche",
+    "language": "fr",
+    "source": "model",
+    "modelWritten": true
+  },
+  {
+    "query": "robe longue rouge pour un mariage",
+    "language": "fr",
+    "source": "model",
+    "modelWritten": true
+  },
+  {
+    "query": "robe rouge",
+    "language": "fr",
+    "source": "model",
+    "modelWritten": true
+  },
+  {
+    "query": "sac a main en cuir noir",
+    "language": "fr",
+    "source": "model",
+    "modelWritten": true
+  },
+  {
+    "query": "sac à main",
+    "language": "fr",
+    "source": "model",
+    "modelWritten": true
+  },
+  {
+    "query": "je cherche une robe longue et légère pour un mariage en été",
+    "language": "fr",
+    "source": "model",
+    "modelWritten": true
+  },
+  {
+    "query": "pantalones cortos",
+    "language": "es",
+    "source": "model",
+    "modelWritten": true
+  },
+  {
+    "query": "pantalon vaquero ajustado tiro alto",
+    "language": "es",
+    "source": "model",
+    "modelWritten": true
+  },
+  {
+    "query": "que me pongo para una boda en la playa en verano que sea comodo",
+    "language": "es",
+    "source": "model",
+    "modelWritten": true
+  },
+  {
+    "query": "botines negros",
+    "language": "es",
+    "source": "model",
+    "modelWritten": true
+  },
+  {
+    "query": "traje de baño",
+    "language": "es",
+    "source": "model",
+    "modelWritten": true
+  },
+  {
+    "query": "vestido negro",
+    "language": "es",
+    "source": "model",
+    "modelWritten": true
+  },
+  {
+    "query": "bufanda de lana",
+    "language": "es",
+    "source": "model",
+    "modelWritten": true
+  },
+  {
+    "query": "camisa de lino manga larga",
+    "language": "es",
+    "source": "model",
+    "modelWritten": true
+  },
+  {
+    "query": "cinturón de cuero",
+    "language": "es",
+    "source": "model",
+    "modelWritten": true
+  },
+  {
+    "query": "zapatillas blancas",
+    "language": "es",
+    "source": "model",
+    "modelWritten": true
+  },
+  {
+    "query": "bolso de cuero marron grande",
+    "language": "es",
+    "source": "model",
+    "modelWritten": true
+  },
+  {
+    "query": "sueter de lana gris comodo",
+    "language": "es",
+    "source": "model",
+    "modelWritten": true
+  },
+  {
+    "query": "chaqueta impermeable negra para lluvia",
+    "language": "es",
+    "source": "model",
+    "modelWritten": true
+  }
+]
