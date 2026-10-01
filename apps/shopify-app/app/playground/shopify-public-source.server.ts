@@ -3,6 +3,7 @@ import type {
   SourceProduct,
 } from "./catalog-source.server";
 import { usableImageUrls } from "../catalog/mapping.server";
+import type { VariantRecord } from "../catalog/variants.server";
 import { htmlToPlainText } from "./catalog-source.server";
 import type { PoliteFetch } from "./polite-fetch.server";
 
@@ -27,7 +28,19 @@ export interface ShopifyPublicProduct {
   product_type: string | null;
   tags: string[] | string | null;
   updated_at?: string | null;
-  variants: Array<{ price: string | number | null; available?: boolean }>;
+  /** Identity and option fields (YOY-142 AC-4) are absent in older fixtures. */
+  variants: Array<{
+    id?: number | string;
+    position?: number | null;
+    option1?: string | null;
+    option2?: string | null;
+    option3?: string | null;
+    updated_at?: string | null;
+    price: string | number | null;
+    available?: boolean;
+  }>;
+  /** The product's option names; a variant's option1–3 are their values, in this order. */
+  options?: Array<{ name: string; position?: number | null }>;
   images: Array<{ src: string; alt: string | null }>;
 }
 
@@ -108,6 +121,50 @@ export async function fetchShopifyPublicStoreMeta(
 }
 
 /**
+ * The variants of one feed product (YOY-142 AC-4): each variant's
+ * `option1`/`option2`/`option3` paired, in order, with the product's option
+ * names — verbatim (AC-6) — its price and `available`, `quantity` null (the
+ * public feed exposes no stock). A variant without an id or a readable
+ * price is skipped.
+ */
+export function mapShopifyPublicVariants(product: ShopifyPublicProduct): VariantRecord[] {
+  const names = [...(product.options ?? [])]
+    .map((option, index) => ({ name: option.name, position: option.position ?? index + 1 }))
+    .sort((a, b) => a.position - b.position)
+    .map((option) => option.name);
+  const productUpdatedAt =
+    typeof product.updated_at === "string" && product.updated_at !== ""
+      ? new Date(product.updated_at)
+      : null;
+  const variants: VariantRecord[] = [];
+  product.variants.forEach((variant, index) => {
+    const price = Number(variant.price);
+    if (variant.id === undefined || variant.id === null || variant.price === null || !Number.isFinite(price)) {
+      return;
+    }
+    const options = [variant.option1, variant.option2, variant.option3].flatMap(
+      (value, optionIndex) => {
+        const name = names[optionIndex];
+        return typeof value === "string" && name !== undefined ? [{ name, value }] : [];
+      },
+    );
+    variants.push({
+      variantId: String(variant.id),
+      position: variant.position ?? index + 1,
+      options,
+      price,
+      available: variant.available === true,
+      quantity: null,
+      sourceUpdatedAt:
+        typeof variant.updated_at === "string" && variant.updated_at !== ""
+          ? new Date(variant.updated_at)
+          : productUpdatedAt,
+    });
+  });
+  return variants;
+}
+
+/**
  * Map one feed product to the port shape. Prices are the min/max over the
  * variants' `price` (strings in the feed); availability is any variant
  * `available`; the first image is the card image; alt texts are every
@@ -145,6 +202,7 @@ export function mapShopifyPublicProduct(
       .filter((alt) => alt !== ""),
     imageUrl: product.images[0]?.src ?? null,
     imageUrls: usableImageUrls(product.images.map((image) => image.src)),
+    variants: mapShopifyPublicVariants(product),
     url:
       product.handle !== undefined && product.handle !== ""
         ? `${origin}/products/${product.handle}`

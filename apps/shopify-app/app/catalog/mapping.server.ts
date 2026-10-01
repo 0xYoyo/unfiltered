@@ -2,6 +2,8 @@ import { createHash } from "node:crypto";
 
 import { isColorwayDesignator } from "@unfiltered/engine";
 
+import type { VariantRecord } from "./variants.server";
+
 /**
  * Image cap per product (YOY-120 AC-1; PRD capability 14): at most this
  * many DISTINCT images per product, in source order — applied by image
@@ -57,7 +59,14 @@ export interface ShopifyProductNode {
     minVariantPrice: { amount: string; currencyCode: string };
     maxVariantPrice: { amount: string; currencyCode: string };
   };
-  variants: { nodes: Array<{ availableForSale: boolean }> };
+  /**
+   * The per-variant fields (YOY-142 AC-2) are absent in fixtures that
+   * predate variant capture and in webhook-derived nodes, which carry their
+   * variants through `webhookVariants` instead; only nodes carrying `id`
+   * become `ProductVariant` rows. `inventoryQuantity` is absent (or null)
+   * when the Admin API refused it under the app's scopes.
+   */
+  variants: { nodes: Array<ShopifyVariantNode> };
   /**
    * `url` is absent in fixtures that predate image capture (YOY-120) and
    * in webhook-derived nodes without `images[].src`; only nodes carrying it
@@ -72,6 +81,18 @@ export interface ShopifyProductNode {
    * from the shop domain and handle instead.
    */
   onlineStoreUrl?: string | null;
+}
+
+/** One variant node of the Admin products query (YOY-142 AC-2). */
+export interface ShopifyVariantNode {
+  availableForSale: boolean;
+  id?: string;
+  position?: number | null;
+  selectedOptions?: Array<{ name: string; value: string }> | null;
+  /** The Admin API's `Money` scalar: a decimal string. */
+  price?: string | number | null;
+  inventoryQuantity?: number | null;
+  updatedAt?: string | null;
 }
 
 /** One snapshot row, before persistence (no DB identity, no shop). */
@@ -189,6 +210,36 @@ export function usableImageUrls(urls: Array<string | null | undefined>): string[
  */
 export function snapshotImageUrls(node: Pick<ShopifyProductNode, "images">): string[] {
   return usableImageUrls(node.images.nodes.map((image) => image.url));
+}
+
+/**
+ * The variants of one Admin product node (YOY-142 AC-2): every node that
+ * carries an `id` and a readable price, in query order, with its
+ * `selectedOptions` verbatim (AC-6) and `inventoryQuantity` as given — null
+ * when the API withheld it. Kept beside the snapshot row like
+ * `snapshotImageUrls`: variants sit outside contentHash (NG-4).
+ */
+export function snapshotVariants(node: Pick<ShopifyProductNode, "variants">): VariantRecord[] {
+  const variants: VariantRecord[] = [];
+  node.variants.nodes.forEach((variant, index) => {
+    const price = Number(variant.price);
+    if (typeof variant.id !== "string" || variant.id === "" || variant.price == null || !Number.isFinite(price)) {
+      return;
+    }
+    variants.push({
+      variantId: variant.id,
+      position: variant.position ?? index + 1,
+      options: (variant.selectedOptions ?? []).map(({ name, value }) => ({ name, value })),
+      price,
+      available: variant.availableForSale,
+      quantity: typeof variant.inventoryQuantity === "number" ? variant.inventoryQuantity : null,
+      sourceUpdatedAt:
+        typeof variant.updatedAt === "string" && variant.updatedAt !== ""
+          ? new Date(variant.updatedAt)
+          : null,
+    });
+  });
+  return variants;
 }
 
 /**

@@ -1,5 +1,6 @@
 import type { SourceProduct } from "./catalog-source.server";
 import { usableImageUrls } from "../catalog/mapping.server";
+import type { VariantOption, VariantRecord } from "../catalog/variants.server";
 import { htmlToPlainText } from "./catalog-source.server";
 
 /**
@@ -245,6 +246,97 @@ export function readOffers(offers: unknown): OfferFacts {
   return facts;
 }
 
+/**
+ * The property a `variesBy` entry names, as the page wrote it minus the
+ * vocabulary prefix: `https://schema.org/size` and `size` both read `size`.
+ */
+const variesByProperty = (value: string): string =>
+  value.replace(/^.*[/#:]/, "");
+
+/** Properties read as options when a group names no `variesBy`. */
+const DEFAULT_VARIANT_PROPERTIES = ["size", "color", "material", "pattern"];
+
+/** A variant property's value: a string, a number, or a node's `name`. */
+const optionValue = (value: unknown): string | null => {
+  if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+    return asString((value as JsonNode)["name"]);
+  }
+  return asString(value);
+};
+
+/**
+ * Per-variant rows a product node provides (YOY-142 AC-5). A
+ * `ProductGroup` (or a Product with `hasVariant`) yields one row per
+ * variant: its options are the properties the group's `variesBy` names
+ * (else size/color/material/pattern), name and value verbatim (AC-6); its
+ * price and availability come from its own offers, the price falling back
+ * to the product's lowest when the variant carries none. A Product whose
+ * `offers` lists two or more Offers — one per variant, the common
+ * storefront form — yields one row per offer, with no option pairs (the
+ * Offer vocabulary carries none). A page with one offer, or none, provides
+ * no per-variant data: zero rows.
+ */
+export function readVariants(
+  node: JsonNode,
+  { sourceId, fallbackPrice }: { sourceId: string; fallbackPrice: number },
+): VariantRecord[] {
+  const variants = Array.isArray(node["hasVariant"])
+    ? (node["hasVariant"] as unknown[]).filter(
+        (variant): variant is JsonNode => variant !== null && typeof variant === "object",
+      )
+    : [];
+  if (variants.length > 0) {
+    const variesBy = (Array.isArray(node["variesBy"]) ? node["variesBy"] : [node["variesBy"]])
+      .filter((entry): entry is string => typeof entry === "string" && entry !== "")
+      .map(variesByProperty);
+    const properties = variesBy.length > 0 ? variesBy : DEFAULT_VARIANT_PROPERTIES;
+    return variants.map((variant, index) => {
+      const offers = readOffers(variant["offers"]);
+      const options: VariantOption[] = properties.flatMap((name) => {
+        const value = optionValue(variant[name]);
+        return value === null ? [] : [{ name, value }];
+      });
+      return {
+        variantId:
+          asString(variant["sku"]) ??
+          asString(variant["productID"]) ??
+          asString(variant["productId"]) ??
+          asString(variant["@id"]) ??
+          `${sourceId}#${index + 1}`,
+        position: index + 1,
+        options,
+        price: offers.priceMin ?? fallbackPrice,
+        available: offers.available,
+        quantity: null,
+        sourceUpdatedAt: null,
+      };
+    });
+  }
+  const offers = (Array.isArray(node["offers"]) ? node["offers"] : []).filter(
+    (offer): offer is JsonNode =>
+      offer !== null && typeof offer === "object" && !hasType(offer as JsonNode, "AggregateOffer"),
+  );
+  if (offers.length < 2) {
+    return [];
+  }
+  return offers.map((offer, index) => {
+    const read = readOffers(offer);
+    return {
+      variantId:
+        asString(offer["sku"]) ??
+        asString(offer["@id"]) ??
+        asString(offer["url"]) ??
+        `${sourceId}#${index + 1}`,
+      position: index + 1,
+      options: [],
+      price: read.priceMin ?? fallbackPrice,
+      available: read.available,
+      quantity: null,
+      sourceUpdatedAt: null,
+    };
+  });
+}
+
 /** Product nodes on the page: `Product` (any subtype) or `ProductGroup`. */
 export function findProductNodes(blocks: unknown[]): JsonNode[] {
   const nodes = candidateNodes(blocks);
@@ -351,6 +443,7 @@ export function mapProductNode(
     // Likewise an unparseable image URL yields no image, not a failed page.
     imageUrl: image !== null ? resolveUrl(image, pageUrl) : null,
     imageUrls,
+    variants: readVariants(node, { sourceId, fallbackPrice: facts.priceMin }),
     url,
     sourceUpdatedAt: null,
   };

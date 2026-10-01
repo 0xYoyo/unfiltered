@@ -83,8 +83,10 @@ function raceLosingDb(): typeof db {
       update: (...args: Parameters<typeof db.catalogProduct.update>) =>
         db.catalogProduct.update(...args),
     },
-    // Image capture (YOY-120) runs after the race is settled; pass it through.
+    // Image (YOY-120) and variant (YOY-142) capture run after the race is
+    // settled; pass them through.
     productImage: db.productImage,
+    productVariant: db.productVariant,
   } as unknown as typeof db;
 }
 

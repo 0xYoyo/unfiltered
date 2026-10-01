@@ -205,6 +205,7 @@ describe("mapping (AC-3)", () => {
       imageAltTexts: ["x"],
       imageUrl: "https://img",
       imageUrls: ["https://img", "https://img2", "https://img3", "https://img4", "https://img5"],
+      variants: [],
       url: "https://store/products/t",
       sourceUpdatedAt: null,
     };
@@ -255,6 +256,8 @@ describe("pipeline (AC-3, AC-7)", () => {
       skippedInvalid: 2,
       // 7001 lists three images, 7003 one (YOY-120).
       images: { fetched: 4, unchanged: 0, failed: 0 },
+      // The feed fixture's variants carry no ids (YOY-142): nothing to key.
+      variants: { written: 0, unchanged: 0, deleted: 0 },
     });
     expect(result.enrich).toEqual({ enriched: 3, cached: 0, failed: 0 });
     expect(result.embed).toEqual({ embedded: 3, cached: 0, deleted: 0 });
@@ -419,6 +422,7 @@ describe("pipeline (AC-3, AC-7)", () => {
       enrichments: 3,
       embeddings: 3,
       images: 4,
+      variants: 0,
       registry: 1,
     });
     expect(await db.catalogProduct.count({ where: { shopDomain: "playground:demo" } })).toBe(0);

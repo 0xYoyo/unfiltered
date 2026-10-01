@@ -12,6 +12,7 @@
  *   npx tsx scripts/evidence.mts clicks [limit]     # latest ClickEvent rows
  *   npx tsx scripts/evidence.mts vision             # visionStatus coverage
  *   npx tsx scripts/evidence.mts attributes ID...   # enrichment of given products
+ *   npx tsx scripts/evidence.mts variants ID        # one product's variants
  */
 
 import { PrismaClient } from "@prisma/client";
@@ -179,6 +180,38 @@ async function attributes(productIds: string[]): Promise<void> {
   }
 }
 
+/**
+ * One product's variants (YOY-142 AC-9): each variant's option pairs, price,
+ * availability and stock quantity, in the merchant's order — the evidence
+ * that sizes and per-size stock survived ingestion. Quantity prints "—"
+ * when the source does not expose it.
+ */
+async function variants(productId: string): Promise<void> {
+  const [product, rows] = await Promise.all([
+    db.catalogProduct.findUnique({
+      where: { shopDomain_productId: { shopDomain: SHOP, productId } },
+      select: { title: true, currencyCode: true },
+    }),
+    db.productVariant.findMany({
+      where: { shopDomain: SHOP, productId },
+      orderBy: { position: "asc" },
+    }),
+  ]);
+  console.log(
+    `${productId}: ${product?.title ?? "no snapshot row"} — ${rows.length} variant(s)`,
+  );
+  console.table(
+    rows.map((row) => ({
+      options: (row.options as Array<{ name: string; value: string }>)
+        .map(({ name, value }) => `${name}: ${value}`)
+        .join(" / "),
+      price: `${row.price} ${product?.currencyCode ?? ""}`.trim(),
+      available: row.available,
+      quantity: row.quantity ?? "—",
+    })),
+  );
+}
+
 const [mode, argument, ...rest] = process.argv.slice(2);
 try {
   switch (mode) {
@@ -206,9 +239,15 @@ try {
       }
       await attributes([argument, ...rest]);
       break;
+    case "variants":
+      if (!argument) {
+        throw new Error("usage: evidence.mts variants PRODUCT_ID");
+      }
+      await variants(argument);
+      break;
     default:
       throw new Error(
-        "usage: evidence.mts counts | searches [limit] | costs SEARCH_ID | clicks [limit] | vision | attributes PRODUCT_ID...",
+        "usage: evidence.mts counts | searches [limit] | costs SEARCH_ID | clicks [limit] | vision | attributes PRODUCT_ID... | variants PRODUCT_ID",
       );
   }
 } finally {

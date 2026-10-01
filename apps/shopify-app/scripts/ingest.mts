@@ -85,6 +85,9 @@ try {
   console.log(
     `images: fetched ${ingest.images.fetched}, unchanged ${ingest.images.unchanged}, failed ${ingest.images.failed}`,
   );
+  console.log(
+    `variants: written ${ingest.variants.written}, unchanged ${ingest.variants.unchanged}, deleted ${ingest.variants.deleted}`,
+  );
   // Text enrichment plus the vision pass (YOY-121 AC-2): images are
   // re-read with the platform fetch, the same fetch that hashed them.
   const enrich = await enrichCatalog({

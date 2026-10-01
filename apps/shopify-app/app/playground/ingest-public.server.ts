@@ -12,6 +12,12 @@ import {
   syncProductImages,
 } from "../catalog/images.server";
 import type { SnapshotProduct } from "../catalog/mapping.server";
+import type { VariantRecord, VariantSyncCounts } from "../catalog/variants.server";
+import {
+  addVariantSyncCounts,
+  emptyVariantSyncCounts,
+  syncProductVariants,
+} from "../catalog/variants.server";
 import {
   usableImageUrls,
   computeContentHash,
@@ -69,6 +75,8 @@ export interface PublicIngestCounts {
   skippedInvalid: number;
   /** Image capture over every snapshotted product (YOY-120 AC-2). */
   images: ImageSyncCounts;
+  /** Variant capture over every snapshotted product (YOY-142 AC-8). */
+  variants: VariantSyncCounts;
 }
 
 export interface PublicIngestResult {
@@ -161,9 +169,14 @@ export async function snapshotPublicCatalog({
     skippedOverMax: Math.max(0, products.length - maxProducts),
     skippedInvalid: 0,
     images: emptyImageSyncCounts(),
+    variants: emptyVariantSyncCounts(),
   };
   const bounded = products.slice(0, maxProducts);
-  const snapshot: Array<{ product: SnapshotProduct; imageUrls: string[] }> = [];
+  const snapshot: Array<{
+    product: SnapshotProduct;
+    imageUrls: string[];
+    variants: VariantRecord[];
+  }> = [];
   const seenIds = new Set<string>();
   for (const product of bounded) {
     if (!isIngestableSourceProduct(product) || seenIds.has(product.sourceId)) {
@@ -176,6 +189,8 @@ export async function snapshotPublicCatalog({
       // Beside the row, outside contentHash (YOY-120 AC-2); the cap is
       // applied by image capture after de-duplication.
       imageUrls: usableImageUrls(product.imageUrls),
+      // Beside the row too (YOY-142 NG-4): variants never dirty the hash.
+      variants: product.variants,
     });
   }
 
@@ -191,7 +206,7 @@ export async function snapshotPublicCatalog({
   });
   const existingRows = new Map(existing.map((row) => [row.productId, row]));
 
-  for (const { product, imageUrls } of snapshot) {
+  for (const { product, imageUrls, variants } of snapshot) {
     const known = existingRows.get(product.productId);
     if (known === undefined) {
       await db.catalogProduct.create({
@@ -249,6 +264,17 @@ export async function snapshotPublicCatalog({
         }),
       );
     }
+    // Variant capture (YOY-142 AC-4/AC-5): no fetch involved, so it runs on
+    // every path; an unchanged variant list writes nothing (AC-8).
+    addVariantSyncCounts(
+      result.variants,
+      await syncProductVariants({
+        db,
+        shopDomain: storeKey,
+        productId: product.productId,
+        variants,
+      }),
+    );
   }
 
   const stale = existing
@@ -259,7 +285,7 @@ export async function snapshotPublicCatalog({
     // with no FK cascade: they go in the same transaction as the product,
     // exactly like the Shopify ingest, so no orphan vector keeps a gone
     // product retrievable.
-    const [, , , { count }] = await db.$transaction([
+    const [, , , , { count }] = await db.$transaction([
       db.productEnrichment.deleteMany({
         where: { shopDomain: storeKey, productId: { in: stale } },
       }),
@@ -267,6 +293,9 @@ export async function snapshotPublicCatalog({
         where: { shopDomain: storeKey, productId: { in: stale } },
       }),
       db.productImage.deleteMany({
+        where: { shopDomain: storeKey, productId: { in: stale } },
+      }),
+      db.productVariant.deleteMany({
         where: { shopDomain: storeKey, productId: { in: stale } },
       }),
       db.catalogProduct.deleteMany({
@@ -368,6 +397,7 @@ export interface PublicCatalogDeletion {
   enrichments: number;
   embeddings: number;
   images: number;
+  variants: number;
   registry: number;
 }
 
@@ -384,10 +414,11 @@ export async function deletePublicCatalog({
   slug: string;
 }): Promise<PublicCatalogDeletion> {
   const storeKey = playgroundStoreKey(slug);
-  const [enrichments, embeddings, images, products, registry] = await db.$transaction([
+  const [enrichments, embeddings, images, variants, products, registry] = await db.$transaction([
     db.productEnrichment.deleteMany({ where: { shopDomain: storeKey } }),
     db.productEmbedding.deleteMany({ where: { shopDomain: storeKey } }),
     db.productImage.deleteMany({ where: { shopDomain: storeKey } }),
+    db.productVariant.deleteMany({ where: { shopDomain: storeKey } }),
     db.catalogProduct.deleteMany({ where: { shopDomain: storeKey } }),
     db.playgroundCatalog.deleteMany({ where: { slug } }),
   ]);
@@ -397,6 +428,7 @@ export async function deletePublicCatalog({
     enrichments: enrichments.count,
     embeddings: embeddings.count,
     images: images.count,
+    variants: variants.count,
     registry: registry.count,
   };
 }

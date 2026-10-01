@@ -143,6 +143,8 @@ describe("JSON-LD extraction (AC-3, AC-4)", () => {
         imageAltTexts: [],
         imageUrl: `${CRAWL_ORIGIN}/img/woo-dress-1.jpg`,
         imageUrls: [`${CRAWL_ORIGIN}/img/woo-dress-1.jpg`, `${CRAWL_ORIGIN}/img/woo-dress-2.jpg`],
+        // One Offer is no per-variant data (YOY-142 AC-5): zero rows.
+        variants: [],
         url: `${CRAWL_ORIGIN}/product/woo-dress`,
         sourceUpdatedAt: null,
       },
