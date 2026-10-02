@@ -17,6 +17,7 @@ import {
   buildCardPrompt,
   CARD_VERSION,
   cardLanguagesFromEnv,
+  cardSpendCapFromEnv,
   composeCardText,
   formatCardReport,
   MAX_ASKS_PER_LANGUAGE,
@@ -412,6 +413,47 @@ describe("cost (AC-9)", () => {
     expect(result.costUsd).toBeCloseTo(0.005, 9);
     const aggregates = await aggregateCosts(db);
     expect(aggregates.byOperation).toContainEqual({ key: "card", calls: 2, costUsd: 0.005 });
+  });
+});
+
+describe("spend cap (AC-12)", () => {
+  it("stops at the cap, keeps the finished cards and leaves the rest unwritten", async () => {
+    // Eight products in priority order, $0.50 a call, a $1.25 cap: the third
+    // card brings the run to $1.50, so the run stops there.
+    for (let i = 0; i < 8; i += 1) {
+      await seedProduct({ title: `Capped ${i}`, sourceUpdatedAt: new Date(Date.UTC(2026, 8, 10 - i)) });
+    }
+    const writer = replayWriter({ costPerCall: 0.5 });
+    const result = await run(writer, { spendCapUsd: 1.25 });
+
+    expect(result).toEqual({ written: 3, cached: 0, failed: 0, costUsd: 1.5, capReachedUsd: 1.25 });
+    expect(writer.titles).toEqual(["Capped 0", "Capped 1", "Capped 2"]);
+    expect(formatCardReport(result)).toBe(
+      "cards: written 3, cached 0, failed 0, cost $1.500000, cap reached at $1.25",
+    );
+    const cards = await db.productCard.findMany({ select: { status: true } });
+    expect(cards).toHaveLength(3);
+    expect(cards.every((card) => card.status === "written")).toBe(true);
+
+    // The next run keeps the finished cards and writes on from where it stopped.
+    const next = await run(replayWriter({ costPerCall: 0.5 }), { spendCapUsd: 100 });
+    expect(next).toEqual({ written: 5, cached: 3, failed: 0, costUsd: 2.5 });
+  });
+
+  it("counts a failed product's attempts toward the cap", async () => {
+    await seedProduct({ title: "Broken" });
+    await seedProduct({ title: "Fine" });
+    const writer = replayWriter({ costPerCall: 0.5, answer: (title) => (title === "Broken" ? {} : answerFor(title)) });
+    const result = await run(writer, { spendCapUsd: 1 });
+    expect(result).toEqual({ written: 0, cached: 0, failed: 1, costUsd: 1, capReachedUsd: 1 });
+    expect(writer.titles).toEqual(["Broken", "Broken"]);
+  });
+
+  it("reads CARD_SPEND_CAP_USD, default $3, and refuses a malformed value", () => {
+    expect(cardSpendCapFromEnv({})).toBe(3);
+    expect(cardSpendCapFromEnv({ CARD_SPEND_CAP_USD: "2.5" })).toBe(2.5);
+    expect(() => cardSpendCapFromEnv({ CARD_SPEND_CAP_USD: "0" })).toThrow(/CARD_SPEND_CAP_USD/);
+    expect(() => cardSpendCapFromEnv({ CARD_SPEND_CAP_USD: "three" })).toThrow(/CARD_SPEND_CAP_USD/);
   });
 });
 
