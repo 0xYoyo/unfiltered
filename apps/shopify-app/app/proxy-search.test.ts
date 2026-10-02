@@ -1,8 +1,9 @@
-import { createHmac } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
 
 import type { PrismaClient } from "@prisma/client";
 import {
   createIntentExtractor,
+  createLlmJudge,
   createQueryClassifier,
   createRetriever,
   type CostRecorder,
@@ -344,6 +345,8 @@ function installOrchestrator(options: {
   intentReuseNow?: () => Date;
   /** Wire Engine v2's find step and set the env default (YOY-145); absent = no find step. */
   engineV2?: boolean;
+  /** The judge's LLM port (YOY-147); absent = no judge wired. */
+  judgeLlm?: LlmClient;
 }): void {
   resetProxySearchOrchestrator();
   orchestratorSeam.build = (routeDb) =>
@@ -375,6 +378,9 @@ function installOrchestrator(options: {
             }),
             engineV2: options.engineV2,
           }
+        : {}),
+      ...(options.judgeLlm !== undefined
+        ? { judge: createLlmJudge({ llm: options.judgeLlm }) }
         : {}),
     });
 }
@@ -1081,8 +1087,75 @@ describe("server-side pages (YOY-145)", () => {
       ),
     );
     const [event] = await db.searchEvent.findMany({ where: { sessionId: "engine-1" } });
-    expect(event!.routeReason).not.toBe("engine-v2");
+    // v2 here (no judge wired) would answer "find-only" (YOY-147 AC-11).
+    expect(event!.routeReason).not.toBe("find-only");
     expect(event!.route).toBe("classic");
+  });
+});
+
+describe("the judge on the storefront (YOY-147)", () => {
+  it("logs a judged search as route ai, then serves the throttled session find order with no judge call (AC-7, AC-11)", async () => {
+    await seed([
+      { productId: "wrap-dress", title: "Wrap Dress" },
+      { productId: "linen-shirt", title: "Linen Shirt" },
+    ]);
+    for (const [index, productId] of ["wrap-dress", "linen-shirt"].entries()) {
+      await db.$executeRawUnsafe(
+        `INSERT INTO "CardEmbedding" ("id", "shopDomain", "productId", "section", "textHash", "embedding", "updatedAt")
+         VALUES ($1, $2, $3, 'prose', 'h', $4::vector(3), CURRENT_TIMESTAMP)`,
+        randomUUID(),
+        SHOP,
+        productId,
+        `[1,${(index + 1) / 10},0]`,
+      );
+    }
+    throttleSeam.instance = createSessionThrottle({ limit: 1, now: () => 0 });
+    const judgeCalls: StructuredCompletionRequest[] = [];
+    installOrchestrator({
+      llm: fakeLlm({}),
+      engineV2: true,
+      judgeLlm: {
+        async completeStructured(request) {
+          judgeCalls.push(request);
+          // Wrap dress close, a fact off (linen, not silk); linen shirt exact.
+          return { c: ["CFF", "E-X"], d: [{ n: 1, p: "linen", a: "silk" }] };
+        },
+      },
+    });
+    const query = "something soft to wear to dinner";
+
+    const judged = await (
+      await action(actionArgs(proxyRequest({ payload: { query, sessionId: "judge-1" } })))
+    ).json();
+    expect(judged.route).toBe("ai");
+    expect(judged.results.map((result: { productId: string }) => result.productId)).toEqual([
+      "linen-shirt",
+      "wrap-dress",
+    ]);
+    expect(judged.results.map((result: { label: unknown }) => result.label)).toEqual([
+      null,
+      { template: "fact-differs", values: ["linen", "silk"] },
+    ]);
+    // The storefront wire carries no verdict and no details (AC-12).
+    expect(JSON.stringify(judged)).not.toMatch(/verdict|"exact"|"close"/);
+    expect(judged).not.toHaveProperty("details");
+
+    // The judged search spent the session's budget of 1; the next is throttled.
+    const capped = await (
+      await action(actionArgs(proxyRequest({ payload: { query, sessionId: "judge-1" } })))
+    ).json();
+    expect(capped.route).toBe("classic");
+    expect(capped.results.map((result: { productId: string }) => result.productId)).toEqual([
+      "wrap-dress",
+      "linen-shirt",
+    ]);
+    expect(judgeCalls).toHaveLength(1);
+
+    const events = await db.searchEvent.findMany({ where: { sessionId: "judge-1" } });
+    expect(events.map((event) => [event.route, event.routeReason]).sort()).toEqual([
+      ["ai", "judged"],
+      ["classic", "capped"],
+    ]);
   });
 });
 

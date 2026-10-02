@@ -2,6 +2,8 @@ import type { PrismaClient } from "@prisma/client";
 import {
   createEscalatingIntentExtractor,
   createIntentExtractor,
+  createJudge,
+  judgeProviderFromEnv,
   DEFAULT_INTENT_ESCALATION_THRESHOLD,
   DEFAULT_INTENT_HEDGE_AFTER_MS,
   createQueryClassifier,
@@ -23,6 +25,7 @@ import {
 } from "../ai/cost-recorder.server";
 import { createPgTrgmClassicStore } from "./classic-store.server";
 import { createFindStep, findSetSizeFromEnv } from "./find.server";
+import { judgeDeadlineMsFromEnv, judgeRowCharsFromEnv } from "./judge-step.server";
 import {
   createSearchOrchestrator,
   DEFAULT_PAGE_SIZE,
@@ -362,6 +365,15 @@ export function removeChipFromIntent(intent: Intent, chip: ProxyChip): Intent {
   return next;
 }
 
+/**
+ * The judge's label on the wire (YOY-147 AC-9): `fact-differs` with the
+ * product's value then the asked one, or `close-match` with none.
+ */
+export interface ProxyLabel {
+  template: "fact-differs" | "close-match";
+  values: string[];
+}
+
 /** One result card on the wire — the exact keys of the contract, no more. */
 export interface ProxyResult {
   productId: string;
@@ -379,6 +391,12 @@ export interface ProxyResult {
    * False whenever no positive color constraint was applied.
    */
   colorUnknown: boolean;
+  /**
+   * The judge's label or null (YOY-147 AC-9), on every Engine v2 result;
+   * absent on the old engine, whose wire is unchanged. The verdict never
+   * reaches the storefront (AC-12).
+   */
+  label?: ProxyLabel | null;
 }
 
 /** The intent on the wire: every field present, absent optionals as null. */
@@ -432,6 +450,7 @@ function serializeCard(card: {
   currencyCode: string;
   available: boolean;
   colorUnknown: boolean;
+  label?: ProxyLabel | null;
 }): ProxyResult {
   return {
     productId: card.productId,
@@ -443,6 +462,14 @@ function serializeCard(card: {
     currencyCode: card.currencyCode,
     available: card.available,
     colorUnknown: card.colorUnknown,
+    ...(card.label !== undefined
+      ? {
+          label:
+            card.label === null
+              ? null
+              : { template: card.label.template, values: [...card.label.values] },
+        }
+      : {}),
   };
 }
 
@@ -676,6 +703,23 @@ export function createProxySearchOrchestrator(
       findSetSize: findSetSizeFromEnv(),
     }),
     engineV2: engineV2FromEnv(),
+    // Engine v2's judge (YOY-147): one call per page inside the find set,
+    // through the one factory — `JUDGE_PROVIDER` picks the client, and the
+    // model is the provider's own config (AC-1). Built only for the
+    // selected provider.
+    judge: createJudge({
+      provider: judgeProviderFromEnv(process.env),
+      clients: {
+        gemini: () =>
+          createGeminiLlmClient({
+            modelId: models.judgeModel,
+            costRecorder,
+            thinkingLevel: models.judgeThinkingLevel,
+          }),
+      },
+      maxRowChars: judgeRowCharsFromEnv(),
+    }),
+    judgeDeadlineMs: judgeDeadlineMsFromEnv(),
   });
 }
 

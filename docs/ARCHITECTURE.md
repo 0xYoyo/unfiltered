@@ -918,12 +918,12 @@ response gains `engine` and — on a paged response only — `page` and
   set in vector order; then every remaining keyword match in keyword order.
   Each product appears once, and each family once (the earlier member stands
   for it).
-- **Response.** Route `ai`, routeReason `engine-v2`, `chips: []`,
-  `intent: null`, no close matches; only the page's products are hydrated.
-  The `find` stage times the whole step. When the embedding call (or the
-  card-index query) fails the page is the keyword order, route `classic`,
-  `degraded: true`; a keyword-store failure propagates, as on the old
-  engine.
+- **Response.** `chips: []`, `intent: null`, no close matches; only the
+  page's products are hydrated. The `find` stage times the whole step. Route
+  and routeReason come from the judge (next section). When the embedding call
+  (or the card-index query) fails the page is the keyword order,
+  `degraded: true`, with no find set to judge; a keyword-store failure
+  propagates, as on the old engine.
 - **Pages on both engines.** Both search APIs take `page` (1-based; anything
   else is 1) and `pageSize` (1–48; anything else is 24). The old engine pages
   by slicing its full result (the request's `limit` is dropped); v2 always
@@ -938,6 +938,66 @@ response gains `engine` and — on a paged response only — `page` and
   find step to recall on the committed seed fixture: every long-sleeve midi
   dress is among the 150 candidates for "long sleeve midi dress", offline,
   from a recorded query vector (`app/search/data/find-recall-query.json`).
+
+## Engine v2: the judge (YOY-147)
+
+`packages/engine/src/judge.ts` holds the one judge interface (`Judge`) and
+the one factory (`createJudge({ provider, clients, maxRowChars? })`):
+`JUDGE_PROVIDER` (default `gemini`, `judgeProviderFromEnv`) picks which
+provider's `LlmClient` answers, and only that client is built. The judge
+model is the provider's own config (`GEMINI_JUDGE_MODEL`, Flash-Lite,
+thinking level low); no other code names it. The orchestrator takes the
+judge as `judge` and its deadline as `judgeDeadlineMs`
+(`JUDGE_DEADLINE_MS`, default 1,500); `app/search/judge-step.server.ts`
+runs one page.
+
+- **One call per page inside the find set.** `FindResult.findSetCount` is
+  how many products from the front of the merged order are the find set (the
+  strong title matches and the vector hits). The page's part inside it is
+  judged in one call (temperature 0, ledger operation `judge`); a page beyond
+  it is served in keyword order with no call (`find-only`), and a page
+  straddling the boundary keeps its keyword tail after the judged part.
+- **Rows.** One per candidate (`judgeRow`): title, price, option names with
+  the values the variants offer, and the written card's summary — or, with no
+  card, the description's first 200 characters — cut to `JUDGE_ROW_CHARS`
+  (default 320). The sentence rides a `Query:` line, which keys replay
+  recordings.
+- **Answer.** Fixed-schema JSON in short codes, no prose field: `c` holds one
+  three-letter code per candidate in page order — verdict (`E` exact, `V` the
+  same item in another colour or size, `C` close, `N` not relevant), missed
+  wishes (`-`, `F` fact, `D` description, `B` both), label (`F`
+  fact-differs, `C` close-match, `X` none) — and `d` holds, per fact-differs
+  label, the candidate's number with the product's value `p` and the asked
+  value `a`. Codes, not one object per candidate, because output tokens are
+  the latency: Flash-Lite pretty-prints structured JSON, and a page of 24 as
+  objects ran ~950–1,500 output tokens and 2.5–4 s against the 1,500 ms
+  deadline; as codes it is ~140 tokens and about 1 s. An answer that is
+  not one known code per candidate, or whose side list names a candidate
+  twice or out of range, is asked once more, then fails
+  (`JudgeAnswerError`).
+- **Order and labels.** `orderByVerdict`: verdict rank, ties in find order,
+  "not relevant" last and never removed. When every candidate is "not
+  relevant" the page stays in find order and every card carries
+  `close-match`. A fact-differs value longer than three words, or a missing
+  value, drops that label. Every v2 result on the wire carries `label`
+  (`{ template, values }` or null); the old engine's wire has no `label` key.
+  The verdict never reaches the storefront.
+- **Fallbacks.** The deadline aborts the call and serves find order
+  (`judge-timeout`); a failed call or an answer invalid twice serves find
+  order (`judge-error`); a throttled session or a playground cap — the
+  requests that force classic — serve find order with no call (`capped`).
+  The client-timeout rescue stays the keyword path. No error reaches the
+  shopper.
+- **Route and caps.** `route` is `ai` exactly when a paid judge call started,
+  so the session throttle and the playground's daily caps (both counted from
+  `route = "ai"`) count judged searches and nothing else. `routeReason` is
+  one of `judged`, `judge-timeout`, `judge-error`, `capped`, `find-only`.
+- **Diagnostics.** The `judge` stage times the rows and the call. Playground
+  `details.judge` is `{ outcome, verdicts: [{ productId, verdict }] }` on a
+  find-path response (verdict null where the judge did not answer), null
+  otherwise. `scripts/latency-probe.mts --engine v2` sends `engine=v2` to the
+  playground API, so the deployment's judge can be timed with `ENGINE_V2`
+  off.
 
 ## Storefront search API over the app proxy (YOY-46)
 

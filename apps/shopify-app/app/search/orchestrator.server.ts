@@ -11,6 +11,9 @@ import {
   type Intent,
   type IntentExtractor,
   type IntentTier,
+  type Judge,
+  type JudgeLabel,
+  type JudgeVerdictCode,
   type QueryClassifier,
   type QueryRoute,
   type RetrievalConstraints,
@@ -20,6 +23,7 @@ import {
 import type { ClassicCardHit } from "./classic-store.server";
 import { findReusableIntent, normalizeReuseQuery } from "./events.server";
 import type { FindStep } from "./find.server";
+import { DEFAULT_JUDGE_DEADLINE_MS, runJudgeStep } from "./judge-step.server";
 import { SEARCH_STAGES, type SearchStage, type SearchStages } from "./stages";
 
 export { SEARCH_STAGES, type SearchStage, type SearchStages } from "./stages";
@@ -231,7 +235,11 @@ function warnIntentFailure(
  * caller asked for a keystroke preview (YOY-68) and no classification ran,
  * or "client-timeout-rescue" when the widget's submitted search ran out its
  * own budget and re-asked down the classic path (YOY-108 / YOY-96 AC-9) —
- * again with no classification run.
+ * again with no classification run. Engine v2 (YOY-147 AC-11) answers with
+ * the judge's outcome: "judged", "judge-timeout" or "judge-error" when a
+ * judge call started, "capped" when a throttle or cap kept it from
+ * starting, and "find-only" when the page had nothing to judge — beyond the
+ * find set, or no judge wired.
  */
 export type SearchRouteReason =
   | ClassificationReason
@@ -240,12 +248,21 @@ export type SearchRouteReason =
   | "classic-zero-hit"
   | "preview"
   | "intent-reuse"
-  | "engine-v2";
+  | V2RouteReason;
+
+/** Engine v2's routeReasons (YOY-147 AC-11). */
+export type V2RouteReason =
+  | "judged"
+  | "judge-timeout"
+  | "judge-error"
+  | "capped"
+  | "find-only";
 
 /**
  * Which engine serves a search (YOY-145): "v1" is the classify → intent →
  * retrieval ladder; "v2" is the find step — the raw sentence's nearest
- * products merged with keyword matches, no model call (AC-1, NG-1).
+ * products merged with keyword matches — then the judge on pages inside the
+ * find set (YOY-147).
  */
 export type SearchEngine = "v1" | "v2";
 
@@ -358,6 +375,17 @@ export interface ProductCard {
    * labeled. False whenever no positive color constraint was applied.
    */
   colorUnknown: boolean;
+  /**
+   * The judge's label (YOY-147 AC-9): on every Engine v2 card, null when it
+   * carries none; absent on the old engine.
+   */
+  label?: JudgeLabel | null;
+  /**
+   * The judge's verdict (YOY-147 AC-12): diagnostic, for the playground's
+   * details only — the storefront wire never carries it. Absent when the
+   * judge did not answer for the card.
+   */
+  verdict?: JudgeVerdictCode;
 }
 
 /** The single response shape every orchestrated search resolves to. */
@@ -481,6 +509,13 @@ export interface SearchOrchestratorOptions {
    * (NG-3). A request's own `engine` overrides it.
    */
   engineV2?: boolean;
+  /**
+   * Engine v2's judge (YOY-147). Absent means v2 pages are served in find
+   * order with reason "find-only".
+   */
+  judge?: Judge;
+  /** How long the judge may take after its call started; 1,500 ms by default (AC-6). */
+  judgeDeadlineMs?: number;
 }
 
 export function createSearchOrchestrator(
@@ -495,6 +530,8 @@ export function createSearchOrchestrator(
     intentReuse,
     find,
     engineV2 = false,
+    judge,
+    judgeDeadlineMs = DEFAULT_JUDGE_DEADLINE_MS,
   } = options;
 
   /** Hydrate ranked hits into display cards, preserving hit order. Hits
@@ -552,7 +589,10 @@ export function createSearchOrchestrator(
         engine === "v2" &&
         find !== undefined &&
         request.preview !== true &&
-        request.forceClassic !== true &&
+        // A throttle or a playground cap forces classic on the old engine;
+        // on v2 it serves find order with no judge call (YOY-147 AC-7). The
+        // client-timeout rescue stays the keyword path on either engine.
+        request.forceClassicReason !== "client-timeout-rescue" &&
         request.resolvedIntent === undefined
       ) {
         response = await findPath(find, request, stages);
@@ -576,10 +616,17 @@ export function createSearchOrchestrator(
 
   /**
    * Engine v2's submitted search (YOY-145): the find step's merged order,
-   * one page of it hydrated. No classification, no intent, no chips and no
-   * close matches (AC-7, NG-1); a failed embedding serves the keyword order
-   * flagged degraded (AC-8). A previous intent is not read — the find step
-   * searches the sentence as typed.
+   * one page of it hydrated, then judged (YOY-147). No classification, no
+   * intent, no chips and no close matches (YOY-145 AC-7); a failed
+   * embedding serves the keyword order flagged degraded (YOY-145 AC-8). A
+   * previous intent is not read — the find step searches the sentence as
+   * typed.
+   *
+   * The judge sees only the page's part inside the find set (YOY-147
+   * AC-10): a page beyond it is served in keyword order with no call, and
+   * a page straddling the boundary keeps its keyword tail after the judged
+   * part. A forced-classic request (throttle or cap) is never judged
+   * (AC-7). The route is "ai" exactly when a judge call started (AC-11).
    */
   async function findPath(
     findStep: FindStep,
@@ -591,17 +638,53 @@ export function createSearchOrchestrator(
     const found = await stages.time("find", () =>
       findStep.find({ shopDomain: request.shopDomain, query: request.query, searchId }),
     );
-    const pageIds = found.productIds.slice((page - 1) * pageSize, page * pageSize);
-    const hits = await stages.time("hydrate", () =>
+    const pageStart = (page - 1) * pageSize;
+    const pageIds = found.productIds.slice(pageStart, pageStart + pageSize);
+    const inFindSet = new Set(pageIds.slice(0, Math.max(0, found.findSetCount - pageStart)));
+    const hydrated = await stages.time("hydrate", () =>
       hydrateCards(
         request.shopDomain,
         pageIds.map((productId) => ({ productId })),
       ),
     );
+    const cards = hydrated.map((card): ProductCard => ({ ...card, label: null }));
+    const judgedPart = cards.filter((card) => inFindSet.has(card.productId));
+    const tail = cards.filter((card) => !inFindSet.has(card.productId));
+
+    let routeReason: V2RouteReason;
+    let judgeStarted = false;
+    let hits = cards;
+    if (request.forceClassic === true) {
+      routeReason = "capped";
+    } else if (judge === undefined || judgedPart.length === 0) {
+      routeReason = "find-only";
+    } else {
+      const judged = await stages.time("judge", () =>
+        runJudgeStep({
+          judge,
+          db,
+          shopDomain: request.shopDomain,
+          sentence: request.query,
+          items: judgedPart,
+          searchId,
+          deadlineMs: judgeDeadlineMs,
+        }),
+      );
+      routeReason = judged.outcome;
+      judgeStarted = judged.started;
+      hits = [
+        ...judged.items.map(({ item, verdict, label }) => ({
+          ...item,
+          label,
+          ...(verdict !== null ? { verdict } : {}),
+        })),
+        ...tail,
+      ];
+    }
     return {
       searchId,
-      route: found.degraded ? "classic" : "ai",
-      routeReason: "engine-v2",
+      route: judgeStarted ? "ai" : "classic",
+      routeReason,
       intent: null,
       hits,
       chips: [],
