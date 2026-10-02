@@ -1,0 +1,410 @@
+import { randomUUID } from "node:crypto";
+
+import type { PrismaClient } from "@prisma/client";
+import type {
+  EmbeddingClient,
+  IntentExtractor,
+  QueryClassifier,
+  Retriever,
+} from "@unfiltered/engine";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+
+import { createTestDb } from "../testing/helpers.server";
+import { createPgTrgmClassicStore } from "./classic-store.server";
+import {
+  createFindStep,
+  DEFAULT_FIND_SET_SIZE,
+  findSetSizeFromEnv,
+  mergeFindOrder,
+  STRONG_TITLE_SCORE,
+} from "./find.server";
+import {
+  createSearchOrchestrator,
+  type SearchOrchestrator,
+} from "./orchestrator.server";
+import { serializeProxySearchResponse } from "./proxy.server";
+
+// Engine v2's find step and server-side pages (YOY-145) on the embedded
+// PGlite database: the real card-index query and the real pg_trgm store,
+// a fake embedding client whose every query lands on [1, 0, 0]. A card
+// vector [1, y, 0] is farther from the query the larger y is, so vector
+// order is set by `y` alone.
+
+const SHOP = "engine-v2-shop.myshopify.com";
+const DIMENSION = 3;
+
+interface Product {
+  productId: string;
+  title: string;
+  /** Card-vector distance knob; no card vector when absent. */
+  y?: number;
+  familyKey?: string;
+  available?: boolean;
+  priceMin?: number;
+  status?: string;
+  publishedAt?: Date | null;
+}
+
+async function seed(db: PrismaClient, products: Product[]): Promise<void> {
+  for (const product of products) {
+    await db.catalogProduct.create({
+      data: {
+        shopDomain: SHOP,
+        productId: product.productId,
+        title: product.title,
+        description: "",
+        tags: [],
+        vendor: "fixture",
+        productType: "",
+        priceMin: product.priceMin ?? 100,
+        priceMax: product.priceMin ?? 100,
+        currencyCode: "USD",
+        available: product.available ?? true,
+        status: product.status ?? "ACTIVE",
+        publishedAt: product.publishedAt === undefined ? new Date() : product.publishedAt,
+        familyKey: product.familyKey ?? "",
+        imageAltTexts: [],
+        sourceUpdatedAt: new Date(),
+        contentHash: `hash-${product.productId}`,
+      },
+    });
+    if (product.y !== undefined) {
+      await db.$executeRawUnsafe(
+        `INSERT INTO "CardEmbedding" ("id", "shopDomain", "productId", "section", "textHash", "embedding", "updatedAt")
+         VALUES ($1, $2, $3, 'prose', 'h', $4::vector(${DIMENSION}), CURRENT_TIMESTAMP)`,
+        randomUUID(),
+        SHOP,
+        product.productId,
+        `[1,${product.y},0]`,
+      );
+    }
+  }
+}
+
+/** A fake embedding port counting its calls; `fail` makes every call reject. */
+function fakeEmbeddings(options: { fail?: boolean } = {}): EmbeddingClient & { calls: number } {
+  const client = {
+    dimension: DIMENSION,
+    calls: 0,
+    async embed(request: { texts: string[] }) {
+      client.calls += 1;
+      if (options.fail === true) {
+        throw new Error("embedding backend unavailable");
+      }
+      return request.texts.map(() => [1, 0, 0]);
+    },
+  };
+  return client;
+}
+
+/** Ports the old engine must never touch on these paths: any call fails the test. */
+function untouchable(): { classifier: QueryClassifier; extractor: IntentExtractor; retriever: Retriever; modelCalls: () => number } {
+  let calls = 0;
+  const fail = (what: string) => {
+    calls += 1;
+    return Promise.reject(new Error(`unexpected ${what} call`));
+  };
+  return {
+    classifier: { classify: () => fail("classification") },
+    extractor: { extract: () => fail("intent") },
+    retriever: { retrieve: () => fail("retrieval") },
+    modelCalls: () => calls,
+  };
+}
+
+/** A classifier that routes every query classic without a model call. */
+const classicClassifier: QueryClassifier = {
+  classify: () => Promise.resolve({ route: "classic", reason: "short-query" }),
+  settled: () => ({ route: "classic", reason: "short-query" }),
+};
+
+describe("the find step's merge order (AC-2)", () => {
+  it("leads with strong title matches, then vector order, then the remaining keyword matches", () => {
+    const merged = mergeFindOrder(
+      ["v1", "v2", "k-weak"],
+      [
+        { productId: "k-strong", score: STRONG_TITLE_SCORE },
+        { productId: "k-weak", score: 0.5 },
+        { productId: "k-beyond", score: 0.4 },
+        { productId: "v2", score: 0.95 },
+      ],
+    );
+    // v2 is a strong title match, so it leads alongside k-strong in keyword
+    // order; k-weak keeps its vector place; k-beyond follows the find set.
+    expect(merged).toEqual(["k-strong", "v2", "v1", "k-weak", "k-beyond"]);
+  });
+
+  it("is the keyword order alone when the vector half has nothing", () => {
+    expect(
+      mergeFindOrder([], [
+        { productId: "a", score: 0.5 },
+        { productId: "b", score: 0.95 },
+      ]),
+    ).toEqual(["b", "a"]);
+  });
+});
+
+describe("FIND_SET_SIZE (AC-1)", () => {
+  it("defaults to 150 and rejects a malformed value", () => {
+    expect(findSetSizeFromEnv({})).toBe(DEFAULT_FIND_SET_SIZE);
+    expect(DEFAULT_FIND_SET_SIZE).toBe(150);
+    expect(findSetSizeFromEnv({ FIND_SET_SIZE: "40" })).toBe(40);
+    expect(() => findSetSizeFromEnv({ FIND_SET_SIZE: "0" })).toThrow(/FIND_SET_SIZE/);
+    expect(() => findSetSizeFromEnv({ FIND_SET_SIZE: "1.5" })).toThrow(/FIND_SET_SIZE/);
+  });
+});
+
+describe("Engine v2 on the database", () => {
+  let db: PrismaClient;
+
+  beforeAll(async () => {
+    db = await createTestDb();
+  });
+
+  beforeEach(async () => {
+    await db.$executeRawUnsafe(`DELETE FROM "CardEmbedding"`);
+    await db.catalogProduct.deleteMany();
+  });
+
+  afterAll(async () => {
+    await db.$disconnect();
+  });
+
+  const findStep = (embeddings: EmbeddingClient, findSetSize?: number) =>
+    createFindStep({
+      db,
+      embeddings,
+      classicStore: createPgTrgmClassicStore(db),
+      ...(findSetSize !== undefined ? { findSetSize } : {}),
+    });
+
+  const find = (embeddings: EmbeddingClient, query: string, findSetSize?: number) =>
+    findStep(embeddings, findSetSize).find({ shopDomain: SHOP, query, searchId: "s-1" });
+
+  function orchestrator(
+    embeddings: EmbeddingClient,
+    options: { engineV2?: boolean; find?: boolean; classifier?: QueryClassifier } = {},
+  ): SearchOrchestrator & { modelCalls: () => number } {
+    const ports = untouchable();
+    const built = createSearchOrchestrator({
+      db,
+      classifier: options.classifier ?? ports.classifier,
+      extractor: ports.extractor,
+      retriever: ports.retriever,
+      classicStore: createPgTrgmClassicStore(db),
+      ...(options.find === false ? {} : { find: findStep(embeddings) }),
+      engineV2: options.engineV2 ?? true,
+    });
+    return { ...built, modelCalls: ports.modelCalls };
+  }
+
+  it("ranks an exact-title match first, ahead of every nearer vector hit", async () => {
+    await seed(db, [
+      { productId: "near-1", title: "Flowing Linen Shirt", y: 0.1 },
+      { productId: "near-2", title: "Cotton Wrap Top", y: 0.2 },
+      { productId: "aurora", title: "Aurora Midi Dress", y: 0.9 },
+    ]);
+    const embeddings = fakeEmbeddings();
+    const result = await find(embeddings, "Aurora Midi Dress");
+    expect(result.productIds[0]).toBe("aurora");
+    expect(result.productIds).toEqual(["aurora", "near-1", "near-2"]);
+    expect(result.degraded).toBe(false);
+    // One vector for the raw sentence (AC-1).
+    expect(embeddings.calls).toBe(1);
+  });
+
+  it("leads a descriptive query with the vector hits, keyword-only matches after the find set", async () => {
+    await seed(db, [
+      { productId: "v-near", title: "Silk Slip Gown", y: 0.1 },
+      { productId: "v-mid", title: "Chiffon Maxi", y: 0.3 },
+      { productId: "v-far", title: "Velvet Blazer", y: 0.8 },
+      // A keyword match outside the two-product find set.
+      { productId: "kw-only", title: "Evening Party Clutch" },
+    ]);
+    const result = await find(fakeEmbeddings(), "something for an evening party", 2);
+    expect(result.productIds).toEqual(["v-near", "v-mid", "kw-only"]);
+  });
+
+  it("removes nothing but store, active and published: no stock, price or category filter (AC-3)", async () => {
+    await seed(db, [
+      // The old engine filters these under a stated intent (in stock,
+      // under a budget); the find step keeps both.
+      { productId: "sold-out", title: "Sold Out Dress", y: 0.1, available: false },
+      { productId: "pricey", title: "Couture Dress", y: 0.2, priceMin: 99_999 },
+      { productId: "draft", title: "Draft Dress", y: 0.05, status: "DRAFT" },
+      { productId: "unpublished", title: "Hidden Dress", y: 0.06, publishedAt: null },
+    ]);
+    const result = await find(fakeEmbeddings(), "dress under 50 in stock");
+    expect(result.productIds).toEqual(expect.arrayContaining(["sold-out", "pricey"]));
+    expect(result.productIds).not.toContain("draft");
+    expect(result.productIds).not.toContain("unpublished");
+  });
+
+  it("serves one colourway per family across the vector and keyword halves", async () => {
+    await seed(db, [
+      { productId: "rose-red", title: "Rose Dress Red", y: 0.1, familyKey: "rose" },
+      // No card vector: found by keyword only, but its family is already in.
+      { productId: "rose-blue", title: "Rose Dress Blue", familyKey: "rose" },
+      { productId: "other", title: "Lily Skirt", y: 0.2 },
+    ]);
+    const result = await find(fakeEmbeddings(), "rose dress");
+    expect(result.productIds.filter((id) => id.startsWith("rose-"))).toHaveLength(1);
+    expect(result.productIds).toContain("other");
+  });
+
+  it("serves the keyword order, degraded, when the embedding call fails (AC-8)", async () => {
+    await seed(db, [
+      { productId: "near", title: "Plain Tee", y: 0.1 },
+      { productId: "kw", title: "Wool Coat", y: 0.9 },
+    ]);
+    const result = await find(fakeEmbeddings({ fail: true }), "wool coat");
+    expect(result).toEqual({ productIds: ["kw"], degraded: true });
+
+    const response = await orchestrator(fakeEmbeddings({ fail: true })).runSearch({
+      query: "wool coat",
+      shopDomain: SHOP,
+    });
+    expect(response.degraded).toBe(true);
+    expect(response.hits.map((hit) => hit.productId)).toEqual(["kw"]);
+    expect(serializeProxySearchResponse(response).results).toHaveLength(1);
+  });
+
+  it("pages on the server: page 2 starts where page 1 ended, totalCount stable (AC-4)", async () => {
+    await seed(
+      db,
+      Array.from({ length: 30 }, (_, index) => ({
+        productId: `p-${String(index).padStart(2, "0")}`,
+        title: `Product ${index}`,
+        y: index / 10,
+      })),
+    );
+    const engine = orchestrator(fakeEmbeddings());
+    const page1 = await engine.runSearch({
+      query: "something",
+      shopDomain: SHOP,
+      paging: { page: 1, pageSize: 24 },
+    });
+    const page2 = await engine.runSearch({
+      query: "something",
+      shopDomain: SHOP,
+      paging: { page: 2, pageSize: 24 },
+    });
+    expect(page1.hits).toHaveLength(24);
+    expect(page2.hits).toHaveLength(6);
+    expect(page1.hits.at(-1)!.productId).toBe("p-23");
+    expect(page2.hits[0]!.productId).toBe("p-24");
+    expect([page1.totalCount, page2.totalCount]).toEqual([30, 30]);
+    expect([page1.page, page2.page]).toEqual([1, 2]);
+
+    // No page parameters on v2: the first page of 24.
+    const unpaged = await engine.runSearch({ query: "something", shopDomain: SHOP });
+    expect(unpaged.hits).toHaveLength(24);
+    expect(unpaged).toMatchObject({ page: 1, totalCount: 30 });
+
+    const body = serializeProxySearchResponse(page2);
+    expect(body).toMatchObject({ page: 2, totalCount: 30 });
+    expect(body.results).toHaveLength(6);
+  });
+
+  it("answers v2 with no chips, no intent, no close matches and a find stage (AC-7, AC-11)", async () => {
+    await seed(db, [{ productId: "a", title: "Linen Shirt", y: 0.1 }]);
+    const engine = orchestrator(fakeEmbeddings());
+    const response = await engine.runSearch({ query: "long sleeve linen", shopDomain: SHOP });
+    expect(response).toMatchObject({
+      route: "ai",
+      routeReason: "engine-v2",
+      engine: "v2",
+      chips: [],
+      intent: null,
+      closeMatches: [],
+      degraded: false,
+    });
+    expect(response.stages.find).toBeGreaterThanOrEqual(0);
+    // No judge, no labels, no extraction (NG-1): no model call of any kind.
+    expect(engine.modelCalls()).toBe(0);
+    const body = serializeProxySearchResponse(response);
+    expect(body.chips).toEqual([]);
+    expect(body.intent).toBeNull();
+    expect(body).not.toHaveProperty("closeMatches");
+  });
+
+  it("lets a request's engine override the env switch, either way (AC-6)", async () => {
+    await seed(db, [{ productId: "a", title: "Wool Coat", y: 0.1 }]);
+    const off = orchestrator(fakeEmbeddings(), { engineV2: false, classifier: classicClassifier });
+    expect((await off.runSearch({ query: "wool coat", shopDomain: SHOP })).engine).toBe("v1");
+    const asked = await off.runSearch({ query: "wool coat", shopDomain: SHOP, engine: "v2" });
+    expect(asked).toMatchObject({ engine: "v2", routeReason: "engine-v2" });
+
+    const on = orchestrator(fakeEmbeddings(), { engineV2: true, classifier: classicClassifier });
+    const v1 = await on.runSearch({ query: "wool coat", shopDomain: SHOP, engine: "v1" });
+    expect(v1).toMatchObject({ engine: "v1", routeReason: "short-query" });
+  });
+
+  it("keeps keystroke previews free of model and embedding calls on either engine (AC-9)", async () => {
+    await seed(db, [{ productId: "a", title: "Wool Coat", y: 0.1 }]);
+    for (const engineV2 of [false, true]) {
+      const embeddings = fakeEmbeddings();
+      const engine = orchestrator(embeddings, { engineV2 });
+      const response = await engine.runSearch({
+        query: "wool",
+        shopDomain: SHOP,
+        preview: true,
+        paging: { page: 1, pageSize: 24 },
+      });
+      expect(response.routeReason).toBe("preview");
+      expect(response.hits.map((hit) => hit.productId)).toEqual(["a"]);
+      // The preview is untouched by paging too: no page keys.
+      expect(response.page).toBeUndefined();
+      expect(embeddings.calls).toBe(0);
+      expect(engine.modelCalls()).toBe(0);
+    }
+  });
+
+  it("pages the old engine by slicing its full result (AC-5)", async () => {
+    await seed(
+      db,
+      Array.from({ length: 30 }, (_, index) => ({
+        productId: `d-${String(index).padStart(2, "0")}`,
+        title: `Dress ${index}`,
+      })),
+    );
+    const engine = orchestrator(fakeEmbeddings(), { engineV2: false, classifier: classicClassifier });
+    const full = await engine.runSearch({ query: "dress", shopDomain: SHOP });
+    const page2 = await engine.runSearch({
+      query: "dress",
+      shopDomain: SHOP,
+      // The playground's own cap is dropped for a page: the slice reads the full set.
+      limit: 24,
+      paging: { page: 2, pageSize: 10 },
+    });
+    expect(full.hits).toHaveLength(30);
+    expect(page2).toMatchObject({ engine: "v1", page: 2, totalCount: 30 });
+    expect(page2.hits.map((hit) => hit.productId)).toEqual(
+      full.hits.slice(10, 20).map((hit) => hit.productId),
+    );
+  });
+
+  it("answers byte-identically with the switch off and no page parameters (AC-5)", async () => {
+    await seed(
+      db,
+      Array.from({ length: 5 }, (_, index) => ({
+        productId: `d-${index}`,
+        title: `Dress ${index}`,
+        y: index / 10,
+      })),
+    );
+    const embeddings = fakeEmbeddings();
+    const withFind = orchestrator(embeddings, { engineV2: false, classifier: classicClassifier });
+    const withoutFind = orchestrator(embeddings, {
+      engineV2: false,
+      find: false,
+      classifier: classicClassifier,
+    });
+    const request = { query: "dress", shopDomain: SHOP, searchId: "fixed-search" };
+    const before = JSON.stringify(serializeProxySearchResponse(await withoutFind.runSearch(request)));
+    const after = JSON.stringify(serializeProxySearchResponse(await withFind.runSearch(request)));
+    expect(after).toBe(before);
+    expect(after).not.toContain("totalCount");
+    expect(embeddings.calls).toBe(0);
+  });
+});

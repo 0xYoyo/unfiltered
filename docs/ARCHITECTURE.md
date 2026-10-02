@@ -889,6 +889,56 @@ zero-hit golden (g25, `zeroHit: { relaxedFirst: "priceMax" }`) and counts
 an excluded primary colour among close matches as a hard-constraint
 violation.
 
+## Engine v2: the find step and server-side pages (YOY-145)
+
+`apps/shopify-app/app/search/find.server.ts` (`createFindStep({ db,
+embeddings, classicStore, findSetSize? })`) is the first half of Engine v2,
+behind a switch. The orchestrator takes it as `find` and `engineV2` (the
+default engine); `runSearch` accepts `engine: "v1" | "v2"` to override that
+default per request and `paging: { page, pageSize }` for one page, and the
+response gains `engine` and — on a paged response only — `page` and
+`totalCount`.
+
+- **The switch.** `ENGINE_V2=1` makes v2 the default (`engineV2FromEnv`);
+  anything else is the old engine. Only the playground API reads a request's
+  `engine=v1|v2` (an unknown value answers 400); the storefront proxy never
+  parses it, so the storefront takes the env default. `.github/workflows/
+  score.yml` takes an `engine` input that sets `ENGINE_V2` for a hidden run.
+- **Find.** The raw sentence, trimmed, is embedded as one vector (one
+  `embedding` ledger row per new query; the find step caches recent query
+  vectors, so a page request re-embeds nothing) and the nearest
+  `FIND_SET_SIZE` products (default 150) come from `queryCardIndex` — card
+  vectors, else the raw-text `ProductEmbedding` row, collapsed by product and
+  family. Alongside, the pg_trgm store returns its full keyword match set with
+  no constraints. Nothing but store, `ACTIVE` and published removes a
+  product: no category, colour, occasion, price or attribute filter runs.
+- **Merge order** (`mergeFindOrder`). Keyword matches whose classic score is
+  at least `STRONG_TITLE_SCORE` (0.9 — a title similarity of at least 6/7,
+  the title holding the whole query) lead in keyword order; then the find
+  set in vector order; then every remaining keyword match in keyword order.
+  Each product appears once, and each family once (the earlier member stands
+  for it).
+- **Response.** Route `ai`, routeReason `engine-v2`, `chips: []`,
+  `intent: null`, no close matches; only the page's products are hydrated.
+  The `find` stage times the whole step. When the embedding call (or the
+  card-index query) fails the page is the keyword order, route `classic`,
+  `degraded: true`; a keyword-store failure propagates, as on the old
+  engine.
+- **Pages on both engines.** Both search APIs take `page` (1-based; anything
+  else is 1) and `pageSize` (1–48; anything else is 24). The old engine pages
+  by slicing its full result (the request's `limit` is dropped); v2 always
+  pages, the first page of 24 when no page parameter came. Without page
+  parameters the old engine's response — and the proxy body — is
+  byte-identical to before. Keystroke previews ignore paging and never reach
+  the find step: zero model and zero embedding calls on either engine.
+- **Logging.** `SearchEvent.page` (default 1) records the page each request
+  served: one row per page request.
+- **Measured on recall, not order.** A description wish ("long sleeves") is
+  the judge's to rank, never the find step's. `find-recall.test.ts` holds the
+  find step to recall on the committed seed fixture: every long-sleeve midi
+  dress is among the 150 candidates for "long sleeve midi dress", offline,
+  from a recorded query vector (`app/search/data/find-recall-query.json`).
+
 ## Storefront search API over the app proxy (YOY-46)
 
 The storefront widget reaches the orchestrator through a Shopify app proxy:

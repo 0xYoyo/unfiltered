@@ -93,6 +93,7 @@ import { createPrismaCostRecorder } from "./ai/cost-recorder.server";
 import { action } from "./routes/apps.unfiltered.search";
 import { createPgTrgmClassicStore } from "./search/classic-store.server";
 import { writeClickEvent } from "./search/events.server";
+import { createFindStep } from "./search/find.server";
 import { createSearchOrchestrator } from "./search/orchestrator.server";
 import {
   intentEscalationThresholdFromEnv,
@@ -341,6 +342,8 @@ function installOrchestrator(options: {
   intentReuseWindowMs?: number;
   /** Clock the reuse lookup reads, so a test can age the window. */
   intentReuseNow?: () => Date;
+  /** Wire Engine v2's find step and set the env default (YOY-145); absent = no find step. */
+  engineV2?: boolean;
 }): void {
   resetProxySearchOrchestrator();
   orchestratorSeam.build = (routeDb) =>
@@ -363,6 +366,16 @@ function installOrchestrator(options: {
         store: createPgVectorRetrievalStore(routeDb as PrismaClient),
       }),
       classicStore: createPgTrgmClassicStore(routeDb as PrismaClient),
+      ...(options.engineV2 !== undefined
+        ? {
+            find: createFindStep({
+              db: routeDb as PrismaClient,
+              embeddings: options.embeddings ?? fakeEmbeddings(),
+              classicStore: createPgTrgmClassicStore(routeDb as PrismaClient),
+            }),
+            engineV2: options.engineV2,
+          }
+        : {}),
     });
 }
 
@@ -1016,6 +1029,60 @@ describe("search event logging (YOY-47 AC-2)", () => {
     } finally {
       errorLog.mockRestore();
     }
+  });
+});
+
+describe("server-side pages (YOY-145)", () => {
+  const products = ["a", "b", "c"].map((suffix) => ({
+    productId: `nike-90-${suffix}`,
+    title: `nike 90 ${suffix}`,
+  }));
+
+  it("serves one page with page and totalCount, and logs the page on its SearchEvent (AC-4, AC-5, AC-10)", async () => {
+    await seed(products);
+    installOrchestrator({ llm: fakeLlm({}), engineV2: false });
+    const full = await (
+      await action(actionArgs(proxyRequest({ payload: { query: "nike 90", sessionId: "page-0" } })))
+    ).json();
+    // No page parameters: the unpaged contract, no page keys.
+    expect(Object.keys(full).sort()).toEqual(CONTRACT_KEYS.slice().sort());
+    expect(full.results).toHaveLength(3);
+
+    const response = await action(
+      actionArgs(
+        proxyRequest({
+          payload: { query: "nike 90", sessionId: "page-2", page: 2, pageSize: 1 },
+        }),
+      ),
+    );
+    const body = await response.json();
+    expect(body).toMatchObject({ page: 2, totalCount: 3 });
+    expect(body.results).toEqual([full.results[1]]);
+    expect(Object.keys(body).sort()).toEqual(
+      [...CONTRACT_KEYS, "page", "totalCount"].sort(),
+    );
+
+    const events = await db.searchEvent.findMany({
+      where: { sessionId: { in: ["page-0", "page-2"] } },
+      orderBy: { sessionId: "asc" },
+    });
+    expect(events.map((event) => [event.sessionId, event.page])).toEqual([
+      ["page-0", 1],
+      ["page-2", 2],
+    ]);
+  });
+
+  it("ignores an engine parameter: the env switch alone decides the storefront's engine (AC-6)", async () => {
+    await seed(products);
+    installOrchestrator({ llm: fakeLlm({}), engineV2: false });
+    await action(
+      actionArgs(
+        proxyRequest({ payload: { query: "nike 90", sessionId: "engine-1", engine: "v2" } }),
+      ),
+    );
+    const [event] = await db.searchEvent.findMany({ where: { sessionId: "engine-1" } });
+    expect(event!.routeReason).not.toBe("engine-v2");
+    expect(event!.route).toBe("classic");
   });
 });
 

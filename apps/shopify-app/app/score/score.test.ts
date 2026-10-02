@@ -961,6 +961,11 @@ describe("the score workflow (YOY-141 AC-1, AC-2)", () => {
     expect(triggers).toMatch(/ref:\n(?:\s+.*\n)*?\s+default: main/);
   });
 
+  it("scores the engine the dispatch names: v2 sets ENGINE_V2=1, v1 by default (YOY-145 AC-13)", () => {
+    expect(triggers).toMatch(/engine:\n(?:\s+.*\n)*?\s+default: v1/);
+    expect(workflow).toContain("ENGINE_V2: ${{ inputs.engine == 'v2' && '1' || '0' }}");
+  });
+
   it("leaves ci.yml on pull_request with no score job", () => {
     const ci = readFileSync(join(REPO_ROOT, ".github", "workflows", "ci.yml"), "utf8");
     expect(ci).toMatch(/^on:\n\s+pull_request:/m);
