@@ -21,7 +21,7 @@ export class EmbeddingDimensionError extends Error {}
 export const DESCRIPTION_EXCERPT_CHARS = 500;
 
 /** Texts per embedding-port call, within the Gemini batch-request limit. */
-const EMBED_BATCH_SIZE = 100;
+export const EMBED_BATCH_SIZE = 100;
 
 /** The snapshot fields the composed embedding text reads. */
 export interface EmbeddableProduct {
@@ -132,29 +132,32 @@ function assertDimension(dimension: number): void {
  * built for a different dimension is dropped first — its cast expression
  * would reject every insert of the newly configured dimension. HNSW with
  * pgvector's default parameters — index tuning is out of scope (NG-3).
+ * `table` is a vector table this module owns — "ProductEmbedding", or
+ * "CardEmbedding" for the card vectors (YOY-144 AC-1).
  */
-async function ensureEmbeddingIndex(
+export async function ensureEmbeddingIndex(
   db: PrismaClient,
   dimension: number,
+  table: "ProductEmbedding" | "CardEmbedding" = "ProductEmbedding",
 ): Promise<void> {
   const stale = await db.$queryRawUnsafe<Array<{ indexname: string }>>(
     `SELECT indexname FROM pg_indexes
-     WHERE tablename = 'ProductEmbedding'
-       AND indexname LIKE 'ProductEmbedding_cosine_%_idx'
+     WHERE tablename = '${table}'
+       AND indexname LIKE '${table}_cosine_%_idx'
        AND indexname <> $1`,
-    `ProductEmbedding_cosine_${dimension}_idx`,
+    `${table}_cosine_${dimension}_idx`,
   );
   for (const row of stale) {
     await db.$executeRawUnsafe(`DROP INDEX IF EXISTS "${row.indexname}"`);
   }
   await db.$executeRawUnsafe(
-    `CREATE INDEX IF NOT EXISTS "ProductEmbedding_cosine_${dimension}_idx"
-     ON "ProductEmbedding"
+    `CREATE INDEX IF NOT EXISTS "${table}_cosine_${dimension}_idx"
+     ON "${table}"
      USING hnsw ((("embedding")::vector(${dimension})) vector_cosine_ops)`,
   );
 }
 
-function toVectorLiteral(vector: number[]): string {
+export function toVectorLiteral(vector: number[]): string {
   return `[${vector.join(",")}]`;
 }
 

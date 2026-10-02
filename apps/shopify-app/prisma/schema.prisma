@@ -278,6 +278,29 @@ model ProductCard {
   @@index([shopDomain])
 }
 
+// Card vectors (YOY-144): several per product, one per card section —
+// "prose" (facts + look + read) and "asks:<lang>" (one ask list per
+// language) — so short queries in any language land near the right
+// products. `textHash` is the SHA-256 of the embedded section text: an
+// unchanged section is never re-embedded. Dimensionless "vector" like
+// ProductEmbedding; all access goes through raw SQL in
+// app/catalog/card-embed.server.ts and app/search/card-retrieval.server.ts.
+// Keyed by tenant + product + section with no FK cascade: every product
+// delete removes them in the same transaction.
+model CardEmbedding {
+  id         String                 @id @default(uuid())
+  shopDomain String
+  productId  String
+  section    String
+  textHash   String
+  embedding  Unsupported("vector")
+  createdAt  DateTime               @default(now())
+  updatedAt  DateTime               @updatedAt
+
+  @@unique([shopDomain, productId, section])
+  @@index([shopDomain])
+}
+
 // Shopper search log (YOY-47): exactly one row per proxy search request —
 // including degraded, zero-hit, and throttled searches — for the dashboard
 // and attribution work of later milestones. Write-only in this milestone.

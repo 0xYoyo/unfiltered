@@ -3,6 +3,7 @@ import type { EmbeddingClient, LlmClient } from "@unfiltered/engine";
 
 import type { CardWriter } from "../catalog/card.server";
 import { formatCardReport } from "../catalog/card.server";
+import { formatCardVectorReport } from "../catalog/card-embed.server";
 import { formatVisionReport } from "../catalog/enrich.server";
 
 import type { CatalogSource } from "./catalog-source.server";
@@ -362,6 +363,9 @@ export async function runIngestPublicCli({
     log(
       `embed: embedded ${result.embed.embedded}, cached ${result.embed.cached}, deleted ${result.embed.deleted}`,
     );
+    if (result.cardVectors !== undefined) {
+      log(formatCardVectorReport(result.cardVectors));
+    }
     const cost = await db.aiCall.aggregate({
       _sum: { costUsd: true },
       _count: { _all: true },
