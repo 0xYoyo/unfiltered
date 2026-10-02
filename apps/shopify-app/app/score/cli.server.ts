@@ -241,7 +241,7 @@ export async function exportFixtureCommand(
     const fixture = await exportScoreFixture(db, storeKey);
     writeFixtureFile(values.out, fixture);
     out(
-      `fixture: ${fixture.products.length} products, ${fixture.enrichments.length} enrichments, ${fixture.embeddings.length} embeddings (ingested ${fixture.ingestedAt})`,
+      `fixture: ${fixture.products.length} products, ${fixture.enrichments.length} enrichments, ${fixture.embeddings.length} embeddings, ${fixture.variants?.length ?? 0} variants, ${fixture.cards?.length ?? 0} cards, ${fixture.cardEmbeddings?.length ?? 0} card vectors (ingested ${fixture.ingestedAt})`,
     );
     return 0;
   } finally {

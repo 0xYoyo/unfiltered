@@ -1,7 +1,7 @@
 /**
- * Export one store key's CatalogProduct, ProductEnrichment and
- * ProductEmbedding rows from the configured database to a score fixture
- * (YOY-140 AC-8).
+ * Export one store key's CatalogProduct, ProductEnrichment, ProductEmbedding,
+ * ProductVariant, ProductCard and CardEmbedding rows from the configured
+ * database to a score fixture (YOY-140 AC-8, YOY-144 AC-10).
  *
  * Env loads in-process like render-migrate.mts.
  */
