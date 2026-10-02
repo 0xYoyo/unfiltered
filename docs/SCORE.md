@@ -186,6 +186,7 @@ deployment's.
 | Run | Engine | en | he | ar | ru | fr | es | Under 1 s | Cost |
 |-----|--------|----|----|----|----|----|----|-----------|------|
 | 1 | M5 engine | 0.472 | 0.269 | 0.398 | 0.431 | 0.324 | 0.306 | classic 96 % · AI 34 % (EN 40 %, HE 28 %), 2026-10-01 | $0.0571 |
+| 2 | Engine v2 find step (`ENGINE_V2=1`) | 0.597 | 0.278 | 0.569 | 0.569 | 0.574 | 0.384 | — (not deployed) | $0.0276 |
 | 1 (invalid: 18 failures) | M5 engine | 0.306 | 0.032 | 0.181 | 0.083 | 0.167 | 0.106 | — | $0.0391 |
 
 Run 1 — M5 engine: [run 36908656314](https://github.com/0xYoyo/unfiltered/actions/runs/36908656314),
@@ -194,6 +195,16 @@ Run 1 — M5 engine: [run 36908656314](https://github.com/0xYoyo/unfiltered/acti
 touches only the score tooling and the workflow). Green, leak check clean
 (72 checked), **0 failed searches**. Env settings present:
 `GEMINI_API_KEY` only.
+
+Run 2 — the find step: [run 37001240933](https://github.com/0xYoyo/unfiltered/actions/runs/37001240933),
+2026-10-02, dispatched with `ref=YOY-145-find-step` and `engine=v2` on the
+branch that adds the find step (YOY-145), so `ENGINE_V2=1`: every search is
+the raw sentence's nearest products merged with keyword matches, no model
+call before the grade. Green, leak check clean (72 checked), **0 failed
+searches**. Env settings present: `GEMINI_API_KEY` only. Against run 1 every
+language is up — en +0.125 (above the en noise band, 0.111), he +0.009, ar
++0.171, ru +0.138, fr +0.250, es +0.078. 144 model calls (72 query
+embeddings, 72 grades) cost $0.0276.
 
 Run 1 (invalid): [run 36905483201](https://github.com/0xYoyo/unfiltered/actions/runs/36905483201)
 at `bdcc41e`, 18 of 72 searches failed and scored 0 (en 2, he 2, ar 3,
