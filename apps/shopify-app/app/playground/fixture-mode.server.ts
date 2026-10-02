@@ -46,7 +46,12 @@ export type PlaygroundFixtureName =
   | "ai-delayed"
   | "ai-reuse"
   | "degraded"
-  | "color-unknown";
+  | "color-unknown"
+  // YOY-146: a 30-product order served one page at a time, and the same
+  // order whose page 2 fails.
+  | "paged"
+  | "paged-fail"
+  | "paged-slow";
 
 /** How long the `delayed` fixture waits — long enough to observe loading. */
 export const FIXTURE_DELAY_MS = 700;
@@ -105,6 +110,10 @@ export function selectFixture(
     }
   }
 
+  if (has("paged")) {
+    return has("fail") ? "paged-fail" : has("slow") ? "paged-slow" : "paged";
+  }
+
   for (const name of ["empty", "error", "timeout", "delayed"] as const) {
     if (has(name)) {
       return name;
@@ -120,10 +129,71 @@ export interface FixtureOutcome {
   body: PlaygroundSearchResponse | null;
 }
 
+/** Products in the `paged` fixture's whole order (YOY-146). */
+export const PAGED_FIXTURE_SIZE = 30;
+
+/**
+ * The `paged` fixture's whole order: the results fixture's first card
+ * repeated with distinguishable ids and titles, so a test can name the card
+ * at any position.
+ */
+function pagedOrder(): PlaygroundSearchResponse {
+  const base = asResponse(resultsFixture);
+  const template = base.results[0]!;
+  return {
+    ...base,
+    searchId: "fixture-paged",
+    results: Array.from({ length: PAGED_FIXTURE_SIZE }, (_, index) => ({
+      ...template,
+      productId: `paged-${index}`,
+      title: `Paged dress ${String(index).padStart(2, "0")}`,
+    })),
+  };
+}
+
+/**
+ * One page of a fixture's answer, as the endpoint serves it (YOY-145
+ * AC-4): with page parameters the response holds that page plus `page` and
+ * `totalCount`; without them it is unchanged.
+ */
+export function pageOfFixture(
+  outcome: FixtureOutcome,
+  paging: { page: number; pageSize: number } | undefined,
+): FixtureOutcome {
+  if (paging === undefined || outcome.body === null) {
+    return outcome;
+  }
+  const start = (paging.page - 1) * paging.pageSize;
+  return {
+    ...outcome,
+    body: {
+      ...outcome.body,
+      results: outcome.body.results.slice(start, start + paging.pageSize),
+      page: paging.page,
+      totalCount: outcome.body.results.length,
+    },
+  };
+}
+
 export function fixtureOutcome(
   name: PlaygroundFixtureName,
+  paging?: { page: number },
 ): FixtureOutcome {
   switch (name) {
+    case "paged":
+      return { delayMs: 0, status: 200, body: pagedOrder() };
+    case "paged-slow":
+      // Later pages answer slowly, so the quiet loading line is observable.
+      return {
+        delayMs: (paging?.page ?? 1) > 1 ? FIXTURE_DELAY_MS : 0,
+        status: 200,
+        body: pagedOrder(),
+      };
+    case "paged-fail":
+      // Page 1 answers; every later page fails (YOY-146 AC-9).
+      return (paging?.page ?? 1) > 1
+        ? { delayMs: 0, status: 500, body: null }
+        : { delayMs: 0, status: 200, body: pagedOrder() };
     case "empty":
       return { delayMs: 0, status: 200, body: asResponse(emptyFixture) };
     case "error":

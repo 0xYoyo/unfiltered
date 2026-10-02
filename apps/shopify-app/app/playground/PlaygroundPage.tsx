@@ -40,6 +40,27 @@ import {
 
 type Phase = "initial" | "loading" | "settled";
 
+/** Results per page a submitted search asks for (YOY-146 AC-1). */
+const PAGE_SIZE = 24;
+
+/**
+ * The further pages of the submitted search on screen (YOY-146): the exact
+ * request that produced page 1, the next page to ask for, and how far the
+ * whole order goes. Replaced by every new response; a page that lands for a
+ * replaced one is dropped.
+ */
+interface PagingState {
+  query: string;
+  previousIntent: ProxyIntent | null;
+  removeChip?: ProxyChip;
+  nextPage: number;
+  shown: number;
+  total: number;
+  loading: boolean;
+  /** A page failed: appending stops, the shown cards stay (AC-9). */
+  stopped: boolean;
+}
+
 export function PlaygroundPage({
   locale,
   pathname,
@@ -65,6 +86,10 @@ export function PlaygroundPage({
     null,
   );
   const [failed, setFailed] = useState(false);
+  // Cards appended from later pages (YOY-146 AC-6), below page 1's.
+  const [more, setMore] = useState<PlaygroundCard[]>([]);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const pagingRef = useRef<PagingState | null>(null);
   // The searchId a click beacon may carry: the last SUBMITTED response's,
   // or null while the cards on screen belong to a keystroke preview. A
   // preview writes no SearchEvent row (YOY-68 AC-3), so its searchId is not
@@ -118,6 +143,8 @@ export function PlaygroundPage({
       // intent: refinement is a submitted-search idea (YOY-68, AC-2).
       const held = preview ? null : heldIntentRef.current;
 
+      pagingRef.current = null;
+      setLoadingMore(false);
       setPhase("loading");
       try {
         const next = await searchPlayground({
@@ -128,12 +155,30 @@ export function PlaygroundPage({
           ...(refinement?.removeChip === undefined
             ? {}
             : { removeChip: refinement.removeChip }),
+          // Every submit asks for page 1 (YOY-146 AC-1); a preview is
+          // never paged.
+          ...(preview ? {} : { paging: { page: 1, pageSize: PAGE_SIZE } }),
           signal: controller.signal,
         });
         if (controller.signal.aborted) {
           return;
         }
         setResponse(next);
+        setMore([]);
+        pagingRef.current = preview
+          ? null
+          : {
+              query: trimmed,
+              previousIntent: held,
+              ...(refinement?.removeChip === undefined
+                ? {}
+                : { removeChip: refinement.removeChip }),
+              nextPage: (next.page ?? 1) + 1,
+              shown: next.results.length,
+              total: next.totalCount ?? next.results.length,
+              loading: false,
+              stopped: false,
+            };
         // The cards on screen are now this response's: attributable only
         // when it was submitted (AC-14).
         setAttributableSearchId(preview ? null : next.searchId);
@@ -164,6 +209,63 @@ export function PlaygroundPage({
     },
     [catalog],
   );
+
+  /**
+   * Append the next page below the cards on screen (YOY-146 AC-6 to AC-9):
+   * one request per page, the quiet line while it loads, nothing once the
+   * shown count reaches `totalCount`, and a failed page leaves every card
+   * in place with no error text.
+   */
+  const loadNextPage = useCallback(async () => {
+    const state = pagingRef.current;
+    if (
+      state === null ||
+      state.loading ||
+      state.stopped ||
+      state.shown >= state.total
+    ) {
+      return;
+    }
+    state.loading = true;
+    setLoadingMore(true);
+    try {
+      const next = await searchPlayground({
+        query: state.query,
+        preview: false,
+        ...(catalog === undefined ? {} : { catalog }),
+        ...(state.previousIntent === null
+          ? {}
+          : { previousIntent: state.previousIntent }),
+        ...(state.removeChip === undefined
+          ? {}
+          : { removeChip: state.removeChip }),
+        paging: { page: state.nextPage, pageSize: PAGE_SIZE },
+      });
+      if (pagingRef.current !== state) {
+        return;
+      }
+      state.nextPage += 1;
+      state.shown += next.results.length;
+      if (next.results.length === 0) {
+        state.stopped = true;
+      }
+      setMore((shown) => [...shown, ...next.results]);
+    } catch {
+      if (pagingRef.current === state) {
+        state.stopped = true;
+      }
+    } finally {
+      if (pagingRef.current === state) {
+        state.loading = false;
+        setLoadingMore(false);
+      }
+    }
+  }, [catalog]);
+
+  // Stable, so the grid's last-card watch re-arms only when cards change.
+  const appendNextPage = useCallback(() => {
+    void loadNextPage();
+  }, [loadNextPage]);
 
   useEffect(() => {
     const trimmed = query.trim();
@@ -209,6 +311,9 @@ export function PlaygroundPage({
   /** Drop everything held and go back to the initial state (AC-3). */
   const newSearch = useCallback(() => {
     requestRef.current?.abort();
+    pagingRef.current = null;
+    setMore([]);
+    setLoadingMore(false);
     if (debounceRef.current !== null) {
       clearTimeout(debounceRef.current);
       debounceRef.current = null;
@@ -256,7 +361,10 @@ export function PlaygroundPage({
       ? response.chips
       : [];
 
-  const cards = response?.results ?? [];
+  const cards = useMemo(
+    () => [...(response?.results ?? []), ...more],
+    [response, more],
+  );
   const closeMatches = response?.closeMatches ?? [];
   const zeroHit =
     response !== null &&
@@ -402,7 +510,20 @@ export function PlaygroundPage({
           strings={strings}
           skeleton={phase === "loading" && cards.length === 0}
           onOpen={openCard}
+          onLastCardVisible={appendNextPage}
         />
+        {loadingMore ? (
+          // The one quiet line while the next page loads (YOY-146 AC-7):
+          // the status line's own ink and size, below the grid — no
+          // spinner, no skeleton, no control.
+          <p
+            className="statusLine"
+            role="status"
+            data-testid="playground-loading-more"
+          >
+            {strings.loadingMore}
+          </p>
+        ) : null}
 
         {closeMatches.length === 0 ? null : (
           <section className="closeMatches">

@@ -3,6 +3,7 @@ import type { LoaderFunctionArgs } from "react-router";
 import db from "../db.server";
 import {
   fixtureOutcome,
+  pageOfFixture,
   playgroundFixturesEnabled,
   selectFixture,
   selectFixtureForRemoval,
@@ -80,10 +81,16 @@ export const loader = async ({
   if (playgroundFixturesEnabled()) {
     // A chip removal is answered by its own echo rather than by the query
     // text, because the query has not changed — only the constraint set has.
-    const outcome = fixtureOutcome(
-      body.removeChip !== undefined
-        ? selectFixtureForRemoval(body.removeChip)
-        : selectFixture(body.query, body.mode !== undefined),
+    // Paged like the real endpoint (YOY-146): page parameters in, that
+    // page plus `page` and `totalCount` out.
+    const outcome = pageOfFixture(
+      fixtureOutcome(
+        body.removeChip !== undefined
+          ? selectFixtureForRemoval(body.removeChip)
+          : selectFixture(body.query, body.mode !== undefined),
+        body.paging,
+      ),
+      body.mode === "preview" ? undefined : body.paging,
     );
     await sleep(outcome.delayMs);
     return outcome.body === null

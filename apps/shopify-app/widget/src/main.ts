@@ -5,12 +5,14 @@ import {
   resolveNativeRender,
 } from "./native-render";
 import type { NativeRenderOverrides } from "./native-render.config";
-import { createOverlay, ROOT_TESTID } from "./overlay";
+import { createOverlay, ROOT_TESTID, type PageLoader } from "./overlay";
 import {
   createSearchClient,
   SearchTimeoutError,
+  type PageRequest,
   type ProxyChip,
   type ProxyIntent,
+  type ProxySearchResponse,
   type SearchRequestContext,
 } from "./search-client";
 import { getSessionId } from "./session";
@@ -65,6 +67,12 @@ export interface WidgetConfig {
 }
 
 const DEFAULT_DEBOUNCE_MS = 200;
+
+/**
+ * Results per page on the overlay path (YOY-146 AC-1), which has no theme
+ * config of its own; the theme-native path uses its configured page size.
+ */
+export const DEFAULT_PAGE_SIZE = 24;
 
 /**
  * Consecutive hard search failures (HTTP error, network failure, timeout,
@@ -329,11 +337,17 @@ export function init(config: WidgetConfig): void {
     /**
      * The page a resumed results view opens on (YOY-107): a results-view URL
      * loaded fresh names its own page, and the view must land there rather
-     * than silently on page 1. Consumed by the first render and reset, so
-     * every later search starts at page 1 — a new set makes the old page
+     * than silently on page 1 — so its first request asks for that page
+     * directly (YOY-146 AC-5). Consumed by that request and reset, so every
+     * later search starts at page 1: a new set makes the old page
      * meaningless.
      */
     let resumePage = 1;
+    const takeResumePage = (): number => {
+      const page = resumePage;
+      resumePage = 1;
+      return page;
+    };
 
     const surfaceOptions = {
       onClose: () => {
@@ -382,13 +396,35 @@ export function init(config: WidgetConfig): void {
               onLeave: () => {
                 dismiss();
               },
-              initialPage: () => {
-                const page = resumePage;
-                resumePage = 1;
-                return page;
-              },
             }),
           );
+    // The page size every submitted search asks for (YOY-146 AC-1): the
+    // theme's own on the native path, the overlay's default otherwise.
+    const pageSize = nativeConfig?.page.pageSize ?? DEFAULT_PAGE_SIZE;
+
+    /**
+     * The loader for the further pages of one submitted search (YOY-146):
+     * the same query and refinement context, another page. A page asked for
+     * after the search was superseded or dismissed is refused, so a late
+     * page can never land in a newer search's view.
+     */
+    const pageLoader = (
+      sequence: number,
+      fetchPage: (paging: PageRequest) => Promise<ProxySearchResponse>,
+    ): PageLoader => ({
+      pageSize,
+      load: async (page) => {
+        const current = (): boolean => !inert && sequence === requestSequence;
+        if (!current()) {
+          throw new Error("search superseded");
+        }
+        const response = await fetchPage({ page, pageSize });
+        if (!current()) {
+          throw new Error("search superseded");
+        }
+        return response;
+      },
+    });
 
     /** A debounced preview is pending or a request is in flight (YOY-69
      * AC-2): the window in which dismissal must cancel, not just hide. */
@@ -455,10 +491,11 @@ export function init(config: WidgetConfig): void {
     const rescueWithClassic = async (
       query: string,
       sequence: number,
+      paging: PageRequest,
     ): Promise<boolean> => {
       let response;
       try {
-        response = await client.searchClassic(query, getSessionId());
+        response = await client.searchClassic(query, getSessionId(), paging);
       } catch {
         return false; // AC-2: the failure state is now the honest answer.
       }
@@ -474,7 +511,13 @@ export function init(config: WidgetConfig): void {
       // A classic response carries no intent, exactly as a server-degraded
       // one does; refinement has nothing to hold either way.
       heldIntent = response.intent;
-      overlay.showResponse(response, { onCardClick, onChipRemove });
+      overlay.showResponse(response, {
+        onCardClick,
+        onChipRemove,
+        pages: pageLoader(sequence, (next) =>
+          client.searchClassic(query, getSessionId(), next),
+        ),
+      });
       return true;
     };
 
@@ -496,8 +539,21 @@ export function init(config: WidgetConfig): void {
       if (!preview || !overlay.isOpen()) {
         overlay.showLoading();
       }
+      // Every submitted search asks for one page (YOY-146 AC-1); a resumed
+      // results view asks for the page its URL names (AC-5). A keystroke
+      // preview stays unpaged (NG-4).
+      const paging: PageRequest | undefined = preview
+        ? undefined
+        : {
+            page: nativeConfig !== null ? takeResumePage() : 1,
+            pageSize,
+          };
       try {
-        const response = await client.search(query, getSessionId(), context);
+        const response = await client.search(
+          query,
+          getSessionId(),
+          paging === undefined ? context : { ...context, paging },
+        );
         if (inert || sequence !== requestSequence) {
           return; // A newer keystroke (or a dismissal) superseded this.
         }
@@ -518,7 +574,13 @@ export function init(config: WidgetConfig): void {
         // The response's echoed intent replaces the held one (AC-4) — also
         // when it is null (a classic response holds no intent to refine).
         heldIntent = response.intent;
-        overlay.showResponse(response, { onCardClick, onChipRemove });
+        overlay.showResponse(response, {
+          onCardClick,
+          onChipRemove,
+          pages: pageLoader(sequence, (next) =>
+            client.search(query, getSessionId(), { ...context, paging: next }),
+          ),
+        });
       } catch (error) {
         if (inert || sequence !== requestSequence) {
           return; // A newer keystroke (or a dismissal) superseded this.
@@ -529,8 +591,8 @@ export function init(config: WidgetConfig): void {
         // answer the same query immediately. Rescue it before considering
         // any failure state. Previews are already the classic path, so a
         // preview timing out has nothing to fall back to.
-        if (error instanceof SearchTimeoutError && !preview) {
-          if (await rescueWithClassic(query, sequence)) {
+        if (error instanceof SearchTimeoutError && paging !== undefined) {
+          if (await rescueWithClassic(query, sequence, paging)) {
             return;
           }
           if (inert || sequence !== requestSequence) {

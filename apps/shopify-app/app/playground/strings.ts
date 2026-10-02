@@ -39,6 +39,8 @@ export interface PlaygroundStrings {
   initialHint: string;
   /** The single quiet status line while a search is in flight (AC-7). */
   loading: string;
+  /** The one quiet line below the grid while the next page loads (YOY-146 AC-7). */
+  loadingMore: string;
   /** Classic search that matched nothing (AC-7). */
   emptyResults: string;
   /**
@@ -135,6 +137,7 @@ export const PLAYGROUND_STRING_CATALOG: Record<
     searchLabel: "Search the catalog",
     initialHint: "Type the way you would say it out loud.",
     loading: "Searching…",
+    loadingMore: "Loading more…",
     emptyResults: "Nothing matched that.",
     requestFailed: "That search did not come back. Try again.",
     resultsLabel: "Results",
@@ -190,6 +193,7 @@ export const PLAYGROUND_STRING_CATALOG: Record<
     searchLabel: "חיפוש בקטלוג",
     initialHint: "כתבו בדיוק כמו שהייתם אומרים בקול.",
     loading: "מחפש…",
+    loadingMore: "טוען עוד…",
     emptyResults: "לא נמצאה התאמה.",
     requestFailed: "החיפוש לא חזר. נסו שוב.",
     resultsLabel: "תוצאות",

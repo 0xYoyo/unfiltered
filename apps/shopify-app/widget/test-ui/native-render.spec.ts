@@ -1266,12 +1266,14 @@ test.describe("the full match set, paged by the theme (YOY-107)", () => {
     // The count line still states the whole set, never the page.
     await expect(themeCount(page)).toHaveText('30 results found for “dress”');
     expect(new URL(page.url()).searchParams.get("page")).toBe("2");
-    // No new search: paging is a render over the set already in hand.
-    expect(
-      await page.evaluate(
-        () => (window as unknown as { __searchRequests: unknown[] }).__searchRequests.length,
-      ),
-    ).toBe(2);
+    // Page 2 came from the server, as one more request for exactly that
+    // page of the same refinement (YOY-146 AC-2).
+    const requests = await page.evaluate(
+      () =>
+        (window as unknown as { __searchRequests: Array<Record<string, unknown>> })
+          .__searchRequests,
+    );
+    expect(requests.at(-1)).toMatchObject({ page: 2, pageSize: 12 });
 
     // The last page carries the remainder, and page 1 drops the parameter
     // exactly as the theme's own first page does.
@@ -1457,16 +1459,23 @@ test.describe("the full match set, paged by the theme (YOY-107)", () => {
     expect(new URLSearchParams(first).has("page")).toBe(false);
   });
 
-  test("a shell without usable pagination markup still serves the full set, on one page", async ({
+  test("a shell without usable pagination markup still reaches the full set: later pages append as the shopper scrolls", async ({
     page,
   }) => {
     await page.goto(`${FULL_SET}&shell=missing`);
     await submitQuery(page, "dress");
     await nativeChips(page).filter({ hasText: "blue" }).click();
+    await expect(items(page)).toHaveCount(12);
 
-    // No theme pagination to mirror and none invented (NG-3): every result
-    // renders, which is still the parity floor.
-    await expect(items(page)).toHaveCount(30);
+    // No theme pagination to mirror and none invented (NG-3, YOY-146
+    // AC-11): each time the last row enters the viewport the next server
+    // page appends, until every result is on the page — still the parity
+    // floor.
+    for (const expected of [24, 30]) {
+      await items(page).last().scrollIntoViewIfNeeded();
+      await expect(items(page)).toHaveCount(expected);
+    }
+    await expect(titles(page).last()).toHaveText("Full Set Dress 29");
     await expect(page.getByTestId("theme-pagination")).toHaveCount(0);
   });
 });

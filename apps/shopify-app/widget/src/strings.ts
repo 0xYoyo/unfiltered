@@ -17,6 +17,8 @@ export interface WidgetStrings {
   /** The theme search input's placeholder while the widget owns it. */
   inputPlaceholder: string;
   loading: string;
+  /** The one quiet line while the next page of results loads (YOY-146 AC-7). */
+  loadingMore: string;
   noResults: string;
   /** The AI zero-hit message (YOY-49 AC-3). */
   zeroHit: string;
@@ -54,6 +56,7 @@ export const STRING_CATALOG: Record<WidgetLocale, WidgetStrings> = {
   en: {
     inputPlaceholder: "Search",
     loading: "Searching…",
+    loadingMore: "Loading more…",
     noResults: "No results",
     zeroHit: "Nothing matches all of these",
     closeMatchesHeading: "Close matches",
@@ -75,6 +78,7 @@ export const STRING_CATALOG: Record<WidgetLocale, WidgetStrings> = {
   he: {
     inputPlaceholder: "חיפוש",
     loading: "מחפש…",
+    loadingMore: "טוען עוד…",
     noResults: "אין תוצאות",
     zeroHit: "שום פריט לא מתאים לכל הסינונים",
     closeMatchesHeading: "התאמות קרובות",

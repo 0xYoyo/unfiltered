@@ -395,6 +395,24 @@
       const blueSubset = (count) =>
         manyResults(count).filter((_, index) => index % 3 === 0);
 
+      /**
+       * Server-side pages (YOY-146): a request carrying `page` and
+       * `pageSize` gets that page of the fixture's whole result order plus
+       * `page` and `totalCount`, as the real endpoint answers.
+       */
+      const paged = (body, request) => {
+        if (request.page === undefined) {
+          return body;
+        }
+        const start = (request.page - 1) * request.pageSize;
+        return {
+          ...body,
+          results: body.results.slice(start, start + request.pageSize),
+          page: request.page,
+          totalCount: body.results.length,
+        };
+      };
+
       const AI_INTENT = {
         category: "dress",
         priceMin: null,
@@ -618,6 +636,10 @@
           if (parsed.searchParams.has("mode")) {
             request.mode = parsed.searchParams.get("mode");
           }
+          if (parsed.searchParams.has("page")) {
+            request.page = Number(parsed.searchParams.get("page"));
+            request.pageSize = Number(parsed.searchParams.get("pageSize"));
+          }
           window.__searchRequests.push(request);
           // Hold the response in flight so the loading state is observable.
           const searchDelay = Number(params.get("searchDelay") ?? 0);
@@ -649,7 +671,7 @@
             if (fixture === "timeout-rescue-error") {
               return Promise.resolve(new Response(null, { status: 500 }));
             }
-            return Promise.resolve(jsonResponse(RESULTS_RESPONSE));
+            return Promise.resolve(jsonResponse(paged(RESULTS_RESPONSE, request)));
           }
           let body;
           if (fixture === "full-set") {
@@ -668,6 +690,14 @@
                 : AI_CHIPS,
               intent: AI_INTENT,
             };
+          } else if (fixture === "many") {
+            // YOY-146: a plain 30-product order (`?results=<N>` sizes it),
+            // served one page per request.
+            body = {
+              ...RESULTS_RESPONSE,
+              searchId: "harness-many-1",
+              results: manyResults(Number(params.get("results") ?? 30)),
+            };
           } else if (request.mode === "preview" || request.mode === "classic") {
             body = RESULTS_RESPONSE;
           } else if (request.removeChip !== undefined) {
@@ -683,7 +713,7 @@
           } else {
             body = RESULTS_RESPONSE;
           }
-          return settle(jsonResponse(body));
+          return settle(jsonResponse(paged(body, request)));
         }
         if (url.startsWith("/apps/unfiltered/click")) {
           const log = JSON.parse(sessionStorage.getItem("harness:clickBeacons") ?? "[]");

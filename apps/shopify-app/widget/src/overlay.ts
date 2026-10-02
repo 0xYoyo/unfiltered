@@ -31,11 +31,24 @@ export const CLOSE_MATCHES_TESTID = "unfiltered-widget-close-matches";
 export const NEW_SEARCH_TESTID = "unfiltered-widget-new-search";
 export const COLOR_NOTE_TESTID = "unfiltered-widget-color-note";
 export const PREVIEW_EMPTY_TESTID = "unfiltered-widget-preview-empty";
+export const LOADING_MORE_TESTID = "unfiltered-widget-loading-more";
+
+/**
+ * The further pages of a submitted search (YOY-146): the page size the
+ * search asked for and a loader for any page of the same search. Absent on
+ * a keystroke preview, which is never paged (NG-4).
+ */
+export interface PageLoader {
+  pageSize: number;
+  load: (page: number) => Promise<ProxySearchResponse>;
+}
 
 /** Card and chip interactions the state machine in main.ts handles. */
 export interface ResponseHandlers {
+  /** `position` is the card's place in the whole result order (YOY-146 AC-10). */
   onCardClick: (result: ProxyResult, position: number) => void;
   onChipRemove: (chip: ProxyChip) => void;
+  pages?: PageLoader;
 }
 
 export interface Overlay {
@@ -155,6 +168,15 @@ export function createOverlay(options: OverlayOptions): Overlay {
   grid.className = "grid";
   grid.setAttribute("data-testid", RESULTS_TESTID);
 
+  // The next page's quiet line (YOY-146 AC-7): plain status text below the
+  // grid while a page loads — no spinner, no skeleton, no control.
+  const loadingMore = document.createElement("div");
+  loadingMore.className = "status status-quiet";
+  loadingMore.setAttribute("data-testid", LOADING_MORE_TESTID);
+  loadingMore.setAttribute("role", "status");
+  loadingMore.textContent = strings.loadingMore;
+  loadingMore.hidden = true;
+
   const closeMatches = document.createElement("section");
   closeMatches.className = "close-matches";
   closeMatches.setAttribute("data-testid", CLOSE_MATCHES_TESTID);
@@ -174,9 +196,82 @@ export function createOverlay(options: OverlayOptions): Overlay {
     zeroHit,
     previewEmpty,
     grid,
+    loadingMore,
     closeMatches,
   );
   shadow.appendChild(overlay);
+
+  /**
+   * Further pages, appended as the shopper scrolls (YOY-146 AC-6 to AC-9):
+   * when the last card enters the viewport the next page is requested and
+   * its cards go below the ones shown, which never move. Appending stops at
+   * `totalCount`; a failed page leaves every shown card in place and says
+   * nothing. Each render starts a new generation, so a page that lands for
+   * an older response is dropped.
+   */
+  let generation = 0;
+  let observer: IntersectionObserver | null = null;
+  const stopAppending = (): void => {
+    observer?.disconnect();
+    observer = null;
+    loadingMore.hidden = true;
+  };
+  const appendPages = (
+    response: ProxySearchResponse,
+    handlers: ResponseHandlers,
+  ): void => {
+    stopAppending();
+    const mine = (generation += 1);
+    const pages = handlers.pages;
+    const total = response.totalCount ?? response.results.length;
+    if (pages === undefined || typeof IntersectionObserver === "undefined") {
+      return;
+    }
+    let shown = response.results.length;
+    let nextPage = (response.page ?? 1) + 1;
+    const watchLast = (): void => {
+      const last = grid.lastElementChild;
+      if (shown >= total || last === null) {
+        return;
+      }
+      observer = new IntersectionObserver((entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) {
+          return;
+        }
+        observer?.disconnect();
+        observer = null;
+        loadingMore.hidden = false;
+        const page = nextPage;
+        pages.load(page).then(
+          (next) => {
+            if (mine !== generation) {
+              return;
+            }
+            loadingMore.hidden = true;
+            const offset = (page - 1) * pages.pageSize;
+            grid.append(
+              ...next.results.map((result, index) =>
+                card(result, offset + index, handlers.onCardClick),
+              ),
+            );
+            shown += next.results.length;
+            nextPage = page + 1;
+            if (next.results.length > 0) {
+              watchLast();
+            }
+          },
+          () => {
+            // AC-9: the shown cards stay, and no error reaches the shopper.
+            if (mine === generation) {
+              loadingMore.hidden = true;
+            }
+          },
+        );
+      });
+      observer.observe(last);
+    };
+    watchLast();
+  };
 
   function card(
     result: ProxyResult,
@@ -314,6 +409,8 @@ export function createOverlay(options: OverlayOptions): Overlay {
     },
     close() {
       overlay.hidden = true;
+      generation += 1;
+      stopAppending();
     },
     isOpen() {
       return !overlay.hidden;
@@ -322,6 +419,8 @@ export function createOverlay(options: OverlayOptions): Overlay {
       // First open happens here or in showResponse (YOY-67 AC-6): the
       // overlay never renders before there is something — at least a
       // loading state — to show.
+      generation += 1;
+      stopAppending();
       overlay.hidden = false;
       loading.hidden = false;
       noResults.hidden = true;
@@ -329,6 +428,8 @@ export function createOverlay(options: OverlayOptions): Overlay {
       previewEmpty.hidden = true;
     },
     showIdle() {
+      generation += 1;
+      stopAppending();
       loading.hidden = true;
       noResults.hidden = true;
       zeroHit.hidden = true;
@@ -367,11 +468,15 @@ export function createOverlay(options: OverlayOptions): Overlay {
       );
       chipsRow.hidden = chips.length === 0;
 
+      // Positions count from the page's place in the whole order (AC-10).
+      const offset =
+        ((response.page ?? 1) - 1) * (handlers.pages?.pageSize ?? 0);
       grid.replaceChildren(
         ...response.results.map((result, index) =>
-          card(result, index, handlers.onCardClick),
+          card(result, offset + index, handlers.onCardClick),
         ),
       );
+      appendPages(response, handlers);
 
       // Empty states: an AI zero-hit keeps the session alive with its chips
       // and close matches (AC-3); a classic empty set is a plain
@@ -407,6 +512,9 @@ export function createOverlay(options: OverlayOptions): Overlay {
       chipsRow.replaceChildren();
       closeMatches.hidden = true;
       closeMatchesGrid.replaceChildren();
+      // A preview is never paged (NG-4).
+      generation += 1;
+      stopAppending();
 
       grid.replaceChildren(
         ...response.results.map((result, index) =>
@@ -416,6 +524,8 @@ export function createOverlay(options: OverlayOptions): Overlay {
       previewEmpty.hidden = response.results.length !== 0;
     },
     destroy() {
+      generation += 1;
+      stopAppending();
       host.remove();
     },
   };

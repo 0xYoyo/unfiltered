@@ -67,6 +67,19 @@ export interface ProxySearchResponse {
   closeMatches?: ProxyResult[];
   /** Constraint names the server relaxed to find them (YOY-111). */
   closeMatchesRelaxed?: string[];
+  /**
+   * The page `results` holds and the size of the whole result order
+   * (YOY-146): present on every paged response. Absent from a server that
+   * predates server-side pages, whose `results` is then the whole set.
+   */
+  page?: number;
+  totalCount?: number;
+}
+
+/** One page of a submitted search (YOY-146 AC-1): 1-based, and its size. */
+export interface PageRequest {
+  page: number;
+  pageSize: number;
 }
 
 /** Optional context a search request carries (YOY-49). */
@@ -89,6 +102,11 @@ export interface SearchRequestContext {
    * exclusive with `preview`, `previousIntent`, and `removeChip`.
    */
   classic?: boolean;
+  /**
+   * The page to fetch (YOY-146 AC-1): every submitted search carries one;
+   * a keystroke preview never does (NG-4).
+   */
+  paging?: PageRequest;
 }
 
 export interface SearchClientOptions {
@@ -164,6 +182,10 @@ export function buildSearchParams(
   } else if (context?.classic === true) {
     params.set("mode", "classic");
   }
+  if (context?.paging !== undefined && context.preview !== true) {
+    params.set("page", String(context.paging.page));
+    params.set("pageSize", String(context.paging.pageSize));
+  }
   return params;
 }
 
@@ -203,6 +225,7 @@ export interface SearchClient {
   searchClassic(
     query: string,
     sessionId: string,
+    paging?: PageRequest,
   ): Promise<ProxySearchResponse>;
   /**
    * Fire the click beacon and return immediately (AC-5): the request is
@@ -275,12 +298,17 @@ export function createSearchClient(
       return request(query, sessionId, context, timeoutMs);
     },
 
-    async searchClassic(query, sessionId) {
+    async searchClassic(query, sessionId, paging) {
       // `mode=classic` (YOY-96 AC-9): keyword results, zero LLM calls, no
       // throttle budget — like a preview — but a submitted search the
       // server writes a SearchEvent for, so the response's searchId is one
       // the click beacon can attribute to.
-      return request(query, sessionId, { classic: true }, fallbackTimeoutMs);
+      return request(
+        query,
+        sessionId,
+        { classic: true, ...(paging !== undefined ? { paging } : {}) },
+        fallbackTimeoutMs,
+      );
     },
 
     sendClickBeacon(beacon) {
