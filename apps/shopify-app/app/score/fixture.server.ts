@@ -4,9 +4,12 @@ import { Prisma, type PrismaClient } from "@prisma/client";
 
 /**
  * The score fixture (YOY-140 AC-8): one store key's searchable state —
- * CatalogProduct, ProductEnrichment and ProductEmbedding rows — as one JSON
- * file, so the runner (AC-6) can seed an in-process database with the
- * catalog as it stood on `ingestedAt`, and every run scores the same catalog.
+ * CatalogProduct, ProductEnrichment and ProductEmbedding rows, and from
+ * version 2 (YOY-144 AC-10) ProductVariant, ProductCard and CardEmbedding
+ * rows too — as one JSON file, so the runner (AC-6) can seed an in-process
+ * database with the catalog as it stood on `ingestedAt`, and every run
+ * scores the same catalog. A version-1 file still imports: it simply has no
+ * variants, cards or card vectors.
  *
  * Row ids and row timestamps are not exported: they are the database's
  * bookkeeping, not catalog state, and the import writes fresh ones.
@@ -14,7 +17,7 @@ import { Prisma, type PrismaClient } from "@prisma/client";
  * so the round trip is exact.
  */
 
-export const SCORE_FIXTURE_VERSION = 1;
+export const SCORE_FIXTURE_VERSION = 2;
 
 type Bookkeeping = "id" | "createdAt" | "updatedAt";
 
@@ -36,14 +39,38 @@ export interface FixtureEmbedding {
   vector: string;
 }
 
+export type FixtureVariant = Omit<
+  Prisma.ProductVariantGetPayload<object>,
+  Bookkeeping | "sourceUpdatedAt"
+> & { sourceUpdatedAt: string | null };
+
+export type FixtureCard = Omit<Prisma.ProductCardGetPayload<object>, Bookkeeping | "writtenAt"> & {
+  writtenAt: string;
+};
+
+export interface FixtureCardEmbedding {
+  productId: string;
+  section: string;
+  textHash: string;
+  /** base64 of the vector as little-endian Float32. */
+  vector: string;
+}
+
 export interface ScoreFixture {
-  version: typeof SCORE_FIXTURE_VERSION;
+  /** 1: products, enrichments, embeddings. 2: also variants, cards, card vectors. */
+  version: 1 | typeof SCORE_FIXTURE_VERSION;
   storeKey: string;
   /** When the exported catalog was last ingested. */
   ingestedAt: string;
   products: FixtureProduct[];
   enrichments: FixtureEnrichment[];
   embeddings: FixtureEmbedding[];
+  /** Version 2 only. */
+  variants?: FixtureVariant[];
+  /** Version 2 only. */
+  cards?: FixtureCard[];
+  /** Version 2 only. */
+  cardEmbeddings?: FixtureCardEmbedding[];
 }
 
 export function encodeVector(vector: readonly number[]): string {
@@ -97,6 +124,21 @@ export async function exportScoreFixture(
        FROM "ProductEmbedding" WHERE "shopDomain" = $1 ORDER BY "productId"`,
     storeKey,
   );
+  const variants = await db.productVariant.findMany({
+    where: { shopDomain: storeKey },
+    orderBy: [{ productId: "asc" }, { variantId: "asc" }],
+  });
+  const cards = await db.productCard.findMany({
+    where: { shopDomain: storeKey },
+    orderBy: { productId: "asc" },
+  });
+  const cardEmbeddings = await db.$queryRawUnsafe<
+    { productId: string; section: string; textHash: string; embedding: string }[]
+  >(
+    `SELECT "productId", "section", "textHash", "embedding"::text AS "embedding"
+       FROM "CardEmbedding" WHERE "shopDomain" = $1 ORDER BY "productId", "section"`,
+    storeKey,
+  );
   const registry = await db.playgroundCatalog.findUnique({
     where: { storeKey },
     select: { lastIngestedAt: true },
@@ -122,6 +164,20 @@ export async function exportScoreFixture(
       contentHash: row.contentHash,
       vector: encodeVector(parseVectorText(row.embedding)),
     })),
+    variants: variants.map(withoutBookkeeping).map((row) => ({
+      ...row,
+      sourceUpdatedAt: row.sourceUpdatedAt?.toISOString() ?? null,
+    })),
+    cards: cards.map(withoutBookkeeping).map((row) => ({
+      ...row,
+      writtenAt: row.writtenAt.toISOString(),
+    })),
+    cardEmbeddings: cardEmbeddings.map((row) => ({
+      productId: row.productId,
+      section: row.section,
+      textHash: row.textHash,
+      vector: encodeVector(parseVectorText(row.embedding)),
+    })),
   };
 }
 
@@ -134,7 +190,7 @@ export async function importScoreFixture(
   db: PrismaClient,
   fixture: ScoreFixture,
 ): Promise<void> {
-  if (fixture.version !== SCORE_FIXTURE_VERSION) {
+  if (fixture.version !== 1 && fixture.version !== SCORE_FIXTURE_VERSION) {
     throw new Error(`score fixture: unsupported version ${String(fixture.version)}`);
   }
   const { storeKey } = fixture;
@@ -168,6 +224,40 @@ export async function importScoreFixture(
       storeKey,
       embedding.productId,
       embedding.contentHash,
+      `[${vector.join(",")}]`,
+    );
+  }
+  for (const variant of fixture.variants ?? []) {
+    await db.productVariant.create({
+      data: {
+        ...variant,
+        shopDomain: storeKey,
+        options: jsonColumn(variant.options),
+        sourceUpdatedAt: variant.sourceUpdatedAt === null ? null : new Date(variant.sourceUpdatedAt),
+      },
+    });
+  }
+  for (const card of fixture.cards ?? []) {
+    await db.productCard.create({
+      data: {
+        ...card,
+        shopDomain: storeKey,
+        asks: jsonColumn(card.asks),
+        writtenAt: new Date(card.writtenAt),
+      },
+    });
+  }
+  for (const cardEmbedding of fixture.cardEmbeddings ?? []) {
+    const vector = decodeVector(cardEmbedding.vector);
+    await db.$executeRawUnsafe(
+      `INSERT INTO "CardEmbedding"
+         ("id", "shopDomain", "productId", "section", "textHash", "embedding", "updatedAt")
+       VALUES ($1, $2, $3, $4, $5, $6::vector(${vector.length}), CURRENT_TIMESTAMP)`,
+      randomUUID(),
+      storeKey,
+      cardEmbedding.productId,
+      cardEmbedding.section,
+      cardEmbedding.textHash,
       `[${vector.join(",")}]`,
     );
   }

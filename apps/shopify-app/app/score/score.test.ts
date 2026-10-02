@@ -633,6 +633,79 @@ describe("the fixture (AC-8)", () => {
     expect(exported.products[0]).not.toHaveProperty("id");
   });
 
+  it("round-trips variants, cards and card vectors (YOY-144 AC-10)", async () => {
+    const source = await createTestDb();
+    await importScoreFixture(source, buildSyntheticFixture());
+    await source.productVariant.create({
+      data: {
+        shopDomain: SYNTHETIC_STORE_KEY,
+        productId: "syn-1",
+        variantId: "syn-1-v1",
+        position: 1,
+        options: { size: "M", colour: "white" },
+        price: 40,
+        available: true,
+        quantity: 3,
+        sourceUpdatedAt: new Date("2026-09-01T00:00:00.000Z"),
+      },
+    });
+    await source.productCard.create({
+      data: {
+        shopDomain: SYNTHETIC_STORE_KEY,
+        productId: "syn-1",
+        status: "written",
+        facts: "A linen shirt. Material: 100% linen.",
+        look: "White, relaxed.",
+        read: "Summer, casual.",
+        summary: "A white linen shirt.",
+        asks: { en: ["linen shirt"], he: ["חולצת פשתן"] },
+        cardText: "Facts: A linen shirt.",
+        cardTextHash: "card-hash",
+        inputHash: "input-hash",
+        cardVersion: 1,
+        modelId: "gemini-3.5-flash-lite",
+        writtenAt: new Date("2026-10-02T09:13:28.046Z"),
+      },
+    });
+    for (const [section, vector] of [["prose", "[0.25,-0.5,1]"], ["asks:en", "[0.125,0.75,-1]"]] as const) {
+      await source.$executeRawUnsafe(
+        `INSERT INTO "CardEmbedding" ("id", "shopDomain", "productId", "section", "textHash", "embedding", "updatedAt")
+         VALUES (gen_random_uuid()::text, $1, 'syn-1', $2, $3, $4::vector(3), CURRENT_TIMESTAMP)`,
+        SYNTHETIC_STORE_KEY,
+        section,
+        `hash-${section}`,
+        vector,
+      );
+    }
+
+    const ingestedAt = new Date("2026-09-15T12:00:00.000Z");
+    const exported = await exportScoreFixture(source, SYNTHETIC_STORE_KEY, { ingestedAt });
+    expect(exported.version).toBe(2);
+    expect(exported.variants).toHaveLength(1);
+    expect(exported.cards).toHaveLength(1);
+    expect(exported.cardEmbeddings?.map((row) => row.section)).toEqual(["asks:en", "prose"]);
+    expect(exported.cards?.[0]).not.toHaveProperty("id");
+
+    const target = await createTestDb();
+    await importScoreFixture(target, JSON.parse(JSON.stringify(exported)));
+    expect(await exportScoreFixture(target, SYNTHETIC_STORE_KEY, { ingestedAt })).toEqual(exported);
+    const cardVectors = async (db: typeof source) =>
+      db.$queryRawUnsafe<{ section: string; embedding: string }[]>(
+        `SELECT "section", "embedding"::text AS "embedding" FROM "CardEmbedding" ORDER BY "section"`,
+      );
+    expect(await cardVectors(target)).toEqual(await cardVectors(source));
+  });
+
+  it("still imports a version-1 fixture, which has no variants, cards or card vectors", async () => {
+    const db = await createTestDb();
+    const fixture = buildSyntheticFixture();
+    expect(fixture.version).toBe(1);
+    expect(fixture).not.toHaveProperty("cards");
+    await importScoreFixture(db, fixture);
+    expect(await db.catalogProduct.count()).toBe(7);
+    expect(await db.productCard.count()).toBe(0);
+  });
+
   it("exports nothing of another store key", async () => {
     const db = await createTestDb();
     await importScoreFixture(db, buildSyntheticFixture());
