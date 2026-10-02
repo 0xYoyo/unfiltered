@@ -36,6 +36,10 @@ import {
   writeCatalogCards,
 } from "../app/catalog/card.server";
 import {
+  embedCatalogCards,
+  formatCardVectorReport,
+} from "../app/catalog/card-embed.server";
+import {
   createCatalogEmbeddingClient,
   embedCatalog,
 } from "../app/catalog/embed.server";
@@ -122,7 +126,6 @@ try {
   }
   // Cards (YOY-143): one Flash-Lite call per product whose card is missing
   // or stale, in priority order; written after enrichment, which they read.
-  // Cards are not embedded yet (NG-1), so the embed step below is unchanged.
   const cards = await writeCatalogCards({
     db,
     shopDomain: shop,
@@ -134,14 +137,15 @@ try {
     // steps still run, but the ingest exits non-zero.
     process.exitCode = 1;
   }
-  const embed = await embedCatalog({
-    db,
-    shopDomain: shop,
-    embeddings: createCatalogEmbeddingClient(db),
-  });
+  const embeddings = createCatalogEmbeddingClient(db);
+  const embed = await embedCatalog({ db, shopDomain: shop, embeddings });
   console.log(
     `embed: embedded ${embed.embedded}, cached ${embed.cached}, deleted ${embed.deleted}`,
   );
+  // Card vectors (YOY-144): the prose and each language's asks of every
+  // written card; an unchanged section makes no embedding call.
+  const cardVectors = await embedCatalogCards({ db, shopDomain: shop, embeddings });
+  console.log(formatCardVectorReport(cardVectors));
 } catch (error) {
   if (error instanceof OfflineAuthError) {
     // Actionable, not a stack trace (YOY-98 AC-2).

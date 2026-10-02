@@ -424,6 +424,7 @@ describe("pipeline (AC-3, AC-7)", () => {
       images: 4,
       variants: 0,
       cards: 0,
+      cardVectors: 0,
       registry: 1,
     });
     expect(await db.catalogProduct.count({ where: { shopDomain: "playground:demo" } })).toBe(0);

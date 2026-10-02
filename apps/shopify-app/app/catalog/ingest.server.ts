@@ -308,7 +308,7 @@ export async function ingestCatalog({
     // FK cascade, so they must go in the same operation as the product
     // (YOY-29 AC-5, YOY-61 AC-2 — a leftover embedding row would keep a
     // deleted or non-active product retrievable).
-    const [, , , , , { count }] = await db.$transaction([
+    const [, , , , , , { count }] = await db.$transaction([
       db.productEnrichment.deleteMany({
         where: { shopDomain, productId: { in: stale } },
       }),
@@ -322,6 +322,9 @@ export async function ingestCatalog({
         where: { shopDomain, productId: { in: stale } },
       }),
       db.productCard.deleteMany({
+        where: { shopDomain, productId: { in: stale } },
+      }),
+      db.cardEmbedding.deleteMany({
         where: { shopDomain, productId: { in: stale } },
       }),
       db.catalogProduct.deleteMany({

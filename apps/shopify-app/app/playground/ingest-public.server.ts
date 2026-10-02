@@ -3,6 +3,8 @@ import type { EmbeddingClient, LlmClient } from "@unfiltered/engine";
 
 import type { CardResult, CardWriter } from "../catalog/card.server";
 import { writeCatalogCards } from "../catalog/card.server";
+import type { CardEmbedResult } from "../catalog/card-embed.server";
+import { embedCatalogCards } from "../catalog/card-embed.server";
 import type { EmbedResult } from "../catalog/embed.server";
 import { embedCatalog } from "../catalog/embed.server";
 import type { EnrichResult } from "../catalog/enrich.server";
@@ -88,6 +90,8 @@ export interface PublicIngestResult {
   /** Present exactly when a card writer was given (YOY-143 AC-9). */
   cards?: CardResult;
   embed: EmbedResult;
+  /** Present exactly when a card writer was given (YOY-144 AC-2, AC-9). */
+  cardVectors?: CardEmbedResult;
 }
 
 /**
@@ -289,7 +293,7 @@ export async function snapshotPublicCatalog({
     // with no FK cascade: they go in the same transaction as the product,
     // exactly like the Shopify ingest, so no orphan vector keeps a gone
     // product retrievable.
-    const [, , , , , { count }] = await db.$transaction([
+    const [, , , , , , { count }] = await db.$transaction([
       db.productEnrichment.deleteMany({
         where: { shopDomain: storeKey, productId: { in: stale } },
       }),
@@ -303,6 +307,9 @@ export async function snapshotPublicCatalog({
         where: { shopDomain: storeKey, productId: { in: stale } },
       }),
       db.productCard.deleteMany({
+        where: { shopDomain: storeKey, productId: { in: stale } },
+      }),
+      db.cardEmbedding.deleteMany({
         where: { shopDomain: storeKey, productId: { in: stale } },
       }),
       db.catalogProduct.deleteMany({
@@ -390,6 +397,11 @@ export async function ingestPublicCatalog({
           fetchImage: imageFetch,
         });
   const embed = await embedCatalog({ db, shopDomain: storeKey, embeddings });
+  // Card vectors (YOY-144) follow the cards, through the same embedding port.
+  const cardVectors =
+    cards === undefined
+      ? undefined
+      : await embedCatalogCards({ db, shopDomain: storeKey, embeddings });
   const productCount = await db.catalogProduct.count({
     where: { shopDomain: storeKey },
   });
@@ -418,6 +430,7 @@ export async function ingestPublicCatalog({
     enrich,
     ...(cardResult !== undefined ? { cards: cardResult } : {}),
     embed,
+    ...(cardVectors !== undefined ? { cardVectors } : {}),
   };
 }
 
@@ -430,6 +443,8 @@ export interface PublicCatalogDeletion {
   images: number;
   variants: number;
   cards: number;
+  /** Card vectors (YOY-144 AC-8). */
+  cardVectors: number;
   registry: number;
 }
 
@@ -446,12 +461,13 @@ export async function deletePublicCatalog({
   slug: string;
 }): Promise<PublicCatalogDeletion> {
   const storeKey = playgroundStoreKey(slug);
-  const [enrichments, embeddings, images, variants, cards, products, registry] = await db.$transaction([
+  const [enrichments, embeddings, images, variants, cards, cardVectors, products, registry] = await db.$transaction([
     db.productEnrichment.deleteMany({ where: { shopDomain: storeKey } }),
     db.productEmbedding.deleteMany({ where: { shopDomain: storeKey } }),
     db.productImage.deleteMany({ where: { shopDomain: storeKey } }),
     db.productVariant.deleteMany({ where: { shopDomain: storeKey } }),
     db.productCard.deleteMany({ where: { shopDomain: storeKey } }),
+    db.cardEmbedding.deleteMany({ where: { shopDomain: storeKey } }),
     db.catalogProduct.deleteMany({ where: { shopDomain: storeKey } }),
     db.playgroundCatalog.deleteMany({ where: { slug } }),
   ]);
@@ -463,6 +479,7 @@ export async function deletePublicCatalog({
     images: images.count,
     variants: variants.count,
     cards: cards.count,
+    cardVectors: cardVectors.count,
     registry: registry.count,
   };
 }
