@@ -59,6 +59,12 @@ vi.mock("./search/proxy.server", async (importOriginal) => {
               ? { classic: 12 }
               : { hydrate: 4, retrieve: 30, embed: 80, intent: 400, classify: 25 },
           intentTier: forced || preview ? null : "lite",
+          // The engine the request resolved to (YOY-145 AC-11): the
+          // request's own, else the env default this fake takes as v1.
+          engine: (request.engine as string | undefined) ?? "v1",
+          ...(request.paging !== undefined
+            ? { page: (request.paging as { page: number }).page, totalCount: 30 }
+            : {}),
           ...(orchestratorSeam.response ?? {}),
         });
       },
@@ -101,7 +107,7 @@ const CONTRACT_KEYS = [
   "searchId",
 ].sort();
 
-const DETAIL_KEYS = ["intentTier", "latencyMs", "limited", "routeReason", "stages"].sort();
+const DETAIL_KEYS = ["engine", "intentTier", "latencyMs", "limited", "routeReason", "stages"].sort();
 
 const RESULT_KEYS = [
   "available",
@@ -358,6 +364,61 @@ describe("the response contract (AC-2)", () => {
     await searchLoader(loaderArgs(searchRequest({})));
 
     expect(orchestratorSeam.requests[0].limit).toBe(24);
+  });
+});
+
+describe("engine and pages (YOY-145)", () => {
+  it("honours engine=v1|v2 for the request and reports it in details (AC-6, AC-11)", async () => {
+    const v2 = (await (
+      await searchLoader(loaderArgs(searchRequest({ engine: "v2" })))
+    ).json()) as { details: { engine: string } };
+    const v1 = (await (
+      await searchLoader(loaderArgs(searchRequest({ engine: "v1" })))
+    ).json()) as { details: { engine: string } };
+    const unset = (await (
+      await searchLoader(loaderArgs(searchRequest({})))
+    ).json()) as { details: { engine: string } };
+
+    expect(orchestratorSeam.requests.map((request) => request.engine)).toEqual([
+      "v2",
+      "v1",
+      undefined,
+    ]);
+    expect([v2.details.engine, v1.details.engine, unset.details.engine]).toEqual([
+      "v2",
+      "v1",
+      "v1",
+    ]);
+  });
+
+  it("answers 400 for an unknown engine, before any search runs", async () => {
+    const response = await searchLoader(loaderArgs(searchRequest({ engine: "v3" })));
+    expect(response.status).toBe(400);
+    expect(orchestratorSeam.requests).toHaveLength(0);
+  });
+
+  it("forwards page parameters and answers page and totalCount, logging the page (AC-4, AC-10)", async () => {
+    const response = await searchLoader(
+      loaderArgs(searchRequest({ engine: "v2", page: "2", pageSize: "24" })),
+    );
+    const body = (await response.json()) as Record<string, unknown>;
+
+    expect(orchestratorSeam.requests[0]!.paging).toEqual({ page: 2, pageSize: 24 });
+    expect(body).toMatchObject({ page: 2, totalCount: 30 });
+    expect(Object.keys(body).sort()).toEqual([...CONTRACT_KEYS, "page", "totalCount"].sort());
+
+    const events = await db.searchEvent.findMany({ where: { sessionId: "s1" } });
+    expect(events.map((event) => event.page)).toEqual([2]);
+  });
+
+  it("leaves an unpaged request's body without page keys, logged as page 1", async () => {
+    const body = (await (
+      await searchLoader(loaderArgs(searchRequest({})))
+    ).json()) as Record<string, unknown>;
+    expect(orchestratorSeam.requests[0]).not.toHaveProperty("paging");
+    expect(Object.keys(body).sort()).toEqual(CONTRACT_KEYS);
+    const events = await db.searchEvent.findMany({ where: { sessionId: "s1" } });
+    expect(events.map((event) => event.page)).toEqual([1]);
   });
 });
 

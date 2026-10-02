@@ -318,6 +318,9 @@ model SearchEvent {
   degraded    Boolean
   latencyMs   Int
   resultCount Int
+  // Which page the request served (YOY-145 AC-10): one row per page request.
+  // Unpaged searches and rows before the column are page 1.
+  page        Int      @default(1)
   // Exact-query intent reuse (YOY-64 AC-4): the query as the reuse key
   // (trimmed, whitespace-collapsed, case-folded) and the intent the search
   // was served with, both null on classic, degraded, and pre-column rows.

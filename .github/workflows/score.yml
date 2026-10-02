@@ -12,6 +12,16 @@ on:
         description: Branch, tag or SHA to score
         required: true
         default: main
+      # Which engine the run scores (YOY-145): v2 sets ENGINE_V2=1, the
+      # switch the score runner's orchestrator reads like production does.
+      engine:
+        description: Engine to score (v1 or v2)
+        required: true
+        default: v1
+        type: choice
+        options:
+          - v1
+          - v2
 
 permissions:
   contents: read
@@ -47,10 +57,13 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           # Through env, never interpolated into the script: a ref is input.
           SCORE_REF: ${{ inputs.ref }}
+          ENGINE_V2: ${{ inputs.engine == 'v2' && '1' || '0' }}
         run: |
           # Which env settings the run has (AC-13): names only, never values.
           echo "env settings present:"
           env | cut -d= -f1 | grep -E '^(GEMINI|INTENT)_' | sort | sed 's/^/  /'
+          # The engine is a choice input, not a secret: printed as-is.
+          echo "engine: ENGINE_V2=$ENGINE_V2"
           set +e
           npx tsx scripts/score-run.mts --hidden-set "$RUNNER_TEMP/hidden.b64" \
             > "$RUNNER_TEMP/score-output.txt" 2>&1

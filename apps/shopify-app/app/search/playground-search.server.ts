@@ -1,7 +1,12 @@
 import type { Intent } from "@unfiltered/engine";
 
 import { PLAYGROUND_RESULT_LIMIT } from "../playground/api.server";
-import type { SearchOrchestrator, SearchResponse } from "./orchestrator.server";
+import type {
+  SearchEngine,
+  SearchOrchestrator,
+  SearchPaging,
+  SearchResponse,
+} from "./orchestrator.server";
 
 /**
  * The playground's one search call (YOY-140 AC-6): the mode-to-request
@@ -26,6 +31,10 @@ export interface PlaygroundSearchInput {
   resolvedIntent?: Intent;
   /** Refinement: the session's previous intent. */
   previousIntent?: Intent;
+  /** The engine for this request (YOY-145 AC-6); the env default when absent. */
+  engine?: SearchEngine;
+  /** One page of results (YOY-145 AC-4); `limit` is then ignored. */
+  paging?: SearchPaging;
 }
 
 export interface PlaygroundSearchResult {
@@ -42,6 +51,8 @@ export async function runPlaygroundSearch(
     query: input.query,
     shopDomain: input.storeKey,
     limit: input.limit ?? PLAYGROUND_RESULT_LIMIT,
+    ...(input.engine !== undefined ? { engine: input.engine } : {}),
+    ...(input.paging !== undefined ? { paging: input.paging } : {}),
     ...(input.preview === true
       ? { preview: true }
       : input.classic === true

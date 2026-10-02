@@ -3,7 +3,9 @@
  * orchestrator times each one it actually runs; `embed` and `retrieve` come
  * from the retriever's own split, `hydrate` covers every card hydration the
  * response needed, and `closeMatches` covers the zero-hit rescue (keyword
- * backfill plus relaxed retrieval). A stage that did not run is absent.
+ * backfill plus relaxed retrieval). `find` is Engine v2's find step
+ * (YOY-145 AC-11): the raw-sentence embedding, the card-index query and the
+ * keyword search together. A stage that did not run is absent.
  *
  * Shared between the server (the orchestrator's ledger, the playground
  * serializer) and the client (the engine-details panel renders the rows in
@@ -14,6 +16,7 @@ export const SEARCH_STAGES = [
   "intent",
   "embed",
   "retrieve",
+  "find",
   "classic",
   "hydrate",
   "closeMatches",

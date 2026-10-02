@@ -65,6 +65,13 @@ export const loader = async ({
   if (body === null) {
     return emptyResponse(400);
   }
+  // The engine for this request (YOY-145 AC-6), overriding ENGINE_V2; only
+  // this API reads it — the storefront proxy ignores the parameter. An
+  // unknown value is a malformed request, like any other parse failure.
+  const engineParam = url.searchParams.get("engine");
+  if (engineParam !== null && engineParam !== "v1" && engineParam !== "v2") {
+    return emptyResponse(400);
+  }
 
   // Fixture mode (YOY-92 AC-8): the UI lane answers from committed JSON, so
   // the page under test needs no database, no Gemini key, and no network.
@@ -129,6 +136,8 @@ export const loader = async ({
       limited: limited !== null,
       resolvedIntent,
       previousIntent: body.previousIntent,
+      ...(engineParam !== null ? { engine: engineParam } : {}),
+      ...(body.paging !== undefined ? { paging: body.paging } : {}),
     });
 
     // Budget is consumed whenever the classifier actually took the AI route,
@@ -161,6 +170,8 @@ export const loader = async ({
         degraded: response.degraded,
         latencyMs,
         resultCount: response.hits.length,
+        // One row per page request, with its page (YOY-145 AC-10).
+        page: response.page ?? 1,
         // Only a freshly EXTRACTED intent is stored (YOY-125 AC-3): a
         // response served under "intent-reuse" must not re-anchor the reuse
         // window on itself.
@@ -180,6 +191,7 @@ export const loader = async ({
         limited,
         stages: response.stages,
         intentTier: response.intentTier,
+        engine: response.engine,
       }),
       { headers: PLAYGROUND_RESPONSE_HEADERS },
     );

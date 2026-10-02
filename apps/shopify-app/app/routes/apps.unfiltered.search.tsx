@@ -123,6 +123,10 @@ async function handleSearch(
     // not memoized, so this stays inside the containment try.
     const orchestrator = getProxySearchOrchestrator(db);
     const startedAt = Date.now();
+    // Page parameters ride every submitted shape (YOY-145 AC-4); the
+    // orchestrator ignores them on a preview (AC-9). No `engine` here: the
+    // storefront takes the env default, whatever the request says (AC-6).
+    const paging = body.paging !== undefined ? { paging: body.paging } : {};
     const response = await orchestrator.runSearch(
       preview
         ? { query: body.query, shopDomain: shop, preview: true }
@@ -132,14 +136,16 @@ async function handleSearch(
               shopDomain: shop,
               forceClassic: true,
               forceClassicReason: "client-timeout-rescue",
+              ...paging,
             }
         : throttled
-        ? { query: body.query, shopDomain: shop, forceClassic: true }
+        ? { query: body.query, shopDomain: shop, forceClassic: true, ...paging }
         : resolvedIntent !== undefined
-          ? { query: body.query, shopDomain: shop, resolvedIntent }
+          ? { query: body.query, shopDomain: shop, resolvedIntent, ...paging }
           : {
               query: body.query,
               shopDomain: shop,
+              ...paging,
               ...(body.previousIntent !== undefined
                 ? { previousIntent: body.previousIntent }
                 : {}),
@@ -209,6 +215,9 @@ async function handleSearch(
         degraded: response.degraded,
         latencyMs,
         resultCount: response.hits.length,
+        // One row per page request, with its page (YOY-145 AC-10); an
+        // unpaged response is the first and only page.
+        page: response.page ?? 1,
         // The intent a later identical query may reuse (YOY-64 AC-4): only
         // a served, non-degraded AI intent that was actually EXTRACTED here,
         // keyed by the normalized query. A response served from an earlier

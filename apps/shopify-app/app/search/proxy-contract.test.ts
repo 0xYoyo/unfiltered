@@ -4,6 +4,8 @@ import { createSearchClient } from "../../widget/src/search-client";
 import type { SearchResponse } from "./orchestrator.server";
 import {
   parseClickBeaconParams,
+  parsePaging,
+  parseProxySearchBody,
   parseProxySearchParams,
   serializeProxySearchResponse,
 } from "./proxy.server";
@@ -239,6 +241,57 @@ describe("search response: route serialization → widget consumption", () => {
       expect(body).not.toHaveProperty("stages");
       expect(JSON.stringify(body)).not.toContain("stages");
     }
+  });
+});
+
+describe("server-side pages (YOY-145 AC-4 to AC-6)", () => {
+  const params = (extra: Record<string, string>) =>
+    new URLSearchParams({ query: "midi dress", sessionId: "session-p", ...extra });
+
+  it("parses page and pageSize; an out-of-range pageSize becomes 24 and a bad page becomes 1", () => {
+    expect(parseProxySearchParams(params({ page: "2", pageSize: "48" }))?.paging).toEqual({
+      page: 2,
+      pageSize: 48,
+    });
+    for (const pageSize of ["0", "49", "-3", "12.5", "lots", ""]) {
+      expect(parseProxySearchParams(params({ pageSize }))?.paging).toEqual({
+        page: 1,
+        pageSize: 24,
+      });
+    }
+    for (const page of ["0", "-1", "1.5", "two"]) {
+      expect(parseProxySearchParams(params({ page }))?.paging?.page).toBe(1);
+    }
+    // The JSON body carries numbers.
+    expect(
+      parseProxySearchBody({ query: "midi dress", sessionId: "s", page: 3, pageSize: 1 })?.paging,
+    ).toEqual({ page: 3, pageSize: 1 });
+    expect(parsePaging(undefined, 100)).toEqual({ page: 1, pageSize: 24 });
+  });
+
+  it("leaves a request without page parameters unpaged, and never reads engine on the proxy", () => {
+    expect(parseProxySearchParams(params({}))).toEqual({
+      query: "midi dress",
+      sessionId: "session-p",
+    });
+    // The storefront proxy ignores `engine` (AC-6): nothing of it survives parsing.
+    expect(parseProxySearchParams(params({ engine: "v2" }))).toEqual({
+      query: "midi dress",
+      sessionId: "session-p",
+    });
+  });
+
+  it("serializes page and totalCount on a paged response only", () => {
+    const unpaged = serializeProxySearchResponse(ORCHESTRATOR_RESPONSE);
+    expect(unpaged).not.toHaveProperty("page");
+    expect(unpaged).not.toHaveProperty("totalCount");
+    const paged = serializeProxySearchResponse({
+      ...ORCHESTRATOR_RESPONSE,
+      page: 2,
+      totalCount: 25,
+    });
+    expect(paged).toMatchObject({ page: 2, totalCount: 25 });
+    expect(paged.results).toEqual(unpaged.results);
   });
 });
 

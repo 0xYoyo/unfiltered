@@ -25,6 +25,11 @@ export interface SearchEventInput {
   latencyMs: number;
   resultCount: number;
   /**
+   * Which page of results this request served (YOY-145 AC-10): one row per
+   * page request. Absent means 1 — an unpaged search is its own first page.
+   */
+  page?: number;
+  /**
    * The intent the search was served with, when the AI path produced one
    * and the response was not degraded (YOY-64 AC-4); an identical query
    * within the reuse window is answered from it without any LLM call.

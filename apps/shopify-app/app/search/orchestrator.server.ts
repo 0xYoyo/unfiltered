@@ -19,6 +19,7 @@ import {
 
 import type { ClassicCardHit } from "./classic-store.server";
 import { findReusableIntent, normalizeReuseQuery } from "./events.server";
+import type { FindStep } from "./find.server";
 import { SEARCH_STAGES, type SearchStage, type SearchStages } from "./stages";
 
 export { SEARCH_STAGES, type SearchStage, type SearchStages } from "./stages";
@@ -238,7 +239,26 @@ export type SearchRouteReason =
   | ForceClassicReason
   | "classic-zero-hit"
   | "preview"
-  | "intent-reuse";
+  | "intent-reuse"
+  | "engine-v2";
+
+/**
+ * Which engine serves a search (YOY-145): "v1" is the classify → intent →
+ * retrieval ladder; "v2" is the find step — the raw sentence's nearest
+ * products merged with keyword matches, no model call (AC-1, NG-1).
+ */
+export type SearchEngine = "v1" | "v2";
+
+/** One requested page of results (YOY-145 AC-4): 1-based, 1 to 48 per page. */
+export interface SearchPaging {
+  page: number;
+  pageSize: number;
+}
+
+/** The page size a request without valid page parameters gets (AC-4). */
+export const DEFAULT_PAGE_SIZE = 24;
+/** The largest page a request may ask for (AC-4). */
+export const MAX_PAGE_SIZE = 48;
 
 /**
  * Why a caller forced the classic path (`forceClassic`): the session spent
@@ -296,9 +316,24 @@ export interface SearchRequest {
    * match set (YOY-107): both routes return every product matching the query
    * and its hard constraints, ranked, and the consumer paginates it with the
    * theme's own pagination. Zero-hit close matches are capped separately and
-   * always (AC-5), so this never widens them.
+   * always (AC-5), so this never widens them. Ignored when `paging` is set:
+   * a page is a slice of the full set.
    */
   limit?: number;
+  /**
+   * The engine for this request (YOY-145 AC-6), overriding the
+   * orchestrator's default; absent means the default. Only the playground
+   * API sets it.
+   */
+  engine?: SearchEngine;
+  /**
+   * Serve one page (YOY-145 AC-4): `hits` is that page, and the response
+   * carries `page` and `totalCount`. On the old engine the page is a slice
+   * of its full result (AC-5). Absent means today's response, untouched —
+   * except on the find step, which always pages (first page by default).
+   * Keystroke previews ignore it (AC-9).
+   */
+  paging?: SearchPaging;
 }
 
 /** One ranked result card, hydrated from the catalog snapshot. */
@@ -369,6 +404,12 @@ export interface SearchResponse {
    * persisted and never reaches the storefront contract.
    */
   stages: SearchStages;
+  /** The engine the request resolved to (YOY-145 AC-11); diagnostic. */
+  engine: SearchEngine;
+  /** The page `hits` holds (YOY-145 AC-4); present exactly when the response is paged. */
+  page?: number;
+  /** Results across every page (YOY-145 AC-4); present exactly when `page` is. */
+  totalCount?: number;
 }
 
 /**
@@ -405,7 +446,7 @@ function createStageLedger() {
 }
 
 /** A response before its stage ledger and intent tier are attached. */
-type StagelessResponse = Omit<SearchResponse, "stages" | "intentTier">;
+type StagelessResponse = Omit<SearchResponse, "stages" | "intentTier" | "engine">;
 
 /** Mutable slot the intent call fills with the tier that answered. */
 interface TierSlot {
@@ -430,13 +471,31 @@ export interface SearchOrchestratorOptions {
    * means off (tests, the eval harness); production passes the env window.
    */
   intentReuse?: { windowMs: number; now?: () => Date };
+  /**
+   * Engine v2's find step (YOY-145). Absent means every request runs the
+   * old engine, whatever it asks for.
+   */
+  find?: FindStep;
+  /**
+   * The default engine is v2 (`ENGINE_V2=1`, YOY-145 AC-1); off unless set
+   * (NG-3). A request's own `engine` overrides it.
+   */
+  engineV2?: boolean;
 }
 
 export function createSearchOrchestrator(
   options: SearchOrchestratorOptions,
 ): SearchOrchestrator {
-  const { db, classifier, extractor, retriever, classicStore, intentReuse } =
-    options;
+  const {
+    db,
+    classifier,
+    extractor,
+    retriever,
+    classicStore,
+    intentReuse,
+    find,
+    engineV2 = false,
+  } = options;
 
   /** Hydrate ranked hits into display cards, preserving hit order. Hits
    * whose snapshot row vanished between ranking and hydration are dropped
@@ -486,10 +545,73 @@ export function createSearchOrchestrator(
     async runSearch(request: SearchRequest): Promise<SearchResponse> {
       const stages = createStageLedger();
       const tier: TierSlot = { value: null };
-      const response = await execute(request, stages, tier);
-      return { ...response, stages: stages.snapshot(), intentTier: tier.value };
+      const engine: SearchEngine =
+        find === undefined ? "v1" : (request.engine ?? (engineV2 ? "v2" : "v1"));
+      let response: StagelessResponse;
+      if (
+        engine === "v2" &&
+        find !== undefined &&
+        request.preview !== true &&
+        request.forceClassic !== true &&
+        request.resolvedIntent === undefined
+      ) {
+        response = await findPath(find, request, stages);
+      } else if (request.paging !== undefined && request.preview !== true) {
+        // The old engine pages by slicing its full result (AC-5): the limit
+        // is dropped so the slice and `totalCount` see every match.
+        const full = await execute({ ...request, limit: undefined }, stages, tier);
+        const { page, pageSize } = request.paging;
+        response = {
+          ...full,
+          hits: full.hits.slice((page - 1) * pageSize, page * pageSize),
+          page,
+          totalCount: full.hits.length,
+        };
+      } else {
+        response = await execute(request, stages, tier);
+      }
+      return { ...response, stages: stages.snapshot(), intentTier: tier.value, engine };
     },
   };
+
+  /**
+   * Engine v2's submitted search (YOY-145): the find step's merged order,
+   * one page of it hydrated. No classification, no intent, no chips and no
+   * close matches (AC-7, NG-1); a failed embedding serves the keyword order
+   * flagged degraded (AC-8). A previous intent is not read — the find step
+   * searches the sentence as typed.
+   */
+  async function findPath(
+    findStep: FindStep,
+    request: SearchRequest,
+    stages: ReturnType<typeof createStageLedger>,
+  ): Promise<StagelessResponse> {
+    const searchId = request.searchId ?? randomUUID();
+    const { page, pageSize } = request.paging ?? { page: 1, pageSize: DEFAULT_PAGE_SIZE };
+    const found = await stages.time("find", () =>
+      findStep.find({ shopDomain: request.shopDomain, query: request.query, searchId }),
+    );
+    const pageIds = found.productIds.slice((page - 1) * pageSize, page * pageSize);
+    const hits = await stages.time("hydrate", () =>
+      hydrateCards(
+        request.shopDomain,
+        pageIds.map((productId) => ({ productId })),
+      ),
+    );
+    return {
+      searchId,
+      route: found.degraded ? "classic" : "ai",
+      routeReason: "engine-v2",
+      intent: null,
+      hits,
+      chips: [],
+      degraded: found.degraded,
+      closeMatches: [],
+      closeMatchesRelaxed: [],
+      page,
+      totalCount: found.productIds.length,
+    };
+  }
 
   async function execute(
     request: SearchRequest,

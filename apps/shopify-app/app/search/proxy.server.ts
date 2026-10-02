@@ -22,9 +22,13 @@ import {
   type CostRecorder,
 } from "../ai/cost-recorder.server";
 import { createPgTrgmClassicStore } from "./classic-store.server";
+import { createFindStep, findSetSizeFromEnv } from "./find.server";
 import {
   createSearchOrchestrator,
+  DEFAULT_PAGE_SIZE,
+  MAX_PAGE_SIZE,
   type SearchOrchestrator,
+  type SearchPaging,
   type SearchResponse,
 } from "./orchestrator.server";
 import { createPgVectorRetrievalStore } from "./retrieval-store.server";
@@ -66,6 +70,13 @@ export interface ProxySearchBody {
    * `previousIntent` or `removeChip`.
    */
   mode?: ProxySearchMode;
+  /**
+   * The requested page (YOY-145 AC-4), present when the request carried
+   * `page` or `pageSize`: `page` is 1-based (anything else becomes 1) and
+   * `pageSize` 1 to 48 (anything else becomes 24). Absent means today's
+   * unpaged response (AC-5).
+   */
+  paging?: SearchPaging;
 }
 
 /** The classic-only wire modes; see `ProxySearchBody.mode`. */
@@ -120,6 +131,10 @@ export function parseProxySearchBody(value: unknown): ProxySearchBody | null {
     body.mode = record.mode as ProxySearchMode;
   }
 
+  if (record.page !== undefined || record.pageSize !== undefined) {
+    body.paging = parsePaging(record.page, record.pageSize);
+  }
+
   if (record.previousIntent !== undefined && record.previousIntent !== null) {
     const intent = parseIntent(record.previousIntent);
     if (intent === null) {
@@ -153,6 +168,30 @@ export function parseProxySearchBody(value: unknown): ProxySearchBody | null {
 }
 
 /**
+ * Normalize page parameters (YOY-145 AC-4). Lenient by contract, unlike the
+ * rest of the body: a page that is not a positive whole number is the first
+ * page, and a page size outside 1 to 48 is 24. Accepts numbers (the JSON
+ * body) and decimal strings (query parameters).
+ */
+export function parsePaging(page: unknown, pageSize: unknown): SearchPaging {
+  const whole = (value: unknown): number | null => {
+    const number =
+      typeof value === "number"
+        ? value
+        : typeof value === "string" && /^\d+$/.test(value.trim())
+          ? Number(value.trim())
+          : Number.NaN;
+    return Number.isSafeInteger(number) ? number : null;
+  };
+  const pageNumber = whole(page);
+  const size = whole(pageSize);
+  return {
+    page: pageNumber !== null && pageNumber >= 1 ? pageNumber : 1,
+    pageSize: size !== null && size >= 1 && size <= MAX_PAGE_SIZE ? size : DEFAULT_PAGE_SIZE,
+  };
+}
+
+/**
  * Parse a search request from GET query parameters — the transport the
  * widget actually uses (YOY-60 AC-1: the proxy edge rejects browser POSTs,
  * which carry `Origin`; GET forwards). Object-valued fields travel as JSON
@@ -174,6 +213,14 @@ export function parseProxySearchParams(
   const mode = params.get("mode");
   if (mode !== null) {
     record.mode = mode;
+  }
+  // Page parameters (YOY-145 AC-4). `engine` is deliberately not read: the
+  // storefront proxy ignores it (AC-6); only the playground route honours it.
+  for (const key of ["page", "pageSize"] as const) {
+    const value = params.get(key);
+    if (value !== null) {
+      record[key] = value;
+    }
   }
   const previousIntent = params.get("previousIntent");
   if (previousIntent !== null) {
@@ -369,6 +416,10 @@ export interface ProxySearchResponse {
    * came without relaxing anything.
    */
   closeMatchesRelaxed?: string[];
+  /** The page `results` holds (YOY-145 AC-4); present on paged responses only. */
+  page?: number;
+  /** Results across every page; present exactly when `page` is. */
+  totalCount?: number;
 }
 
 function serializeCard(card: {
@@ -434,6 +485,12 @@ export function serializeProxySearchResponse(
   if (response.closeMatches.length > 0) {
     body.closeMatches = response.closeMatches.map(serializeCard);
     body.closeMatchesRelaxed = [...response.closeMatchesRelaxed];
+  }
+  // Only a paged response carries the page keys, so an unpaged one stays
+  // byte-identical to the pre-paging contract (YOY-145 AC-5).
+  if (response.page !== undefined && response.totalCount !== undefined) {
+    body.page = response.page;
+    body.totalCount = response.totalCount;
   }
   return body;
 }
@@ -519,6 +576,19 @@ export function intentReuseWindowMsFromEnv(
   return minutes * 60_000;
 }
 
+/** Env var switching the default engine to v2 (YOY-145 AC-1). */
+export const ENGINE_V2_ENV = "ENGINE_V2";
+
+/**
+ * Whether Engine v2 is the default: `ENGINE_V2=1`. Anything else — unset,
+ * empty, `0` — is the old engine (NG-3: off by default).
+ */
+export function engineV2FromEnv(
+  env: Record<string, string | undefined> = process.env,
+): boolean {
+  return env[ENGINE_V2_ENV]?.trim() === "1";
+}
+
 /**
  * The orchestrator wired for production storefront traffic: configured
  * Gemini models metered through the Prisma cost ledger, over the pgvector
@@ -537,6 +607,12 @@ export function createProxySearchOrchestrator(
 ): SearchOrchestrator {
   const models = geminiModelsFromEnv();
   const reuseWindowMs = intentReuseWindowMsFromEnv();
+  const embeddings = createGeminiEmbeddingClient({
+    modelId: models.embeddingModel,
+    dimension: models.embeddingDimension,
+    costRecorder,
+  });
+  const classicStore = createPgTrgmClassicStore(db);
   return createSearchOrchestrator({
     ...(reuseWindowMs > 0 ? { intentReuse: { windowMs: reuseWindowMs } } : {}),
     db,
@@ -587,14 +663,19 @@ export function createProxySearchOrchestrator(
       deadlineMs: models.intentTimeoutMs,
     }),
     retriever: createRetriever({
-      embeddings: createGeminiEmbeddingClient({
-        modelId: models.embeddingModel,
-        dimension: models.embeddingDimension,
-        costRecorder,
-      }),
+      embeddings,
       store: createPgVectorRetrievalStore(db),
     }),
-    classicStore: createPgTrgmClassicStore(db),
+    classicStore,
+    // Engine v2's find step (YOY-145), behind ENGINE_V2 (NG-3); the
+    // playground may still ask for either engine per request (AC-6).
+    find: createFindStep({
+      db,
+      embeddings,
+      classicStore,
+      findSetSize: findSetSizeFromEnv(),
+    }),
+    engineV2: engineV2FromEnv(),
   });
 }
 
