@@ -252,6 +252,42 @@
           headers: { "Content-Type": "application/json" },
         });
 
+      /**
+       * A large classic result order (YOY-146): `fixture=many&results=<N>`
+       * answers N distinguishable products, so a test can name the card it
+       * expects at any position of the whole order.
+       */
+      const manyResults = (count) =>
+        Array.from({ length: count }, (_, index) => ({
+          productId: `gid://shopify/Product/many-${index}`,
+          title: `Many Dress ${String(index).padStart(2, "0")}`,
+          url: `/products/many-${index}`,
+          imageUrl: null,
+          priceMin: 100 + index,
+          priceMax: 100 + index,
+          currencyCode: "ILS",
+          available: true,
+        }));
+
+      /**
+       * Server-side pages (YOY-146): a request carrying `page` and
+       * `pageSize` gets that page of the fixture's whole result order plus
+       * `page` and `totalCount`, as the real endpoint answers. A request
+       * without them gets the whole set, as before.
+       */
+      const paged = (body, request) => {
+        if (request.page === undefined) {
+          return body;
+        }
+        const start = (request.page - 1) * request.pageSize;
+        return {
+          ...body,
+          results: body.results.slice(start, start + request.pageSize),
+          page: request.page,
+          totalCount: body.results.length,
+        };
+      };
+
       // Contract-correct chip-removal echo: chips minus the removed one,
       // the previousIntent echoed back, and a recomputed result set (a
       // product the removed constraint had excluded appears).
@@ -302,9 +338,20 @@
           if (params.has("mode")) {
             request.mode = params.get("mode");
           }
+          if (params.has("page")) {
+            request.page = Number(params.get("page"));
+            request.pageSize = Number(params.get("pageSize"));
+          }
           window.__searchRequests.push(request);
           searchCount += 1;
           if (fixture === "error") {
+            return Promise.resolve(new Response(null, { status: 500 }));
+          }
+          // `failPage=<N>`: that page's request fails (YOY-146 AC-9).
+          const failPage = new URLSearchParams(window.location.search).get(
+            "failPage",
+          );
+          if (failPage !== null && request.page === Number(failPage)) {
             return Promise.resolve(new Response(null, { status: 500 }));
           }
           if (fixture === "slow-then-fast" && searchCount === 1) {
@@ -344,7 +391,7 @@
             if (fixture === "timeout-rescue-error") {
               return Promise.resolve(new Response(null, { status: 500 }));
             }
-            return Promise.resolve(jsonResponse(RESULTS_RESPONSE));
+            return Promise.resolve(jsonResponse(paged(RESULTS_RESPONSE, request)));
           }
           let body;
           if (request.mode === "preview" || request.mode === "classic") {
@@ -372,6 +419,17 @@
             body = DEGRADED_RESPONSE;
           } else if (fixture === "empty") {
             body = { ...RESULTS_RESPONSE, results: [] };
+          } else if (fixture === "many") {
+            body = {
+              ...RESULTS_RESPONSE,
+              searchId: "harness-many-1",
+              results: manyResults(
+                Number(
+                  new URLSearchParams(window.location.search).get("results") ??
+                    30,
+                ),
+              ),
+            };
           } else if (fixture === "null-url") {
             // A catalog whose adapter resolved no product links (YOY-87
             // AC-4): every card renders linkless.
@@ -385,9 +443,20 @@
           } else {
             body = RESULTS_RESPONSE;
           }
+          body = paged(body, request);
           if (fixture === "delayed" || fixture === "ai-delayed") {
             return new Promise((resolve) =>
               setTimeout(() => resolve(jsonResponse(body)), 500),
+            );
+          }
+          // `pageDelay=<ms>`: later pages answer slowly, so the quiet
+          // loading line is observable (YOY-146 AC-7).
+          const pageDelay = Number(
+            new URLSearchParams(window.location.search).get("pageDelay") ?? 0,
+          );
+          if (pageDelay > 0 && (request.page ?? 1) > 1) {
+            return new Promise((resolve) =>
+              setTimeout(() => resolve(jsonResponse(body)), pageDelay),
             );
           }
           return Promise.resolve(jsonResponse(body));

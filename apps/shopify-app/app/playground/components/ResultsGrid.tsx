@@ -1,3 +1,5 @@
+import { useEffect, useRef } from "react";
+
 import { Card, type PlaygroundCard } from "./Card";
 import type { PlaygroundStrings } from "../strings";
 
@@ -21,12 +23,39 @@ export function ResultsGrid({
   strings,
   skeleton = false,
   onOpen,
+  onLastCardVisible,
 }: {
   cards: PlaygroundCard[];
   strings: PlaygroundStrings;
   skeleton?: boolean;
   onOpen: (card: PlaygroundCard, position: number) => void;
+  /**
+   * Called when the last card enters the viewport (YOY-146 AC-6): the page
+   * appends the next page below. Re-armed whenever the card count changes.
+   */
+  onLastCardVisible?: () => void;
 }) {
+  const listRef = useRef<HTMLUListElement | null>(null);
+  useEffect(() => {
+    const last = listRef.current?.lastElementChild;
+    if (
+      onLastCardVisible === undefined ||
+      last === null ||
+      last === undefined ||
+      typeof IntersectionObserver === "undefined"
+    ) {
+      return;
+    }
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        observer.disconnect();
+        onLastCardVisible();
+      }
+    });
+    observer.observe(last);
+    return () => observer.disconnect();
+  }, [cards.length, onLastCardVisible]);
+
   if (cards.length === 0 && skeleton) {
     return (
       <div className="results">
@@ -47,6 +76,7 @@ export function ResultsGrid({
     <div className="results">
       {cards.length === 0 ? null : (
         <ul
+          ref={listRef}
           className="grid"
           aria-label={strings.resultsLabel}
           data-testid="playground-grid"

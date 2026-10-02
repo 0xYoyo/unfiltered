@@ -62,6 +62,11 @@ export interface PlaygroundSearchRequest {
   previousIntent?: ProxyIntent;
   /** Chip the visitor dismissed; the server adjusts `previousIntent`. */
   removeChip?: ProxyChip;
+  /**
+   * The page a submitted search asks for (YOY-146): every submit carries
+   * one; a keystroke preview never does.
+   */
+  paging?: { page: number; pageSize: number };
   signal?: AbortSignal;
 }
 
@@ -72,6 +77,7 @@ export function playgroundSearchUrl(request: {
   catalog?: string;
   previousIntent?: ProxyIntent;
   removeChip?: ProxyChip;
+  paging?: { page: number; pageSize: number };
 }): string {
   const params = new URLSearchParams({
     query: request.query,
@@ -91,6 +97,10 @@ export function playgroundSearchUrl(request: {
   if (request.removeChip !== undefined) {
     params.set("removeChip", JSON.stringify(request.removeChip));
   }
+  if (request.paging !== undefined && !request.preview) {
+    params.set("page", String(request.paging.page));
+    params.set("pageSize", String(request.paging.pageSize));
+  }
   return `/api/playground/search?${params.toString()}`;
 }
 
@@ -109,6 +119,7 @@ export async function searchPlayground(
     ...(request.removeChip === undefined
       ? {}
       : { removeChip: request.removeChip }),
+    ...(request.paging === undefined ? {} : { paging: request.paging }),
   });
   const response = await fetch(url, {
     ...(request.signal === undefined ? {} : { signal: request.signal }),

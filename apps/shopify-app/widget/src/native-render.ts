@@ -150,13 +150,6 @@ export interface NativeSurfaceOptions {
   /** The shopper navigated out of the results view (Back / Forward past
    * it): cancel whatever this view was still searching for. */
   onLeave: () => void;
-  /**
-   * The page a freshly rendered response should open on (YOY-107): 1 for an
-   * ordinary search, and the URL's own page for a results view resumed from
-   * its URL, so a reloaded or shared link lands where it says it does. Read
-   * once per response and consumed — the next search starts at page 1.
-   */
-  initialPage?: () => number;
 }
 
 /** A theme card produced for one result, or null when the mechanism could
@@ -485,19 +478,111 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
   /** The query the view currently shows (URL, count line, template input). */
   let currentQuery = "";
   /**
-   * The response the view is showing, held whole (YOY-107): the server
-   * returns the FULL match set, and the view renders one page of it at a
-   * time with the theme's own pagination, so paging is a re-render from
-   * memory — no request, and card fetches only for the page on screen
-   * (AC-4). Null until a response has been rendered.
+   * The search the view is showing (YOY-146): its first response (chips,
+   * route, intent and close matches come from it), the size of the whole
+   * result order, and every page fetched for it so far. The server serves
+   * one page per request; a page already fetched in this search is shown
+   * again without a request (AC-3), and card fetches happen only for the
+   * page on screen (YOY-107 AC-4). Null until a response has been rendered.
    */
-  let current: {
+  interface HeldSearch {
     response: ProxySearchResponse;
     handlers: ResponseHandlers;
     preview: boolean;
-  } | null = null;
+    total: number;
+    pageSize: number;
+    pages: Map<number, Promise<ProxyResult[]>>;
+  }
+  let current: HeldSearch | null = null;
   /** The 1-based page of that set currently on screen. */
   let currentPage = 1;
+  /** Watches the last row of cards (YOY-146 AC-4); one per rendered page. */
+  let lastRowObserver: IntersectionObserver | null = null;
+  const stopWatching = (): void => {
+    lastRowObserver?.disconnect();
+    lastRowObserver = null;
+  };
+
+  /**
+   * One page of the held search: from memory when it was fetched before
+   * (AC-3), else requested once and held. A failed request is forgotten, so
+   * selecting the page later asks again.
+   */
+  function fetchPage(held: HeldSearch, page: number): Promise<ProxyResult[]> {
+    const known = held.pages.get(page);
+    if (known !== undefined) {
+      return known;
+    }
+    const loader = held.handlers.pages;
+    if (loader === undefined) {
+      return Promise.resolve([]);
+    }
+    const pending = loader.load(page).then((next) => next.results);
+    held.pages.set(page, pending);
+    pending.catch(() => {
+      if (held.pages.get(page) === pending) {
+        held.pages.delete(page);
+      }
+    });
+    return pending;
+  }
+
+  /**
+   * When the last row of cards enters the viewport (YOY-146 AC-4): with the
+   * theme's pagination, the next page is requested once and held, so
+   * selecting it shows it without waiting; with none to mirror, the next
+   * page's cards are appended below, page after page up to `totalCount` —
+   * the whole set stays reachable with no control of ours (AC-11).
+   */
+  function watchLastRow(
+    held: HeldSearch,
+    token: number,
+    page: number,
+    pageCount: number,
+    append: boolean,
+  ): void {
+    stopWatching();
+    const last = list.lastElementChild;
+    if (
+      page >= pageCount ||
+      last === null ||
+      typeof IntersectionObserver === "undefined"
+    ) {
+      return;
+    }
+    lastRowObserver = new IntersectionObserver((entries) => {
+      if (!entries.some((entry) => entry.isIntersecting)) {
+        return;
+      }
+      stopWatching();
+      const next = page + 1;
+      if (!append) {
+        fetchPage(held, next).catch(() => {
+          // A failed prefetch is retried when the page is selected.
+        });
+        return;
+      }
+      fetchPage(held, next)
+        .then((results) =>
+          buildItems(results, held.handlers, (next - 1) * held.pageSize),
+        )
+        .then(
+          (built) => {
+            if (token !== renderToken || current !== held) {
+              return;
+            }
+            list.append(...built.items);
+            if (built.items.length > 0) {
+              watchLastRow(held, token, next, pageCount, true);
+            }
+          },
+          () => {
+            // The shown cards stay; no error reaches the shopper.
+          },
+        );
+    });
+    lastRowObserver.observe(last);
+  }
 
   const fetchMs: number[] = [];
   const produce: CardProducer =
@@ -583,6 +668,8 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
   async function buildItems(
     results: ProxyResult[],
     handlers: ResponseHandlers,
+    /** The first card's place in the whole result order (YOY-146 AC-10). */
+    offset = 0,
   ): Promise<{ items: HTMLLIElement[]; native: number; cached: number }> {
     let native = 0;
     let cached = 0;
@@ -603,7 +690,7 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
       item.className = config.grid.itemClass;
       item.setAttribute("data-testid", NATIVE_ITEM_TESTID);
       item.setAttribute("data-product-id", result.productId);
-      item.setAttribute("data-position", String(index));
+      item.setAttribute("data-position", String(offset + index));
       const produced = cards[index];
       if (produced === null) {
         item.setAttribute("data-fallback", "true");
@@ -626,7 +713,7 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
           event.target instanceof Element &&
           event.target.closest("a") !== null
         ) {
-          handlers.onCardClick(result, index);
+          handlers.onCardClick(result, offset + index);
         }
       });
       return item;
@@ -687,6 +774,7 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
 
   function clearAll(): void {
     renderToken += 1;
+    stopWatching();
     current = null;
     currentPage = 1;
     mirror.setResult(currentQuery, null);
@@ -703,29 +791,30 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
   }
 
   /**
-   * Render one page of the held result set. The count line always states the
-   * TRUE total (YOY-107 AC-1/AC-2) — the page is a window on it, never the
-   * number of matches — and only this page's cards are fetched or cloned
-   * (AC-4). Close matches belong to the zero-hit state, which by definition
-   * has a single page, so they are never paged (AC-5).
+   * Render one page of the held search. The count line always states the
+   * TRUE total (YOY-107 AC-1/AC-2, now `totalCount`, YOY-146 AC-2) — the
+   * page is a window on it, never the number of matches — and the theme's
+   * page links number 1 to ceil(totalCount / pageSize). A page not yet in
+   * hand is requested from the server; one fetched before is shown again
+   * without a request (AC-3). Only this page's cards are fetched or cloned
+   * (YOY-107 AC-4). Close matches belong to the zero-hit state, which by
+   * definition has a single page, so they are never paged (YOY-107 AC-5).
    */
   async function renderPage(page: number): Promise<void> {
     if (current === null) {
       return;
     }
-    const { response, handlers, preview } = current;
-    const total = response.results.length;
-    const { pageSize } = config.page;
+    const held = current;
+    const { response, handlers, preview, total, pageSize } = held;
     const pageCount = Math.max(1, Math.ceil(total / pageSize));
     const target = Math.min(Math.max(1, Math.trunc(page)), pageCount);
     const moved = target !== currentPage;
-    currentPage = target;
 
     ensureStyles();
     currentQuery = options.query();
-    mirror.enter(currentQuery, target);
     const query = currentQuery;
     const token = ++renderToken;
+    stopWatching();
     const started = performance.now();
     const fetchesBefore = fetchMs.length;
     // Cards are fetched/cloned before the grid swaps: the loading state
@@ -744,44 +833,43 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
     const empty = total === 0;
     const aiZeroHit = !preview && empty && response.route === "ai";
     const matches = aiZeroHit ? (response.closeMatches ?? []) : [];
-    const pageResults = response.results.slice(
-      (target - 1) * pageSize,
-      target * pageSize,
-    );
 
-    // The shell (first render only — cached afterwards) and the cards are
-    // fetched together, so the theme's page and our grid appear in one paint.
+    // The page's results and the shell (first render only — cached
+    // afterwards) are awaited together, then the cards, so the theme's page
+    // and our grid appear in one paint.
+    let pageResults: ProxyResult[];
+    try {
+      [pageResults] = await Promise.all([
+        fetchPage(held, target),
+        mirror.ready(),
+      ]);
+    } catch {
+      // A failed page request (YOY-146 AC-9's rule, on this path too): the
+      // page on screen stays as it is, and no error reaches the shopper.
+      if (token === renderToken) {
+        loading.hidden = true;
+      }
+      return;
+    }
+    if (token !== renderToken) {
+      return; // Superseded while fetching.
+    }
     const [built, builtMatches] = await Promise.all([
-      buildItems(pageResults, handlers),
+      buildItems(pageResults, handlers, (target - 1) * pageSize),
       buildItems(matches, handlers),
-      mirror.ready(),
     ]);
     if (token !== renderToken) {
       return; // Superseded while fetching.
     }
 
     // With no theme pagination to mirror, a second page would be
-    // unreachable — a cap the shopper cannot escape is exactly what YOY-107
-    // removes, so the whole set renders on this one page instead. Known
-    // only once the shell has settled, which this render already waited for.
-    let paged = mirror.canPage();
-    let items = built;
-    let shownPage = target;
-    let shownPageCount = pageCount;
-    if (!paged && total > pageSize) {
-      const whole = await buildItems(response.results, handlers);
-      if (token !== renderToken) {
-        return;
-      }
-      items = whole;
-      shownPage = 1;
-      shownPageCount = 1;
-      mirror.enter(query, 1);
-    } else if (!paged) {
-      shownPageCount = 1;
-    }
-    paged = shownPageCount > 1;
-    currentPage = shownPage;
+    // unreachable through a control — so the next pages append as the
+    // shopper scrolls instead (no control of ours, AC-11). Known only once
+    // the shell has settled, which this render already waited for.
+    const paged = mirror.canPage();
+    const shownPageCount = paged ? pageCount : 1;
+    currentPage = target;
+    mirror.enter(query, paged ? target : 1);
 
     loading.hidden = true;
     // The theme's own count line now states OUR count for the shopper's
@@ -790,7 +878,7 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
     // The theme's own pagination, over our set (YOY-107 AC-1/NG-3).
     mirror.setPages({
       pageCount: shownPageCount,
-      current: shownPage,
+      current: target,
       onSelect: (next) => {
         void renderPage(next);
       },
@@ -804,7 +892,7 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
       ...chips.map((chip) => chipElement(chip, currency, handlers.onChipRemove)),
     );
     chipsRow.hidden = chips.length === 0;
-    list.replaceChildren(...items.items);
+    list.replaceChildren(...built.items);
     // The heading names what was relaxed to find them (YOY-111 AC-4).
     closeMatchesHeading.textContent = closeMatchesHeadingText(
       strings,
@@ -815,33 +903,37 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
     zeroHit.hidden = !aiZeroHit;
     noResults.hidden = !(!preview && empty && response.route === "classic");
     previewEmpty.hidden = !(preview && empty);
+    watchLastRow(held, token, target, pageCount, !paged);
 
     // Per-PAGE render diagnostics (AC-4): the cards this page cost, not the
     // whole set's.
-    const rendered = items.items.length + builtMatches.items.length;
-    const nativeCount = items.native + builtMatches.native;
+    const rendered = built.items.length + builtMatches.items.length;
+    const nativeCount = built.native + builtMatches.native;
     section.setAttribute("data-native-count", String(nativeCount));
     section.setAttribute("data-fallback-count", String(rendered - nativeCount));
     section.setAttribute("data-total-count", String(total));
-    section.setAttribute("data-page", String(shownPage));
+    section.setAttribute("data-page", String(target));
     section.setAttribute("data-page-count", String(shownPageCount));
     window.__unfilteredNativeTiming = {
       variant: config.variant,
       totalMs: Math.round(performance.now() - started),
       native: nativeCount,
       fallback: rendered - nativeCount,
-      cached: items.cached + builtMatches.cached,
+      cached: built.cached + builtMatches.cached,
       fetchMs: fetchMs.slice(fetchesBefore),
-      page: shownPage,
+      page: target,
       pageCount: shownPageCount,
       total,
     };
   }
 
   /**
-   * Show a response: hold the full set, then render its first page. A new
-   * response always starts at page 1 — a refinement recomputes the set, so
-   * the page the shopper was on no longer means anything (YOY-107 AC-3).
+   * Show a response: hold its page and the size of the whole order, then
+   * render it. A submitted response is the page the search asked for — page
+   * 1, or the page a resumed results URL names (YOY-146 AC-5); a refinement
+   * recomputes the set, so it starts over (YOY-107 AC-3). A response with no
+   * `totalCount` (a keystroke preview, or a server predating pages) is the
+   * whole set, paged here.
    */
   function render(
     response: ProxySearchResponse,
@@ -849,9 +941,27 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
     preview: boolean,
   ): void {
     ensureMounted();
-    current = { response, handlers, preview };
+    const pageSize = handlers.pages?.pageSize ?? config.page.pageSize;
+    const pages = new Map<number, Promise<ProxyResult[]>>();
+    let first = response.page ?? 1;
+    const total = response.totalCount ?? response.results.length;
+    if (response.totalCount === undefined) {
+      first = 1;
+      const count = Math.max(1, Math.ceil(response.results.length / pageSize));
+      for (let page = 1; page <= count; page += 1) {
+        pages.set(
+          page,
+          Promise.resolve(
+            response.results.slice((page - 1) * pageSize, page * pageSize),
+          ),
+        );
+      }
+    } else {
+      pages.set(first, Promise.resolve(response.results));
+    }
+    current = { response, handlers, preview, total, pageSize, pages };
     currentPage = 1;
-    void renderPage(options.initialPage?.() ?? 1);
+    void renderPage(first);
   }
 
   return {
@@ -861,6 +971,7 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
     },
     close() {
       renderToken += 1;
+      stopWatching();
       leaveView();
     },
     isOpen() {
@@ -871,6 +982,7 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
         ensureMounted();
       }
       renderToken += 1;
+      stopWatching();
       if (mirror.isEntered()) {
         // A submitted query on an already-entered view (YOY-96 AC-5): the
         // count line must never state the previous query while this one
@@ -901,6 +1013,7 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
     },
     destroy() {
       renderToken += 1;
+      stopWatching();
       leaveView();
       mirror.destroy();
       section.remove();

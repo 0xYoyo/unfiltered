@@ -207,8 +207,10 @@ apps/
           evidence-intent-tier.spec.ts
           evidence-latency.spec.ts
           evidence-negation.spec.ts
+          evidence-paging.spec.ts
           evidence-store.spec.ts
           evidence.spec.ts
+          paging.spec.ts
           playground.spec.ts
           site.spec.ts
           snapshots.spec.ts
@@ -508,6 +510,7 @@ apps/
         evidence-close-matches.spec.ts
         evidence-hardening.spec.ts
         evidence-negation-chips.spec.ts
+        evidence-server-pages.spec.ts
         localization.spec.ts
         localization.spec.ts-snapshots/
           ai-results-en-darwin.png
@@ -545,6 +548,7 @@ apps/
           native-negation-he-mobile-linux.png
         preview-submit.spec.ts
         search-takeover.spec.ts
+        server-pages.spec.ts
         widget.spec.ts
       theme-native.html
       vite.config.ts
@@ -759,6 +763,47 @@ docs/
       mobile-en-2-example-submitted.png
       mobile-he-1-examples.png
       mobile-he-2-example-submitted.png
+    YOY-146/
+      playground-desktop-en-1-first-page.png
+      playground-desktop-en-2-loading-more.png
+      playground-desktop-en-3-appended.png
+      playground-desktop-en-4-failed-page.png
+      playground-desktop-he-1-first-page.png
+      playground-desktop-he-2-loading-more.png
+      playground-desktop-he-3-appended.png
+      playground-desktop-he-4-failed-page.png
+      playground-mobile-en-1-first-page.png
+      playground-mobile-en-2-loading-more.png
+      playground-mobile-en-3-appended.png
+      playground-mobile-en-4-failed-page.png
+      playground-mobile-he-1-first-page.png
+      playground-mobile-he-2-loading-more.png
+      playground-mobile-he-3-appended.png
+      playground-mobile-he-4-failed-page.png
+      widget-native-desktop-en-1-page-1.png
+      widget-native-desktop-en-2-page-2.png
+      widget-native-desktop-he-1-page-1.png
+      widget-native-desktop-he-2-page-2.png
+      widget-native-mobile-en-1-page-1.png
+      widget-native-mobile-en-2-page-2.png
+      widget-native-mobile-he-1-page-1.png
+      widget-native-mobile-he-2-page-2.png
+      widget-overlay-desktop-en-1-first-page.png
+      widget-overlay-desktop-en-2-loading-more.png
+      widget-overlay-desktop-en-3-appended.png
+      widget-overlay-desktop-en-4-failed-page.png
+      widget-overlay-desktop-he-1-first-page.png
+      widget-overlay-desktop-he-2-loading-more.png
+      widget-overlay-desktop-he-3-appended.png
+      widget-overlay-desktop-he-4-failed-page.png
+      widget-overlay-mobile-en-1-first-page.png
+      widget-overlay-mobile-en-2-loading-more.png
+      widget-overlay-mobile-en-3-appended.png
+      widget-overlay-mobile-en-4-failed-page.png
+      widget-overlay-mobile-he-1-first-page.png
+      widget-overlay-mobile-he-2-loading-more.png
+      widget-overlay-mobile-he-3-appended.png
+      widget-overlay-mobile-he-4-failed-page.png
     YOY-64/
       desktop-en-intent-reuse.png
       desktop-he-intent-reuse.png
@@ -1048,6 +1093,7 @@ vitest.setup.ts
 - apps/shopify-app/app/playground/shopify-public-source.test.ts → apps/shopify-app/app/playground/catalog-source.server.ts, apps/shopify-app/app/playground/fixtures/shopify-public-products.ts, apps/shopify-app/app/playground/polite-fetch.server.ts, apps/shopify-app/app/playground/shopify-public-source.server.ts, apps/shopify-app/app/testing/fake-store.server.ts
 - apps/shopify-app/app/playground/sitemap.server.ts → apps/shopify-app/app/playground/polite-fetch.server.ts
 - apps/shopify-app/app/playground/test-ui/ai-states.spec.ts → apps/shopify-app/app/playground/strings.ts
+- apps/shopify-app/app/playground/test-ui/paging.spec.ts → apps/shopify-app/app/playground/strings.ts
 - apps/shopify-app/app/playground/test-ui/playground.spec.ts → apps/shopify-app/app/playground/strings.ts
 - apps/shopify-app/app/playground/test-ui/store-preload.spec.ts → apps/shopify-app/app/playground/strings.ts
 - apps/shopify-app/app/proxy-click.test.ts → apps/shopify-app/app/db.server.ts, apps/shopify-app/app/routes/apps.unfiltered.click.tsx, apps/shopify-app/app/testing/helpers.server.ts

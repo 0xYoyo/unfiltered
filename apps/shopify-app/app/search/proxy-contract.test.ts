@@ -281,6 +281,23 @@ describe("server-side pages (YOY-145 AC-4 to AC-6)", () => {
     });
   });
 
+  it("the widget's submitted search carries page and pageSize; its preview carries neither (YOY-146 AC-1, NG-4)", async () => {
+    const captured: CapturedRequest[] = [];
+    captureFetch(captured);
+    const client = createSearchClient();
+    await client.search("midi dress", "session-p", { paging: { page: 3, pageSize: 12 } });
+    await client.search("midi", "session-p", { preview: true, paging: { page: 2, pageSize: 12 } });
+
+    const submitted = new URL(captured[0]!.url, "https://shop.example");
+    expect(parseProxySearchParams(submitted.searchParams)?.paging).toEqual({
+      page: 3,
+      pageSize: 12,
+    });
+    const preview = new URL(captured[1]!.url, "https://shop.example");
+    expect(preview.searchParams.has("page")).toBe(false);
+    expect(parseProxySearchParams(preview.searchParams)?.paging).toBeUndefined();
+  });
+
   it("serializes page and totalCount on a paged response only", () => {
     const unpaged = serializeProxySearchResponse(ORCHESTRATOR_RESPONSE);
     expect(unpaged).not.toHaveProperty("page");

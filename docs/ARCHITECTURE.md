@@ -1138,6 +1138,25 @@ live services.
 
 ## Storefront widget and UI test lane
 
+**Server pages (YOY-146).** Every submitted search — widget and playground —
+asks for one page (`page`, `pageSize`: the theme's configured page size on
+the theme-native path, 24 on the overlay and the playground); keystroke
+previews stay unpaged. `main.ts` hands each submitted response a page loader
+(`ResponseHandlers.pages`) for the same query and refinement context, which
+refuses pages once the search is superseded. The theme-native view holds
+every page it fetched for the search, so a page selected again needs no
+request; its page links number 1 to `ceil(totalCount / pageSize)`, the count
+line states `totalCount`, and when the last row enters the viewport the next
+page is fetched once and held. A results URL naming `page=N` requests page N
+first. When the theme's search page has no pagination to mirror, later pages
+append as the shopper scrolls instead. The overlay and the playground append
+the next page below as the last card comes into view, with one quiet
+"Loading more…" line, until the shown count reaches `totalCount`; a failed
+page leaves the shown cards and says nothing. Click-beacon positions count
+through the whole result order. The harness stubs and the playground fixture
+mode (`paged`, `paged slow`, `paged fail`) answer page requests the way the
+endpoint does.
+
 The storefront search widget (YOY-43 scaffold, YOY-48 takeover) is plain
 TypeScript + CSS in `apps/shopify-app/widget/src/`, built by Vite
 (`apps/shopify-app/widget/vite.config.ts`) into one self-contained IIFE
