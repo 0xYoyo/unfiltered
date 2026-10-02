@@ -31,7 +31,8 @@ import { globalImageFetch } from "./images.server";
  * Prose is written in the language of the product's own text (AC-5).
  * Cached by input hash and CARD_VERSION (AC-7): an unchanged product makes
  * zero calls. Two failed attempts mark the product failed without failing
- * the run; it is retried when its inputs change (AC-8).
+ * the run; it is retried when its inputs change (AC-8). A run stops at the
+ * spend cap (AC-12): the cap is code, not a promise.
  */
 
 /**
@@ -71,6 +72,28 @@ export function cardLanguagesFromEnv(
     );
   }
   return [...new Set(languages)];
+}
+
+/** The card spend cap when `CARD_SPEND_CAP_USD` is unset, USD (AC-12). */
+export const DEFAULT_CARD_SPEND_CAP_USD = 3;
+
+/**
+ * The per-run card spend cap: `CARD_SPEND_CAP_USD` as a positive number of
+ * dollars, else DEFAULT_CARD_SPEND_CAP_USD. A malformed value fails loudly
+ * rather than silently running uncapped.
+ */
+export function cardSpendCapFromEnv(
+  env: Record<string, string | undefined> = process.env,
+): number {
+  const raw = env.CARD_SPEND_CAP_USD;
+  if (raw === undefined || raw.trim() === "") {
+    return DEFAULT_CARD_SPEND_CAP_USD;
+  }
+  const cap = Number(raw);
+  if (!Number.isFinite(cap) || cap <= 0) {
+    throw new Error(`CARD_SPEND_CAP_USD must be a positive number of dollars, got ${JSON.stringify(raw)}`);
+  }
+  return cap;
 }
 
 /** One card's sections, validated. */
@@ -340,11 +363,20 @@ export interface CardResult {
   failed: number;
   /** Ledger cost of this run's `card` calls for the store, USD. */
   costUsd: number;
+  /**
+   * The spend cap, USD, when the run stopped at it (AC-12); absent when the
+   * run finished under the cap. A capped run is a failed run: callers exit
+   * non-zero.
+   */
+  capReachedUsd?: number;
 }
 
 /** The `cards: …` operator report line (AC-9), one format for every ingest path. */
 export function formatCardReport(cards: CardResult): string {
-  return `cards: written ${cards.written}, cached ${cards.cached}, failed ${cards.failed}, cost $${cards.costUsd.toFixed(6)}`;
+  const report = `cards: written ${cards.written}, cached ${cards.cached}, failed ${cards.failed}, cost $${cards.costUsd.toFixed(6)}`;
+  return cards.capReachedUsd === undefined
+    ? report
+    : `${report}, cap reached at $${cards.capReachedUsd.toFixed(2)}`;
 }
 
 /**
@@ -360,6 +392,11 @@ export function formatCardReport(cards: CardResult): string {
  * images none of which can be fetched makes no call and keeps its row, so
  * the next run tries again. Rows are written one product at a time, so a
  * run that stops part-way never pays twice for the cards it finished.
+ *
+ * Spend cap (AC-12): after each product that made a call, the run's `card`
+ * ledger rows for the store are summed; once the sum reaches `spendCapUsd`
+ * the run stops — every finished card stays, the rest stay unwritten — and
+ * the result carries `capReachedUsd`.
  */
 export async function writeCatalogCards({
   db,
@@ -367,6 +404,7 @@ export async function writeCatalogCards({
   writer,
   fetchImage = globalImageFetch,
   languages = cardLanguagesFromEnv(),
+  spendCapUsd = cardSpendCapFromEnv(),
   now = () => new Date(),
 }: {
   db: PrismaClient;
@@ -374,6 +412,7 @@ export async function writeCatalogCards({
   writer: CardWriter;
   fetchImage?: ImageFetch;
   languages?: readonly string[];
+  spendCapUsd?: number;
   now?: () => Date;
 }): Promise<CardResult> {
   const startedAt = now();
@@ -393,6 +432,13 @@ export async function writeCatalogCards({
   const cardByProduct = new Map(cards.map((row) => [row.productId, row]));
   const schema = buildCardSchema(languages);
   const result: CardResult = { written: 0, cached: 0, failed: 0, costUsd: 0 };
+  const runCost = async (): Promise<number> => {
+    const cost = await db.aiCall.aggregate({
+      _sum: { costUsd: true },
+      where: { shopDomain, operation: "card", createdAt: { gte: startedAt } },
+    });
+    return cost._sum.costUsd ?? 0;
+  };
 
   for (const product of products) {
     const enrichment = enrichmentByProduct.get(product.productId) ?? null;
@@ -459,13 +505,14 @@ export async function writeCatalogCards({
       update: data,
     });
     result[card === null ? "failed" : "written"] += 1;
+
+    if ((await runCost()) >= spendCapUsd) {
+      result.capReachedUsd = spendCapUsd;
+      break;
+    }
   }
 
-  const cost = await db.aiCall.aggregate({
-    _sum: { costUsd: true },
-    where: { shopDomain, operation: "card", createdAt: { gte: startedAt } },
-  });
-  result.costUsd = cost._sum.costUsd ?? 0;
+  result.costUsd = await runCost();
   return result;
 }
 

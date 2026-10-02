@@ -373,7 +373,8 @@ export async function runIngestPublicCli({
     log(
       `requests: ${fetch.stats.requests}, retries: ${fetch.stats.retries}, robots-skipped: ${fetch.stats.robotsSkipped}`,
     );
-    return 0;
+    // The card spend cap stopped the card run (YOY-143 AC-12): exit non-zero.
+    return result.cards?.capReachedUsd !== undefined ? 1 : 0;
   } catch (caught) {
     if (caught instanceof RobotsDisallowedError || caught instanceof CrawlSetupError) {
       error(`ingest aborted: ${caught.message} — nothing was written`);

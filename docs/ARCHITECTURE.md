@@ -335,6 +335,13 @@ call and keeps its row, so the next run tries again. Cards are written in
 priority order — in stock first, then most recently updated — one row at a
 time, so a run that stops part-way never pays twice for cards it finished.
 
+**The spend cap.** `writeCatalogCards` reads `CARD_SPEND_CAP_USD` (default
+`3`; a non-positive or non-numeric value fails loudly). After each product
+that made a call it sums the run's `card` ledger rows for the store; once
+the sum reaches the cap the run stops. Finished cards stay, the rest stay
+unwritten for the next run, the report line ends `cap reached at $X`, and
+both `ingest` and `ingest:public` exit non-zero.
+
 **Reports.** `npm run ingest` prints `cards: written N, cached M, failed K,
 cost $X` after the `vision:` line (cost = the run's `card` ledger rows for
 the store); `/internal/costs` shows the `card` operation. `ingest:public`

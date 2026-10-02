@@ -129,6 +129,11 @@ try {
     writer: createCardWriter(db),
   });
   console.log(formatCardReport(cards));
+  if (cards.capReachedUsd !== undefined) {
+    // The spend cap stopped the card run (YOY-143 AC-12): the remaining
+    // steps still run, but the ingest exits non-zero.
+    process.exitCode = 1;
+  }
   const embed = await embedCatalog({
     db,
     shopDomain: shop,

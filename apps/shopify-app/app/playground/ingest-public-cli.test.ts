@@ -1,6 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import type { EmbeddingClient, LlmClient } from "@unfiltered/engine";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { CardWriter } from "../catalog/card.server";
 import type { FakeRoute } from "../testing/fake-store.server";
@@ -110,7 +110,7 @@ afterAll(async () => {
   await db.$disconnect();
 });
 
-function harness(routes: Record<string, FakeRoute> = fixtureRoutes()) {
+function harness(routes: Record<string, FakeRoute> = fixtureRoutes(), ai = fixtureAi) {
   const store = createFakeStore(routes);
   const fetch = createPoliteFetch({ contactUrl: "https://playground.example", fetch: store.fetch });
   const out: string[] = [];
@@ -123,7 +123,7 @@ function harness(routes: Record<string, FakeRoute> = fixtureRoutes()) {
       fetch,
       aiClients: () => {
         aiBuilt += 1;
-        return fixtureAi();
+        return ai();
       },
       log: (line) => out.push(line),
       error: (line) => err.push(line),
@@ -325,6 +325,46 @@ describe("runIngestPublicCli", () => {
     const second = harness();
     expect(await second.run(["--url", FIXTURE_ORIGIN, "--slug", "demo", "--cards"])).toBe(0);
     expect(second.out).toContain("cards: written 0, cached 3, failed 0, cost $0.000000");
+  });
+
+  it("--cards stops at CARD_SPEND_CAP_USD and exits non-zero (YOY-143 AC-12)", async () => {
+    // A card writer that meters $1 a call into the ledger, under a $2 cap:
+    // the second card reaches the cap, the third product stays unwritten.
+    const metered = () => {
+      const ai = fixtureAi();
+      const answer = ai.cards.llm;
+      return {
+        ...ai,
+        cards: {
+          ...ai.cards,
+          llm: {
+            async completeStructured(request: Parameters<LlmClient["completeStructured"]>[0]) {
+              await db.aiCall.create({
+                data: {
+                  provider: "replay",
+                  modelId: "fixture-card-model",
+                  operation: request.operation,
+                  inputTokens: 1,
+                  outputTokens: 1,
+                  costUsd: 1,
+                  shopDomain: request.storeId ?? null,
+                },
+              });
+              return answer.completeStructured(request);
+            },
+          },
+        },
+      };
+    };
+    vi.stubEnv("CARD_SPEND_CAP_USD", "2");
+    try {
+      const { run, out } = harness(fixtureRoutes(), metered);
+      expect(await run(["--url", FIXTURE_ORIGIN, "--slug", "demo", "--max", "4", "--cards"])).toBe(1);
+      expect(out).toContain("cards: written 2, cached 0, failed 0, cost $2.000000, cap reached at $2.00");
+      expect(await db.productCard.count({ where: { shopDomain: "playground:demo" } })).toBe(2);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it("--delete removes the catalog and reports the counts (verify step 7)", async () => {
