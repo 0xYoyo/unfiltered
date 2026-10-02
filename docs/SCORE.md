@@ -208,7 +208,7 @@ language is up — en +0.125 (above the en noise band, 0.111), he +0.009, ar
 embeddings, 72 grades) cost $0.0276.
 
 Run 3 — the judge: [run 37009009491](https://github.com/0xYoyo/unfiltered/actions/runs/37009009491),
-2026-10-02, dispatched with `ref=YOY-147-judge` (`8bd9b0e`) and `engine=v2`
+2026-10-02, dispatched with `ref=YOY-147-judge` (`878b7ee`) and `engine=v2`
 on the branch that adds the judge (YOY-147): the find step, then one
 Flash-Lite judge call per page inside the find set (deadline 1,500 ms).
 Green, leak check clean (72 checked), **0 failed searches**. Env settings
