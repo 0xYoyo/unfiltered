@@ -187,6 +187,7 @@ deployment's.
 |-----|--------|----|----|----|----|----|----|-----------|------|
 | 1 | M5 engine | 0.472 | 0.269 | 0.398 | 0.431 | 0.324 | 0.306 | classic 96 % · AI 34 % (EN 40 %, HE 28 %), 2026-10-01 | $0.0571 |
 | 2 | Engine v2 find step (`ENGINE_V2=1`) | 0.597 | 0.278 | 0.569 | 0.569 | 0.574 | 0.384 | — (not deployed) | $0.0276 |
+| 3 | Engine v2 find step + judge (`ENGINE_V2=1`) | 0.597 | 0.292 | 0.556 | 0.648 | 0.542 | 0.403 | — (not deployed) | $0.0928 |
 | 1 (invalid: 18 failures) | M5 engine | 0.306 | 0.032 | 0.181 | 0.083 | 0.167 | 0.106 | — | $0.0391 |
 
 Run 1 — M5 engine: [run 36908656314](https://github.com/0xYoyo/unfiltered/actions/runs/36908656314),
@@ -205,6 +206,25 @@ searches**. Env settings present: `GEMINI_API_KEY` only. Against run 1 every
 language is up — en +0.125 (above the en noise band, 0.111), he +0.009, ar
 +0.171, ru +0.138, fr +0.250, es +0.078. 144 model calls (72 query
 embeddings, 72 grades) cost $0.0276.
+
+Run 3 — the judge: [run 37009009491](https://github.com/0xYoyo/unfiltered/actions/runs/37009009491),
+2026-10-02, dispatched with `ref=YOY-147-judge` (`8bd9b0e`) and `engine=v2`
+on the branch that adds the judge (YOY-147): the find step, then one
+Flash-Lite judge call per page inside the find set (deadline 1,500 ms).
+Green, leak check clean (72 checked), **0 failed searches**. Env settings
+present: `GEMINI_API_KEY` only. Against run 2: en 0.000 (equal), he +0.014,
+ar −0.013, ru +0.079, fr −0.032, es +0.019. The gate — above run 2 in every
+language with log queries (en, he) — is **not met**: en is equal. The
+runner's own under-1-s column is 0 % in every language. 216 model calls
+(72 query embeddings, 72 judge calls, 72 grades) cost $0.0928.
+
+Speed and judge cost (YOY-147 AC-15), measured locally on the public half
+(78 searches over the seed fixture, `ENGINE_V2=1`, 2026-10-02; a local run
+from Israel, not the deployment): search latency median **1,510 ms**,
+**0 %** under 1 s (the find step alone: 100 % under 1 s); judge stage median
+1,136 ms; 20 of 78 judge calls passed the 1,500 ms deadline and served find
+order. Judge ledger rows: 78 calls, mean 1,841 input and 162 output tokens,
+**$0.958 per 1,000 uncached searches**.
 
 Run 1 (invalid): [run 36905483201](https://github.com/0xYoyo/unfiltered/actions/runs/36905483201)
 at `bdcc41e`, 18 of 72 searches failed and scored 0 (en 2, he 2, ar 3,
