@@ -332,8 +332,11 @@ apps/
         card-retrieval.test.ts
         classic-store.server.ts
         classic-store.test.ts
+        data/
+          find-recall-query.json
         engine-v2.test.ts
         events.server.ts
+        find-recall.test.ts
         find.server.ts
         orchestrator.server.ts
         orchestrator.test.ts
@@ -1091,6 +1094,7 @@ vitest.setup.ts
 - apps/shopify-app/app/search/classic-store.server.ts → apps/shopify-app/app/search/retrieval-store.server.ts
 - apps/shopify-app/app/search/classic-store.test.ts → apps/shopify-app/app/search/classic-store.server.ts, apps/shopify-app/app/testing/helpers.server.ts
 - apps/shopify-app/app/search/engine-v2.test.ts → apps/shopify-app/app/search/classic-store.server.ts, apps/shopify-app/app/search/find.server.ts, apps/shopify-app/app/search/orchestrator.server.ts, apps/shopify-app/app/search/proxy.server.ts, apps/shopify-app/app/testing/helpers.server.ts
+- apps/shopify-app/app/search/find-recall.test.ts → apps/shopify-app/app/score/cli.server.ts, apps/shopify-app/app/score/fixture.server.ts, apps/shopify-app/app/search/card-retrieval.server.ts, apps/shopify-app/app/search/classic-store.server.ts, apps/shopify-app/app/search/find.server.ts, apps/shopify-app/app/testing/helpers.server.ts
 - apps/shopify-app/app/search/find.server.ts → apps/shopify-app/app/search/card-retrieval.server.ts
 - apps/shopify-app/app/search/orchestrator.server.ts → apps/shopify-app/app/search/classic-store.server.ts, apps/shopify-app/app/search/events.server.ts, apps/shopify-app/app/search/find.server.ts, apps/shopify-app/app/search/stages.ts
 - apps/shopify-app/app/search/orchestrator.test.ts → apps/shopify-app/app/ai/cost-recorder.server.ts, apps/shopify-app/app/search/classic-store.server.ts, apps/shopify-app/app/search/orchestrator.server.ts, apps/shopify-app/app/search/retrieval-store.server.ts, apps/shopify-app/app/testing/helpers.server.ts, apps/shopify-app/widget/src/search-client.ts

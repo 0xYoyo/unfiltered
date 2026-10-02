@@ -933,6 +933,11 @@ response gains `engine` and — on a paged response only — `page` and
   the find step: zero model and zero embedding calls on either engine.
 - **Logging.** `SearchEvent.page` (default 1) records the page each request
   served: one row per page request.
+- **Measured on recall, not order.** A description wish ("long sleeves") is
+  the judge's to rank, never the find step's. `find-recall.test.ts` holds the
+  find step to recall on the committed seed fixture: every long-sleeve midi
+  dress is among the 150 candidates for "long sleeve midi dress", offline,
+  from a recorded query vector (`app/search/data/find-recall-query.json`).
 
 ## Storefront search API over the app proxy (YOY-46)
 
