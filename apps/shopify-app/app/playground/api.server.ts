@@ -1,13 +1,14 @@
 import type { PrismaClient } from "@prisma/client";
 
 import { PLAYGROUND_STORE_KEY_PREFIX } from "./ingest-public.server";
-import type { IntentTier } from "@unfiltered/engine";
+import type { IntentTier, JudgeVerdictCode } from "@unfiltered/engine";
 
 import {
   SEARCH_STAGES,
   type SearchEngine,
   type SearchResponse,
   type SearchStages,
+  type V2RouteReason,
 } from "../search/orchestrator.server";
 import {
   serializeProxySearchResponse,
@@ -64,6 +65,18 @@ export interface PlaygroundSearchDetails {
   intentTier: IntentTier | null;
   /** Which engine served the search (YOY-145 AC-11). */
   engine: SearchEngine;
+  /**
+   * What the judge did (YOY-147 AC-12): its outcome and the verdict per
+   * result, in result order — null for a result the judge did not answer
+   * for. Null on the old engine. The storefront wire carries none of it.
+   */
+  judge: PlaygroundJudgeDetails | null;
+}
+
+/** The judge's part of the playground details (YOY-147 AC-12). */
+export interface PlaygroundJudgeDetails {
+  outcome: V2RouteReason;
+  verdicts: Array<{ productId: string; verdict: JudgeVerdictCode | null }>;
 }
 
 /** The playground response: the proxy contract plus `details`, nothing else. */
@@ -74,7 +87,8 @@ export interface PlaygroundSearchResponse extends ProxySearchResponse {
 /**
  * Map an orchestrator response onto the playground wire contract. Delegates
  * the card/chip/intent mapping to the proxy's own serializer — the two APIs
- * must never drift — and adds exactly the six detail fields. Explicit
+ * must never drift — and adds exactly the six detail fields the route hands
+ * over, plus the judge's details read from the response (YOY-147 AC-12). Explicit
  * re-mapping is what keeps a later orchestrator field from leaking out
  * (AC-2, the same guarantee `serializeProxySearchResponse` gives); `stages`
  * is copied key by key in pipeline order so the wire order is the
@@ -82,7 +96,7 @@ export interface PlaygroundSearchResponse extends ProxySearchResponse {
  */
 export function serializePlaygroundSearchResponse(
   response: SearchResponse,
-  details: PlaygroundSearchDetails,
+  details: Omit<PlaygroundSearchDetails, "judge">,
 ): PlaygroundSearchResponse {
   return {
     ...serializeProxySearchResponse(response),
@@ -93,7 +107,34 @@ export function serializePlaygroundSearchResponse(
       stages: serializeStages(details.stages),
       intentTier: details.intentTier,
       engine: details.engine,
+      judge: judgeDetails(response),
     },
+  };
+}
+
+const V2_ROUTE_REASONS: ReadonlySet<string> = new Set<V2RouteReason>([
+  "judged",
+  "judge-timeout",
+  "judge-error",
+  "capped",
+  "find-only",
+]);
+
+/**
+ * The judge's outcome and per-result verdicts on a response the find path
+ * served; null otherwise — the old engine, and the keyword paths (preview,
+ * classic rescue) a v2 request still takes.
+ */
+function judgeDetails(response: SearchResponse): PlaygroundJudgeDetails | null {
+  if (response.engine !== "v2" || !V2_ROUTE_REASONS.has(response.routeReason)) {
+    return null;
+  }
+  return {
+    outcome: response.routeReason as V2RouteReason,
+    verdicts: response.hits.map((hit) => ({
+      productId: hit.productId,
+      verdict: hit.verdict ?? null,
+    })),
   };
 }
 

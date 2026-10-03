@@ -23,7 +23,7 @@
     "typecheck": "react-router typegen && tsc --noEmit",
     "ingest": "npx tsx scripts/ingest.mts",
     "ingest:public": "npx tsx scripts/ingest-public.mts",
-    "score:public": "npx tsx scripts/score-run.mts",
+    "score:public": "JUDGE_DEADLINE_MS=4000 npx tsx scripts/score-run.mts",
     "build:widget": "vite build --config widget/vite.config.ts",
     "widget:harness": "vite --config widget/vite.config.ts --host 127.0.0.1 --port 4173 --strictPort"
   },

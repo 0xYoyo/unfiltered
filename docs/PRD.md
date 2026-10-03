@@ -1,10 +1,12 @@
 # Unfiltered — PRD
-Version: 3 · Date: 2026-09-28
+Version: 3.1 · Date: 2026-10-02
 Supersedes v2; decisions in docs/RESET-2026-09-27.md. Refinements of
 2026-09-30 in §3 Engine v2 (binding where they differ from the text above
 them). Amendments of 2026-10-01 (budget rules, hidden-set home, label values,
 "in stock", code labels on fallback, the card-writer estimate of ≈ $4 per
 1,000 in Refinement 6) are marked inline and bind where they differ.
+v3.1 (2026-10-02, YOY-147): §3 Refinement 2 — the merchant-fact label
+carries two values, the product's and the asked one, not one parameter.
 
 Product type: B2B web SaaS, delivered first as a native Shopify app
 (self-serve). The engine is catalog-agnostic by design: a universal script
@@ -300,8 +302,10 @@ Agreed in the co-manager plan review of 29–30 Sep 2026. Numbers marked
 2. **Short-code answers.** The judge answers per product with codes, never
    prose: a verdict (exact / same item, other colour or size / close / not
    relevant), a set of missed-wish flags, and a label template id with its
-   values (one, or two for the merchant-fact label; see "The query path",
-   amended 2026-10-01). Estimate: ≈ $1 per 1,000 uncached searches (replaces
+   values: the merchant-fact label carries two — the product's value and the
+   asked value, each at most three words, in the language of the shopper's
+   sentence — not one parameter (v3.1; see "The query path", amended
+   2026-10-01). Estimate: ≈ $1 per 1,000 uncached searches (replaces
    the $2–4 figure, which assumed prose output).
 3. **Labels from code where the fact is the merchant's.** Size, stock and
    price labels are computed by code from the variants table, never by the

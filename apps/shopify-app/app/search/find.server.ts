@@ -102,6 +102,12 @@ export function mergeFindOrder(
 /** The find step's answer: every found product in merged order. */
 export interface FindResult {
   productIds: string[];
+  /**
+   * How many of `productIds`, from the front, are the find set: the strong
+   * title matches and the vector hits (YOY-147 AC-10). The rest are keyword
+   * matches beyond it, in keyword order; pages there are never judged.
+   */
+  findSetCount: number;
   /** True when the vector half failed and the keyword order was served alone (AC-8). */
   degraded: boolean;
 }
@@ -204,12 +210,26 @@ export function createFindStep(options: FindStepOptions): FindStep {
           }),
         );
       }
-      const merged = mergeFindOrder(
-        vector.ok ? vector.hits.map((hit) => hit.productId) : [],
-        keyword.hits,
+      const vectorIds = vector.ok ? vector.hits.map((hit) => hit.productId) : [];
+      const merged = mergeFindOrder(vectorIds, keyword.hits);
+      // The find set is the merged order's front: the strong title matches
+      // and the vector hits, which `mergeFindOrder` places before any
+      // keyword-only match. With no vector half there is no find set.
+      const findSet = new Set(
+        vectorIds.length === 0
+          ? []
+          : [
+              ...vectorIds,
+              ...keyword.hits
+                .filter((match) => match.score >= STRONG_TITLE_SCORE)
+                .map((match) => match.productId),
+            ],
       );
+      const productIds = await collapseFamilies(shopDomain, merged);
+      const beyond = productIds.findIndex((productId) => !findSet.has(productId));
       return {
-        productIds: await collapseFamilies(shopDomain, merged),
+        productIds,
+        findSetCount: beyond === -1 ? productIds.length : beyond,
         degraded: !vector.ok,
       };
     },

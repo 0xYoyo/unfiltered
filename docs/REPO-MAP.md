@@ -340,6 +340,8 @@ apps/
         events.server.ts
         find-recall.test.ts
         find.server.ts
+        judge-step.server.ts
+        judge.test.ts
         orchestrator.server.ts
         orchestrator.test.ts
         playground-search.server.ts
@@ -982,6 +984,7 @@ packages/
       index.ts
       intent-escalation.ts
       intent.ts
+      judge.ts
       retrieve.ts
       taxonomy.ts
     test/
@@ -1142,11 +1145,12 @@ vitest.setup.ts
 - apps/shopify-app/app/search/engine-v2.test.ts → apps/shopify-app/app/search/classic-store.server.ts, apps/shopify-app/app/search/find.server.ts, apps/shopify-app/app/search/orchestrator.server.ts, apps/shopify-app/app/search/proxy.server.ts, apps/shopify-app/app/testing/helpers.server.ts
 - apps/shopify-app/app/search/find-recall.test.ts → apps/shopify-app/app/score/cli.server.ts, apps/shopify-app/app/score/fixture.server.ts, apps/shopify-app/app/search/card-retrieval.server.ts, apps/shopify-app/app/search/classic-store.server.ts, apps/shopify-app/app/search/find.server.ts, apps/shopify-app/app/testing/helpers.server.ts
 - apps/shopify-app/app/search/find.server.ts → apps/shopify-app/app/search/card-retrieval.server.ts
-- apps/shopify-app/app/search/orchestrator.server.ts → apps/shopify-app/app/search/classic-store.server.ts, apps/shopify-app/app/search/events.server.ts, apps/shopify-app/app/search/find.server.ts, apps/shopify-app/app/search/stages.ts
+- apps/shopify-app/app/search/judge.test.ts → apps/shopify-app/app/eval/replay.server.ts, apps/shopify-app/app/playground/api.server.ts, apps/shopify-app/app/search/classic-store.server.ts, apps/shopify-app/app/search/find.server.ts, apps/shopify-app/app/search/judge-step.server.ts, apps/shopify-app/app/search/orchestrator.server.ts, apps/shopify-app/app/search/proxy.server.ts, apps/shopify-app/app/testing/helpers.server.ts
+- apps/shopify-app/app/search/orchestrator.server.ts → apps/shopify-app/app/search/classic-store.server.ts, apps/shopify-app/app/search/events.server.ts, apps/shopify-app/app/search/find.server.ts, apps/shopify-app/app/search/judge-step.server.ts, apps/shopify-app/app/search/stages.ts
 - apps/shopify-app/app/search/orchestrator.test.ts → apps/shopify-app/app/ai/cost-recorder.server.ts, apps/shopify-app/app/search/classic-store.server.ts, apps/shopify-app/app/search/orchestrator.server.ts, apps/shopify-app/app/search/retrieval-store.server.ts, apps/shopify-app/app/testing/helpers.server.ts, apps/shopify-app/widget/src/search-client.ts
 - apps/shopify-app/app/search/playground-search.server.ts → apps/shopify-app/app/playground/api.server.ts, apps/shopify-app/app/search/orchestrator.server.ts
 - apps/shopify-app/app/search/proxy-contract.test.ts → apps/shopify-app/app/search/orchestrator.server.ts, apps/shopify-app/app/search/proxy.server.ts, apps/shopify-app/widget/src/search-client.ts
-- apps/shopify-app/app/search/proxy.server.ts → apps/shopify-app/app/ai/cost-recorder.server.ts, apps/shopify-app/app/search/classic-store.server.ts, apps/shopify-app/app/search/find.server.ts, apps/shopify-app/app/search/orchestrator.server.ts, apps/shopify-app/app/search/retrieval-store.server.ts
+- apps/shopify-app/app/search/proxy.server.ts → apps/shopify-app/app/ai/cost-recorder.server.ts, apps/shopify-app/app/search/classic-store.server.ts, apps/shopify-app/app/search/find.server.ts, apps/shopify-app/app/search/judge-step.server.ts, apps/shopify-app/app/search/orchestrator.server.ts, apps/shopify-app/app/search/retrieval-store.server.ts
 - apps/shopify-app/app/search/retrieval-store.server.ts → apps/shopify-app/app/catalog/hnsw.server.ts
 - apps/shopify-app/app/search/retrieval-store.test.ts → apps/shopify-app/app/search/retrieval-store.server.ts, apps/shopify-app/app/testing/helpers.server.ts
 - apps/shopify-app/app/search/retrieval-tenant-recall.test.ts → apps/shopify-app/app/search/retrieval-store.server.ts, apps/shopify-app/app/testing/helpers.server.ts
@@ -1192,6 +1196,7 @@ vitest.setup.ts
 - packages/engine/src/classify.ts → packages/engine/src/colors.ts, packages/engine/src/index.ts
 - packages/engine/src/intent-escalation.ts → packages/engine/src/intent.ts
 - packages/engine/src/intent.ts → packages/engine/src/index.ts, packages/engine/src/taxonomy.ts
+- packages/engine/src/judge.ts → packages/engine/src/index.ts
 - packages/engine/src/retrieve.ts → packages/engine/src/index.ts, packages/engine/src/intent.ts
 - packages/engine/test/classic.test.ts → packages/engine/src/index.ts
 - packages/engine/test/classify.test.ts → packages/engine/src/index.ts

@@ -119,6 +119,11 @@ export const DEFAULT_VISION_MODEL = "gemini-3.5-flash-lite";
  * `GEMINI_CARD_MODEL`.
  */
 export const DEFAULT_CARD_MODEL = "gemini-3.5-flash-lite";
+/**
+ * Default judge model (YOY-147 AC-2): Flash-Lite, one call per page of the
+ * find set. Override with `GEMINI_JUDGE_MODEL`.
+ */
+export const DEFAULT_JUDGE_MODEL = "gemini-3.5-flash-lite";
 export const DEFAULT_EMBEDDING_DIMENSION = 768;
 /** Thinking level the intent client runs at unless the env overrides it. */
 export const DEFAULT_INTENT_THINKING_LEVEL = "low";
@@ -141,6 +146,12 @@ export const DEFAULT_VISION_THINKING_LEVEL = "low";
  * (`model-default` sends no thinkingConfig).
  */
 export const DEFAULT_CARD_THINKING_LEVEL = "low";
+/**
+ * Thinking level of the judge call (YOY-147 AC-2): low, explicit, never the
+ * model default (`GEMINI_JUDGE_THINKING_LEVEL`; `model-default` sends no
+ * thinkingConfig).
+ */
+export const DEFAULT_JUDGE_THINKING_LEVEL = "low";
 /**
  * Per-request abort timeout of the lite intent call (YOY-116): the lite
  * tier exists to be fast, and a hung lite call escalates to the accuracy
@@ -195,6 +206,13 @@ export interface GeminiModelConfig {
    * its own default (`GEMINI_CARD_THINKING_LEVEL=model-default`).
    */
   cardThinkingLevel: string | undefined;
+  /** For the judge call (YOY-147): one call per page of the find set. */
+  judgeModel: string;
+  /**
+   * Thinking level for the judge, or undefined to leave the model at its
+   * own default (`GEMINI_JUDGE_THINKING_LEVEL=model-default`).
+   */
+  judgeThinkingLevel: string | undefined;
   /**
    * Thinking level for the intent client, or undefined to leave the model at
    * its own default (`GEMINI_INTENT_THINKING_LEVEL=model-default`).
@@ -218,7 +236,7 @@ export interface GeminiModelConfig {
  * GEMINI_INTENT_LITE_MODEL, GEMINI_INTENT_LITE_THINKING_LEVEL,
  * GEMINI_INTENT_LITE_TIMEOUT_MS, GEMINI_INTENT_TIMEOUT_MS,
  * GEMINI_VISION_MODEL, GEMINI_VISION_THINKING_LEVEL, GEMINI_CARD_MODEL,
- * GEMINI_CARD_THINKING_LEVEL.
+ * GEMINI_CARD_THINKING_LEVEL, GEMINI_JUDGE_MODEL, GEMINI_JUDGE_THINKING_LEVEL.
  */
 export function geminiModelsFromEnv(
   env: Record<string, string | undefined> = process.env,
@@ -241,6 +259,12 @@ export function geminiModelsFromEnv(
       "GEMINI_CARD_THINKING_LEVEL",
       env.GEMINI_CARD_THINKING_LEVEL,
       DEFAULT_CARD_THINKING_LEVEL,
+    ),
+    judgeModel: env.GEMINI_JUDGE_MODEL ?? DEFAULT_JUDGE_MODEL,
+    judgeThinkingLevel: parseThinkingLevel(
+      "GEMINI_JUDGE_THINKING_LEVEL",
+      env.GEMINI_JUDGE_THINKING_LEVEL,
+      DEFAULT_JUDGE_THINKING_LEVEL,
     ),
     intentThinkingLevel: parseThinkingLevel(
       "GEMINI_INTENT_THINKING_LEVEL",

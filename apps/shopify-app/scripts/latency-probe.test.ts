@@ -10,6 +10,7 @@ import {
   formatSummary,
   loadQueries,
   parseArgs,
+  probeSearchParams,
   percentile,
   ProbeUsageError,
   summarize,
@@ -184,6 +185,7 @@ describe("arguments", () => {
       assertAiP50: null,
       assertAiP95: null,
       aiPerMinute: 10,
+      engine: null,
     });
     expect(
       parseArgs([
@@ -200,6 +202,18 @@ describe("arguments", () => {
     expect(() => parseArgs(["--url", "u", "--verbose", "1"])).toThrow(ProbeUsageError);
     expect(() => parseArgs(["--url", "u", "--runs", "0"])).toThrow(ProbeUsageError);
     expect(() => parseArgs(["--url", "u", "--runs"])).toThrow(ProbeUsageError);
+  });
+
+  it("accepts --engine v1|v2 and sends it to the playground API (YOY-147 AC-13)", () => {
+    const args = parseArgs(["--url", "https://x.example", "--engine", "v2"]);
+    expect(args.engine).toBe("v2");
+    expect(probeSearchParams(args, "linen dress").get("engine")).toBe("v2");
+    expect(parseArgs(["--url", "u", "--engine", "v1"]).engine).toBe("v1");
+    expect(() => parseArgs(["--url", "u", "--engine", "v3"])).toThrow(ProbeUsageError);
+    // Absent: no parameter, the deployment's default engine answers.
+    const plain = probeSearchParams(parseArgs(["--url", "u"]), "linen dress");
+    expect(plain.has("engine")).toBe(false);
+    expect(plain.get("query")).toBe("linen dress");
   });
 });
 

@@ -13,6 +13,8 @@ import {
   DEFAULT_VISION_THINKING_LEVEL,
   DEFAULT_CARD_MODEL,
   DEFAULT_CARD_THINKING_LEVEL,
+  DEFAULT_JUDGE_MODEL,
+  DEFAULT_JUDGE_THINKING_LEVEL,
   DEFAULT_INTENT_TIMEOUT_MS,
   DEFAULT_INTENT_MODEL,
   DEFAULT_INTENT_THINKING_LEVEL,
@@ -98,6 +100,8 @@ describe("model configuration", () => {
       visionThinkingLevel: DEFAULT_VISION_THINKING_LEVEL,
       cardModel: DEFAULT_CARD_MODEL,
       cardThinkingLevel: DEFAULT_CARD_THINKING_LEVEL,
+      judgeModel: DEFAULT_JUDGE_MODEL,
+      judgeThinkingLevel: DEFAULT_JUDGE_THINKING_LEVEL,
       intentThinkingLevel: DEFAULT_INTENT_THINKING_LEVEL,
       intentLiteThinkingLevel: DEFAULT_INTENT_LITE_THINKING_LEVEL,
       intentLiteTimeoutMs: DEFAULT_INTENT_LITE_TIMEOUT_MS,
@@ -120,6 +124,9 @@ describe("model configuration", () => {
     // The card writer (YOY-143): Flash-Lite, thinking set explicitly.
     expect(DEFAULT_CARD_MODEL).toBe("gemini-3.5-flash-lite");
     expect(DEFAULT_CARD_THINKING_LEVEL).toBe("low");
+    // The judge (YOY-147 AC-2): Flash-Lite at thinking level low.
+    expect(DEFAULT_JUDGE_MODEL).toBe("gemini-3.5-flash-lite");
+    expect(DEFAULT_JUDGE_THINKING_LEVEL).toBe("low");
   });
 
   it("reads every model from env overrides", () => {
@@ -137,6 +144,8 @@ describe("model configuration", () => {
       GEMINI_VISION_THINKING_LEVEL: "medium",
       GEMINI_CARD_MODEL: "model-f",
       GEMINI_CARD_THINKING_LEVEL: "high",
+      GEMINI_JUDGE_MODEL: "model-g",
+      GEMINI_JUDGE_THINKING_LEVEL: "medium",
     });
     expect(models).toEqual({
       classificationModel: "model-a",
@@ -148,6 +157,8 @@ describe("model configuration", () => {
       visionThinkingLevel: "medium",
       cardModel: "model-f",
       cardThinkingLevel: "high",
+      judgeModel: "model-g",
+      judgeThinkingLevel: "medium",
       intentThinkingLevel: "high",
       intentLiteThinkingLevel: "medium",
       intentLiteTimeoutMs: 5000,

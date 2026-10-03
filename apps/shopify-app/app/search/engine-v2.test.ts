@@ -258,7 +258,8 @@ describe("Engine v2 on the database", () => {
       { productId: "kw", title: "Wool Coat", y: 0.9 },
     ]);
     const result = await find(fakeEmbeddings({ fail: true }), "wool coat");
-    expect(result).toEqual({ productIds: ["kw"], degraded: true });
+    // No vector half, no find set: every page is keyword order (YOY-147 AC-10).
+    expect(result).toEqual({ productIds: ["kw"], findSetCount: 0, degraded: true });
 
     const response = await orchestrator(fakeEmbeddings({ fail: true })).runSearch({
       query: "wool coat",
@@ -310,9 +311,11 @@ describe("Engine v2 on the database", () => {
     await seed(db, [{ productId: "a", title: "Linen Shirt", y: 0.1 }]);
     const engine = orchestrator(fakeEmbeddings());
     const response = await engine.runSearch({ query: "long sleeve linen", shopDomain: SHOP });
+    // No judge wired here: the page is served in find order, and no paid
+    // judge call started, so the route is classic (YOY-147 AC-11).
     expect(response).toMatchObject({
-      route: "ai",
-      routeReason: "engine-v2",
+      route: "classic",
+      routeReason: "find-only",
       engine: "v2",
       chips: [],
       intent: null,
@@ -333,7 +336,7 @@ describe("Engine v2 on the database", () => {
     const off = orchestrator(fakeEmbeddings(), { engineV2: false, classifier: classicClassifier });
     expect((await off.runSearch({ query: "wool coat", shopDomain: SHOP })).engine).toBe("v1");
     const asked = await off.runSearch({ query: "wool coat", shopDomain: SHOP, engine: "v2" });
-    expect(asked).toMatchObject({ engine: "v2", routeReason: "engine-v2" });
+    expect(asked).toMatchObject({ engine: "v2", routeReason: "find-only" });
 
     const on = orchestrator(fakeEmbeddings(), { engineV2: true, classifier: classicClassifier });
     const v1 = await on.runSearch({ query: "wool coat", shopDomain: SHOP, engine: "v1" });

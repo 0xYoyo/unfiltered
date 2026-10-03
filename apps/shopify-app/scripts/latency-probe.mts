@@ -20,7 +20,12 @@
  *   npx tsx scripts/latency-probe.mts --url https://<service>.onrender.com \
  *     [--catalog <slug>] [--runs 20] [--set classic|ai-en|ai-he|all] \
  *     [--assert-classic-p95 500] [--assert-ai-p50 2000] [--assert-ai-p95 3500] \
- *     [--ai-per-minute 10]
+ *     [--ai-per-minute 10] [--engine v1|v2]
+ *
+ * `--engine` (YOY-147 AC-13) is sent to the playground API as its `engine`
+ * parameter, so the probe can time Engine v2 — the find step and the judge —
+ * on a deployment whose `ENGINE_V2` is off. Absent, no parameter is sent and
+ * the deployment's default engine answers.
  *
  * Exit 1 on any asserted breach or any failed request; exit 0 otherwise.
  */
@@ -47,6 +52,8 @@ export interface ProbeArgs {
   assertAiP95: number | null;
   /** Ceiling on AI-set requests per sliding minute; the playground's is 10. */
   aiPerMinute: number;
+  /** The playground's `engine` parameter (YOY-147 AC-13); null sends none. */
+  engine: "v1" | "v2" | null;
 }
 
 const DEFAULT_RUNS = 20;
@@ -133,6 +140,7 @@ export function parseArgs(argv: readonly string[]): ProbeArgs {
     "assert-ai-p50",
     "assert-ai-p95",
     "ai-per-minute",
+    "engine",
   ]);
   for (const flag of values.keys()) {
     if (!known.has(flag)) {
@@ -171,6 +179,10 @@ export function parseArgs(argv: readonly string[]): ProbeArgs {
       `--set must be one of ${[...PROBE_SETS, "all"].join("|")}, got ${set}`,
     );
   }
+  const engine = values.get("engine") ?? null;
+  if (engine !== null && engine !== "v1" && engine !== "v2") {
+    throw new ProbeUsageError(`--engine must be v1 or v2, got ${engine}`);
+  }
   return {
     url: url.replace(/\/+$/, ""),
     catalog: values.get("catalog") ?? null,
@@ -180,6 +192,7 @@ export function parseArgs(argv: readonly string[]): ProbeArgs {
     assertAiP50: optionalMs("assert-ai-p50"),
     assertAiP95: optionalMs("assert-ai-p95"),
     aiPerMinute: positive("ai-per-minute", DEFAULT_AI_PER_MINUTE),
+    engine,
   };
 }
 
@@ -359,12 +372,11 @@ interface PlaygroundBody {
   };
 }
 
-/** One request against the playground API; throws on a non-200 answer. */
-async function probeOnce(
-  args: ProbeArgs,
-  set: ProbeSet,
+/** The query string of one probe request: the catalog and engine when given. */
+export function probeSearchParams(
+  args: Pick<ProbeArgs, "catalog" | "engine">,
   query: string,
-): Promise<ProbeSample> {
+): URLSearchParams {
   const params = new URLSearchParams({
     query,
     sessionId: `probe-${crypto.randomUUID()}`,
@@ -372,6 +384,19 @@ async function probeOnce(
   if (args.catalog !== null) {
     params.set("catalog", args.catalog);
   }
+  if (args.engine !== null) {
+    params.set("engine", args.engine);
+  }
+  return params;
+}
+
+/** One request against the playground API; throws on a non-200 answer. */
+async function probeOnce(
+  args: ProbeArgs,
+  set: ProbeSet,
+  query: string,
+): Promise<ProbeSample> {
+  const params = probeSearchParams(args, query);
   const response = await fetch(`${args.url}/api/playground/search?${params}`);
   if (response.status !== 200) {
     throw new Error(`HTTP ${response.status} for ${set} "${query}"`);
@@ -490,7 +515,7 @@ export async function main(argv: readonly string[]): Promise<0 | 1> {
   }
 
   console.log("");
-  console.log(`latency probe — ${args.url}${args.catalog === null ? "" : ` catalog=${args.catalog}`} runs=${args.runs}`);
+  console.log(`latency probe — ${args.url}${args.catalog === null ? "" : ` catalog=${args.catalog}`}${args.engine === null ? "" : ` engine=${args.engine}`} runs=${args.runs}`);
   for (const summary of summaries) {
     console.log(formatSummary(summary));
   }

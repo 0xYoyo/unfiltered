@@ -58,12 +58,17 @@ jobs:
           # Through env, never interpolated into the script: a ref is input.
           SCORE_REF: ${{ inputs.ref }}
           ENGINE_V2: ${{ inputs.engine == 'v2' && '1' || '0' }}
+          # A score run measures the judge's judgment, not its speed
+          # (YOY-147 AC-18): speed is the latency probe's, on the deployment.
+          # Production keeps its 1,500 ms deadline.
+          JUDGE_DEADLINE_MS: "4000"
         run: |
           # Which env settings the run has (AC-13): names only, never values.
           echo "env settings present:"
           env | cut -d= -f1 | grep -E '^(GEMINI|INTENT)_' | sort | sed 's/^/  /'
           # The engine is a choice input, not a secret: printed as-is.
           echo "engine: ENGINE_V2=$ENGINE_V2"
+          echo "judge deadline: JUDGE_DEADLINE_MS=$JUDGE_DEADLINE_MS"
           set +e
           npx tsx scripts/score-run.mts --hidden-set "$RUNNER_TEMP/hidden.b64" \
             > "$RUNNER_TEMP/score-output.txt" 2>&1
