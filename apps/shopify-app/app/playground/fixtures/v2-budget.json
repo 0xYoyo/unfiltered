@@ -1,0 +1,75 @@
+{
+  "searchId": "fixture-v2-budget",
+  "route": "ai",
+  "degraded": false,
+  "results": [
+    {
+      "productId": "p-v2-1",
+      "title": "Linen Wrap Dress",
+      "url": "https://example.test/products/p-v2-1",
+      "imageUrl": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 4'><rect width='4' height='4' fill='%23d9d4cd'/></svg>",
+      "priceMin": 380,
+      "priceMax": 380,
+      "currencyCode": "ILS",
+      "available": true,
+      "colorUnknown": false
+    },
+    {
+      "productId": "p-v2-2",
+      "title": "Cotton Shirt Dress",
+      "url": "https://example.test/products/p-v2-2",
+      "imageUrl": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 4'><rect width='4' height='4' fill='%23cfc9c1'/></svg>",
+      "priceMin": 290,
+      "priceMax": 290,
+      "currencyCode": "ILS",
+      "available": true,
+      "colorUnknown": false
+    },
+    {
+      "productId": "p-v2-3",
+      "title": "Jersey Midi Dress",
+      "url": "https://example.test/products/p-v2-3",
+      "imageUrl": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 4'><rect width='4' height='4' fill='%23c8c2b8'/></svg>",
+      "priceMin": 245,
+      "priceMax": 245,
+      "currencyCode": "ILS",
+      "available": true,
+      "colorUnknown": false
+    }
+  ],
+  "chips": [
+    {
+      "field": "priceMax",
+      "value": "400",
+      "currency": "ILS"
+    },
+    {
+      "field": "size",
+      "value": "M"
+    },
+    {
+      "field": "availability",
+      "value": "in stock"
+    },
+    {
+      "field": "exclude",
+      "value": "black"
+    }
+  ],
+  "intent": null,
+  "details": {
+    "routeReason": "judged",
+    "latencyMs": 912,
+    "limited": null,
+    "stages": {
+      "find": 71,
+      "hydrate": 9,
+      "judge": 702
+    },
+    "intentTier": null,
+    "engine": "v2",
+    "judge": null
+  },
+  "page": 1,
+  "totalCount": 3
+}

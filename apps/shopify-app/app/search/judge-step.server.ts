@@ -247,6 +247,13 @@ export interface JudgeStepRequest<T extends { productId: string }> {
   page?: number;
   /** The whole-order position of the page's first item (YOY-148 AC-4); 0 by default. */
   positionOffset?: number;
+  /**
+   * Whether the judge's `excluded` flags drop products (YOY-149 AC-11);
+   * true by default. False when the shopper removed an `exclude` chip
+   * (AC-15): the sentence still says "not black", so the flags — fresh or
+   * cached — are ignored for the request.
+   */
+  applyExcluded?: boolean;
 }
 
 /**
@@ -306,7 +313,7 @@ function storedVerdicts(
     if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
       return null;
     }
-    const { id, verdict, missed, label } = raw as Record<string, unknown>;
+    const { id, verdict, missed, label, excluded } = raw as Record<string, unknown>;
     if (
       id !== candidates[index]!.id ||
       typeof verdict !== "string" ||
@@ -334,6 +341,7 @@ function storedVerdicts(
       verdict: verdict as JudgeVerdictCode,
       missed: missed as JudgeVerdict["missed"],
       label: parsedLabel,
+      excluded: excluded === true,
     });
   }
   return verdicts;
@@ -369,6 +377,7 @@ async function storeAnswer(
     verdict: entry.verdict,
     missed: [...entry.missed],
     label: entry.label === null ? null : { template: entry.label.template, values: [...entry.label.values] },
+    excluded: entry.excluded,
   })) as Prisma.InputJsonValue;
   try {
     await db.judgeAnswer.upsert({
@@ -475,6 +484,12 @@ export async function runJudgeStep<T extends { productId: string }>(
   const giveUpMs = Math.max(request.giveUpMs ?? DEFAULT_JUDGE_GIVE_UP_MS, deadlineMs);
   const page = request.page ?? 1;
   const positionOffset = request.positionOffset ?? 0;
+  const applyExcluded = request.applyExcluded ?? true;
+  const order = (verdicts: readonly JudgeVerdict[]) =>
+    orderByVerdict(
+      items,
+      applyExcluded ? verdicts : verdicts.map((entry) => ({ ...entry, excluded: false })),
+    );
   const findOrder = (
     outcome: JudgeOutcome,
     started = true,
@@ -517,7 +532,7 @@ export async function runJudgeStep<T extends { productId: string }>(
     verdicts: JudgeVerdict[],
     outcome: "judged" | "judge-cached",
   ): Promise<JudgeStepResult<T>> => {
-    const served = orderByVerdict(items, verdicts);
+    const served = order(verdicts);
     await writeVerdictRows(db, {
       shopDomain,
       searchId,
@@ -570,7 +585,7 @@ export async function runJudgeStep<T extends { productId: string }>(
         return {};
       }
       return Object.fromEntries(
-        orderByVerdict(items, late.verdicts).map((entry) => [entry.item.productId, entry.label]),
+        order(late.verdicts).map((entry) => [entry.item.productId, entry.label]),
       );
     });
     pendingLabels.set(key, { shopDomain, labels });

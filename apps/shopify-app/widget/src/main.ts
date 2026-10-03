@@ -13,6 +13,7 @@ import {
   type ProxyChip,
   type ProxyIntent,
   type ProxySearchResponse,
+  type RemovedChip,
   type SearchRequestContext,
 } from "./search-client";
 import { getSessionId } from "./session";
@@ -326,6 +327,13 @@ export function init(config: WidgetConfig): void {
     let heldIntent: ProxyIntent | null = null;
     let lastQuery = "";
     /**
+     * Engine v2 chip removal (YOY-149 AC-15): every chip removed so far in
+     * the current search chain. A v2 response echoes no intent, so removal
+     * re-asks the same query with this whole list; a search the shopper
+     * submits themselves starts a new chain with an empty one.
+     */
+    let removedChips: RemovedChip[] = [];
+    /**
      * The query the native results view is currently showing or fetching.
      * Distinct from `lastQuery` (refinement memory, which only a SETTLED
      * submitted response updates): the mirror is entered at the loading
@@ -358,6 +366,7 @@ export function init(config: WidgetConfig): void {
         // results; the next query is sent without previousIntent.
         heldIntent = null;
         lastQuery = "";
+        removedChips = [];
         input.value = "";
         overlay.showIdle();
         input.focus();
@@ -618,17 +627,35 @@ export function init(config: WidgetConfig): void {
      * Chip removal (AC-2): resend the last query carrying the held intent
      * and the dismissed chip; the server recomputes without that constraint
      * and the whole overlay re-renders from its response.
+     *
+     * An engine v2 response (YOY-149 AC-15) echoes `intent: null`, so there
+     * is no intent to adjust: the same query is re-asked, page 1, with
+     * `removedChips` — every chip removed in this search chain, the new one
+     * included — and no `previousIntent`/`removeChip`.
      */
     const onChipRemove = (chip: ProxyChip): void => {
-      if (inert || heldIntent === null) {
+      if (inert) {
+        return;
+      }
+      if (heldIntent !== null) {
+        debouncePending = false;
+        window.clearTimeout(debounceTimer);
+        void runSearch(lastQuery, {
+          previousIntent: heldIntent,
+          removeChip: chip,
+        });
+        return;
+      }
+      if (lastQuery === "") {
         return;
       }
       debouncePending = false;
       window.clearTimeout(debounceTimer);
-      void runSearch(lastQuery, {
-        previousIntent: heldIntent,
-        removeChip: chip,
-      });
+      removedChips = [
+        ...removedChips,
+        { field: chip.field, value: chip.value },
+      ];
+      void runSearch(lastQuery, { removedChips });
     };
 
     const onType = (): void => {
@@ -743,6 +770,8 @@ export function init(config: WidgetConfig): void {
         overlay.showIdle();
         return;
       }
+      // A search the shopper submits starts a new chain (YOY-149 AC-15).
+      removedChips = [];
       void runSearch(
         query,
         heldIntent !== null ? { previousIntent: heldIntent } : undefined,

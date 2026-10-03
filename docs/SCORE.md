@@ -175,13 +175,61 @@ Read from each run's cost ledger (the run's cost line): one public run —
 (runs: $0.0597, $0.0595, $0.0594). Hidden run 1 — 72 searches, 255 model
 calls — costs **$0.0571**, read from the cost line in its workflow log.
 
+## Public reference after AC-17 (main, 2026-10-03)
+
+The public half on `main` at `7251eda` (YOY-147's facts rows and YOY-148
+merged), Engine v2, `JUDGE_DEADLINE_MS=4000`, one pass, 78 searches, 0
+failed, $0.1837 over 234 model calls
+([posted on YOY-147](https://linear.app/0xyoyo/issue/YOY-147/m6-the-judge-one-call-per-page-verdict-order-deadline-and-reject-all#comment-cb087bde)).
+This is the public comparison for every issue from YOY-149 on — not the
+2026-10-02 "run-3 public" numbers, which predate AC-17. Judge a change by
+the noise band of the M5 baseline above.
+
+| | en | he | ar | ru | fr | es |
+|---|---|---|---|---|---|---|
+| Reference | 0.590 | 0.368 | 0.470 | 0.402 | 0.406 | 0.581 |
+
+Every score run now prints its engine on its first line and refuses to
+start when `ENGINE_V2` is unset and no `--engine v1|v2` is given.
+
+**Runner guards (2026-10-03).** Each search prints a progress line to
+stderr as it finishes (`[n/78] <lang> ok|fail <stage>`, never the query);
+a search plus its grade that takes over 90 s counts as failed
+(`ScoreSearchTimeout`); grader, judge and extraction calls time out at
+30 s; and after 5 consecutive failed searches the run stops, prints the
+partial table with `aborted after 5 consecutive failures` and its spend
+so far, and exits 1. The leak check reads all of these as strict lines.
+
+**Noise band floor (2026-10-03).** Every language's band is
+`max(M5 band, 0.03)`: ar's 0.017 and fr's 0.004 came from too few M5 runs
+to be a real band for Engine v2. This applies to YOY-149's AC-17 and to
+every later gate. Effective bands: en 0.111, he 0.090, ar 0.030, ru 0.055,
+fr 0.030, es 0.060.
+
+**Known catalog effects.** The seed catalog is priced in USD with a median
+of $314; only 40 of its 465 products cost under $107.50 (400 ILS), and none
+of its 99 dresses or 30 coats do (at 600 ILS, 4 dresses). Six of the 13
+public Hebrew searches state a shekel cap, so on this catalog a Hebrew
+budget almost never has an in-budget relevant product, and Hebrew scores
+are sensitive to how the number tiers treat that case (YOY-149: tiers
+sorted over the whole find set put cheap unrelated products on page 1 —
+he 0.150 against a 0.368 reference — until the tiers were limited to the
+find front). A run on a cheaper catalog will move Hebrew for that reason,
+not because the engine changed.
+
 ## Results
 
 Hidden-half scores per language. "Under 1 s" is the latency probe's share
 of searches under 1,000 ms server-side against the deployment
 (`scripts/latency-probe.mts --runs 5 --set all`, docs/LATENCY.md); the
 score runner's own under-1-s column times a local run and is not the
-deployment's.
+deployment's. The runner's "no extraction" column (YOY-149 AC-4) is the
+share of Engine v2 searches composed without the wish extraction — it
+answered after the grace or failed — and "extraction cached" (AC-18) the
+share the extraction cache answered with no call; both read "—" on the
+old engine. `score-run.mts --passes 2` runs the set twice on one scratch
+database, cold then warm, each pass with its own cost and `extract calls`
+line.
 
 | Run | Engine | en | he | ar | ru | fr | es | Under 1 s | Cost |
 |-----|--------|----|----|----|----|----|----|-----------|------|

@@ -559,9 +559,102 @@ describe("the runner (AC-6, AC-7)", () => {
     expect(code).toBe(0);
     const output = written.join("");
     expect(output).not.toContain(marker);
-    expect(output).toMatch(/^language\s+score/);
-    // Header, three language rows, the cost line.
-    expect(output.trim().split("\n")).toHaveLength(5);
+    // Progress lines go to stderr as the run goes; stdout starts with the engine.
+    expect(output.replace(/^\[\d+\/\d+\] .*\n/gm, "")).toMatch(/^engine synthetic\nlanguage\s+score/);
+    // The engine line, header, three language rows, the cost line, the extract-call
+    // line — plus one progress line per search on stderr (YOY-149 runner guard).
+    const onePass = output.trim().split("\n");
+    const progressLines = onePass.filter((line) => /^\[\d+\/\d+\] /.test(line));
+    expect(progressLines.length).toBeGreaterThan(0);
+    expect(progressLines.every((line) => / ok$/.test(line))).toBe(true);
+    expect(onePass.filter((line) => !/^\[\d+\/\d+\] /.test(line))).toHaveLength(7);
+    expect(output.trim().split("\n").at(-1)).toBe("extract calls 0");
+
+    written.length = 0;
+    vi.spyOn(process.stdout, "write").mockImplementation(record);
+    vi.spyOn(process.stderr, "write").mockImplementation(record);
+    const twice = await runScoreCommand(["--synthetic", "--set", setPath, "--passes", "2"]);
+    vi.restoreAllMocks();
+    expect(twice).toBe(0);
+    const lines = written
+      .join("")
+      .trim()
+      .split("\n")
+      .filter((line) => !/^\[\d+\/\d+\] /.test(line));
+    // Each pass: its header line, then its own table (YOY-149 AC-18).
+    expect(lines.filter((line) => /^pass \d$/.test(line))).toEqual(["pass 1", "pass 2"]);
+    expect(lines.filter((line) => line.startsWith("language"))).toHaveLength(2);
+    expect(await runScoreCommand(["--synthetic", "--set", setPath, "--passes", "4"])).toBe(2);
+  });
+
+  it("refuses to start a real run with no engine named, before it spends (YOY-149)", async () => {
+    const saved = process.env.ENGINE_V2;
+    delete process.env.ENGINE_V2;
+    const errors: string[] = [];
+    try {
+      const code = await runScoreCommand(["--set", "/nonexistent/set.json"], {
+        out: () => undefined,
+        err: (line: string) => void errors.push(line),
+      });
+      expect(code).toBe(2);
+      expect(errors.join("\n")).toMatch(/ENGINE_V2 is not set/);
+      expect(
+        await runScoreCommand(["--engine", "v3"], { out: () => undefined, err: () => undefined }),
+      ).toBe(2);
+    } finally {
+      if (saved === undefined) delete process.env.ENGINE_V2;
+      else process.env.ENGINE_V2 = saved;
+    }
+  });
+
+  it("reports progress per search, stops after five consecutive failures, and times a stuck search out (YOY-149 runner guards)", async () => {
+    const db = await createTestDb();
+    await importScoreFixture(db, buildSyntheticFixture());
+    const set: ScoreSetEntry[] = Array.from({ length: 8 }, (_, index) => ({
+      query: `QUERY-${index}`,
+      language: "en" as const,
+      source: "log" as const,
+      modelWritten: false,
+    }));
+    const progress: string[] = [];
+    const failing = {
+      runSearch: () => Promise.reject(new TypeError("fetch failed")),
+    } as unknown as Parameters<typeof runScoreSet>[0]["orchestrator"];
+    const report = await runScoreSet({
+      db,
+      orchestrator: failing,
+      grader: fakeGrader(3).llm,
+      storeKey: SYNTHETIC_STORE_KEY,
+      set,
+      progress: (line) => void progress.push(line),
+    });
+    expect(progress).toEqual([
+      "[1/8] en fail search",
+      "[2/8] en fail search",
+      "[3/8] en fail search",
+      "[4/8] en fail search",
+      "[5/8] en fail search",
+    ]);
+    expect(report.abortedAfter).toBe(5);
+    expect(report.languages[0]!.searches).toBe(5);
+    const table = formatScoreTable(report);
+    expect(table.split("\n")).toContain("aborted after 5 consecutive failures");
+    expect(table).not.toContain("QUERY-");
+    // The leak check reads the guard lines as table lines, not query text.
+    expect(findLeaks(`${progress.join("\n")}\n${table}\n`, set)).toEqual({ leaked: 0 });
+
+    const stuck = {
+      runSearch: () => new Promise(() => undefined),
+    } as unknown as Parameters<typeof runScoreSet>[0]["orchestrator"];
+    const timed = await runScoreSet({
+      db,
+      orchestrator: stuck,
+      grader: fakeGrader(3).llm,
+      storeKey: SYNTHETIC_STORE_KEY,
+      set: set.slice(0, 1),
+      searchTimeoutMs: 20,
+    });
+    expect(timed.failures).toEqual([{ stage: "search", className: "ScoreSearchTimeout", count: 1 }]);
   });
 
   it("captures the query-bearing warnings a degraded search logs", async () => {
@@ -792,7 +885,11 @@ describe("failures by stage and class (YOY-141 AC-13)", () => {
       set,
     });
     expect(report.failures).toEqual([]);
-    expect(formatScoreTable(report).split("\n").at(-1)).toMatch(/^cost /);
+    // The cost line, then the extract-call line (YOY-149 AC-18), and no failure line.
+    expect(formatScoreTable(report).split("\n").slice(-2)).toEqual([
+      expect.stringMatching(/^cost /),
+      "extract calls 0",
+    ]);
   });
 });
 
@@ -864,14 +961,33 @@ describe("the hidden run's leak check (YOY-141 AC-3)", () => {
   ];
   const table = formatScoreTable({
     languages: [
-      { language: "en", score: 0.5, searches: 12, modelWritten: false, underOneSecond: 0.5, failed: 0 },
-      { language: "he", score: 0.25, searches: 12, modelWritten: false, underOneSecond: 1, failed: 1 },
+      { language: "en", score: 0.5, searches: 12, modelWritten: false, underOneSecond: 0.5, withoutExtraction: 0.25, extractionCached: 0.5, failed: 0 },
+      { language: "he", score: 0.25, searches: 12, modelWritten: false, underOneSecond: 1, withoutExtraction: null, extractionCached: null, failed: 1 },
     ],
     cost: { usd: 0.0812, calls: 96 },
     failures: [
       { stage: "search", className: "GeminiTimeoutError", count: 2 },
       { stage: "grade", className: "Error", count: 1 },
     ],
+  });
+
+  it("prints the shares composed without the extraction and answered by its cache, a dash when none reported (YOY-149 AC-4, AC-18)", () => {
+    const [header, en, he] = table.split("\n");
+    expect(header).toMatch(/under 1 s\s+no extraction\s+extraction cached\s+failed$/);
+    expect(en).toMatch(/\s50%\s+25%\s+50%\s+0$/);
+    expect(he).toMatch(/\s100%\s+—\s+—\s+1$/);
+  });
+
+  it("skips only strict pass headers and extract-call lines (YOY-149 AC-18)", () => {
+    const hiddenWord: ScoreSetEntry[] = [
+      { query: "pass", language: "en", source: "model", modelWritten: false },
+      { query: "extract", language: "en", source: "model", modelWritten: false },
+    ];
+    expect(findLeaks("pass 2\nextract calls 0\nengine v2\n", hiddenWord)).toEqual({ leaked: 0 });
+    expect(findLeaks("pass the salt\nextract calls for linen\n", hiddenWord)).toEqual({ leaked: 2 });
+    expect(formatScoreTable({ languages: [], cost: { usd: 0, calls: 0 }, failures: [], extractCalls: 0 })).toContain(
+      "extract calls 0",
+    );
   });
 
   it("passes a clean score table, even when hidden searches are table words", () => {

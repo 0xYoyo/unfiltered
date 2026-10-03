@@ -1,5 +1,5 @@
 # Unfiltered — PRD
-Version: 3.1 · Date: 2026-10-02
+Version: 3.2 · Date: 2026-10-03
 Supersedes v2; decisions in docs/RESET-2026-09-27.md. Refinements of
 2026-09-30 in §3 Engine v2 (binding where they differ from the text above
 them). Amendments of 2026-10-01 (budget rules, hidden-set home, label values,
@@ -7,6 +7,10 @@ them). Amendments of 2026-10-01 (budget rules, hidden-set home, label values,
 1,000 in Refinement 6) are marked inline and bind where they differ.
 v3.1 (2026-10-02, YOY-147): §3 Refinement 2 — the merchant-fact label
 carries two values, the product's and the asked one, not one parameter.
+v3.2 (2026-10-03, YOY-149): the 2026-10-01 amendments are version-bound —
+§3 Three kinds of wishes: a stated "in stock" is a firm filter; capability
+6: on judge failure the page keeps the code-computed price, size and stock
+labels.
 
 Product type: B2B web SaaS, delivered first as a native Shopify app
 (self-serve). The engine is catalog-agnostic by design: a universal script

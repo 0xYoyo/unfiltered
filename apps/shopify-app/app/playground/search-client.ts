@@ -17,6 +17,16 @@ import type { PlaygroundSearchResponse } from "./api.server";
 
 export const PREVIEW_DEBOUNCE_MS = 200;
 
+/**
+ * One removed engine v2 chip as it rides `removedChips` (YOY-149): the
+ * field and value identify it. Structural, so it does not depend on the
+ * server's chip field union.
+ */
+export interface RemovedChip {
+  field: string;
+  value: string;
+}
+
 const SESSION_STORAGE_KEY = "unfiltered:playground:sessionId";
 
 let inMemorySessionId: string | undefined;
@@ -63,6 +73,13 @@ export interface PlaygroundSearchRequest {
   /** Chip the visitor dismissed; the server adjusts `previousIntent`. */
   removeChip?: ProxyChip;
   /**
+   * Engine v2 chip removal (YOY-149 AC-15): every chip removed so far in
+   * this search chain, the newest included. A v2 response echoes no
+   * intent, so the same query is re-asked with this list instead of
+   * `previousIntent`/`removeChip`.
+   */
+  removedChips?: readonly RemovedChip[];
+  /**
    * The page a submitted search asks for (YOY-146): every submit carries
    * one; a keystroke preview never does.
    */
@@ -77,6 +94,7 @@ export function playgroundSearchUrl(request: {
   catalog?: string;
   previousIntent?: ProxyIntent;
   removeChip?: ProxyChip;
+  removedChips?: readonly RemovedChip[];
   paging?: { page: number; pageSize: number };
 }): string {
   const params = new URLSearchParams({
@@ -96,6 +114,17 @@ export function playgroundSearchUrl(request: {
   }
   if (request.removeChip !== undefined) {
     params.set("removeChip", JSON.stringify(request.removeChip));
+  }
+  if (request.removedChips !== undefined && request.removedChips.length > 0) {
+    params.set(
+      "removedChips",
+      JSON.stringify(
+        request.removedChips.map((chip) => ({
+          field: chip.field,
+          value: chip.value,
+        })),
+      ),
+    );
   }
   if (request.paging !== undefined && !request.preview) {
     params.set("page", String(request.paging.page));
@@ -119,6 +148,9 @@ export async function searchPlayground(
     ...(request.removeChip === undefined
       ? {}
       : { removeChip: request.removeChip }),
+    ...(request.removedChips === undefined
+      ? {}
+      : { removedChips: request.removedChips }),
     ...(request.paging === undefined ? {} : { paging: request.paging }),
   });
   const response = await fetch(url, {

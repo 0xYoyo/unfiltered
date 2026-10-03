@@ -45,9 +45,25 @@ export interface ProxyChip {
     | "attributesExclude"
     | "attributesInclude"
     | "occasion"
-    | "availability";
+    | "availability"
+    // Engine v2 (YOY-149): the shopper's size as typed, and one exclusion
+    // field for any excluded term.
+    | "size"
+    | "exclude";
   value: string;
+  /**
+   * The ISO currency of an engine v2 price chip's number (YOY-149), when
+   * the shopper's query or the store named one. Display-only; absent on
+   * v1 chips, whose currency rides the echoed intent.
+   */
+  currency?: string;
 }
+
+/**
+ * One removed engine v2 chip as it rides `removedChips` (YOY-149 AC-15):
+ * the field and value are what identify it; a currency is harmless.
+ */
+export type RemovedChip = Pick<ProxyChip, "field" | "value">;
 
 /**
  * The proxy's echoed intent (YOY-49): held client-side between requests and
@@ -88,6 +104,13 @@ export interface SearchRequestContext {
   previousIntent?: ProxyIntent;
   /** Chip the shopper dismissed; requires `previousIntent`. */
   removeChip?: ProxyChip;
+  /**
+   * Engine v2 chip removal (YOY-149 AC-15): EVERY chip the shopper has
+   * removed in this search chain, the newest included. A v2 response
+   * echoes no intent, so the same query is re-asked with this list instead
+   * of `previousIntent`/`removeChip`.
+   */
+  removedChips?: readonly RemovedChip[];
   /**
    * Keystroke preview (YOY-68): the request rides `mode=preview` and the
    * server serves classic-only results with no logging and no AI spend.
@@ -173,6 +196,17 @@ export function buildSearchParams(
   }
   if (context?.removeChip !== undefined) {
     params.set("removeChip", JSON.stringify(context.removeChip));
+  }
+  if (context?.removedChips !== undefined && context.removedChips.length > 0) {
+    params.set(
+      "removedChips",
+      JSON.stringify(
+        context.removedChips.map((chip) => ({
+          field: chip.field,
+          value: chip.value,
+        })),
+      ),
+    );
   }
   // `mode` is OMITTED on ordinary submitted searches — its absence is what
   // makes the full pipeline run (YOY-68 AC-2). `classic` is the submitted

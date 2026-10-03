@@ -1044,6 +1044,74 @@ runs one page.
   operation `judge`), cache hits (searches served `judge-cached`) and the
   hit rate, hits over hits plus calls.
 
+## Engine v2: stated wishes, chips and code labels (YOY-149)
+
+The three kinds of wishes (docs/PRD.md §3) applied by code. Packages:
+`packages/engine/src/extract.ts` (the extraction), `app/search/wishes.server.ts`
+(the composer), `config/currency-rates.json` (the rates).
+
+- **Extraction.** `createWishExtractor` makes one Flash-Lite call (operation
+  `extract`, `GEMINI_EXTRACT_MODEL`, thinking level low) that starts with
+  the search, in parallel with find, under a throttle or cap too. It returns
+  only price max/min, currency, size, in stock, excluded terms (as typed and
+  in English) and whether price or size was firm. `parseExtractAnswer`
+  keeps a price only when its digits appear in the sentence (thousands
+  separators ignored) and a size or excluded term only when it appears
+  verbatim, ignoring case. When find finishes, the page waits for it at
+  most `EXTRACTION_GRACE_MS` (800, by the 2026-10-03 decision, AC-18) and
+  composes the moment it lands; a late or failed extraction leaves the page
+  composed without it — no chips, no tiers, no code labels, no exclusion
+  filter. `extractionInTime` on every find-path response (and in playground
+  `details`) records which; the score table's "no extraction" column and the
+  latency probe's `no-extraction=` give the share composed without it.
+- **Extraction cache** (AC-18, `app/search/extraction-cache.server.ts`).
+  `ExtractionAnswer` holds one validated extraction per key: the SHA-256 of
+  the normalized sentence, its language by script, `EXTRACT_PROMPT_VERSION`
+  and the model id. Not keyed by tenant — the answer depends on the
+  sentence alone; never evicted. A hit makes no call. A late call is not
+  aborted: it runs on and fills the cache, so the next search is warm.
+  `extractionCached` (response and `details`) says the cache answered; the
+  score table's "extraction cached" column and the probe's
+  `extraction-cached=` give the share. `score-run.mts --passes 2` runs the
+  set twice on one scratch database — cold, then warm — each pass with its
+  own spend and `extract calls` line.
+- **Removed chips.** Both APIs take `removedChips` (a JSON array of
+  `{ field, value }`, at most 20). A removed fact is not applied and its
+  chip is absent.
+- **Composer** (`composeWishes`, the `compose` stage), over every result of
+  the find step before pages are cut:
+  - Walls remove products from the results and the count: a firm price
+    (cheapest variant over the cap); a firm size (no in-stock variant in
+    that size — a product that does not offer the size has none); a stated
+    "in stock" (sold-out products); an exclusion (every variant carries
+    the term as an option value, or the card facts state it — typed or
+    English form, a whole word in any script).
+  - Number tiers sort the find front only — the first `TIER_FRONT_SIZE`
+    (48) surviving candidates in find order: every number wish met, then
+    the price within `PRICE_NEAR_PERCENT` (10) over the cap with the rest
+    met, then other misses, each tier in find order. Candidates past the
+    front and the keyword tail keep their order and never jump ahead
+    (2026-10-03: a soft budget never outranks relevance). Within a page the
+    judge orders by verdict, then tier, then find order; on a judge
+    timeout, error or cap the page keeps tier-then-find order.
+  - A size matches a variant option value, ignoring case: offered and in
+    stock is met, offered and sold out a miss, not offered met.
+  - A cap in a currency other than the product's converts through USD with
+    `config/currency-rates.json` (hand-entered, with `asOf`); an unlisted
+    pair leaves the number unapplied while its chip still shows.
+- **Code labels.** `price-near` / `price-far` carry the product's cheapest
+  price in its currency and the cap as stated (`"105 USD"`, `"400 ILS"`);
+  `size-missing` carries the size and up to two in-stock values nearest it
+  in the merchant's option order. A code label replaces the judge's on the
+  same card and holds after a judge timeout, error or cap.
+- **Judge exclusions.** The judge answer gains `x`, the numbers of products
+  the shopper excluded; `orderByVerdict` drops them from the page and they
+  carry no label. `JUDGE_PROMPT_VERSION` is 2.
+- **Chips.** One per kept fact, fields `priceMax`, `priceMin`, `size`,
+  `availability`, `exclude`. A price chip's value is the shopper's own
+  number with `currency` when they stated one; an exclude chip's value is
+  the term as typed.
+
 ## Storefront search API over the app proxy (YOY-46)
 
 The storefront widget reaches the orchestrator through a Shopify app proxy:

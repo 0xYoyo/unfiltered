@@ -117,6 +117,23 @@ export {
   type JudgeVerdictCode,
   type LlmJudgeOptions,
 } from "./judge.js";
+export {
+  buildExtractPrompt,
+  createWishExtractor,
+  EXTRACT_PROMPT_VERSION,
+  EXTRACT_SCHEMA,
+  ExtractAnswerError,
+  NO_WISHES,
+  parseExtractAnswer,
+  sentenceHasNumber,
+  sentenceHasText,
+  statedCurrency,
+  type ExcludedTerm,
+  type ExtractedWishes,
+  type ExtractRequest,
+  type StatedPrice,
+  type WishExtractor,
+} from "./extract.js";
 
 export {
   ATTRIBUTE_EVIDENCE_TERMS,

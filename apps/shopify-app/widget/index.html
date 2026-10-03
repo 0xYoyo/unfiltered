@@ -247,6 +247,48 @@
         intent: null,
       };
 
+      // Engine v2 fixtures (YOY-149): `intent: null`, chips of the v2
+      // fields only — a price chip carrying the shopper's number and its
+      // ISO currency, the size as typed, availability, and an exclusion
+      // carrying the excluded term as typed (Hebrew under `locale=he`, as a
+      // Hebrew shopper would type it). `?fixture=budget|exclude|size`
+      // selects one. Removal rides `removedChips` (every chip removed in
+      // the chain): the answer is the same response minus those chips.
+      const V2_LOCALE = new URLSearchParams(window.location.search).get("locale");
+      const V2_EXCLUDED = V2_LOCALE === "he" ? "שחור" : "black";
+      const V2_CHIPS = {
+        budget: [{ field: "priceMax", value: "400", currency: "ILS" }],
+        exclude: [
+          { field: "priceMax", value: "400", currency: "ILS" },
+          { field: "exclude", value: V2_EXCLUDED },
+        ],
+        size: [
+          { field: "size", value: "M" },
+          { field: "availability", value: "in stock" },
+        ],
+      };
+      const v2Response = (name, results, request) => {
+        const removed = request.removedChips ?? [];
+        const chips = V2_CHIPS[name].filter(
+          (chip) =>
+            !removed.some(
+              (gone) => gone.field === chip.field && gone.value === chip.value,
+            ),
+        );
+        // The price cap holds while its chip stands; removed, dearer
+        // products come back.
+        const capped = chips.some((chip) => chip.field === "priceMax");
+        return {
+          searchId: `harness-v2-${name}-${removed.length}`,
+          route: "ai",
+          degraded: false,
+          results: capped
+            ? results.filter((result) => result.priceMin <= 400)
+            : results,
+          chips,
+          intent: null,
+        };
+      };
       const jsonResponse = (body) =>
         new Response(JSON.stringify(body), {
           headers: { "Content-Type": "application/json" },
@@ -335,6 +377,9 @@
           if (params.has("removeChip")) {
             request.removeChip = JSON.parse(params.get("removeChip"));
           }
+          if (params.has("removedChips")) {
+            request.removedChips = JSON.parse(params.get("removedChips"));
+          }
           if (params.has("mode")) {
             request.mode = params.get("mode");
           }
@@ -403,7 +448,20 @@
               fixture === "empty"
                 ? { ...RESULTS_RESPONSE, results: [] }
                 : RESULTS_RESPONSE;
-          } else if (request.removeChip !== undefined) {
+          } else if (fixture in V2_CHIPS) {
+            body = v2Response(fixture, [
+              ...AI_RESPONSE.results,
+              {
+                productId: "gid://shopify/Product/14",
+                title: "Velvet Gown",
+                url: "/products/velvet-gown",
+                imageUrl: PIXEL,
+                priceMin: 620,
+                priceMax: 620,
+                currencyCode: "ILS",
+                available: true,
+              },
+            ], request);          } else if (request.removeChip !== undefined) {
             body = chipRemovalResponse(request);
           } else if (fixture === "ai" || fixture === "ai-delayed") {
             body = AI_RESPONSE;

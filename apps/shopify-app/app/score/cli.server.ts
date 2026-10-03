@@ -15,7 +15,12 @@ import {
 } from "./fixture.server";
 import { gradeAgreement, gradeSearch, type GradedResult } from "./grade.server";
 import { findLeaks } from "./leak.server";
-import { formatScoreTable, runScoreSet, withCapturedConsole } from "./run.server";
+import {
+  formatScoreTable,
+  runScoreSet,
+  withCapturedConsole,
+  type ScoreReport,
+} from "./run.server";
 import {
   buildScoreSet,
   decodeHiddenSet,
@@ -90,6 +95,9 @@ async function liveDb(): Promise<PrismaClient> {
 }
 
 /** Live Flash-Lite at thinking level low — the grader (AC-4) and the filler. */
+/** The runner's per-call timeout on grader and judge calls (YOY-149 runner guard). */
+export const RUNNER_CALL_TIMEOUT_MS = 30_000;
+
 async function flashLite(costRecorder: CostRecorder): Promise<LlmClient> {
   const { createGeminiLlmClient, DEFAULT_INTENT_LITE_MODEL } = await import(
     "@unfiltered/provider-gemini"
@@ -98,6 +106,7 @@ async function flashLite(costRecorder: CostRecorder): Promise<LlmClient> {
     modelId: process.env[SCORE_MODEL_ENV] ?? DEFAULT_INTENT_LITE_MODEL,
     thinkingLevel: "low",
     costRecorder,
+    requestTimeoutMs: RUNNER_CALL_TIMEOUT_MS,
   });
 }
 
@@ -162,8 +171,38 @@ export async function runScoreCommand(
       "hidden-set": { type: "string" },
       fixture: { type: "string" },
       synthetic: { type: "boolean", default: false },
+      // Passes over the set on one scratch database (YOY-149 AC-18): the
+      // second pass meets the caches the first filled — warm.
+      passes: { type: "string", default: "1" },
+      // The engine scored (YOY-149, decision 2026-10-03): v1 or v2. Without
+      // it ENGINE_V2 must be set, so a wrong-engine run fails before it spends.
+      engine: { type: "string" },
     },
   });
+  let engine: "v1" | "v2" | "synthetic";
+  if (values.synthetic) {
+    engine = "synthetic";
+  } else if (values.engine !== undefined) {
+    if (values.engine !== "v1" && values.engine !== "v2") {
+      err("score run: --engine must be v1 or v2");
+      return 2;
+    }
+    engine = values.engine;
+    // The orchestrator reads the switch at construction, like production.
+    process.env.ENGINE_V2 = engine === "v2" ? "1" : "0";
+  } else {
+    const switchValue = process.env.ENGINE_V2?.trim();
+    if (switchValue === undefined || switchValue === "") {
+      err("score run: ENGINE_V2 is not set — set ENGINE_V2=1 (or 0), or pass --engine v1|v2");
+      return 2;
+    }
+    engine = switchValue === "1" ? "v2" : "v1";
+  }
+  const passes = Number(values.passes);
+  if (!Number.isInteger(passes) || passes < 1 || passes > 3) {
+    err("score run: --passes must be 1, 2 or 3");
+    return 2;
+  }
   let set: ScoreSetEntry[];
   try {
     set =
@@ -187,7 +226,7 @@ export async function runScoreCommand(
 
   const db = await createScratchDb();
   try {
-    const { result: report } = await withCapturedConsole(async () => {
+    const { result: reports } = await withCapturedConsole(async () => {
       await importScoreFixture(db, fixture);
       let orchestrator: SearchOrchestrator;
       let grader: LlmClient;
@@ -203,14 +242,48 @@ export async function runScoreCommand(
         // The run reads its spend from this ledger (AC-10): it owns the
         // pipeline's queued recorder so it can flush it first.
         const searchLedger = createQueuedCostRecorder(createPrismaCostRecorder(db));
-        orchestrator = createProxySearchOrchestrator(db, { costRecorder: searchLedger });
+        orchestrator = createProxySearchOrchestrator(db, {
+          costRecorder: searchLedger,
+          requestTimeoutMs: RUNNER_CALL_TIMEOUT_MS,
+        });
         grader = await flashLite(createPrismaCostRecorder(db));
         flushLedger = searchLedger.flush;
       }
-      return runScoreSet({ db, orchestrator, grader, storeKey: fixture.storeKey, set, flushLedger });
+      // Each pass reports its own spend and extraction calls: the ledger is
+      // cumulative, so a later pass subtracts what came before it.
+      const results: ScoreReport[] = [];
+      let before = { usd: 0, calls: 0, extractCalls: 0 };
+      for (let pass = 1; pass <= passes; pass += 1) {
+        const report = await runScoreSet({
+          db,
+          orchestrator,
+          grader,
+          storeKey: fixture.storeKey,
+          set,
+          flushLedger,
+          // Progress to stderr as each search finishes (YOY-149 runner guard).
+          progress: (line) => err(line),
+        });
+        const extractCalls = report.extractCalls ?? 0;
+        results.push({
+          ...report,
+          cost: { usd: report.cost.usd - before.usd, calls: report.cost.calls - before.calls },
+          extractCalls: extractCalls - before.extractCalls,
+        });
+        before = { usd: report.cost.usd, calls: report.cost.calls, extractCalls };
+        // A run that stopped early does not start another pass.
+        if (report.abortedAfter !== undefined) break;
+      }
+      return results;
     });
-    out(formatScoreTable(report));
-    return 0;
+    // The engine first, so a wrong-engine run is visible on its first line.
+    out(
+      `engine ${engine}\n` +
+        (reports.length === 1
+          ? formatScoreTable(reports[0]!)
+          : reports.map((report, index) => `pass ${index + 1}\n${formatScoreTable(report)}`).join("\n")),
+    );
+    return reports.some((report) => report.abortedAfter !== undefined) ? 1 : 0;
   } catch (error) {
     // The name only: a message can carry query text.
     err(`score run failed (${(error as Error).name})`);

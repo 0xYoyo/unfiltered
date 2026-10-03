@@ -127,6 +127,9 @@ async function handleSearch(
     // orchestrator ignores them on a preview (AC-9). No `engine` here: the
     // storefront takes the env default, whatever the request says (AC-6).
     const paging = body.paging !== undefined ? { paging: body.paging } : {};
+    // Chips removed from an Engine v2 response (YOY-149 AC-15).
+    const removed =
+      body.removedChips !== undefined ? { removedChips: body.removedChips } : {};
     const response = await orchestrator.runSearch(
       preview
         ? { query: body.query, shopDomain: shop, preview: true }
@@ -139,13 +142,14 @@ async function handleSearch(
               ...paging,
             }
         : throttled
-        ? { query: body.query, shopDomain: shop, forceClassic: true, ...paging }
+        ? { query: body.query, shopDomain: shop, forceClassic: true, ...paging, ...removed }
         : resolvedIntent !== undefined
           ? { query: body.query, shopDomain: shop, resolvedIntent, ...paging }
           : {
               query: body.query,
               shopDomain: shop,
               ...paging,
+              ...removed,
               ...(body.previousIntent !== undefined
                 ? { previousIntent: body.previousIntent }
                 : {}),

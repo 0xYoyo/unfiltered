@@ -320,6 +320,18 @@ model JudgeAnswer {
   @@unique([shopDomain, cacheKey])
 }
 
+// The wish extraction cache (YOY-149 AC-18): one validated extraction per
+// cache key — the SHA-256 of the normalized sentence, its language (by
+// script), the extraction prompt version and the model id. Not keyed by
+// tenant: the answer depends on the sentence alone. `wishes` is the
+// validated answer. Never evicted.
+model ExtractionAnswer {
+  id        String   @id @default(uuid())
+  cacheKey  String   @unique
+  wishes    Json
+  createdAt DateTime @default(now())
+}
+
 // The verdict log (YOY-148 AC-4): one row per product on every judged or
 // cache-served page — which search, page and whole-order position, the
 // verdict, the missed-wish flags, the label template, whether the cache

@@ -28,6 +28,13 @@ export interface SearchOutcome {
   language: ScoreLanguage;
   score: number;
   latencyMs: number;
+  /**
+   * Whether the wish extraction answered in time (YOY-149 AC-4); null when
+   * the search was not served by Engine v2's find path, or failed.
+   */
+  extractionInTime: boolean | null;
+  /** Whether the extraction cache answered (YOY-149 AC-18); null where `extractionInTime` is. */
+  extractionCached: boolean | null;
   /** The search or its grading threw; scored 0. */
   failed: boolean;
   /** Where and what threw, for a failed search (YOY-141 AC-13). */
@@ -73,6 +80,16 @@ export interface LanguageScore {
   modelWritten: boolean;
   /** Share of searches answered in under 1 s, 0–1. */
   underOneSecond: number;
+  /**
+   * Share of Engine v2 searches composed without the wish extraction, 0–1
+   * (YOY-149 AC-4); null when no search in the language reported it.
+   */
+  withoutExtraction: number | null;
+  /**
+   * Share of Engine v2 searches the extraction cache answered, 0–1 (YOY-149
+   * AC-18); null when no search in the language reported it.
+   */
+  extractionCached: number | null;
   failed: number;
 }
 
@@ -82,6 +99,34 @@ export interface ScoreReport {
   cost: { usd: number; calls: number };
   /** Failed searches per (stage, class), most frequent first (YOY-141 AC-13). */
   failures: FailureCount[];
+  /**
+   * Wish-extraction calls in the ledger (YOY-149 AC-18): a warm pass over
+   * sentences already extracted makes none. Printed when present.
+   */
+  extractCalls?: number;
+  /**
+   * Set when the run stopped early after this many consecutive failed
+   * searches (YOY-149 runner guard): the table covers the searches before it.
+   */
+  abortedAfter?: number;
+}
+
+/** Consecutive failed searches after which a run stops (YOY-149 runner guard). */
+export const MAX_CONSECUTIVE_FAILURES = 5;
+/** One search plus its grade may take this long before it counts as failed (YOY-149 runner guard). */
+export const SEARCH_TIMEOUT_MS = 90_000;
+
+/** A scored search that ran past `SEARCH_TIMEOUT_MS`. */
+export class ScoreSearchTimeout extends Error {
+  override readonly name = "ScoreSearchTimeout";
+}
+
+function withTimeout<T>(work: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new ScoreSearchTimeout(`no result within ${ms}ms`)), ms);
+  });
+  return Promise.race([work, timeout]).finally(() => clearTimeout(timer));
 }
 
 /**
@@ -210,6 +255,9 @@ export async function runScoreSet({
   storeKey,
   set,
   flushLedger = async () => {},
+  progress = () => {},
+  maxConsecutiveFailures = MAX_CONSECUTIVE_FAILURES,
+  searchTimeoutMs = SEARCH_TIMEOUT_MS,
 }: {
   db: PrismaClient;
   orchestrator: SearchOrchestrator;
@@ -218,31 +266,63 @@ export async function runScoreSet({
   set: readonly ScoreSetEntry[];
   /** Settles the search pipeline's queued ledger writes before the cost is read. */
   flushLedger?: () => Promise<void>;
+  /**
+   * One line per search as it finishes, `[n/N] <lang> ok|fail <stage>` (YOY-149
+   * runner guard): a stalled run shows in seconds. Never carries the query.
+   */
+  progress?: (line: string) => void;
+  maxConsecutiveFailures?: number;
+  searchTimeoutMs?: number;
 }): Promise<ScoreReport> {
   const outcomes: SearchOutcome[] = [];
-  for (const entry of set) {
+  let consecutiveFailures = 0;
+  let abortedAfter: number | undefined;
+  for (const [index, entry] of set.entries()) {
     let stage: FailureStage = "search";
+    const position = `[${index + 1}/${set.length}] ${entry.language}`;
     try {
-      const { response, latencyMs } = await runPlaygroundSearch(orchestrator, {
-        query: entry.query,
-        storeKey,
-        limit: SCORE_RESULT_LIMIT,
+      const { response, latencyMs, grades } = await withTimeout(
+        (async () => {
+          const searched = await runPlaygroundSearch(orchestrator, {
+            query: entry.query,
+            storeKey,
+            limit: SCORE_RESULT_LIMIT,
+          });
+          stage = "grade";
+          const top = searched.response.hits.slice(0, GRADED_RESULTS).map((hit) => hit.productId);
+          const results = await gradedResults(db, storeKey, top);
+          return { ...searched, grades: await gradeSearch({ llm: grader, query: entry.query, results }) };
+        })(),
+        searchTimeoutMs,
+      );
+      outcomes.push({
+        language: entry.language,
+        score: searchScore(grades),
+        latencyMs,
+        extractionInTime: response.extractionInTime ?? null,
+        extractionCached: response.extractionCached ?? null,
+        failed: false,
       });
-      stage = "grade";
-      const top = response.hits.slice(0, GRADED_RESULTS).map((hit) => hit.productId);
-      const results = await gradedResults(db, storeKey, top);
-      const grades = await gradeSearch({ llm: grader, query: entry.query, results });
-      outcomes.push({ language: entry.language, score: searchScore(grades), latencyMs, failed: false });
+      consecutiveFailures = 0;
+      progress(`${position} ok`);
     } catch (error) {
+      consecutiveFailures += 1;
+      progress(`${position} fail ${stage}`);
       // A failure is scored and counted by stage and class, never printed:
       // its message may carry the query.
       outcomes.push({
         language: entry.language,
         score: 0,
         latencyMs: Infinity,
+        extractionInTime: null,
+        extractionCached: null,
         failed: true,
         failure: { stage, className: failureClassName(error) },
       });
+      if (consecutiveFailures >= maxConsecutiveFailures) {
+        abortedAfter = consecutiveFailures;
+        break;
+      }
     }
   }
 
@@ -257,11 +337,35 @@ export async function runScoreSet({
       searches: scored.length,
       modelWritten: set.some((entry) => entry.language === language && entry.modelWritten),
       underOneSecond: mean(scored.map((outcome) => (outcome.latencyMs < FAST_SEARCH_MS ? 1 : 0))),
+      withoutExtraction: shareWithoutExtraction(scored),
+      extractionCached: shareExtractionCached(scored),
       failed: scored.filter((outcome) => outcome.failed).length,
     });
   }
   await flushLedger();
-  return { languages, cost: await readRunCost(db), failures: countFailures(outcomes) };
+  return {
+    languages,
+    cost: await readRunCost(db),
+    failures: countFailures(outcomes),
+    extractCalls: await db.aiCall.count({ where: { operation: "extract" } }),
+    ...(abortedAfter !== undefined ? { abortedAfter } : {}),
+  };
+}
+
+/** The share of searches that reported the extraction late (YOY-149 AC-4); null when none reported. */
+function shareWithoutExtraction(outcomes: readonly SearchOutcome[]): number | null {
+  const reported = outcomes.filter((outcome) => outcome.extractionInTime !== null);
+  return reported.length === 0
+    ? null
+    : reported.filter((outcome) => outcome.extractionInTime === false).length / reported.length;
+}
+
+/** The share of searches the extraction cache answered (YOY-149 AC-18); null when none reported. */
+function shareExtractionCached(outcomes: readonly SearchOutcome[]): number | null {
+  const reported = outcomes.filter((outcome) => outcome.extractionCached !== null);
+  return reported.length === 0
+    ? null
+    : reported.filter((outcome) => outcome.extractionCached === true).length / reported.length;
 }
 
 function countFailures(outcomes: readonly SearchOutcome[]): FailureCount[] {
@@ -284,13 +388,24 @@ function countFailures(outcomes: readonly SearchOutcome[]): FailureCount[] {
 /** The score table: the only thing a run prints (AC-5, AC-7). */
 export function formatScoreTable(report: ScoreReport): string {
   const rows = [
-    ["language", "score", "searches", "model-written", "under 1 s", "failed"],
+    [
+      "language",
+      "score",
+      "searches",
+      "model-written",
+      "under 1 s",
+      "no extraction",
+      "extraction cached",
+      "failed",
+    ],
     ...report.languages.map((row) => [
       row.language,
       row.score.toFixed(3),
       String(row.searches),
       row.modelWritten ? "yes" : "no",
       `${Math.round(row.underOneSecond * 100)}%`,
+      row.withoutExtraction === null ? "—" : `${Math.round(row.withoutExtraction * 100)}%`,
+      row.extractionCached === null ? "—" : `${Math.round(row.extractionCached * 100)}%`,
       String(row.failed),
     ]),
   ];
@@ -298,6 +413,10 @@ export function formatScoreTable(report: ScoreReport): string {
   return [
     ...rows.map((row) => row.map((cell, column) => cell.padEnd(widths[column]!)).join("  ").trimEnd()),
     formatCostLine(report.cost),
+    ...(report.extractCalls !== undefined ? [`extract calls ${report.extractCalls}`] : []),
+    ...(report.abortedAfter !== undefined
+      ? [`aborted after ${report.abortedAfter} consecutive failures`]
+      : []),
     ...report.failures.map(formatFailureLine),
   ].join("\n");
 }
