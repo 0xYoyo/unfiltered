@@ -187,7 +187,8 @@ deployment's.
 |-----|--------|----|----|----|----|----|----|-----------|------|
 | 1 | M5 engine | 0.472 | 0.269 | 0.398 | 0.431 | 0.324 | 0.306 | classic 96 % · AI 34 % (EN 40 %, HE 28 %), 2026-10-01 | $0.0571 |
 | 2 | Engine v2 find step (`ENGINE_V2=1`) | 0.597 | 0.278 | 0.569 | 0.569 | 0.574 | 0.384 | — (not deployed) | $0.0276 |
-| 3 | Engine v2 find step + judge (`ENGINE_V2=1`) | 0.597 | 0.292 | 0.556 | 0.648 | 0.542 | 0.403 | — (not deployed) | $0.0928 |
+| 3 | Engine v2 find step + judge reading facts (`ENGINE_V2=1`, judge deadline 4,000 ms) | 0.644 | 0.366 | 0.491 | 0.676 | 0.569 | 0.431 | — (not deployed) | $0.1858 |
+| 3 (first, superseded) | Engine v2 find step + judge reading the summary (`ENGINE_V2=1`, deadline 1,500 ms) | 0.597 | 0.292 | 0.556 | 0.648 | 0.542 | 0.403 | — (not deployed) | $0.0928 |
 | 1 (invalid: 18 failures) | M5 engine | 0.306 | 0.032 | 0.181 | 0.083 | 0.167 | 0.106 | — | $0.0391 |
 
 Run 1 — M5 engine: [run 36908656314](https://github.com/0xYoyo/unfiltered/actions/runs/36908656314),
@@ -218,13 +219,37 @@ language with log queries (en, he) — is **not met**: en is equal. The
 runner's own under-1-s column is 0 % in every language. 216 model calls
 (72 query embeddings, 72 judge calls, 72 grades) cost $0.0928.
 
+Run 3, repeated after the judge reads facts (YOY-147 AC-17, AC-18):
+[run 37111633995](https://github.com/0xYoyo/unfiltered/actions/runs/37111633995),
+2026-10-03, dispatched with `ref=729b096` and `engine=v2` on the judge
+branch. Each candidate row now carries the card's `facts` and the five
+vision attributes instead of the card summary (480 characters), the prompt
+makes `exact` conditional on every stated wish being met by the row, and
+the workflow sets `JUDGE_DEADLINE_MS=4000` so the score measures judgment,
+not speed. Green, leak check clean (72 checked), **0 failed searches**. Env
+settings present: `GEMINI_API_KEY` only. Against run 2: en **+0.047**, he
+**+0.088**, ar −0.078, ru +0.107, fr −0.005, es +0.047. The gate — above
+run 2 in every language with log queries (en, he) — is **met**. ar, fr are
+model-written sets and outside the gate; ar's drop is noted for run 4. 216
+model calls cost $0.1858, about double the first run 3: longer rows, and
+with 4,000 ms no judge call is cut off. Before the re-run, the offline
+probe (seed fixture, recorded query vector, live judge on page 1, 'long
+sleeve midi dress') held **4 of 6** long-sleeve dresses in the judged top
+six on 3 of 3 calls (find order alone: 1 of 6), up from 1–3 of 6 with the
+summary rows; the 3 calls took 963–2,481 ms and cost $0.0075 from their
+ledger rows ($2.50 per 1,000 page-1 judge calls of 24 rows).
+
 Speed and judge cost (YOY-147 AC-15), measured locally on the public half
 (78 searches over the seed fixture, `ENGINE_V2=1`, 2026-10-02; a local run
 from Israel, not the deployment): search latency median **1,510 ms**,
 **0 %** under 1 s (the find step alone: 100 % under 1 s); judge stage median
 1,136 ms; 20 of 78 judge calls passed the 1,500 ms deadline and served find
 order. Judge ledger rows: 78 calls, mean 1,841 input and 162 output tokens,
-**$0.958 per 1,000 uncached searches**.
+**$0.958 per 1,000 uncached searches**. These were measured with the
+summary rows (320 characters), before AC-17; the facts rows are longer, and
+the offline probe's ledger puts a 24-row page-1 judge call at $0.0025 ($2.50
+per 1,000). The speed gate is the latency probe's, on the deployment, at
+run 4.
 
 Run 1 (invalid): [run 36905483201](https://github.com/0xYoyo/unfiltered/actions/runs/36905483201)
 at `bdcc41e`, 18 of 72 searches failed and scored 0 (en 2, he 2, ar 3,
