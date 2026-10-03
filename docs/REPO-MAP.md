@@ -823,6 +823,23 @@ docs/
       widget-overlay-mobile-he-2-loading-more.png
       widget-overlay-mobile-he-3-appended.png
       widget-overlay-mobile-he-4-failed-page.png
+    YOY-149/
+      playground-desktop-en-1-budget-chips.png
+      playground-desktop-en-2-cap-removed.png
+      playground-desktop-he-1-budget-chips.png
+      playground-desktop-he-2-cap-removed.png
+      playground-mobile-en-1-budget-chips.png
+      playground-mobile-en-2-cap-removed.png
+      playground-mobile-he-1-budget-chips.png
+      playground-mobile-he-2-cap-removed.png
+      widget-native-desktop-en-size-chip.png
+      widget-native-desktop-he-size-chip.png
+      widget-native-mobile-en-size-chip.png
+      widget-native-mobile-he-size-chip.png
+      widget-overlay-desktop-en-exclude-chip.png
+      widget-overlay-desktop-he-exclude-chip.png
+      widget-overlay-mobile-en-exclude-chip.png
+      widget-overlay-mobile-he-exclude-chip.png
     YOY-64/
       desktop-en-intent-reuse.png
       desktop-he-intent-reuse.png
