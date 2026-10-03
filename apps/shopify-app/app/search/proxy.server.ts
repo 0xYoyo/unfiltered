@@ -757,7 +757,10 @@ export function createProxySearchOrchestrator(
     // caller that reads the ledger afterwards passes its own queued recorder
     // and flushes it first (the score run, YOY-141 AC-10).
     costRecorder = createQueuedCostRecorder(createPrismaCostRecorder(db)),
-  }: { costRecorder?: CostRecorder } = {},
+    // A per-call timeout on the judge and the wish extraction; the score
+    // runner sets 30 s (YOY-149 runner guard). Unset keeps each client's own.
+    requestTimeoutMs,
+  }: { costRecorder?: CostRecorder; requestTimeoutMs?: number } = {},
 ): SearchOrchestrator {
   const models = geminiModelsFromEnv();
   const reuseWindowMs = intentReuseWindowMsFromEnv();
@@ -842,6 +845,7 @@ export function createProxySearchOrchestrator(
             modelId: models.judgeModel,
             costRecorder,
             thinkingLevel: models.judgeThinkingLevel,
+            ...(requestTimeoutMs !== undefined ? { requestTimeoutMs } : {}),
           }),
       },
       // The answer-cache key names the model (YOY-148 AC-1).
@@ -859,6 +863,7 @@ export function createProxySearchOrchestrator(
         modelId: models.extractModel,
         costRecorder,
         thinkingLevel: models.extractThinkingLevel,
+        ...(requestTimeoutMs !== undefined ? { requestTimeoutMs } : {}),
       }),
     }),
     extractionGraceMs: extractionGraceMsFromEnv(),

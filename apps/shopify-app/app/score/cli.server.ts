@@ -95,6 +95,9 @@ async function liveDb(): Promise<PrismaClient> {
 }
 
 /** Live Flash-Lite at thinking level low — the grader (AC-4) and the filler. */
+/** The runner's per-call timeout on grader and judge calls (YOY-149 runner guard). */
+export const RUNNER_CALL_TIMEOUT_MS = 30_000;
+
 async function flashLite(costRecorder: CostRecorder): Promise<LlmClient> {
   const { createGeminiLlmClient, DEFAULT_INTENT_LITE_MODEL } = await import(
     "@unfiltered/provider-gemini"
@@ -103,6 +106,7 @@ async function flashLite(costRecorder: CostRecorder): Promise<LlmClient> {
     modelId: process.env[SCORE_MODEL_ENV] ?? DEFAULT_INTENT_LITE_MODEL,
     thinkingLevel: "low",
     costRecorder,
+    requestTimeoutMs: RUNNER_CALL_TIMEOUT_MS,
   });
 }
 
@@ -238,7 +242,10 @@ export async function runScoreCommand(
         // The run reads its spend from this ledger (AC-10): it owns the
         // pipeline's queued recorder so it can flush it first.
         const searchLedger = createQueuedCostRecorder(createPrismaCostRecorder(db));
-        orchestrator = createProxySearchOrchestrator(db, { costRecorder: searchLedger });
+        orchestrator = createProxySearchOrchestrator(db, {
+          costRecorder: searchLedger,
+          requestTimeoutMs: RUNNER_CALL_TIMEOUT_MS,
+        });
         grader = await flashLite(createPrismaCostRecorder(db));
         flushLedger = searchLedger.flush;
       }
@@ -254,6 +261,8 @@ export async function runScoreCommand(
           storeKey: fixture.storeKey,
           set,
           flushLedger,
+          // Progress to stderr as each search finishes (YOY-149 runner guard).
+          progress: (line) => err(line),
         });
         const extractCalls = report.extractCalls ?? 0;
         results.push({
@@ -262,6 +271,8 @@ export async function runScoreCommand(
           extractCalls: extractCalls - before.extractCalls,
         });
         before = { usd: report.cost.usd, calls: report.cost.calls, extractCalls };
+        // A run that stopped early does not start another pass.
+        if (report.abortedAfter !== undefined) break;
       }
       return results;
     });
@@ -272,7 +283,7 @@ export async function runScoreCommand(
           ? formatScoreTable(reports[0]!)
           : reports.map((report, index) => `pass ${index + 1}\n${formatScoreTable(report)}`).join("\n")),
     );
-    return 0;
+    return reports.some((report) => report.abortedAfter !== undefined) ? 1 : 0;
   } catch (error) {
     // The name only: a message can carry query text.
     err(`score run failed (${(error as Error).name})`);

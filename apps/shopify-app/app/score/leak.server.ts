@@ -28,6 +28,9 @@ const FAILURE_LINE = /^failed (?:search|grade) [A-Za-z_$][\w$]{0,63} \d+$/;
 const PASS_LINE = /^pass \d+$/;
 // The engine line every run starts with (YOY-149, decision 2026-10-03).
 const ENGINE_LINE = /^engine (?:v1|v2|synthetic)$/;
+// The runner's progress and early-stop lines (YOY-149 runner guards).
+const PROGRESS_LINE = new RegExp(`^\\[\\d+/\\d+\\] ${LANGUAGE} (?:ok|fail (?:search|grade))$`);
+const ABORT_LINE = /^aborted after \d+ consecutive failures$/;
 const EXTRACT_LINE = /^extract calls \d+$/;
 const STRICT_LINES = [
   TABLE_HEADER,
@@ -37,6 +40,8 @@ const STRICT_LINES = [
   PASS_LINE,
   EXTRACT_LINE,
   ENGINE_LINE,
+  PROGRESS_LINE,
+  ABORT_LINE,
 ];
 
 /**

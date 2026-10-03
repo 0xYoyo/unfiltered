@@ -104,6 +104,29 @@ export interface ScoreReport {
    * sentences already extracted makes none. Printed when present.
    */
   extractCalls?: number;
+  /**
+   * Set when the run stopped early after this many consecutive failed
+   * searches (YOY-149 runner guard): the table covers the searches before it.
+   */
+  abortedAfter?: number;
+}
+
+/** Consecutive failed searches after which a run stops (YOY-149 runner guard). */
+export const MAX_CONSECUTIVE_FAILURES = 5;
+/** One search plus its grade may take this long before it counts as failed (YOY-149 runner guard). */
+export const SEARCH_TIMEOUT_MS = 90_000;
+
+/** A scored search that ran past `SEARCH_TIMEOUT_MS`. */
+export class ScoreSearchTimeout extends Error {
+  override readonly name = "ScoreSearchTimeout";
+}
+
+function withTimeout<T>(work: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new ScoreSearchTimeout(`no result within ${ms}ms`)), ms);
+  });
+  return Promise.race([work, timeout]).finally(() => clearTimeout(timer));
 }
 
 /**
@@ -232,6 +255,9 @@ export async function runScoreSet({
   storeKey,
   set,
   flushLedger = async () => {},
+  progress = () => {},
+  maxConsecutiveFailures = MAX_CONSECUTIVE_FAILURES,
+  searchTimeoutMs = SEARCH_TIMEOUT_MS,
 }: {
   db: PrismaClient;
   orchestrator: SearchOrchestrator;
@@ -240,20 +266,35 @@ export async function runScoreSet({
   set: readonly ScoreSetEntry[];
   /** Settles the search pipeline's queued ledger writes before the cost is read. */
   flushLedger?: () => Promise<void>;
+  /**
+   * One line per search as it finishes, `[n/N] <lang> ok|fail <stage>` (YOY-149
+   * runner guard): a stalled run shows in seconds. Never carries the query.
+   */
+  progress?: (line: string) => void;
+  maxConsecutiveFailures?: number;
+  searchTimeoutMs?: number;
 }): Promise<ScoreReport> {
   const outcomes: SearchOutcome[] = [];
-  for (const entry of set) {
+  let consecutiveFailures = 0;
+  let abortedAfter: number | undefined;
+  for (const [index, entry] of set.entries()) {
     let stage: FailureStage = "search";
+    const position = `[${index + 1}/${set.length}] ${entry.language}`;
     try {
-      const { response, latencyMs } = await runPlaygroundSearch(orchestrator, {
-        query: entry.query,
-        storeKey,
-        limit: SCORE_RESULT_LIMIT,
-      });
-      stage = "grade";
-      const top = response.hits.slice(0, GRADED_RESULTS).map((hit) => hit.productId);
-      const results = await gradedResults(db, storeKey, top);
-      const grades = await gradeSearch({ llm: grader, query: entry.query, results });
+      const { response, latencyMs, grades } = await withTimeout(
+        (async () => {
+          const searched = await runPlaygroundSearch(orchestrator, {
+            query: entry.query,
+            storeKey,
+            limit: SCORE_RESULT_LIMIT,
+          });
+          stage = "grade";
+          const top = searched.response.hits.slice(0, GRADED_RESULTS).map((hit) => hit.productId);
+          const results = await gradedResults(db, storeKey, top);
+          return { ...searched, grades: await gradeSearch({ llm: grader, query: entry.query, results }) };
+        })(),
+        searchTimeoutMs,
+      );
       outcomes.push({
         language: entry.language,
         score: searchScore(grades),
@@ -262,7 +303,11 @@ export async function runScoreSet({
         extractionCached: response.extractionCached ?? null,
         failed: false,
       });
+      consecutiveFailures = 0;
+      progress(`${position} ok`);
     } catch (error) {
+      consecutiveFailures += 1;
+      progress(`${position} fail ${stage}`);
       // A failure is scored and counted by stage and class, never printed:
       // its message may carry the query.
       outcomes.push({
@@ -274,6 +319,10 @@ export async function runScoreSet({
         failed: true,
         failure: { stage, className: failureClassName(error) },
       });
+      if (consecutiveFailures >= maxConsecutiveFailures) {
+        abortedAfter = consecutiveFailures;
+        break;
+      }
     }
   }
 
@@ -299,6 +348,7 @@ export async function runScoreSet({
     cost: await readRunCost(db),
     failures: countFailures(outcomes),
     extractCalls: await db.aiCall.count({ where: { operation: "extract" } }),
+    ...(abortedAfter !== undefined ? { abortedAfter } : {}),
   };
 }
 
@@ -364,6 +414,9 @@ export function formatScoreTable(report: ScoreReport): string {
     ...rows.map((row) => row.map((cell, column) => cell.padEnd(widths[column]!)).join("  ").trimEnd()),
     formatCostLine(report.cost),
     ...(report.extractCalls !== undefined ? [`extract calls ${report.extractCalls}`] : []),
+    ...(report.abortedAfter !== undefined
+      ? [`aborted after ${report.abortedAfter} consecutive failures`]
+      : []),
     ...report.failures.map(formatFailureLine),
   ].join("\n");
 }

@@ -192,6 +192,14 @@ the noise band of the M5 baseline above.
 Every score run now prints its engine on its first line and refuses to
 start when `ENGINE_V2` is unset and no `--engine v1|v2` is given.
 
+**Runner guards (2026-10-03).** Each search prints a progress line to
+stderr as it finishes (`[n/78] <lang> ok|fail <stage>`, never the query);
+a search plus its grade that takes over 90 s counts as failed
+(`ScoreSearchTimeout`); grader, judge and extraction calls time out at
+30 s; and after 5 consecutive failed searches the run stops, prints the
+partial table with `aborted after 5 consecutive failures` and its spend
+so far, and exits 1. The leak check reads all of these as strict lines.
+
 **Noise band floor (2026-10-03).** Every language's band is
 `max(M5 band, 0.03)`: ar's 0.017 and fr's 0.004 came from too few M5 runs
 to be a real band for Engine v2. This applies to YOY-149's AC-17 and to
