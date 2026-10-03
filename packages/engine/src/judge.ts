@@ -22,6 +22,14 @@ export const JUDGE_PROVIDERS = ["gemini"] as const;
 export type JudgeProvider = (typeof JUDGE_PROVIDERS)[number];
 export const DEFAULT_JUDGE_PROVIDER: JudgeProvider = "gemini";
 
+/**
+ * The judge prompt's version (YOY-148 AC-1): part of the answer-cache key,
+ * so a stored answer is never served for a prompt that has since changed.
+ * Bump it with every change to `buildJudgePrompt`, `judgeRow` or the
+ * answer schema.
+ */
+export const JUDGE_PROMPT_VERSION = 1;
+
 /** Characters one candidate row is cut to (AC-2; raised to 480 by AC-17). */
 export const DEFAULT_JUDGE_ROW_CHARS = 480;
 /** Description characters a product with no card contributes (AC-2). */
@@ -101,6 +109,12 @@ export interface JudgeVerdict {
 }
 
 export interface Judge {
+  /**
+   * Which provider and model answer, e.g. `gemini:gemini-3.5-flash-lite`
+   * (YOY-148 AC-1): part of the answer-cache key. Absent on a judge built
+   * without one; it then caches under `unknown`.
+   */
+  readonly identity?: string;
   /**
    * One verdict per candidate, in candidate order. Rejects with
    * `JudgeAnswerError` when the answer is invalid twice (AC-4), and with
@@ -356,6 +370,8 @@ export function parseJudgeAnswer(
 
 export interface LlmJudgeOptions {
   llm: LlmClient;
+  /** Provider and model, for the answer-cache key (YOY-148 AC-1). */
+  identity?: string;
   /** Characters a candidate row is cut to; 320 by default (AC-2). */
   maxRowChars?: number;
 }
@@ -369,6 +385,7 @@ export function createLlmJudge(options: LlmJudgeOptions): Judge {
   const { llm } = options;
   const maxRowChars = options.maxRowChars ?? DEFAULT_JUDGE_ROW_CHARS;
   return {
+    ...(options.identity !== undefined ? { identity: options.identity } : {}),
     async judge(request) {
       const prompt = buildJudgePrompt(request.sentence, request.candidates, maxRowChars);
       for (let attempt = 1; attempt <= 2; attempt += 1) {
@@ -398,13 +415,17 @@ export interface JudgeFactoryOptions {
   provider: JudgeProvider;
   /** The provider's LLM client for the judge call, built only for the selected one. */
   clients: Record<JudgeProvider, () => LlmClient>;
+  /** The model each provider's client calls, for the answer-cache key (YOY-148 AC-1). */
+  modelIds?: Partial<Record<JudgeProvider, string>>;
   maxRowChars?: number;
 }
 
 /** The one judge factory (AC-1): the selected provider's client behind the one judge. */
 export function createJudge(options: JudgeFactoryOptions): Judge {
+  const modelId = options.modelIds?.[options.provider] ?? "unknown";
   return createLlmJudge({
     llm: options.clients[options.provider](),
+    identity: `${options.provider}:${modelId}`,
     ...(options.maxRowChars !== undefined ? { maxRowChars: options.maxRowChars } : {}),
   });
 }

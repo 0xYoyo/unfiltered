@@ -25,7 +25,11 @@ import {
 } from "../ai/cost-recorder.server";
 import { createPgTrgmClassicStore } from "./classic-store.server";
 import { createFindStep, findSetSizeFromEnv } from "./find.server";
-import { judgeDeadlineMsFromEnv, judgeRowCharsFromEnv } from "./judge-step.server";
+import {
+  judgeDeadlineMsFromEnv,
+  judgeGiveUpMsFromEnv,
+  judgeRowCharsFromEnv,
+} from "./judge-step.server";
 import {
   createSearchOrchestrator,
   DEFAULT_PAGE_SIZE,
@@ -281,6 +285,48 @@ export function parseClickBeaconBody(value: unknown): ClickBeaconBody | null {
   return { searchId, sessionId, productId, position };
 }
 
+/** A labels request (YOY-148 AC-8): which search and which page. */
+export interface LabelsRequest {
+  searchId: string;
+  page: number;
+}
+
+/**
+ * Parse a labels request from GET query parameters (YOY-148 AC-8): a
+ * non-empty `searchId` of at most 200 characters and a whole `page` of 1 or
+ * more. Anything else is null.
+ */
+export function parseLabelsParams(params: URLSearchParams): LabelsRequest | null {
+  const searchId = params.get("searchId");
+  const page = params.get("page");
+  if (searchId === null || searchId.trim() === "" || searchId.length > 200 || page === null) {
+    return null;
+  }
+  const parsed = Number(page);
+  if (page.trim() === "" || !Number.isInteger(parsed) || parsed < 1) {
+    return null;
+  }
+  return { searchId, page: parsed };
+}
+
+/** The labels endpoint's body (YOY-148 AC-8, AC-9): labels by product id, never an order. */
+export interface ProxyLabelsResponse {
+  labels: Record<string, ProxyLabel | null>;
+}
+
+export function serializeLabels(
+  labels: Record<string, { template: ProxyLabel["template"]; values: readonly string[] } | null>,
+): ProxyLabelsResponse {
+  return {
+    labels: Object.fromEntries(
+      Object.entries(labels).map(([productId, label]) => [
+        productId,
+        label === null ? null : { template: label.template, values: [...label.values] },
+      ]),
+    ),
+  };
+}
+
 /**
  * Parse a click beacon from GET query parameters (YOY-60): the mirror of
  * the widget's `buildClickParams`, delegating validation to
@@ -438,6 +484,11 @@ export interface ProxySearchResponse {
   page?: number;
   /** Results across every page; present exactly when `page` is. */
   totalCount?: number;
+  /**
+   * Present (true) only when the judge missed its deadline and runs on
+   * (YOY-148 AC-7): the page's labels can be fetched from the labels endpoint.
+   */
+  labelsPending?: true;
 }
 
 function serializeCard(card: {
@@ -518,6 +569,9 @@ export function serializeProxySearchResponse(
   if (response.page !== undefined && response.totalCount !== undefined) {
     body.page = response.page;
     body.totalCount = response.totalCount;
+  }
+  if (response.labelsPending === true) {
+    body.labelsPending = true;
   }
   return body;
 }
@@ -717,9 +771,12 @@ export function createProxySearchOrchestrator(
             thinkingLevel: models.judgeThinkingLevel,
           }),
       },
+      // The answer-cache key names the model (YOY-148 AC-1).
+      modelIds: { gemini: models.judgeModel },
       maxRowChars: judgeRowCharsFromEnv(),
     }),
     judgeDeadlineMs: judgeDeadlineMsFromEnv(),
+    judgeGiveUpMs: judgeGiveUpMsFromEnv(),
   });
 }
 
