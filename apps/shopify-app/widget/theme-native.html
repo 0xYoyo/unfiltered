@@ -496,6 +496,11 @@
           { field: "size", value: "M" },
           { field: "availability", value: "in stock" },
         ],
+        // YOY-150: a refinement chain (`refine`) and a second reading
+        // (`two-meanings`). Both answer a `carry` the way the server builds
+        // one — the request's `previousQuery` and the query, one per line.
+        refine: [{ field: "size", value: "M" }],
+        "two-meanings": [],
       };
       const v2Response = (name, results, request) => {
         const removed = request.removedChips ?? [];
@@ -517,6 +522,17 @@
             : results,
           chips,
           intent: null,
+          ...(name === "refine" || name === "two-meanings"
+            ? {
+                carry:
+                  request.previousQuery === undefined
+                    ? request.query
+                    : `${request.previousQuery}\n${request.query}`,
+              }
+            : {}),
+          ...(name === "two-meanings"
+            ? { otherReading: V2_LOCALE === "he" ? "שמלות כלה" : "Bridal gowns" }
+            : {}),
         };
       };
       const chipRemovalResponse = (request) => ({
@@ -677,6 +693,9 @@
           }
           if (parsed.searchParams.has("removedChips")) {
             request.removedChips = JSON.parse(parsed.searchParams.get("removedChips"));
+          }
+          if (parsed.searchParams.has("previousQuery")) {
+            request.previousQuery = parsed.searchParams.get("previousQuery");
           }
           if (parsed.searchParams.has("mode")) {
             request.mode = parsed.searchParams.get("mode");

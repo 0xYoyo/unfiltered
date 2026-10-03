@@ -86,6 +86,12 @@ export interface ProxySearchBody {
    */
   removedChips?: RemovedChip[];
   /**
+   * The `carry` of the previous Engine v2 response in this chain (YOY-150
+   * AC-1): the search refines or replaces it. At most
+   * `MAX_PREVIOUS_QUERY_CHARS` characters; absent on a fresh search.
+   */
+  previousQuery?: string;
+  /**
    * "preview" marks a keystroke preview (YOY-68): classic-only results,
    * zero LLM calls, no throttle budget, no SearchEvent. "classic" marks a
    * SUBMITTED classic-only search (YOY-96 AC-9) — the widget's rescue of a
@@ -94,7 +100,7 @@ export interface ProxySearchBody {
    * routeReason "client-timeout-rescue") with an attributable searchId.
    * Absent on ordinary submitted searches, which run the full pipeline.
    * Both modes are bare classic fetches, so neither combines with
-   * `previousIntent` or `removeChip`.
+   * `previousIntent`, `removeChip` or `previousQuery`.
    */
   mode?: ProxySearchMode;
   /**
@@ -110,6 +116,12 @@ export interface ProxySearchBody {
 export type ProxySearchMode = "preview" | "classic";
 
 const SEARCH_MODES: ReadonlySet<string> = new Set(["preview", "classic"]);
+
+/**
+ * The longest `previousQuery` accepted (YOY-150 AC-1): a carry holds at most
+ * three sentences, so anything longer is not one the server answered.
+ */
+export const MAX_PREVIOUS_QUERY_CHARS = 2_000;
 
 const CHIP_FIELDS: ReadonlySet<string> = new Set([
   "category",
@@ -152,7 +164,7 @@ export function parseProxySearchBody(value: unknown): ProxySearchBody | null {
     // fetch (YOY-68 AC-1): refinement context belongs to the full submitted
     // pipeline, so combining them is a contract violation, not a request to
     // guess about.
-    if (record.previousIntent != null || record.removeChip != null) {
+    if (record.previousIntent != null || record.removeChip != null || record.previousQuery != null) {
       return null;
     }
     body.mode = record.mode as ProxySearchMode;
@@ -197,6 +209,18 @@ export function parseProxySearchBody(value: unknown): ProxySearchBody | null {
       return null;
     }
     body.removedChips = removed;
+  }
+
+  if (record.previousQuery !== undefined && record.previousQuery !== null) {
+    if (
+      typeof record.previousQuery !== "string" ||
+      record.previousQuery.length > MAX_PREVIOUS_QUERY_CHARS
+    ) {
+      return null;
+    }
+    if (record.previousQuery.trim() !== "") {
+      body.previousQuery = record.previousQuery;
+    }
   }
 
   return body;
@@ -315,6 +339,11 @@ export function parseProxySearchParams(
     } catch {
       return null;
     }
+  }
+  // A plain string parameter (YOY-150 AC-1), not JSON.
+  const previousQuery = params.get("previousQuery");
+  if (previousQuery !== null) {
+    record.previousQuery = previousQuery;
   }
   return parseProxySearchBody(record);
 }
@@ -561,6 +590,16 @@ export interface ProxySearchResponse {
    * (YOY-148 AC-7): the page's labels can be fetched from the labels endpoint.
    */
   labelsPending?: true;
+  /**
+   * What the client sends as `previousQuery` on its next search (YOY-150
+   * AC-3); present on Engine v2 find-path responses only.
+   */
+  carry?: string;
+  /**
+   * A second reading of the search (YOY-150 AC-7), rendered as the chip
+   * "{reading} instead?"; present only when a page-1 product fits it.
+   */
+  otherReading?: string;
 }
 
 function serializeCard(card: {
@@ -645,6 +684,12 @@ export function serializeProxySearchResponse(
   }
   if (response.labelsPending === true) {
     body.labelsPending = true;
+  }
+  if (response.carry !== undefined) {
+    body.carry = response.carry;
+  }
+  if (response.otherReading !== undefined) {
+    body.otherReading = response.otherReading;
   }
   return body;
 }

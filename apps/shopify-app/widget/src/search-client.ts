@@ -90,6 +90,16 @@ export interface ProxySearchResponse {
    */
   page?: number;
   totalCount?: number;
+  /**
+   * The text the next submitted search sends as `previousQuery` (YOY-150
+   * AC-3): present on Engine v2 responses; held in memory only (AC-6).
+   */
+  carry?: string;
+  /**
+   * A second reading of the search (YOY-150 AC-7), rendered as the chip
+   * "{reading} instead?" at the start of the chip row.
+   */
+  otherReading?: string;
 }
 
 /** One page of a submitted search (YOY-146 AC-1): 1-based, and its size. */
@@ -111,6 +121,17 @@ export interface SearchRequestContext {
    * of `previousIntent`/`removeChip`.
    */
   removedChips?: readonly RemovedChip[];
+  /**
+   * The held `carry` of the last Engine v2 response (YOY-150 AC-1): the
+   * search refines or replaces that chain. Never on a preview or the
+   * classic rescue.
+   */
+  previousQuery?: string;
+  /**
+   * A new search the shopper submitted (YOY-150): its response's `carry`
+   * replaces the held one. Client-side only, never on the wire.
+   */
+  submitted?: boolean;
   /**
    * Keystroke preview (YOY-68): the request rides `mode=preview` and the
    * server serves classic-only results with no logging and no AI spend.
@@ -207,6 +228,14 @@ export function buildSearchParams(
         })),
       ),
     );
+  }
+  if (
+    context?.previousQuery !== undefined &&
+    context.previousQuery !== "" &&
+    context.preview !== true &&
+    context.classic !== true
+  ) {
+    params.set("previousQuery", context.previousQuery);
   }
   // `mode` is OMITTED on ordinary submitted searches — its absence is what
   // makes the full pipeline run (YOY-68 AC-2). `classic` is the submitted

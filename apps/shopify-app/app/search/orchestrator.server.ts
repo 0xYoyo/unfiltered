@@ -328,6 +328,13 @@ export interface SearchRequest {
    */
   resolvedIntent?: Intent;
   /**
+   * The refinement chain this query follows (YOY-150 AC-1 – AC-3): the
+   * `carry` of the previous Engine v2 response, echoed back by the client.
+   * Find, the extraction and the judge read it; the old engine ignores it
+   * (NG-4).
+   */
+  previousQuery?: string;
+  /**
    * Chips the shopper removed from an Engine v2 response (YOY-149 AC-15):
    * the facts they name are not applied and their chips are absent. Ignored
    * on the old engine.
@@ -486,6 +493,48 @@ export interface SearchResponse {
    * call was made. Present exactly when `extractionInTime` is.
    */
   extractionCached?: boolean;
+  /**
+   * The text the client sends as `previousQuery` next time (YOY-150 AC-3):
+   * present on every Engine v2 find-path response. The chain's first
+   * sentence plus up to two most recent refinements, newline-separated,
+   * when the query refines; the query alone when it replaces or starts a
+   * chain.
+   */
+  carry?: string;
+  /**
+   * A second reading of the query that a page-1 product fits (YOY-150
+   * AC-7), at most four words in the shopper's language; the surfaces
+   * render it as one chip. Absent when there is none.
+   */
+  otherReading?: string;
+}
+
+/** Refinements a carry keeps after the chain's first sentence (YOY-150 AC-3). */
+export const CARRY_REFINEMENTS = 2;
+
+/** One sentence as a carry holds it: whitespace collapsed, so newlines only separate. */
+function carrySentence(text: string): string {
+  return text.replace(/\s+/g, " ").trim();
+}
+
+/**
+ * The carry of a response (YOY-150 AC-3): the query alone when there is no
+ * previous chain or the query replaces it; otherwise the chain's first
+ * sentence plus its two most recent refinements, this query the last.
+ * `refines` is null when the extraction was late or not wired — read as
+ * refining.
+ */
+export function nextCarry(query: string, previousQuery: string | undefined, refines: boolean | null): string {
+  const sentence = carrySentence(query);
+  const chain = (previousQuery ?? "")
+    .split("\n")
+    .map(carrySentence)
+    .filter((part) => part !== "");
+  if (chain.length === 0 || refines === false) {
+    return sentence;
+  }
+  const [first, ...refinements] = chain;
+  return [first!, ...[...refinements, sentence].slice(-CARRY_REFINEMENTS)].join("\n");
 }
 
 /**
@@ -707,14 +756,26 @@ export function createSearchOrchestrator(
     // The extraction starts with the search, in parallel with find (YOY-149
     // AC-1) — under a throttle or cap too, so the code's labels still hold
     // there (AC-13).
-    const extraction = startExtraction(request, searchId);
+    const previousQuery =
+      request.previousQuery !== undefined && request.previousQuery.trim() !== ""
+        ? request.previousQuery
+        : undefined;
+    const extraction = startExtraction(request, searchId, previousQuery);
     const found = await stages.time("find", () =>
-      findStep.find({ shopDomain: request.shopDomain, query: request.query, searchId }),
+      findStep.find({
+        shopDomain: request.shopDomain,
+        query: request.query,
+        searchId,
+        ...(previousQuery !== undefined ? { previousQuery } : {}),
+      }),
     );
     const settled = await extraction.settle();
     const extracted = settled?.wishes ?? null;
-    const wishes =
-      extracted === null ? null : keepUnremoved(extracted, request.removedChips ?? []);
+    // Removed chips belong to their chain (YOY-150 AC-11): they hold across
+    // a refinement, and a query that replaces the chain starts with none.
+    const removedChips =
+      previousQuery !== undefined && extracted?.refines === false ? [] : (request.removedChips ?? []);
+    const wishes = extracted === null ? null : keepUnremoved(extracted, removedChips);
     let ordered = { productIds: found.productIds, findSetCount: found.findSetCount };
     let codeLabels = new Map<string, CodeLabel>();
     if (wishes !== null && hasAppliedWishes(wishes)) {
@@ -746,6 +807,7 @@ export function createSearchOrchestrator(
     let routeReason: V2RouteReason;
     let judgeStarted = false;
     let labelsPending = false;
+    let otherReading: string | null = null;
     let hits = cards;
     if (request.forceClassic === true) {
       routeReason = "capped";
@@ -758,6 +820,7 @@ export function createSearchOrchestrator(
           db,
           shopDomain: request.shopDomain,
           sentence: request.query,
+          ...(previousQuery !== undefined ? { previousSentence: previousQuery } : {}),
           items: judgedPart,
           searchId,
           deadlineMs: judgeDeadlineMs,
@@ -765,12 +828,14 @@ export function createSearchOrchestrator(
           page,
           positionOffset: pageStart,
           // A removed `exclude` chip is not applied through the judge either (AC-15).
-          applyExcluded: !(request.removedChips ?? []).some((chip) => chip.field === "exclude"),
+          applyExcluded: !removedChips.some((chip) => chip.field === "exclude"),
         }),
       );
       routeReason = judged.outcome;
       judgeStarted = judged.started;
       labelsPending = judged.labelsPending;
+      // The second reading is offered on page 1 only (AC-7).
+      otherReading = page === 1 ? judged.otherReading : null;
       hits = [
         ...judged.items.map(({ item, verdict, label }) => ({
           ...item,
@@ -800,6 +865,8 @@ export function createSearchOrchestrator(
       ...(labelsPending ? { labelsPending: true as const } : {}),
       extractionInTime: extracted !== null,
       extractionCached: settled?.cached === true,
+      carry: nextCarry(request.query, previousQuery, extracted?.refines ?? null),
+      ...(otherReading !== null ? { otherReading } : {}),
     };
   }
 
@@ -813,12 +880,14 @@ export function createSearchOrchestrator(
   function startExtraction(
     request: SearchRequest,
     searchId: string,
+    previousQuery: string | undefined,
   ): { settle(): Promise<CachedExtraction | null> } {
     if (wishExtractor === undefined) {
       return { settle: () => Promise.resolve(null) };
     }
     const answer = extractThroughCache(db, wishExtractor, {
       sentence: request.query,
+      ...(previousQuery !== undefined ? { previousSentence: previousQuery } : {}),
       storeId: request.shopDomain,
       searchId,
     })

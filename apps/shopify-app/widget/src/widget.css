@@ -107,6 +107,14 @@
   text-decoration: line-through;
 }
 
+/* The second reading (YOY-150 AC-8): a question, not a filter — no fill and
+   a dashed hairline in the chip's own inherited colour (W-3), so it never
+   reads as a constraint the search applied. */
+.chip--reading {
+  background: transparent;
+  border-style: dashed;
+}
+
 .chip-remove {
   font-size: 1.1em;
   line-height: 1;

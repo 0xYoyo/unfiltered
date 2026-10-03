@@ -43,6 +43,11 @@ export interface WidgetStrings {
   appliedFilters: string;
   /** aria template for chip remove buttons; {label} is the chip's text. */
   removeFilter: string;
+  /**
+   * The second-reading chip (YOY-150 AC-8), first in the chip row; tapping
+   * it searches {reading} afresh. {reading} is the judge's phrase.
+   */
+  otherReading: string;
   soldOut: string;
   /** Label on results that passed a color filter without color evidence
    * (YOY-67 AC-5). */
@@ -82,6 +87,7 @@ export const STRING_CATALOG: Record<WidgetLocale, WidgetStrings> = {
     searchResults: "Search results",
     appliedFilters: "Applied filters",
     removeFilter: "Remove filter: {label}",
+    otherReading: "{reading} instead?",
     soldOut: "Sold out",
     colorNotConfirmed: "Color not confirmed",
     previewEmpty: "Keep typing…",
@@ -109,6 +115,7 @@ export const STRING_CATALOG: Record<WidgetLocale, WidgetStrings> = {
     searchResults: "תוצאות חיפוש",
     appliedFilters: "סינונים פעילים",
     removeFilter: "הסרת סינון: {label}",
+    otherReading: "{reading} במקום?",
     soldOut: "אזל מהמלאי",
     colorNotConfirmed: "צבע לא מאומת",
     previewEmpty: "המשיכו להקליד…",

@@ -37,6 +37,11 @@ import {
  * The held intent is the whole state model, and it is deliberately ONE
  * intent held in memory: each response's echoed intent replaces it, nothing
  * persists, and there is no transcript (NG-2, X-2). "New search" drops it.
+ *
+ * Engine v2 (YOY-150) holds a `carry` instead: the last submitted
+ * response's text for the next search's `previousQuery`, in memory only
+ * (AC-6). Every submitted search sends it; "New search", an example and the
+ * second-reading chip start afresh without it (AC-5, AC-9).
  */
 
 type Phase = "initial" | "loading" | "settled";
@@ -56,6 +61,8 @@ interface PagingState {
   removeChip?: ProxyChip;
   /** The engine v2 removal list that produced page 1 (YOY-149). */
   removedChips?: readonly RemovedChip[];
+  /** The `previousQuery` that produced page 1 (YOY-150). */
+  previousQuery?: string;
   nextPage: number;
   shown: number;
   total: number;
@@ -132,6 +139,13 @@ export function PlaygroundPage({
   // the same query with this whole list; a search the visitor submits
   // starts a new chain with an empty one.
   const removedChipsRef = useRef<RemovedChip[]>([]);
+  // The refinement chain (YOY-150): `carryRef` is the last submitted v2
+  // response's `carry`, sent as the next search's `previousQuery`;
+  // `chainRef` is the `previousQuery` that produced the response on screen,
+  // which a chip removal re-asks with. Memory only (AC-6).
+  const carryRef = useRef<string | null>(null);
+  const chainRef = useRef<string | null>(null);
+  const [carryHeld, setCarryHeld] = useState(false);
 
   const run = useCallback(
     async (
@@ -140,6 +154,8 @@ export function PlaygroundPage({
       refinement?: {
         removeChip?: ProxyChip;
         removedChips?: readonly RemovedChip[];
+        /** A new submitted search: it sends the held carry (YOY-150 AC-4). */
+        submitted?: boolean;
       },
     ) => {
       const trimmed = text.trim();
@@ -156,6 +172,13 @@ export function PlaygroundPage({
       const removedChips = preview ? undefined : refinement?.removedChips;
       const held =
         preview || removedChips !== undefined ? null : heldIntentRef.current;
+      // A new submit refines the held chain; a removal re-asks the chain
+      // that produced the response on screen (YOY-150 AC-11).
+      const previousQuery = preview
+        ? null
+        : refinement?.submitted === true
+          ? carryRef.current
+          : chainRef.current;
 
       pagingRef.current = null;
       setLoadingMore(false);
@@ -170,6 +193,7 @@ export function PlaygroundPage({
             ? {}
             : { removeChip: refinement.removeChip }),
           ...(removedChips === undefined ? {} : { removedChips }),
+          ...(previousQuery === null ? {} : { previousQuery }),
           // Every submit asks for page 1 (YOY-146 AC-1); a preview is
           // never paged.
           ...(preview ? {} : { paging: { page: 1, pageSize: PAGE_SIZE } }),
@@ -189,6 +213,7 @@ export function PlaygroundPage({
                 ? {}
                 : { removeChip: refinement.removeChip }),
               ...(removedChips === undefined ? {} : { removedChips }),
+              ...(previousQuery === null ? {} : { previousQuery }),
               nextPage: (next.page ?? 1) + 1,
               shown: next.results.length,
               total: next.totalCount ?? next.results.length,
@@ -207,6 +232,19 @@ export function PlaygroundPage({
         // previews for exactly this reason (P-5 parity).
         if (!preview) {
           setHeldIntent(next.intent);
+        }
+        if (refinement?.submitted === true) {
+          // The response's carry is the chain the next submit refines. One
+          // with no earlier sentence started a new chain: the old chain's
+          // removals end with it, and a removal re-asks it afresh.
+          const carry = next.carry ?? null;
+          const chained = carry !== null && carry.includes("\n");
+          carryRef.current = carry;
+          chainRef.current = chained ? previousQuery : null;
+          if (!chained) {
+            removedChipsRef.current = [];
+          }
+          setCarryHeld(carry !== null);
         }
         setFailed(false);
         setPhase("settled");
@@ -258,6 +296,9 @@ export function PlaygroundPage({
         ...(state.removedChips === undefined
           ? {}
           : { removedChips: state.removedChips }),
+        ...(state.previousQuery === undefined
+          ? {}
+          : { previousQuery: state.previousQuery }),
         paging: { page: state.nextPage, pageSize: PAGE_SIZE },
       });
       if (pagingRef.current !== state) {
@@ -311,11 +352,28 @@ export function PlaygroundPage({
         debounceRef.current = null;
       }
       submittedQueryRef.current = (text ?? query).trim();
-      removedChipsRef.current = [];
-      void run(text ?? query, false);
+      // A refinement keeps the chain's removed chips (YOY-150 AC-11); a
+      // search with no held chain starts with none.
+      if (carryRef.current === null) {
+        removedChipsRef.current = [];
+      }
+      void run(text ?? query, false, {
+        submitted: true,
+        ...(removedChipsRef.current.length > 0
+          ? { removedChips: removedChipsRef.current }
+          : {}),
+      });
     },
     [query, run],
   );
+
+  /** Forget the refinement chain: the next search starts afresh (YOY-150 AC-5). */
+  const dropChain = useCallback(() => {
+    carryRef.current = null;
+    chainRef.current = null;
+    removedChipsRef.current = [];
+    setCarryHeld(false);
+  }, []);
 
   const removeChip = useCallback(
     (chip: ProxyChip) => {
@@ -350,21 +408,27 @@ export function PlaygroundPage({
     }
     setQuery("");
     submittedQueryRef.current = null;
-    removedChipsRef.current = [];
+    dropChain();
     setHeldIntent(null);
     setResponse(null);
     setAttributableSearchId(null);
     setFailed(false);
     setPhase("initial");
     inputRef.current?.focus();
-  }, []);
+  }, [dropChain]);
 
-  const pickExample = useCallback(
+  /**
+   * A fresh search for `text` with no `previousQuery`: an example query,
+   * and the second-reading chip (YOY-150 AC-9) — the reading is a new
+   * search, never a re-ordering of these results (NG-3).
+   */
+  const searchAfresh = useCallback(
     (text: string) => {
+      dropChain();
       setQuery(text);
       submit(text);
     },
-    [submit],
+    [dropChain, submit],
   );
 
   const openCard = useCallback(
@@ -507,7 +571,7 @@ export function PlaygroundPage({
             locale={locale}
             strings={strings}
             collapsed={searched}
-            onPick={pickExample}
+            onPick={searchAfresh}
           />
         </section>
 
@@ -525,8 +589,11 @@ export function PlaygroundPage({
               ? {}
               : { currency: response.intent.currency })}
             onRemove={removeChip}
+            {...(response?.otherReading === undefined
+              ? {}
+              : { otherReading: response.otherReading, onPickReading: searchAfresh })}
           />
-          {heldIntent === null ? null : (
+          {heldIntent === null && !carryHeld ? null : (
             <NewSearch strings={strings} onClick={newSearch} />
           )}
         </div>

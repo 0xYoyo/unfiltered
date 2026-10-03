@@ -32,6 +32,7 @@ export const NEW_SEARCH_TESTID = "unfiltered-widget-new-search";
 export const COLOR_NOTE_TESTID = "unfiltered-widget-color-note";
 export const PREVIEW_EMPTY_TESTID = "unfiltered-widget-preview-empty";
 export const LOADING_MORE_TESTID = "unfiltered-widget-loading-more";
+export const OTHER_READING_TESTID = "unfiltered-widget-other-reading";
 
 /**
  * The further pages of a submitted search (YOY-146): the page size the
@@ -48,6 +49,11 @@ export interface ResponseHandlers {
   /** `position` is the card's place in the whole result order (YOY-146 AC-10). */
   onCardClick: (result: ProxyResult, position: number) => void;
   onChipRemove: (chip: ProxyChip) => void;
+  /**
+   * The second-reading chip was tapped (YOY-150 AC-9): search `reading`
+   * afresh. Absent means no reading chip is rendered.
+   */
+  onPickReading?: (reading: string) => void;
   pages?: PageLoader;
 }
 
@@ -404,6 +410,33 @@ export function createOverlay(options: OverlayOptions): Overlay {
     return button;
   }
 
+  /**
+   * The second-reading chip (YOY-150 AC-8): the chip anatomy with no remove
+   * glyph — it is not a filter — reading "{reading} instead?". Tapping it
+   * is a new search (AC-9); nothing opens and nothing blocks (AC-10).
+   */
+  function readingElement(
+    reading: string,
+    onPickReading: (reading: string) => void,
+  ): HTMLElement {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "chip chip--reading";
+    button.setAttribute("data-testid", OTHER_READING_TESTID);
+    button.setAttribute("role", "listitem");
+    // The reading is the shopper's phrase in any script: isolated in a
+    // <bdi>, so a Latin reading in Hebrew chrome keeps its "?" in place.
+    const [before = "", after = ""] = strings.otherReading.split("{reading}");
+    const phrase = document.createElement("bdi");
+    phrase.textContent = reading;
+    // One flex item, so the chip's gap never splits the sentence.
+    const text = document.createElement("span");
+    text.append(before, phrase, after);
+    button.append(text);
+    button.addEventListener("click", () => onPickReading(reading));
+    return button;
+  }
+
   return {
     host,
     open() {
@@ -468,12 +501,17 @@ export function createOverlay(options: OverlayOptions): Overlay {
         typeof response.intent["currency"] === "string"
           ? response.intent["currency"]
           : undefined;
+      const reading =
+        response.otherReading !== undefined && handlers.onPickReading !== undefined
+          ? readingElement(response.otherReading, handlers.onPickReading)
+          : null;
       chipsRow.replaceChildren(
+        ...(reading === null ? [] : [reading]),
         ...chips.map((chip) =>
           chipElement(chip, currency, handlers.onChipRemove),
         ),
       );
-      chipsRow.hidden = chips.length === 0;
+      chipsRow.hidden = chips.length === 0 && reading === null;
 
       // Positions count from the page's place in the whole order (AC-10).
       const offset =

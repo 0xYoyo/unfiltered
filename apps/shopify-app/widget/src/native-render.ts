@@ -56,6 +56,7 @@ export const NATIVE_LIST_TESTID = "unfiltered-native-list";
 export const NATIVE_ITEM_TESTID = "unfiltered-native-item";
 export const NATIVE_CHIP_TESTID = "unfiltered-native-chip";
 export const NATIVE_CHIPS_TESTID = "unfiltered-native-chips";
+export const NATIVE_OTHER_READING_TESTID = "unfiltered-native-other-reading";
 export const NATIVE_LOADING_TESTID = "unfiltered-native-loading";
 export const NATIVE_NO_RESULTS_TESTID = "unfiltered-native-no-results";
 export const NATIVE_ZERO_HIT_TESTID = "unfiltered-native-zero-hit";
@@ -770,6 +771,33 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
     return button;
   }
 
+  /**
+   * The second-reading chip (YOY-150 AC-8): the native chip anatomy with no
+   * remove glyph, reading "{reading} instead?"; tapping it is a new search
+   * (AC-9). No owned control besides (NG-2): it lives in the chip row.
+   */
+  function readingElement(
+    reading: string,
+    onPickReading: (reading: string) => void,
+  ): HTMLElement {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "unfiltered-native__chip unfiltered-native__chip--reading";
+    button.setAttribute("data-testid", NATIVE_OTHER_READING_TESTID);
+    button.setAttribute("role", "listitem");
+    // The reading is the shopper's phrase in any script: isolated in a
+    // <bdi>, so a Latin reading in Hebrew chrome keeps its "?" in place.
+    const [before = "", after = ""] = strings.otherReading.split("{reading}");
+    const phrase = document.createElement("bdi");
+    phrase.textContent = reading;
+    // One flex item, so the chip's gap never splits the sentence.
+    const text = document.createElement("span");
+    text.append(before, phrase, after);
+    button.append(text);
+    button.addEventListener("click", () => onPickReading(reading));
+    return button;
+  }
+
   // Async renders race: a newer response, an idle, or a close must win over
   // cards still being fetched for an older one.
   let renderToken = 0;
@@ -895,10 +923,15 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
       // its own pagination lands the shopper at the top of the new page.
       window.scrollTo(0, 0);
     }
+    const reading =
+      response.otherReading !== undefined && handlers.onPickReading !== undefined
+        ? readingElement(response.otherReading, handlers.onPickReading)
+        : null;
     chipsRow.replaceChildren(
+      ...(reading === null ? [] : [reading]),
       ...chips.map((chip) => chipElement(chip, currency, handlers.onChipRemove)),
     );
-    chipsRow.hidden = chips.length === 0;
+    chipsRow.hidden = chips.length === 0 && reading === null;
     list.replaceChildren(...built.items);
     // The heading names what was relaxed to find them (YOY-111 AC-4).
     closeMatchesHeading.textContent = closeMatchesHeadingText(

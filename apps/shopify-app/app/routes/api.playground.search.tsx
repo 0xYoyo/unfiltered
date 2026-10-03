@@ -9,6 +9,7 @@ import {
   selectFixture,
   selectFixtureForRemoval,
   sleep,
+  withFixtureCarry,
   withoutRemovedChips,
 } from "../playground/fixture-mode.server";
 import {
@@ -96,11 +97,15 @@ export const loader = async ({
         : selectFixture(body.query, body.mode !== undefined),
       body.paging,
     );
-    const outcome = pageOfFixture(
-      removedChips === null
-        ? selected
-        : withoutRemovedChips(selected, removedChips),
-      body.mode === "preview" ? undefined : body.paging,
+    const outcome = withFixtureCarry(
+      pageOfFixture(
+        removedChips === null
+          ? selected
+          : withoutRemovedChips(selected, removedChips),
+        body.mode === "preview" ? undefined : body.paging,
+      ),
+      body.query,
+      body.previousQuery,
     );
     await sleep(outcome.delayMs);
     return outcome.body === null
@@ -154,6 +159,7 @@ export const loader = async ({
       resolvedIntent,
       previousIntent: body.previousIntent,
       ...(body.removedChips !== undefined ? { removedChips: body.removedChips } : {}),
+      ...(body.previousQuery !== undefined ? { previousQuery: body.previousQuery } : {}),
       ...(engineParam !== null ? { engine: engineParam } : {}),
       ...(body.paging !== undefined ? { paging: body.paging } : {}),
     });

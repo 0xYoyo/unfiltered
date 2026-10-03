@@ -67,6 +67,11 @@ export interface PlaygroundStrings {
   chipsLead: string;
   /** aria template for a chip's remove control; {label} is the chip's text. */
   removeFilter: string;
+  /**
+   * The second-reading chip (YOY-150 AC-8), first in the chip row; tapping
+   * it searches {reading} afresh. {reading} is the judge's phrase.
+   */
+  otherReading: string;
   /** AI zero-hit: nothing satisfied every applied constraint. */
   zeroHit: string;
   closeMatchesHeading: string;
@@ -149,6 +154,7 @@ export const PLAYGROUND_STRING_CATALOG: Record<
     appliedFilters: "Applied filters",
     chipsLead: "Understood as",
     removeFilter: "Remove filter: {label}",
+    otherReading: "{reading} instead?",
     zeroHit: "Nothing matches all of these",
     closeMatchesHeading: "Close matches",
     closeMatchesHeadingRelaxed: "Close matches — {list}",
@@ -205,6 +211,7 @@ export const PLAYGROUND_STRING_CATALOG: Record<
     appliedFilters: "מסננים פעילים",
     chipsLead: "הבנו אותך כך",
     removeFilter: "הסרת מסנן: {label}",
+    otherReading: "{reading} במקום?",
     zeroHit: "אין פריט שעונה על כל אלה",
     closeMatchesHeading: "התאמות קרובות",
     closeMatchesHeadingRelaxed: "התאמות קרובות — {list}",

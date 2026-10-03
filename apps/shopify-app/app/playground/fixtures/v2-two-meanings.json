@@ -1,0 +1,59 @@
+{
+  "searchId": "fixture-v2-two-meanings",
+  "route": "ai",
+  "degraded": false,
+  "results": [
+    {
+      "productId": "p-v2-1",
+      "title": "Lace Guest Dress",
+      "url": "https://example.test/products/p-v2-1",
+      "imageUrl": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 4'><rect width='4' height='4' fill='%23d9d4cd'/></svg>",
+      "priceMin": 180,
+      "priceMax": 180,
+      "currencyCode": "USD",
+      "available": true,
+      "colorUnknown": false
+    },
+    {
+      "productId": "p-v2-2",
+      "title": "Satin Midi Dress",
+      "url": "https://example.test/products/p-v2-2",
+      "imageUrl": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 4'><rect width='4' height='4' fill='%23cfc9c1'/></svg>",
+      "priceMin": 240,
+      "priceMax": 240,
+      "currencyCode": "USD",
+      "available": true,
+      "colorUnknown": false
+    },
+    {
+      "productId": "p-v2-3",
+      "title": "Ivory Bridal Gown",
+      "url": "https://example.test/products/p-v2-3",
+      "imageUrl": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 4'><rect width='4' height='4' fill='%23c8c2b8'/></svg>",
+      "priceMin": 990,
+      "priceMax": 990,
+      "currencyCode": "USD",
+      "available": true,
+      "colorUnknown": false
+    }
+  ],
+  "chips": [],
+  "intent": null,
+  "details": {
+    "routeReason": "judged",
+    "latencyMs": 912,
+    "limited": null,
+    "stages": {
+      "find": 71,
+      "hydrate": 9,
+      "judge": 702
+    },
+    "intentTier": null,
+    "engine": "v2",
+    "judge": null
+  },
+  "page": 1,
+  "totalCount": 3,
+  "carry": "two meanings wedding dress",
+  "otherReading": "Bridal gowns"
+}

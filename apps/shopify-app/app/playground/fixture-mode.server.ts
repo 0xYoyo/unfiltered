@@ -24,6 +24,8 @@ import emptyFixture from "./fixtures/empty.json";
 import previewFixture from "./fixtures/preview.json";
 import resultsFixture from "./fixtures/results.json";
 import v2BudgetFixture from "./fixtures/v2-budget.json";
+import v2RefineFixture from "./fixtures/v2-refine.json";
+import v2TwoMeaningsFixture from "./fixtures/v2-two-meanings.json";
 
 import type { PlaygroundSearchResponse } from "./api.server";
 
@@ -55,7 +57,11 @@ export type PlaygroundFixtureName =
   | "paged-slow"
   // YOY-149: an engine v2 response — `intent: null`, chips of the v2
   // fields (a price cap with its currency, size, availability, exclude).
-  | "v2-budget";
+  | "v2-budget"
+  // YOY-150: an engine v2 response that carries `carry` (a refinement
+  // chain), and one that also carries a second reading.
+  | "v2-refine"
+  | "v2-two-meanings";
 
 /** How long the `delayed` fixture waits — long enough to observe loading. */
 export const FIXTURE_DELAY_MS = 700;
@@ -108,6 +114,14 @@ export function selectFixture(
     if (has("wool")) {
       // A negated attribute (YOY-133 AC-5): "ai winter coat not wool".
       return "ai-negation";
+    }
+    if (has("refine")) {
+      // A refinement chain (YOY-150): "refine black dress", then "refine cheaper".
+      return "v2-refine";
+    }
+    if (has("meanings")) {
+      // The second reading (YOY-150): "two meanings wedding dress".
+      return "v2-two-meanings";
     }
     if (has("budget")) {
       // Engine v2 chips (YOY-149): "budget dress under 400".
@@ -248,6 +262,10 @@ export function fixtureOutcome(
       return { delayMs: 0, status: 200, body: asResponse(degradedFixture) };
     case "v2-budget":
       return { delayMs: 0, status: 200, body: asResponse(v2BudgetFixture) };
+    case "v2-refine":
+      return { delayMs: 0, status: 200, body: asResponse(v2RefineFixture) };
+    case "v2-two-meanings":
+      return { delayMs: 0, status: 200, body: asResponse(v2TwoMeaningsFixture) };
     case "color-unknown":
       return {
         delayMs: 0,
@@ -370,6 +388,30 @@ export function withoutRemovedChips(
       ...(outcome.body.totalCount === undefined
         ? {}
         : { totalCount: results.length }),
+    },
+  };
+}
+
+/**
+ * The `carry` a fixture answers (YOY-150 AC-3), as the server would build it
+ * for a refinement: the request's `previousQuery` and the query, one per
+ * line — or the query alone with no previous chain. Only a fixture that
+ * already carries a `carry` gets one; the rest answer unchanged.
+ */
+export function withFixtureCarry(
+  outcome: FixtureOutcome,
+  query: string,
+  previousQuery: string | undefined,
+): FixtureOutcome {
+  if (outcome.body === null || outcome.body.carry === undefined) {
+    return outcome;
+  }
+  const sentence = query.trim();
+  return {
+    ...outcome,
+    body: {
+      ...outcome.body,
+      carry: previousQuery === undefined ? sentence : `${previousQuery}\n${sentence}`,
     },
   };
 }

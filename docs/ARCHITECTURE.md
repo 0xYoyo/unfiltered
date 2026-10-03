@@ -1112,6 +1112,49 @@ The three kinds of wishes (docs/PRD.md §3) applied by code. Packages:
   number with `currency` when they stated one; an exclude chip's value is
   the term as typed.
 
+## Engine v2: refinement and the second reading (YOY-150)
+
+"Same but cheaper" means nothing without the sentence before it, and
+"wedding dress" can mean a bridal gown or a guest's dress. Engine v2
+handles both without an intent form.
+
+- **The chain on the wire.** Both APIs accept `previousQuery` (a plain
+  string, at most 2,000 characters; never on a preview or the classic
+  rescue). Every find-path response carries `carry`: the text the client
+  sends as `previousQuery` next time. `nextCarry` builds it — the query
+  alone on a fresh search or when the extraction says it replaces the
+  chain; otherwise the chain's first sentence plus its two most recent
+  refinements, one sentence per line. A late or failed extraction counts as
+  refining. The old engine ignores `previousQuery` and answers no `carry`
+  (NG-4: its `previousIntent` path is untouched).
+- **Find.** With a previous chain, one embedding call embeds the new
+  sentence alone and the chain plus the new sentence; the two nearest sets
+  merge by distance, each product once at its nearer distance
+  (`mergeNearest`). Keyword matches stay on the new sentence.
+- **Extraction.** The prompt shows the previous search, says the new one
+  may refine or replace it, and asks `refines`. A refining answer may carry
+  the chain's wishes and is validated against the chain and the new
+  sentence together; a replacing one against the new sentence alone. The
+  chain is part of the extraction-cache key. `EXTRACT_PROMPT_VERSION` is 3.
+- **Removed chips belong to their chain.** They hold across a refinement;
+  a query the extraction says replaces the chain starts with none.
+- **Judge.** The prompt shows the previous search too, and the answer gains
+  `r` — a second reading of the search, at most four words in the
+  shopper's language, or `""` — and `rn`, the numbers of the products that
+  fit it. A reading no listed product fits, or one over four words, is
+  dropped; it never invalidates the answer. The chain is part of the
+  answer-cache key, and the stored answer holds the reading (a row from
+  before it reads as no reading). The response carries it as
+  `otherReading` on page 1 only. `JUDGE_PROMPT_VERSION` is 3.
+- **Clients.** The widget and the playground hold `carry` in memory only.
+  Every submitted search sends it; a chip removal re-asks with the chain
+  that produced the results on screen. The overlay's and the playground's
+  "New search" clear it; the theme-native path has no such control and
+  gains none. `otherReading` renders as one chip at the start of the chip
+  row, "{reading} instead?" from the EN and HE catalogs, with the reading
+  in a `<bdi>`; tapping it searches the reading afresh with no
+  `previousQuery`. No dialog, no blocking question.
+
 ## Storefront search API over the app proxy (YOY-46)
 
 The storefront widget reaches the orchestrator through a Shopify app proxy:

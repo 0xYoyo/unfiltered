@@ -207,10 +207,12 @@ every later gate. Effective bands: en 0.111, he 0.090, ar 0.030, ru 0.055,
 fr 0.030, es 0.060.
 
 **Known catalog effects.** The seed catalog is priced in USD with a median
-of $314; only 40 of its 465 products cost under $107.50 (400 ILS), and none
-of its 99 dresses or 30 coats do (at 600 ILS, 4 dresses). Six of the 13
-public Hebrew searches state a shekel cap, so on this catalog a Hebrew
-budget almost never has an in-budget relevant product, and Hebrew scores
+of $314; only 67 of its 465 products cost under $130.51 (400 ILS at the
+2026-10-02 ECB rate, 3.065 per USD), and only 2 of its 99 dresses and none
+of its 30 coats do (at 600 ILS, $195.76: 114 products, 5 dresses, no
+coat). Six of the 13 public Hebrew searches state a shekel cap, so on this
+catalog a Hebrew budget almost never has an in-budget relevant product, and
+Hebrew scores
 are sensitive to how the number tiers treat that case (YOY-149: tiers
 sorted over the whole find set put cheap unrelated products on page 1 —
 he 0.150 against a 0.368 reference — until the tiers were limited to the
@@ -236,6 +238,7 @@ line.
 | 1 | M5 engine | 0.472 | 0.269 | 0.398 | 0.431 | 0.324 | 0.306 | classic 96 % · AI 34 % (EN 40 %, HE 28 %), 2026-10-01 | $0.0571 |
 | 2 | Engine v2 find step (`ENGINE_V2=1`) | 0.597 | 0.278 | 0.569 | 0.569 | 0.574 | 0.384 | — (not deployed) | $0.0276 |
 | 3 | Engine v2 find step + judge reading facts (`ENGINE_V2=1`, judge deadline 4,000 ms) | 0.644 | 0.366 | 0.491 | 0.676 | 0.569 | 0.431 | — (not deployed) | $0.1858 |
+| 4 | Engine v2 + stated wishes (YOY-149) + refinement and second reading (YOY-150) (`ENGINE_V2=1`, judge deadline 4,000 ms) | 0.671 | 0.407 | 0.500 | 0.657 | 0.500 | 0.421 | — (not deployed) | $0.2128 |
 | 3 (first, superseded) | Engine v2 find step + judge reading the summary (`ENGINE_V2=1`, deadline 1,500 ms) | 0.597 | 0.292 | 0.556 | 0.648 | 0.542 | 0.403 | — (not deployed) | $0.0928 |
 | 1 (invalid: 18 failures) | M5 engine | 0.306 | 0.032 | 0.181 | 0.083 | 0.167 | 0.106 | — | $0.0391 |
 
@@ -286,6 +289,23 @@ sleeve midi dress') held **4 of 6** long-sleeve dresses in the judged top
 six on 3 of 3 calls (find order alone: 1 of 6), up from 1–3 of 6 with the
 summary rows; the 3 calls took 963–2,481 ms and cost $0.0075 from their
 ledger rows ($2.50 per 1,000 page-1 judge calls of 24 rows).
+
+Run 4 — wishes and refinement: [run 37143790016](https://github.com/0xYoyo/unfiltered/actions/runs/37143790016),
+2026-10-03, dispatched with `ref=YOY-150-refinement-two-meanings` (`64d06b2`)
+and `engine=v2`: `main` with YOY-149's stated wishes, then YOY-150's
+judge and extraction prompts (version 3, both reading a previous sentence
+when one is sent — the score set sends none) and the currency table at the
+2026-10-02 ECB rates. Green, leak check clean (72 checked), **0 failed
+searches**. Env settings present: `GEMINI_API_KEY` only. Against run 3,
+with each band `max(M5 band, 0.03)`: en +0.027, he **+0.041** (he holds —
+the YOY-149 directive), ar +0.009, ru −0.019 (band 0.055), **fr −0.069
+(band 0.030: a miss)**, es −0.010 (band 0.060). Composed without the
+extraction: 2 of 72 searches (ru 1, fr 1; en, he, ar, es 0). 288 model
+calls (72 embeddings, 72 extractions, 72 judge calls, 72 grades) cost
+$0.2128. The public half on the same branch the same day (`npm run
+score:public -- --engine v2`, one pass, 0 failed, $0.2251): en 0.692,
+he 0.278, ar 0.462, ru 0.419, fr 0.432, es 0.530 — fr +0.026 against the
+public reference, so the hidden fr drop does not show on the public half.
 
 Speed and judge cost (YOY-147 AC-15), measured locally on the public half
 (78 searches over the seed fixture, `ENGINE_V2=1`, 2026-10-02; a local run

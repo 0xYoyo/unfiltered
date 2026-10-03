@@ -38,6 +38,8 @@ export interface PlaygroundSearchInput {
   paging?: SearchPaging;
   /** Chips removed from an Engine v2 response (YOY-149 AC-15). */
   removedChips?: RemovedChip[];
+  /** The previous response's `carry` (YOY-150 AC-1); Engine v2 reads it. */
+  previousQuery?: string;
 }
 
 export interface PlaygroundSearchResult {
@@ -58,6 +60,9 @@ export async function runPlaygroundSearch(
     ...(input.paging !== undefined ? { paging: input.paging } : {}),
     ...(input.removedChips !== undefined && input.preview !== true && input.classic !== true
       ? { removedChips: input.removedChips }
+      : {}),
+    ...(input.previousQuery !== undefined && input.preview !== true && input.classic !== true
+      ? { previousQuery: input.previousQuery }
       : {}),
     ...(input.preview === true
       ? { preview: true }
