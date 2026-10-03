@@ -852,6 +852,8 @@ export function createProxySearchOrchestrator(
     // Engine v2's wish extraction (YOY-149 AC-1): Flash-Lite, operation
     // `extract`, in parallel with find.
     wishExtractor: createWishExtractor({
+      // The extraction-cache key names the model (YOY-149 AC-18).
+      modelId: models.extractModel,
       llm: createGeminiLlmClient({
         modelId: models.extractModel,
         costRecorder,

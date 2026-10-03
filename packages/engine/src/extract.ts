@@ -14,6 +14,14 @@
 
 import type { JsonSchema, LlmClient } from "./index.js";
 
+/**
+ * The extraction prompt's version (AC-18): part of the extraction-cache key,
+ * so a cached answer is never served for a prompt that has since changed.
+ * Bump it with every change to `buildExtractPrompt`, `EXTRACT_SCHEMA` or
+ * `parseExtractAnswer`.
+ */
+export const EXTRACT_PROMPT_VERSION = 2;
+
 /** One term the shopper excluded, as typed and in English (AC-1). */
 export interface ExcludedTerm {
   typed: string;
@@ -140,6 +148,28 @@ const CURRENCY_CODE = /^[A-Z]{3}$/;
  */
 const LEADING_NEGATION = /^(?:not|no|without|non|לא|בלי|ללא)[\s-]+/iu;
 
+/** Currency signs and words a sentence can state a price in. */
+const STATED_CURRENCIES: ReadonlyArray<[RegExp, string]> = [
+  [/₪|ש["״]?ח|שקל|\bnis\b|\bils\b/iu, "ILS"],
+  [/\$|\busd\b|dollars?\b/iu, "USD"],
+  [/€|\beur\b|euros?\b/iu, "EUR"],
+  [/£|\bgbp\b|pounds?\b/iu, "GBP"],
+];
+
+/**
+ * The currency a sentence states for its price when the model named none
+ * (YOY-149 AC-17): a currency sign or word in the sentence; else, for a
+ * Hebrew sentence, shekels; else null (the catalog's own currency).
+ */
+export function statedCurrency(sentence: string): string | null {
+  for (const [pattern, code] of STATED_CURRENCIES) {
+    if (pattern.test(sentence)) {
+      return code;
+    }
+  }
+  return /\p{Script=Hebrew}/u.test(sentence) ? "ILS" : null;
+}
+
 function withoutNegation(term: string): string {
   return term.trim().replace(LEADING_NEGATION, "").trim();
 }
@@ -192,7 +222,11 @@ export function parseExtractAnswer(answer: unknown, sentence: string): Extracted
     priceMax,
     priceMin,
     currency:
-      (priceMax !== null || priceMin !== null) && CURRENCY_CODE.test(currencyRaw) ? currencyRaw : null,
+      priceMax === null && priceMin === null
+        ? null
+        : CURRENCY_CODE.test(currencyRaw)
+          ? currencyRaw
+          : statedCurrency(sentence),
     size,
     inStock: record.inStock === true,
     excluded,
@@ -209,6 +243,8 @@ export interface ExtractRequest {
 }
 
 export interface WishExtractor {
+  /** The model that answers, for the extraction-cache key (AC-18); `unknown` when absent. */
+  readonly modelId?: string;
   /** The validated wishes; rejects when the call fails or its answer is not the schema's shape. */
   extract(request: ExtractRequest): Promise<ExtractedWishes>;
 }
@@ -219,8 +255,9 @@ export class ExtractAnswerError extends Error {
 }
 
 /** The extraction over the LLM port: one call at temperature 0 under operation `extract` (AC-1). */
-export function createWishExtractor(options: { llm: LlmClient }): WishExtractor {
+export function createWishExtractor(options: { llm: LlmClient; modelId?: string }): WishExtractor {
   return {
+    ...(options.modelId !== undefined ? { modelId: options.modelId } : {}),
     async extract(request) {
       const answer = await options.llm.completeStructured({
         prompt: buildExtractPrompt(request.sentence),

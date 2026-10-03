@@ -33,6 +33,8 @@ export interface SearchOutcome {
    * the search was not served by Engine v2's find path, or failed.
    */
   extractionInTime: boolean | null;
+  /** Whether the extraction cache answered (YOY-149 AC-18); null where `extractionInTime` is. */
+  extractionCached: boolean | null;
   /** The search or its grading threw; scored 0. */
   failed: boolean;
   /** Where and what threw, for a failed search (YOY-141 AC-13). */
@@ -83,6 +85,11 @@ export interface LanguageScore {
    * (YOY-149 AC-4); null when no search in the language reported it.
    */
   withoutExtraction: number | null;
+  /**
+   * Share of Engine v2 searches the extraction cache answered, 0–1 (YOY-149
+   * AC-18); null when no search in the language reported it.
+   */
+  extractionCached: number | null;
   failed: number;
 }
 
@@ -92,6 +99,11 @@ export interface ScoreReport {
   cost: { usd: number; calls: number };
   /** Failed searches per (stage, class), most frequent first (YOY-141 AC-13). */
   failures: FailureCount[];
+  /**
+   * Wish-extraction calls in the ledger (YOY-149 AC-18): a warm pass over
+   * sentences already extracted makes none. Printed when present.
+   */
+  extractCalls?: number;
 }
 
 /**
@@ -247,6 +259,7 @@ export async function runScoreSet({
         score: searchScore(grades),
         latencyMs,
         extractionInTime: response.extractionInTime ?? null,
+        extractionCached: response.extractionCached ?? null,
         failed: false,
       });
     } catch (error) {
@@ -257,6 +270,7 @@ export async function runScoreSet({
         score: 0,
         latencyMs: Infinity,
         extractionInTime: null,
+        extractionCached: null,
         failed: true,
         failure: { stage, className: failureClassName(error) },
       });
@@ -275,11 +289,17 @@ export async function runScoreSet({
       modelWritten: set.some((entry) => entry.language === language && entry.modelWritten),
       underOneSecond: mean(scored.map((outcome) => (outcome.latencyMs < FAST_SEARCH_MS ? 1 : 0))),
       withoutExtraction: shareWithoutExtraction(scored),
+      extractionCached: shareExtractionCached(scored),
       failed: scored.filter((outcome) => outcome.failed).length,
     });
   }
   await flushLedger();
-  return { languages, cost: await readRunCost(db), failures: countFailures(outcomes) };
+  return {
+    languages,
+    cost: await readRunCost(db),
+    failures: countFailures(outcomes),
+    extractCalls: await db.aiCall.count({ where: { operation: "extract" } }),
+  };
 }
 
 /** The share of searches that reported the extraction late (YOY-149 AC-4); null when none reported. */
@@ -288,6 +308,14 @@ function shareWithoutExtraction(outcomes: readonly SearchOutcome[]): number | nu
   return reported.length === 0
     ? null
     : reported.filter((outcome) => outcome.extractionInTime === false).length / reported.length;
+}
+
+/** The share of searches the extraction cache answered (YOY-149 AC-18); null when none reported. */
+function shareExtractionCached(outcomes: readonly SearchOutcome[]): number | null {
+  const reported = outcomes.filter((outcome) => outcome.extractionCached !== null);
+  return reported.length === 0
+    ? null
+    : reported.filter((outcome) => outcome.extractionCached === true).length / reported.length;
 }
 
 function countFailures(outcomes: readonly SearchOutcome[]): FailureCount[] {
@@ -310,7 +338,16 @@ function countFailures(outcomes: readonly SearchOutcome[]): FailureCount[] {
 /** The score table: the only thing a run prints (AC-5, AC-7). */
 export function formatScoreTable(report: ScoreReport): string {
   const rows = [
-    ["language", "score", "searches", "model-written", "under 1 s", "no extraction", "failed"],
+    [
+      "language",
+      "score",
+      "searches",
+      "model-written",
+      "under 1 s",
+      "no extraction",
+      "extraction cached",
+      "failed",
+    ],
     ...report.languages.map((row) => [
       row.language,
       row.score.toFixed(3),
@@ -318,6 +355,7 @@ export function formatScoreTable(report: ScoreReport): string {
       row.modelWritten ? "yes" : "no",
       `${Math.round(row.underOneSecond * 100)}%`,
       row.withoutExtraction === null ? "—" : `${Math.round(row.withoutExtraction * 100)}%`,
+      row.extractionCached === null ? "—" : `${Math.round(row.extractionCached * 100)}%`,
       String(row.failed),
     ]),
   ];
@@ -325,6 +363,7 @@ export function formatScoreTable(report: ScoreReport): string {
   return [
     ...rows.map((row) => row.map((cell, column) => cell.padEnd(widths[column]!)).join("  ").trimEnd()),
     formatCostLine(report.cost),
+    ...(report.extractCalls !== undefined ? [`extract calls ${report.extractCalls}`] : []),
     ...report.failures.map(formatFailureLine),
   ].join("\n");
 }

@@ -1057,13 +1057,24 @@ The three kinds of wishes (docs/PRD.md §3) applied by code. Packages:
   in English) and whether price or size was firm. `parseExtractAnswer`
   keeps a price only when its digits appear in the sentence (thousands
   separators ignored) and a size or excluded term only when it appears
-  verbatim, ignoring case. When find finishes, the page waits at most
-  `EXTRACTION_GRACE_MS` (300) for it; a late or failed extraction is
-  aborted and the page composes without it — no chips, no tiers, no code
-  labels, no exclusion filter. `extractionInTime` on every find-path
-  response (and in playground `details`) records which; the score table's
-  "no extraction" column and the latency probe's `no-extraction=` give the
-  share composed without it.
+  verbatim, ignoring case. When find finishes, the page waits for it at
+  most `EXTRACTION_GRACE_MS` (800, by the 2026-10-03 decision, AC-18) and
+  composes the moment it lands; a late or failed extraction leaves the page
+  composed without it — no chips, no tiers, no code labels, no exclusion
+  filter. `extractionInTime` on every find-path response (and in playground
+  `details`) records which; the score table's "no extraction" column and the
+  latency probe's `no-extraction=` give the share composed without it.
+- **Extraction cache** (AC-18, `app/search/extraction-cache.server.ts`).
+  `ExtractionAnswer` holds one validated extraction per key: the SHA-256 of
+  the normalized sentence, its language by script, `EXTRACT_PROMPT_VERSION`
+  and the model id. Not keyed by tenant — the answer depends on the
+  sentence alone; never evicted. A hit makes no call. A late call is not
+  aborted: it runs on and fills the cache, so the next search is warm.
+  `extractionCached` (response and `details`) says the cache answered; the
+  score table's "extraction cached" column and the probe's
+  `extraction-cached=` give the share. `score-run.mts --passes 2` runs the
+  set twice on one scratch database — cold, then warm — each pass with its
+  own spend and `extract calls` line.
 - **Removed chips.** Both APIs take `removedChips` (a JSON array of
   `{ field, value }`, at most 20). A removed fact is not applied and its
   chip is absent.

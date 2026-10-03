@@ -13,8 +13,12 @@ import currencyRates from "../../../../config/currency-rates.json";
 
 /** Env var naming how long the page waits for a late extraction (AC-3). */
 export const EXTRACTION_GRACE_MS_ENV = "EXTRACTION_GRACE_MS";
-/** How long the page waits for the extraction after find finished (AC-3). */
-export const DEFAULT_EXTRACTION_GRACE_MS = 300;
+/**
+ * How long the page waits for the extraction after find finished (AC-3;
+ * 800 by the 2026-10-03 decision, AC-18). The wait ends the moment the
+ * extraction lands: it is a bound, not a sleep.
+ */
+export const DEFAULT_EXTRACTION_GRACE_MS = 800;
 /** Env var naming how far over the cap a price is still "near" (AC-5, AC-12). */
 export const PRICE_NEAR_PERCENT_ENV = "PRICE_NEAR_PERCENT";
 /** A price within this percentage over the cap is near; beyond it is far. */
@@ -36,7 +40,7 @@ function nonNegativeIntFromEnv(
   return value;
 }
 
-/** The grace from `EXTRACTION_GRACE_MS`; unset means 300. A malformed value fails at construction. */
+/** The grace from `EXTRACTION_GRACE_MS`; unset means 800. A malformed value fails at construction. */
 export function extractionGraceMsFromEnv(
   env: Record<string, string | undefined> = process.env,
 ): number {

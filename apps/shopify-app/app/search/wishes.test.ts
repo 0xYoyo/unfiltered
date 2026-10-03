@@ -8,6 +8,7 @@ import {
   EXTRACT_SCHEMA,
   NO_WISHES,
   parseExtractAnswer,
+  statedCurrency,
   type EmbeddingClient,
   type ExtractedWishes,
   type IntentExtractor,
@@ -23,6 +24,7 @@ import { serializePlaygroundSearchResponse } from "../playground/api.server";
 import { createTestDb } from "../testing/helpers.server";
 import { createPgTrgmClassicStore } from "./classic-store.server";
 import { createFindStep } from "./find.server";
+import { extractionCacheKey, sentenceLanguage } from "./extraction-cache.server";
 import { resetPendingLabels } from "./judge-step.server";
 import { createSearchOrchestrator, type SearchRequest } from "./orchestrator.server";
 import {
@@ -124,6 +126,16 @@ describe("the extraction keeps only what the sentence states (AC-1, AC-2)", () =
     expect(buildExtractPrompt("x")).toContain('"עד" are NOT firm');
   });
 
+  it("falls back to the currency the sentence states when the model names none (AC-17)", () => {
+    expect(parseExtractAnswer({ priceMax: 400, currency: null }, "עד 400")!.currency).toBe("ILS");
+    expect(parseExtractAnswer({ priceMax: 80 }, "shirt under $80")!.currency).toBe("USD");
+    expect(parseExtractAnswer({ priceMax: 80 }, "shirt under 80 EUR")!.currency).toBe("EUR");
+    expect(parseExtractAnswer({ priceMax: 80 }, "shirt under 80")!.currency).toBeNull();
+    expect(parseExtractAnswer({ priceMax: 80, currency: "GBP" }, "שמלה עד 80")!.currency).toBe("GBP");
+    expect(parseExtractAnswer({ currency: "ILS" }, "שמלה")!.currency).toBeNull();
+    expect(statedCurrency('עד 300 ש"ח')).toBe("ILS");
+  });
+
   it("keeps a Hebrew excluded term with its English form", () => {
     const parsed = parseExtractAnswer(
       { excluded: [{ typed: "שחור", english: "black" }] },
@@ -189,7 +201,7 @@ describe("removed chips and chip values (AC-14, AC-15)", () => {
   });
 
   it("reads the grace and the near band from the environment", () => {
-    expect(extractionGraceMsFromEnv({})).toBe(300);
+    expect(extractionGraceMsFromEnv({})).toBe(800);
     expect(extractionGraceMsFromEnv({ EXTRACTION_GRACE_MS: "0" })).toBe(0);
     expect(() => extractionGraceMsFromEnv({ EXTRACTION_GRACE_MS: "x" })).toThrow(/EXTRACTION_GRACE_MS/);
     expect(priceNearPercentFromEnv({})).toBe(10);
@@ -437,6 +449,7 @@ async function seed(db: PrismaClient, products: Seeded[]): Promise<void> {
 /** An extractor answering fixed wishes, after `delayMs`. */
 function fixedExtractor(answer: ExtractedWishes, delayMs = 0): WishExtractor & { calls: number } {
   const extractor = {
+    modelId: "fake-extract",
     calls: 0,
     extract: () => {
       extractor.calls += 1;
@@ -468,6 +481,7 @@ describe("wishes on Engine v2 (on the database)", () => {
     await db.catalogProduct.deleteMany();
     await db.judgeAnswer.deleteMany();
     await db.judgeVerdict.deleteMany();
+    await db.extractionAnswer.deleteMany();
     resetPendingLabels();
   });
 
@@ -630,5 +644,62 @@ describe("wishes on Engine v2 (on the database)", () => {
     expect(response.hits.map((hit) => hit.productId)).toEqual(["a"]);
     expect(response.totalCount).toBe(1);
     expect(response.chips).toEqual([{ field: "availability", value: "in stock" }]);
+  });
+  it("serves a repeat sentence from the extraction cache with no call, and says so (AC-18)", async () => {
+    await seed(db, FOUR);
+    const extractor = fixedExtractor(STATED);
+    const engine = orchestrator({ extractor });
+    const first = await search(engine);
+    const second = await search(engine, { query: "  Dress UNDER 100, size M,   not black " });
+    expect(extractor.calls).toBe(1);
+    expect(first).toMatchObject({ extractionInTime: true, extractionCached: false });
+    expect(second).toMatchObject({ extractionInTime: true, extractionCached: true });
+    expect(second.chips).toEqual(first.chips);
+    expect(second.hits.map((hit) => hit.productId)).toEqual(first.hits.map((hit) => hit.productId));
+    const playground = serializePlaygroundSearchResponse(second, {
+      routeReason: second.routeReason,
+      latencyMs: 1,
+      limited: null,
+      stages: second.stages,
+      intentTier: null,
+      engine: "v2",
+    });
+    expect(playground.details).toMatchObject({ extractionInTime: true, extractionCached: true });
+  });
+
+  it("lets a late extraction run on and fill the cache, so the next search is warm (AC-18)", async () => {
+    await seed(db, FOUR);
+    const late = fixedExtractor(STATED, 120);
+    const engine = orchestrator({ extractor: late, graceMs: 10 });
+    const cold = await search(engine);
+    expect(cold).toMatchObject({ extractionInTime: false, extractionCached: false, chips: [] });
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    const warm = await search(engine);
+    expect(late.calls).toBe(1);
+    expect(warm).toMatchObject({ extractionInTime: true, extractionCached: true });
+    expect(warm.chips.map((chip) => chip.field)).toEqual(["priceMax", "size", "exclude"]);
+  });
+
+  it("composes as soon as the extraction lands, not after the whole grace (AC-18)", async () => {
+    await seed(db, FOUR);
+    const startedAt = Date.now();
+    const response = await search(orchestrator({ extractor: fixedExtractor(STATED, 30), graceMs: 2_000 }));
+    expect(response.extractionInTime).toBe(true);
+    expect(Date.now() - startedAt).toBeLessThan(1_500);
+  });
+
+  it("keys the extraction cache on the normalized sentence, its language, the prompt version and the model (AC-18)", () => {
+    const key = extractionCacheKey({ sentence: "Dress under 100", modelId: "m", promptVersion: 1 });
+    expect(key).toMatch(/^[0-9a-f]{64}$/);
+    expect(extractionCacheKey({ sentence: "  dress   UNDER 100 ", modelId: "m", promptVersion: 1 })).toBe(key);
+    expect(extractionCacheKey({ sentence: "dress under 200", modelId: "m", promptVersion: 1 })).not.toBe(key);
+    expect(extractionCacheKey({ sentence: "Dress under 100", modelId: "n", promptVersion: 1 })).not.toBe(key);
+    expect(extractionCacheKey({ sentence: "Dress under 100", modelId: "m", promptVersion: 2 })).not.toBe(key);
+    expect([sentenceLanguage("שמלה"), sentenceLanguage("платье"), sentenceLanguage("فستان"), sentenceLanguage("robe")]).toEqual([
+      "he",
+      "ru",
+      "ar",
+      "en",
+    ]);
   });
 });

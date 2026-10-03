@@ -77,6 +77,8 @@ export interface PlaygroundSearchDetails {
    * latency probe reports the share of searches composed without it.
    */
   extractionInTime: boolean | null;
+  /** Whether the extraction cache answered (YOY-149 AC-18); null where `extractionInTime` is. */
+  extractionCached: boolean | null;
 }
 
 /** The judge's part of the playground details (YOY-147 AC-12). */
@@ -102,7 +104,7 @@ export interface PlaygroundSearchResponse extends ProxySearchResponse {
  */
 export function serializePlaygroundSearchResponse(
   response: SearchResponse,
-  details: Omit<PlaygroundSearchDetails, "judge" | "extractionInTime">,
+  details: Omit<PlaygroundSearchDetails, "judge" | "extractionInTime" | "extractionCached">,
 ): PlaygroundSearchResponse {
   return {
     ...serializeProxySearchResponse(response),
@@ -115,6 +117,7 @@ export function serializePlaygroundSearchResponse(
       engine: details.engine,
       judge: judgeDetails(response),
       extractionInTime: response.extractionInTime ?? null,
+      extractionCached: response.extractionCached ?? null,
     },
   };
 }

@@ -15,7 +15,12 @@ import {
 } from "./fixture.server";
 import { gradeAgreement, gradeSearch, type GradedResult } from "./grade.server";
 import { findLeaks } from "./leak.server";
-import { formatScoreTable, runScoreSet, withCapturedConsole } from "./run.server";
+import {
+  formatScoreTable,
+  runScoreSet,
+  withCapturedConsole,
+  type ScoreReport,
+} from "./run.server";
 import {
   buildScoreSet,
   decodeHiddenSet,
@@ -162,8 +167,16 @@ export async function runScoreCommand(
       "hidden-set": { type: "string" },
       fixture: { type: "string" },
       synthetic: { type: "boolean", default: false },
+      // Passes over the set on one scratch database (YOY-149 AC-18): the
+      // second pass meets the caches the first filled — warm.
+      passes: { type: "string", default: "1" },
     },
   });
+  const passes = Number(values.passes);
+  if (!Number.isInteger(passes) || passes < 1 || passes > 3) {
+    err("score run: --passes must be 1, 2 or 3");
+    return 2;
+  }
   let set: ScoreSetEntry[];
   try {
     set =
@@ -187,7 +200,7 @@ export async function runScoreCommand(
 
   const db = await createScratchDb();
   try {
-    const { result: report } = await withCapturedConsole(async () => {
+    const { result: reports } = await withCapturedConsole(async () => {
       await importScoreFixture(db, fixture);
       let orchestrator: SearchOrchestrator;
       let grader: LlmClient;
@@ -207,9 +220,34 @@ export async function runScoreCommand(
         grader = await flashLite(createPrismaCostRecorder(db));
         flushLedger = searchLedger.flush;
       }
-      return runScoreSet({ db, orchestrator, grader, storeKey: fixture.storeKey, set, flushLedger });
+      // Each pass reports its own spend and extraction calls: the ledger is
+      // cumulative, so a later pass subtracts what came before it.
+      const results: ScoreReport[] = [];
+      let before = { usd: 0, calls: 0, extractCalls: 0 };
+      for (let pass = 1; pass <= passes; pass += 1) {
+        const report = await runScoreSet({
+          db,
+          orchestrator,
+          grader,
+          storeKey: fixture.storeKey,
+          set,
+          flushLedger,
+        });
+        const extractCalls = report.extractCalls ?? 0;
+        results.push({
+          ...report,
+          cost: { usd: report.cost.usd - before.usd, calls: report.cost.calls - before.calls },
+          extractCalls: extractCalls - before.extractCalls,
+        });
+        before = { usd: report.cost.usd, calls: report.cost.calls, extractCalls };
+      }
+      return results;
     });
-    out(formatScoreTable(report));
+    out(
+      reports.length === 1
+        ? formatScoreTable(reports[0]!)
+        : reports.map((report, index) => `pass ${index + 1}\n${formatScoreTable(report)}`).join("\n"),
+    );
     return 0;
   } catch (error) {
     // The name only: a message can carry query text.

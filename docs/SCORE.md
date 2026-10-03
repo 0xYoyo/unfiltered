@@ -183,7 +183,11 @@ of searches under 1,000 ms server-side against the deployment
 score runner's own under-1-s column times a local run and is not the
 deployment's. The runner's "no extraction" column (YOY-149 AC-4) is the
 share of Engine v2 searches composed without the wish extraction — it
-answered after the grace or failed — and "—" on the old engine.
+answered after the grace or failed — and "extraction cached" (AC-18) the
+share the extraction cache answered with no call; both read "—" on the
+old engine. `score-run.mts --passes 2` runs the set twice on one scratch
+database, cold then warm, each pass with its own cost and `extract calls`
+line.
 
 | Run | Engine | en | he | ar | ru | fr | es | Under 1 s | Cost |
 |-----|--------|----|----|----|----|----|----|-----------|------|

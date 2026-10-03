@@ -229,6 +229,8 @@ export interface ProbeSample {
    * the response was not served by Engine v2's find path.
    */
   extractionInTime: boolean | null;
+  /** Whether the extraction cache answered (YOY-149 AC-18); null where `extractionInTime` is. */
+  extractionCached: boolean | null;
 }
 
 export interface SetSummary {
@@ -250,6 +252,8 @@ export interface SetSummary {
    * (YOY-149 AC-4); null when no sample reported it.
    */
   withoutExtraction: number | null;
+  /** Share of Engine v2 samples the extraction cache answered, 0–1 (YOY-149 AC-18); null when none reported. */
+  extractionCached: number | null;
   routes: Record<string, number>;
   /** Mean ms per stage over the samples that ran it; absent when none did. */
   meanStages: Record<string, number>;
@@ -289,16 +293,26 @@ export function summarize(
     limited: samples.filter((sample) => sample.limited !== null).length,
     reused: samples.filter((sample) => sample.routeReason === "intent-reuse").length,
     withoutExtraction: shareWithoutExtraction(samples),
+    extractionCached: shareOf(samples, (sample) => sample.extractionCached),
     routes,
     meanStages,
   };
 }
 
 function shareWithoutExtraction(samples: readonly ProbeSample[]): number | null {
-  const reported = samples.filter((sample) => sample.extractionInTime !== null);
+  const inTime = shareOf(samples, (sample) => sample.extractionInTime);
+  return inTime === null ? null : 1 - inTime;
+}
+
+/** The share of samples whose flag is true, among those that reported it; null when none did. */
+function shareOf(
+  samples: readonly ProbeSample[],
+  flag: (sample: ProbeSample) => boolean | null,
+): number | null {
+  const reported = samples.filter((sample) => flag(sample) !== null);
   return reported.length === 0
     ? null
-    : reported.filter((sample) => sample.extractionInTime === false).length / reported.length;
+    : reported.filter((sample) => flag(sample) === true).length / reported.length;
 }
 
 export interface Breach {
@@ -355,6 +369,9 @@ export function formatSummary(summary: SetSummary): string {
       (summary.withoutExtraction === null
         ? ""
         : ` no-extraction=${Math.round(summary.withoutExtraction * 100)}%`) +
+      (summary.extractionCached === null
+        ? ""
+        : ` extraction-cached=${Math.round(summary.extractionCached * 100)}%`) +
       ` degraded=${summary.degraded} limited=${summary.limited} reused=${summary.reused} routes: ${routes}`,
     `  mean per stage: ${stages === "" ? "(none)" : stages}`,
   ].join("\n");
@@ -391,6 +408,7 @@ interface PlaygroundBody {
     limited: string | null;
     stages: Record<string, number>;
     extractionInTime?: boolean | null;
+    extractionCached?: boolean | null;
   };
 }
 
@@ -435,6 +453,7 @@ async function probeOnce(
     latencyMs: body.details.latencyMs,
     stages: body.details.stages ?? {},
     extractionInTime: body.details.extractionInTime ?? null,
+    extractionCached: body.details.extractionCached ?? null,
   };
 }
 

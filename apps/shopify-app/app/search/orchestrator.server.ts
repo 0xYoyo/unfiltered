@@ -18,12 +18,12 @@ import {
   type QueryRoute,
   type RetrievalConstraints,
   type Retriever,
-  type ExtractedWishes,
   type WishExtractor,
 } from "@unfiltered/engine";
 
 import type { ClassicCardHit } from "./classic-store.server";
 import { findReusableIntent, normalizeReuseQuery } from "./events.server";
+import { extractThroughCache, type CachedExtraction } from "./extraction-cache.server";
 import type { FindStep } from "./find.server";
 import {
   DEFAULT_JUDGE_DEADLINE_MS,
@@ -480,6 +480,11 @@ export interface SearchResponse {
    * when it was late, failed, or no extractor is wired.
    */
   extractionInTime?: boolean;
+  /**
+   * Whether the extraction cache answered (YOY-149 AC-18): no extraction
+   * call was made. Present exactly when `extractionInTime` is.
+   */
+  extractionCached?: boolean;
 }
 
 /**
@@ -568,7 +573,7 @@ export interface SearchOrchestratorOptions {
    * with no stated wishes.
    */
   wishExtractor?: WishExtractor;
-  /** How long the page waits for the extraction after find; 300 ms by default (AC-3). */
+  /** How long the page waits for the extraction after find; 800 ms by default (AC-3, AC-18). */
   extractionGraceMs?: number;
   /** How far over the cap a price is still near, in percent; 10 by default (AC-5, AC-12). */
   priceNearPercent?: number;
@@ -702,7 +707,8 @@ export function createSearchOrchestrator(
     const found = await stages.time("find", () =>
       findStep.find({ shopDomain: request.shopDomain, query: request.query, searchId }),
     );
-    const extracted = await extraction.settle();
+    const settled = await extraction.settle();
+    const extracted = settled?.wishes ?? null;
     const wishes =
       extracted === null ? null : keepUnremoved(extracted, request.removedChips ?? []);
     let ordered = { productIds: found.productIds, findSetCount: found.findSetCount };
@@ -787,32 +793,31 @@ export function createSearchOrchestrator(
       totalCount: ordered.productIds.length,
       ...(labelsPending ? { labelsPending: true as const } : {}),
       extractionInTime: extracted !== null,
+      extractionCached: settled?.cached === true,
     };
   }
 
   /**
-   * Start the wish extraction (YOY-149 AC-1, AC-3). `settle` waits for it
-   * no longer than the grace after the call to `settle` — made when find
-   * finishes — and answers null when it is late, failed, or not wired; a
-   * late call is then aborted, and the page composes without it.
+   * Start the wish extraction (YOY-149 AC-1, AC-3, AC-18), through the
+   * extraction cache. `settle` waits for it no longer than the grace after
+   * the call to `settle` — made when find finishes — and answers the moment
+   * it lands; null when it is late, failed, or not wired. A late call is
+   * not aborted: it runs on and fills the cache for the next search.
    */
   function startExtraction(
     request: SearchRequest,
     searchId: string,
-  ): { settle(): Promise<ExtractedWishes | null> } {
+  ): { settle(): Promise<CachedExtraction | null> } {
     if (wishExtractor === undefined) {
       return { settle: () => Promise.resolve(null) };
     }
-    const controller = new AbortController();
-    const answer = wishExtractor
-      .extract({
-        sentence: request.query,
-        storeId: request.shopDomain,
-        searchId,
-        signal: controller.signal,
-      })
+    const answer = extractThroughCache(db, wishExtractor, {
+      sentence: request.query,
+      storeId: request.shopDomain,
+      searchId,
+    })
       .then(
-        (wishes): ExtractedWishes | null => wishes,
+        (extraction): CachedExtraction | null => extraction,
         (error: unknown) => {
           console.warn(
             "[search] wish extraction failed; composing without it",
@@ -829,11 +834,7 @@ export function createSearchOrchestrator(
         });
         const settled = await Promise.race([answer, grace]);
         clearTimeout(timer);
-        if (settled === "late") {
-          controller.abort();
-          return null;
-        }
-        return settled;
+        return settled === "late" ? null : settled;
       },
     };
   }

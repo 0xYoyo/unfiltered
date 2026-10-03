@@ -109,6 +109,7 @@ const CONTRACT_KEYS = [
 
 const DETAIL_KEYS = [
   "engine",
+  "extractionCached",
   "extractionInTime",
   "intentTier",
   "judge",
@@ -310,6 +311,7 @@ describe("the response contract (AC-2)", () => {
     expect((body.details as { judge: unknown }).judge).toBeNull();
     // Nor the wish extraction's flag (YOY-149 AC-4).
     expect((body.details as { extractionInTime: unknown }).extractionInTime).toBeNull();
+    expect((body.details as { extractionCached: unknown }).extractionCached).toBeNull();
     expect(
       (body.details as { latencyMs: number }).latencyMs,
     ).toBeGreaterThanOrEqual(0);
