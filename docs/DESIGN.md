@@ -100,6 +100,10 @@ Each is imperative, atomic, and checkable from a screenshot or the diff.
   negator word left upright — never by a hue of ours (W-3). The
   playground marks the same distinction with its accent tint (P-9); only
   the means differ, because only the playground may own a hue.
+  One chip has no remove affordance: the two-meanings chip (PRD §3 "Two
+  meanings"), "{reading} instead?", which offers another search rather
+  than filtering this one — a dashed hairline in the host's own colour in
+  the widget, a ghost pill on the playground.
 - **W-8 Quiet by default.** Preview and failure states are quieter (lower
   opacity, smaller type) than submitted-result states; the AI zero-hit
   state names what didn't match and offers close matches; no state ever
