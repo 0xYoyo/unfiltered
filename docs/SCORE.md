@@ -207,10 +207,12 @@ every later gate. Effective bands: en 0.111, he 0.090, ar 0.030, ru 0.055,
 fr 0.030, es 0.060.
 
 **Known catalog effects.** The seed catalog is priced in USD with a median
-of $314; only 40 of its 465 products cost under $107.50 (400 ILS), and none
-of its 99 dresses or 30 coats do (at 600 ILS, 4 dresses). Six of the 13
-public Hebrew searches state a shekel cap, so on this catalog a Hebrew
-budget almost never has an in-budget relevant product, and Hebrew scores
+of $314; only 67 of its 465 products cost under $130.51 (400 ILS at the
+2026-10-02 ECB rate, 3.065 per USD), and only 2 of its 99 dresses and none
+of its 30 coats do (at 600 ILS, $195.76: 114 products, 5 dresses, no
+coat). Six of the 13 public Hebrew searches state a shekel cap, so on this
+catalog a Hebrew budget almost never has an in-budget relevant product, and
+Hebrew scores
 are sensitive to how the number tiers treat that case (YOY-149: tiers
 sorted over the whole find set put cheap unrelated products on page 1 —
 he 0.150 against a 0.368 reference — until the tiers were limited to the

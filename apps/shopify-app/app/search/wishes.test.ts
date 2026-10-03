@@ -35,6 +35,7 @@ import {
 import {
   composeWishes,
   convertAmount,
+  CURRENCY_RATES,
   extractionGraceMsFromEnv,
   holdsWholeWord,
   keepUnremoved,
@@ -217,6 +218,14 @@ describe("currency conversion (AC-7)", () => {
     expect(convertAmount(100, "EUR", "ILS", rates)).toBe(800);
     expect(convertAmount(5, "USD", "USD", rates)).toBe(5);
     expect(convertAmount(100, "JPY", "USD", rates)).toBeNull();
+  });
+
+  it("ships a current table: 400 ILS is roughly $131, not a years-old rate (YOY-150 AC-13)", () => {
+    expect(CURRENCY_RATES.asOf >= "2026-10-02").toBe(true);
+    const usd = convertAmount(400, "ILS", "USD");
+    expect(usd).not.toBeNull();
+    expect(usd!).toBeGreaterThan(120);
+    expect(usd!).toBeLessThan(140);
   });
 });
 
