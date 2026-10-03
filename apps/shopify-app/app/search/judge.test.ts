@@ -62,7 +62,8 @@ function candidate(id: string, overrides: Partial<JudgeCandidate> = {}): JudgeCa
     priceMax: 100,
     currencyCode: "USD",
     options: [],
-    summary: `Summary of ${id}`,
+    facts: `Facts of ${id}`,
+    attributes: [],
     description: "",
     ...overrides,
   };
@@ -92,8 +93,8 @@ function scriptedLlm(
   return client;
 }
 
-describe("the judge's rows and prompt (AC-2)", () => {
-  it("holds title, price, option names and values, and the card summary, cut to 320 characters", () => {
+describe("the judge's rows and prompt (AC-2, AC-17)", () => {
+  it("holds title, price, the card's facts, the vision attributes, then the options, cut to 480 characters", () => {
     const row = judgeRow(
       candidate("a", {
         title: "Aurora Midi Dress",
@@ -104,21 +105,40 @@ describe("the judge's rows and prompt (AC-2)", () => {
           { name: "Color", values: ["Black", "Navy"] },
           { name: "Size", values: ["S", "M"] },
         ],
-        summary: "Black   long-sleeve\nmidi dress in viscose.",
+        facts: "Midi dress   in viscose.\nBack zip.",
+        attributes: [
+          { name: "sleeve length", value: "long" },
+          { name: "neckline", value: "v-neck" },
+        ],
       }),
     );
     expect(row).toBe(
-      "Aurora Midi Dress | 80–95.5 EUR | Color: Black, Navy; Size: S, M | Black long-sleeve midi dress in viscose.",
+      "Aurora Midi Dress | 80–95.5 EUR | Midi dress in viscose. Back zip. | sleeve length: long; neckline: v-neck | Color: Black, Navy; Size: S, M",
     );
-    expect(DEFAULT_JUDGE_ROW_CHARS).toBe(320);
-    const long = judgeRow(candidate("b", { summary: "x".repeat(1000) }));
-    expect(long).toHaveLength(320);
-    expect(judgeRow(candidate("b", { summary: "x".repeat(1000) }), 50)).toHaveLength(50);
+    expect(DEFAULT_JUDGE_ROW_CHARS).toBe(480);
+    const long = judgeRow(candidate("b", { facts: "x".repeat(1000) }));
+    expect(long).toHaveLength(480);
+    expect(judgeRow(candidate("b", { facts: "x".repeat(1000) }), 50)).toHaveLength(50);
+  });
+
+  it("puts `sleeve length: long` in the row of a product with a long-sleeve attribute (AC-17)", () => {
+    const row = judgeRow(
+      candidate("d", {
+        title: "Taib Dress",
+        facts: "Midi dress in crepe.",
+        attributes: [
+          { name: "sleeve length", value: "long" },
+          { name: "garment length", value: "midi" },
+        ],
+      }),
+    );
+    expect(row).toContain("sleeve length: long");
+    expect(row).toBe("Taib Dress | 100 USD | Midi dress in crepe. | sleeve length: long; garment length: midi");
   });
 
   it("uses the title and the description's first 200 characters for a product with no card", () => {
     const row = judgeRow(
-      candidate("c", { title: "Plain Tee", summary: null, description: "d".repeat(500) }),
+      candidate("c", { title: "Plain Tee", facts: null, description: "d".repeat(500) }),
       1000,
     );
     expect(row).toBe(`Plain Tee | 100 USD | ${"d".repeat(200)}`);
@@ -127,8 +147,25 @@ describe("the judge's rows and prompt (AC-2)", () => {
   it("carries the sentence on a Query line and numbers every row", () => {
     const prompt = buildJudgePrompt("long sleeve  midi dress", [candidate("a"), candidate("b")]);
     expect(prompt).toContain("\nQuery: long sleeve midi dress\n");
-    expect(prompt).toContain("\n1. Product a | 100 USD | Summary of a");
-    expect(prompt).toContain("\n2. Product b | 100 USD | Summary of b");
+    expect(prompt).toContain("\n1. Product a | 100 USD | Facts of a");
+    expect(prompt).toContain("\n2. Product b | 100 USD | Facts of b");
+  });
+
+  it("asks for exact only when the row meets every stated wish, so a sleeveless dress for long sleeves is close (AC-17)", () => {
+    const prompt = buildJudgePrompt("long sleeve midi dress", [
+      candidate("a", { attributes: [{ name: "sleeve length", value: "sleeveless" }] }),
+    ]);
+    // A replay answering `E-X` for this sleeveless dress is not what the
+    // prompt asks for: exact needs every stated wish met by the row, and a
+    // contradicted or unmentioned wish is close with the description flag.
+    expect(prompt).toContain(
+      "E = exact: only when every wish the shopper stated is met by the product's row.",
+    );
+    expect(prompt).toMatch(/C = close: .*a stated wish the row contradicts or does not\nmention/);
+    expect(prompt).toContain("Mark it C with the D missed-wish flag");
+    expect(prompt).toContain("never E.");
+    expect(prompt).toContain("Products with the same verdict keep their search order.");
+    expect(prompt).toContain("1. Product a | 100 USD | Facts of a | sleeve length: sleeveless");
   });
 });
 
@@ -308,7 +345,7 @@ describe("the one factory and its configuration (AC-1, AC-2, AC-6)", () => {
     expect(DEFAULT_JUDGE_DEADLINE_MS).toBe(1_500);
     expect(judgeDeadlineMsFromEnv({ JUDGE_DEADLINE_MS: "1" })).toBe(1);
     expect(() => judgeDeadlineMsFromEnv({ JUDGE_DEADLINE_MS: "0" })).toThrow(/JUDGE_DEADLINE_MS/);
-    expect(judgeRowCharsFromEnv({})).toBe(320);
+    expect(judgeRowCharsFromEnv({})).toBe(480);
     expect(judgeRowCharsFromEnv({ JUDGE_ROW_CHARS: "200" })).toBe(200);
     expect(() => judgeRowCharsFromEnv({ JUDGE_ROW_CHARS: "x" })).toThrow(/JUDGE_ROW_CHARS/);
   });
@@ -319,7 +356,9 @@ interface Product {
   title: string;
   /** Card-vector distance knob; no card vector when absent. */
   y?: number;
-  summary?: string;
+  facts?: string;
+  /** Writes an enrichment row with this vision sleeve length when present. */
+  sleeveLength?: string | null;
   description?: string;
   options?: Array<Array<{ name: string; value: string }>>;
 }
@@ -354,18 +393,35 @@ async function seed(db: PrismaClient, products: Product[]): Promise<void> {
         `[1,${product.y},0]`,
       );
     }
-    if (product.summary !== undefined) {
+    if (product.facts !== undefined) {
       await db.productCard.create({
         data: {
           shopDomain: SHOP,
           productId: product.productId,
           status: "written",
-          summary: product.summary,
+          facts: product.facts,
           asks: {},
           inputHash: "i",
           cardVersion: 1,
           modelId: "m",
           writtenAt: new Date(),
+        },
+      });
+    }
+    if (product.sleeveLength !== undefined) {
+      await db.productEnrichment.create({
+        data: {
+          shopDomain: SHOP,
+          productId: product.productId,
+          contentHash: `hash-${product.productId}`,
+          status: "enriched",
+          colors: [],
+          occasions: [],
+          styleTags: [],
+          seasons: [],
+          sleeveLength: product.sleeveLength,
+          neckline: "not-applicable",
+          garmentLength: "midi",
         },
       });
     }
@@ -428,6 +484,7 @@ describe("the judge on Engine v2 (on the database)", () => {
   beforeEach(async () => {
     await db.$executeRawUnsafe(`DELETE FROM "CardEmbedding"`);
     await db.productCard.deleteMany();
+    await db.productEnrichment.deleteMany();
     await db.productVariant.deleteMany();
     await db.catalogProduct.deleteMany();
   });
@@ -514,13 +571,14 @@ describe("the judge on Engine v2 (on the database)", () => {
     expect(Object.keys(playground.details.stages)).toContain("judge");
   });
 
-  it("sends one compact row per candidate, from the card, the variants and the catalog row (AC-2)", async () => {
+  it("sends one compact row per candidate, from the card's facts, the enrichment, the variants and the catalog row (AC-2, AC-17)", async () => {
     await seed(db, [
       {
         productId: "p1",
         title: "Navy Midi Dress",
         y: 0.1,
-        summary: "Navy long-sleeve midi dress.",
+        facts: "Navy midi dress in viscose.",
+        sleeveLength: "long",
         options: [
           [
             { name: "Color", value: "Navy" },
@@ -537,19 +595,30 @@ describe("the judge on Engine v2 (on the database)", () => {
     const candidates = await loadJudgeCandidates(db, SHOP, ["p2", "p1"]);
     expect(candidates.map((entry) => entry.id)).toEqual(["p2", "p1"]);
     expect(candidates[1]).toMatchObject({
-      summary: "Navy long-sleeve midi dress.",
+      facts: "Navy midi dress in viscose.",
+      attributes: [
+        { name: "sleeve length", value: "long" },
+        { name: "garment length", value: "midi" },
+      ],
       options: [
         { name: "Color", values: ["Navy"] },
         { name: "Size", values: ["S", "M"] },
       ],
     });
-    expect(candidates[0]).toMatchObject({ summary: null, description: "Soft cotton tee.", options: [] });
+    expect(candidates[0]).toMatchObject({
+      facts: null,
+      attributes: [],
+      description: "Soft cotton tee.",
+      options: [],
+    });
 
     const llm = scriptedLlm([answer(["E-X", "E-X"])]);
     await search(orchestrator(llm), { query: "navy dress" });
     expect(llm.requests).toHaveLength(1);
     const prompt = llm.requests[0]!.prompt;
-    expect(prompt).toContain("1. Navy Midi Dress | 100 USD | Color: Navy; Size: S, M | Navy long-sleeve midi dress.");
+    expect(prompt).toContain(
+      "1. Navy Midi Dress | 100 USD | Navy midi dress in viscose. | sleeve length: long; garment length: midi | Color: Navy; Size: S, M",
+    );
     expect(prompt).toContain("2. Plain Tee | 100 USD | Soft cotton tee.");
   });
 

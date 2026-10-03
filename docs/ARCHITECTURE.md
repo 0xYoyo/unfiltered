@@ -957,11 +957,21 @@ runs one page.
   judged in one call (temperature 0, ledger operation `judge`); a page beyond
   it is served in keyword order with no call (`find-only`), and a page
   straddling the boundary keeps its keyword tail after the judged part.
-- **Rows.** One per candidate (`judgeRow`): title, price, option names with
-  the values the variants offer, and the written card's summary — or, with no
-  card, the description's first 200 characters — cut to `JUDGE_ROW_CHARS`
-  (default 320). The sentence rides a `Query:` line, which keys replay
-  recordings.
+- **Rows.** One per candidate (`judgeRow`): title, price, the written
+  card's `facts` — or, with no card, the description's first 200 characters
+  — then the enrichment's vision attributes as `key: value` (sleeve length,
+  neckline, garment length, pattern, material appearance) where present,
+  then option names with the values the variants offer, cut to
+  `JUDGE_ROW_CHARS` (default 480). Facts, not the card summary (AC-17): a
+  summary often leaves out the sleeves, and a judge that cannot see them
+  marks every candidate close. The prompt makes `E` conditional on every
+  stated wish being met by the row; a wish the row contradicts or omits is
+  `C` with the `D` flag. The sentence rides a `Query:` line, which keys
+  replay recordings.
+- **Score runs.** `score.yml` and `npm run score:public` set
+  `JUDGE_DEADLINE_MS=4000` (AC-18): the score measures the judge's judgment,
+  not its speed. Speed is the latency probe's, on the deployment; production
+  keeps 1,500 ms.
 - **Answer.** Fixed-schema JSON in short codes, no prose field: `c` holds one
   three-letter code per candidate in page order — verdict (`E` exact, `V` the
   same item in another colour or size, `C` close, `N` not relevant), missed

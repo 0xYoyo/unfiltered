@@ -2,8 +2,10 @@ import type { PrismaClient } from "@prisma/client";
 import {
   DEFAULT_JUDGE_ROW_CHARS,
   orderByVerdict,
+  VISION_NOT_APPLICABLE,
   type Judge,
   type JudgeCandidate,
+  type JudgeCandidateAttribute,
   type JudgeCandidateOption,
   type JudgeLabel,
   type JudgeVerdictCode,
@@ -46,7 +48,7 @@ export function judgeDeadlineMsFromEnv(
   return positiveIntFromEnv(env, JUDGE_DEADLINE_MS_ENV, DEFAULT_JUDGE_DEADLINE_MS);
 }
 
-/** The row length from `JUDGE_ROW_CHARS`; unset means 320. A malformed value fails at construction. */
+/** The row length from `JUDGE_ROW_CHARS`; unset means 480. A malformed value fails at construction. */
 export function judgeRowCharsFromEnv(
   env: Record<string, string | undefined> = process.env,
 ): number {
@@ -56,11 +58,34 @@ export function judgeRowCharsFromEnv(
 /** How the judge step ended: the routeReason it gives the response (AC-11). */
 export type JudgeOutcome = "judged" | "judge-timeout" | "judge-error";
 
+/** The vision attributes a row carries, in row order, by their row names (AC-17). */
+const JUDGE_VISION_ATTRIBUTES = [
+  ["sleeve length", "sleeveLength"],
+  ["neckline", "neckline"],
+  ["garment length", "garmentLength"],
+  ["pattern", "pattern"],
+  ["material appearance", "materialAppearance"],
+] as const;
+
+type VisionColumns = Record<(typeof JUDGE_VISION_ATTRIBUTES)[number][1], string | null>;
+
+/** The vision attributes that hold a value; not-applicable and unknown are left out. */
+function visionAttributes(enrichment: VisionColumns | undefined): JudgeCandidateAttribute[] {
+  if (enrichment === undefined) {
+    return [];
+  }
+  return JUDGE_VISION_ATTRIBUTES.flatMap(([name, column]) => {
+    const value = enrichment[column]?.trim() ?? "";
+    return value === "" || value === VISION_NOT_APPLICABLE ? [] : [{ name, value }];
+  });
+}
+
 /**
- * Read the page's products as judge candidates, in the given order (AC-2):
- * the catalog row's title, price and description, every option name with
- * the values its variants offer (merchant order, each value once), and the
- * written card's summary — null when the product has no written card.
+ * Read the page's products as judge candidates, in the given order (AC-2,
+ * AC-17): the catalog row's title, price and description, every option name
+ * with the values its variants offer (merchant order, each value once), the
+ * written card's `facts` — null when the product has no written card — and
+ * the enrichment's five vision attributes where present.
  */
 export async function loadJudgeCandidates(
   db: PrismaClient,
@@ -71,7 +96,7 @@ export async function loadJudgeCandidates(
     return [];
   }
   const ids = [...productIds];
-  const [products, variants, cards] = await Promise.all([
+  const [products, variants, cards, enrichments] = await Promise.all([
     db.catalogProduct.findMany({
       where: { shopDomain, productId: { in: ids } },
       select: {
@@ -90,7 +115,18 @@ export async function loadJudgeCandidates(
     }),
     db.productCard.findMany({
       where: { shopDomain, productId: { in: ids }, status: "written" },
-      select: { productId: true, summary: true },
+      select: { productId: true, facts: true },
+    }),
+    db.productEnrichment.findMany({
+      where: { shopDomain, productId: { in: ids } },
+      select: {
+        productId: true,
+        sleeveLength: true,
+        neckline: true,
+        garmentLength: true,
+        pattern: true,
+        materialAppearance: true,
+      },
     }),
   ]);
   const optionsOf = new Map<string, JudgeCandidateOption[]>();
@@ -115,11 +151,12 @@ export async function loadJudgeCandidates(
       }
     }
   }
-  const summaryOf = new Map(
+  const factsOf = new Map(
     cards
-      .filter((card) => card.summary.trim() !== "")
-      .map((card) => [card.productId, card.summary]),
+      .filter((card) => card.facts.trim() !== "")
+      .map((card) => [card.productId, card.facts]),
   );
+  const enrichmentOf = new Map(enrichments.map((row) => [row.productId, row]));
   const byId = new Map(products.map((product) => [product.productId, product]));
   return ids.flatMap((productId) => {
     const product = byId.get(productId);
@@ -134,7 +171,8 @@ export async function loadJudgeCandidates(
         priceMax: product.priceMax,
         currencyCode: product.currencyCode,
         options: optionsOf.get(productId) ?? [],
-        summary: summaryOf.get(productId) ?? null,
+        facts: factsOf.get(productId) ?? null,
+        attributes: visionAttributes(enrichmentOf.get(productId)),
         description: product.description,
       },
     ];

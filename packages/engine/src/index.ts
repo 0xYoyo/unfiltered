@@ -103,6 +103,7 @@ export {
   parseJudgeAnswer,
   type Judge,
   type JudgeCandidate,
+  type JudgeCandidateAttribute,
   type JudgeCandidateOption,
   type JudgedItem,
   type JudgeFactoryOptions,

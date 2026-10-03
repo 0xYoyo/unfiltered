@@ -22,8 +22,8 @@ export const JUDGE_PROVIDERS = ["gemini"] as const;
 export type JudgeProvider = (typeof JUDGE_PROVIDERS)[number];
 export const DEFAULT_JUDGE_PROVIDER: JudgeProvider = "gemini";
 
-/** Characters one candidate row is cut to (AC-2). */
-export const DEFAULT_JUDGE_ROW_CHARS = 320;
+/** Characters one candidate row is cut to (AC-2; raised to 480 by AC-17). */
+export const DEFAULT_JUDGE_ROW_CHARS = 480;
 /** Description characters a product with no card contributes (AC-2). */
 export const JUDGE_DESCRIPTION_CHARS = 200;
 /** Words a `fact-differs` value may hold; a longer one drops the label (AC-3, AC-9). */
@@ -59,7 +59,13 @@ export interface JudgeCandidateOption {
   values: string[];
 }
 
-/** One product on the page, as the judge reads it (AC-2). */
+/** One vision attribute of a candidate, e.g. `sleeve length` = `long` (AC-17). */
+export interface JudgeCandidateAttribute {
+  name: string;
+  value: string;
+}
+
+/** One product on the page, as the judge reads it (AC-2, AC-17). */
 export interface JudgeCandidate {
   id: string;
   title: string;
@@ -67,9 +73,11 @@ export interface JudgeCandidate {
   priceMax: number;
   currencyCode: string;
   options: JudgeCandidateOption[];
-  /** The card's summary; null when the product has no card. */
-  summary: string | null;
-  /** Read only when `summary` is null: its first 200 characters stand in. */
+  /** The card's `facts` section; null when the product has no card. */
+  facts: string | null;
+  /** The enrichment's vision attributes that hold a value, in a fixed order. */
+  attributes: JudgeCandidateAttribute[];
+  /** Read only when `facts` is null: its first 200 characters stand in. */
   description: string;
 }
 
@@ -199,9 +207,10 @@ function oneLine(text: string): string {
 }
 
 /**
- * One compact candidate row (AC-2): title, price, option names and values,
- * and the card summary — or, with no card, the description's first 200
- * characters — cut to `maxChars`.
+ * One compact candidate row (AC-2, AC-17): title, price, the card's facts —
+ * or, with no card, the description's first 200 characters — then the
+ * vision attributes as `key: value`, then option names and values, cut to
+ * `maxChars`. Facts, not a blurb: a summary often leaves out the sleeves.
  */
 export function judgeRow(candidate: JudgeCandidate, maxChars = DEFAULT_JUDGE_ROW_CHARS): string {
   const options = candidate.options
@@ -209,10 +218,13 @@ export function judgeRow(candidate: JudgeCandidate, maxChars = DEFAULT_JUDGE_ROW
     .map((option) => `${option.name}: ${option.values.join(", ")}`)
     .join("; ");
   const about =
-    candidate.summary !== null
-      ? candidate.summary
+    candidate.facts !== null
+      ? candidate.facts
       : candidate.description.slice(0, JUDGE_DESCRIPTION_CHARS);
-  const row = [candidate.title, formatPrice(candidate), options, about]
+  const attributes = candidate.attributes
+    .map((attribute) => `${attribute.name}: ${attribute.value}`)
+    .join("; ");
+  const row = [candidate.title, formatPrice(candidate), about, attributes, options]
     .map(oneLine)
     .filter((part) => part !== "")
     .join(" | ");
@@ -230,13 +242,17 @@ export function buildJudgePrompt(
   );
   return [
     "You judge store search results. Read the shopper's search, then every numbered product.",
-    "Answer with one three-letter code per product in c, in product order.",
+    "Products are listed in search order. Answer with one three-letter code per product in c,",
+    "in product order. Judge each product only by what its row says.",
     "",
     "Letter 1, the verdict:",
-    "E = exactly what the shopper asked for: every stated wish is met.",
+    "E = exact: only when every wish the shopper stated is met by the product's row.",
     "V = the item the shopper asked for, but only in another colour or size than asked.",
-    "C = close: the right kind of product, with one stated wish not shown and the rest met.",
-    "N = not a pick: the wrong kind of product, a stated wish visibly off, or two or more not shown.",
+    "C = close: the right kind of product, but a stated wish the row contradicts or does not",
+    "mention (for example, long sleeves asked and the row says sleeveless or says nothing of",
+    "sleeves). Mark it C with the D missed-wish flag (B when a merchant fact also differs), never E.",
+    "N = not relevant: the wrong kind of product.",
+    "Products with the same verdict keep their search order.",
     "",
     "Letter 2, the wishes it misses: - = none; F = a merchant fact differs or is not shown",
     "(material, colour, size, price, an option); D = a described quality is not met or not shown",

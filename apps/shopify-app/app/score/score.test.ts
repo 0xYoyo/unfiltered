@@ -966,6 +966,16 @@ describe("the score workflow (YOY-141 AC-1, AC-2)", () => {
     expect(workflow).toContain("ENGINE_V2: ${{ inputs.engine == 'v2' && '1' || '0' }}");
   });
 
+  it("gives the judge 4,000 ms on a score run, here and in score:public (YOY-147 AC-18)", () => {
+    expect(workflow).toContain('JUDGE_DEADLINE_MS: "4000"');
+    const manifest = JSON.parse(
+      readFileSync(join(REPO_ROOT, "apps", "shopify-app", "package.json"), "utf8"),
+    ) as { scripts: Record<string, string> };
+    expect(manifest.scripts["score:public"]).toBe(
+      "JUDGE_DEADLINE_MS=4000 npx tsx scripts/score-run.mts",
+    );
+  });
+
   it("leaves ci.yml on pull_request with no score job", () => {
     const ci = readFileSync(join(REPO_ROOT, ".github", "workflows", "ci.yml"), "utf8");
     expect(ci).toMatch(/^on:\n\s+pull_request:/m);
