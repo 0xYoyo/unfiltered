@@ -682,6 +682,24 @@ describe("wishes on Engine v2 (on the database)", () => {
     expect(response.hits.map((hit) => hit.productId)).toEqual(["p2", "p3", "p4"]);
   });
 
+  it("ignores the judge's excluded flags once an exclude chip is removed, on a fresh or cached answer (AC-15)", async () => {
+    await seed(db, FOUR);
+    const flagging = () =>
+      orchestrator({ extractor: fixedExtractor(NO_WISHES), judge: judgeLlm(["E-X", "E-X", "E-X", "E-X"], [1]) });
+    const removed = { removedChips: [{ field: "exclude", value: "black" }] };
+    const fresh = await search(flagging(), removed);
+    expect(fresh.routeReason).toBe("judged");
+    expect(fresh.hits.map((hit) => hit.productId)).toContain("p1");
+    expect(fresh.chips.some((chip) => chip.field === "exclude")).toBe(false);
+
+    await db.judgeAnswer.deleteMany();
+    const kept = await search(flagging());
+    expect(kept.hits.map((hit) => hit.productId)).not.toContain("p1");
+    const cached = await search(flagging(), removed);
+    expect(cached.routeReason).toBe("judge-cached");
+    expect(cached.hits.map((hit) => hit.productId)).toContain("p1");
+  });
+
   it("removes sold-out products from the results and the count on in stock (AC-9)", async () => {
     await seed(db, [
       { productId: "a", title: "A Dress", y: 0.1 },
