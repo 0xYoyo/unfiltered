@@ -8,6 +8,7 @@ import {
   DEFAULT_INTENT_HEDGE_AFTER_MS,
   createQueryClassifier,
   createRetriever,
+  createWishExtractor,
   parseIntent,
   type AppliedConstraint,
   type Intent,
@@ -39,6 +40,13 @@ import {
   type SearchResponse,
 } from "./orchestrator.server";
 import { createPgVectorRetrievalStore } from "./retrieval-store.server";
+import {
+  extractionGraceMsFromEnv,
+  priceNearPercentFromEnv,
+  type CodeLabelTemplate,
+  type RemovedChip,
+  type WishChipField,
+} from "./wishes.server";
 
 /**
  * The storefront search contract (YOY-46): parsing for the JSON the widget
@@ -49,10 +57,15 @@ import { createPgVectorRetrievalStore } from "./retrieval-store.server";
  * response body, whatever the orchestrator's own response type grows.
  */
 
-/** One applied-constraint chip, exactly as the widget renders it. */
+/**
+ * One applied-constraint chip, exactly as the widget renders it. Engine v2
+ * answers the fields of `WishChipField` (YOY-149 AC-14); a price chip there
+ * carries the shopper's own `currency` when they stated one.
+ */
 export interface ProxyChip {
-  field: AppliedConstraint["field"];
+  field: AppliedConstraint["field"] | WishChipField;
   value: string;
+  currency?: string;
 }
 
 /** The JSON body the widget POSTs through the proxy. */
@@ -65,6 +78,12 @@ export interface ProxySearchBody {
   previousIntent?: Intent;
   /** Chip the shopper dismissed; requires `previousIntent` to adjust. */
   removeChip?: ProxyChip;
+  /**
+   * Every chip the shopper removed from an Engine v2 response in this search
+   * (YOY-149 AC-15): the facts they name are not applied and their chips
+   * are absent. A JSON array of `{ field, value }`.
+   */
+  removedChips?: RemovedChip[];
   /**
    * "preview" marks a keystroke preview (YOY-68): classic-only results,
    * zero LLM calls, no throttle budget, no SearchEvent. "classic" marks a
@@ -171,7 +190,50 @@ export function parseProxySearchBody(value: unknown): ProxySearchBody | null {
     };
   }
 
+  if (record.removedChips !== undefined && record.removedChips !== null) {
+    const removed = parseRemovedChips(record.removedChips);
+    if (removed === null) {
+      return null;
+    }
+    body.removedChips = removed;
+  }
+
   return body;
+}
+
+const WISH_CHIP_FIELDS: ReadonlySet<string> = new Set<WishChipField>([
+  "priceMax",
+  "priceMin",
+  "size",
+  "availability",
+  "exclude",
+]);
+
+/**
+ * Validate `removedChips` (YOY-149 AC-15): an array of at most 20 chips, each
+ * a known Engine v2 field and a string value of at most 200 characters.
+ */
+function parseRemovedChips(value: unknown): RemovedChip[] | null {
+  if (!Array.isArray(value) || value.length > 20) {
+    return null;
+  }
+  const chips: RemovedChip[] = [];
+  for (const entry of value) {
+    if (typeof entry !== "object" || entry === null) {
+      return null;
+    }
+    const { field, value: chipValue } = entry as Record<string, unknown>;
+    if (
+      typeof field !== "string" ||
+      !WISH_CHIP_FIELDS.has(field) ||
+      typeof chipValue !== "string" ||
+      chipValue.length > 200
+    ) {
+      return null;
+    }
+    chips.push({ field, value: chipValue });
+  }
+  return chips;
 }
 
 /**
@@ -241,6 +303,14 @@ export function parseProxySearchParams(
   if (removeChip !== null) {
     try {
       record.removeChip = JSON.parse(removeChip);
+    } catch {
+      return null;
+    }
+  }
+  const removedChips = params.get("removedChips");
+  if (removedChips !== null) {
+    try {
+      record.removedChips = JSON.parse(removedChips);
     } catch {
       return null;
     }
@@ -416,7 +486,8 @@ export function removeChipFromIntent(intent: Intent, chip: ProxyChip): Intent {
  * product's value then the asked one, or `close-match` with none.
  */
 export interface ProxyLabel {
-  template: "fact-differs" | "close-match";
+  /** The judge's templates (YOY-147) and the code-computed ones (YOY-149 AC-12). */
+  template: "fact-differs" | "close-match" | CodeLabelTemplate;
   values: string[];
 }
 
@@ -557,6 +628,7 @@ export function serializeProxySearchResponse(
     chips: response.chips.map((chip) => ({
       field: chip.field,
       value: chip.value,
+      ...("currency" in chip && chip.currency !== undefined ? { currency: chip.currency } : {}),
     })),
     intent: response.intent === null ? null : serializeIntent(response.intent),
   };
@@ -777,6 +849,17 @@ export function createProxySearchOrchestrator(
     }),
     judgeDeadlineMs: judgeDeadlineMsFromEnv(),
     judgeGiveUpMs: judgeGiveUpMsFromEnv(),
+    // Engine v2's wish extraction (YOY-149 AC-1): Flash-Lite, operation
+    // `extract`, in parallel with find.
+    wishExtractor: createWishExtractor({
+      llm: createGeminiLlmClient({
+        modelId: models.extractModel,
+        costRecorder,
+        thinkingLevel: models.extractThinkingLevel,
+      }),
+    }),
+    extractionGraceMs: extractionGraceMsFromEnv(),
+    priceNearPercent: priceNearPercentFromEnv(),
   });
 }
 

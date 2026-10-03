@@ -736,6 +736,8 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
       : "unfiltered-native__chip";
     button.setAttribute("data-testid", NATIVE_CHIP_TESTID);
     button.setAttribute("data-chip-field", chip.field);
+    // The field under its short name too (YOY-149 verify steps).
+    button.setAttribute("data-field", chip.field);
     button.setAttribute("data-chip-value", chip.value);
     if (negated) {
       button.setAttribute("data-chip-negated", "true");
@@ -824,7 +826,12 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
     zeroHit.hidden = true;
     previewEmpty.hidden = true;
 
-    const chips = !preview && response.route === "ai" ? response.chips : [];
+    // An engine v2 response (YOY-149, `intent: null`) carries chips on
+    // whichever route its judge took; it sends none it did not apply.
+    const chips =
+      !preview && (response.route === "ai" || response.intent === null)
+        ? response.chips
+        : [];
     const currency =
       response.intent !== null &&
       typeof response.intent["currency"] === "string"

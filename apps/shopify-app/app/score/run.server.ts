@@ -28,6 +28,11 @@ export interface SearchOutcome {
   language: ScoreLanguage;
   score: number;
   latencyMs: number;
+  /**
+   * Whether the wish extraction answered in time (YOY-149 AC-4); null when
+   * the search was not served by Engine v2's find path, or failed.
+   */
+  extractionInTime: boolean | null;
   /** The search or its grading threw; scored 0. */
   failed: boolean;
   /** Where and what threw, for a failed search (YOY-141 AC-13). */
@@ -73,6 +78,11 @@ export interface LanguageScore {
   modelWritten: boolean;
   /** Share of searches answered in under 1 s, 0–1. */
   underOneSecond: number;
+  /**
+   * Share of Engine v2 searches composed without the wish extraction, 0–1
+   * (YOY-149 AC-4); null when no search in the language reported it.
+   */
+  withoutExtraction: number | null;
   failed: number;
 }
 
@@ -232,7 +242,13 @@ export async function runScoreSet({
       const top = response.hits.slice(0, GRADED_RESULTS).map((hit) => hit.productId);
       const results = await gradedResults(db, storeKey, top);
       const grades = await gradeSearch({ llm: grader, query: entry.query, results });
-      outcomes.push({ language: entry.language, score: searchScore(grades), latencyMs, failed: false });
+      outcomes.push({
+        language: entry.language,
+        score: searchScore(grades),
+        latencyMs,
+        extractionInTime: response.extractionInTime ?? null,
+        failed: false,
+      });
     } catch (error) {
       // A failure is scored and counted by stage and class, never printed:
       // its message may carry the query.
@@ -240,6 +256,7 @@ export async function runScoreSet({
         language: entry.language,
         score: 0,
         latencyMs: Infinity,
+        extractionInTime: null,
         failed: true,
         failure: { stage, className: failureClassName(error) },
       });
@@ -257,11 +274,20 @@ export async function runScoreSet({
       searches: scored.length,
       modelWritten: set.some((entry) => entry.language === language && entry.modelWritten),
       underOneSecond: mean(scored.map((outcome) => (outcome.latencyMs < FAST_SEARCH_MS ? 1 : 0))),
+      withoutExtraction: shareWithoutExtraction(scored),
       failed: scored.filter((outcome) => outcome.failed).length,
     });
   }
   await flushLedger();
   return { languages, cost: await readRunCost(db), failures: countFailures(outcomes) };
+}
+
+/** The share of searches that reported the extraction late (YOY-149 AC-4); null when none reported. */
+function shareWithoutExtraction(outcomes: readonly SearchOutcome[]): number | null {
+  const reported = outcomes.filter((outcome) => outcome.extractionInTime !== null);
+  return reported.length === 0
+    ? null
+    : reported.filter((outcome) => outcome.extractionInTime === false).length / reported.length;
 }
 
 function countFailures(outcomes: readonly SearchOutcome[]): FailureCount[] {
@@ -284,13 +310,14 @@ function countFailures(outcomes: readonly SearchOutcome[]): FailureCount[] {
 /** The score table: the only thing a run prints (AC-5, AC-7). */
 export function formatScoreTable(report: ScoreReport): string {
   const rows = [
-    ["language", "score", "searches", "model-written", "under 1 s", "failed"],
+    ["language", "score", "searches", "model-written", "under 1 s", "no extraction", "failed"],
     ...report.languages.map((row) => [
       row.language,
       row.score.toFixed(3),
       String(row.searches),
       row.modelWritten ? "yes" : "no",
       `${Math.round(row.underOneSecond * 100)}%`,
+      row.withoutExtraction === null ? "—" : `${Math.round(row.withoutExtraction * 100)}%`,
       String(row.failed),
     ]),
   ];

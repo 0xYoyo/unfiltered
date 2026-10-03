@@ -224,6 +224,11 @@ export interface ProbeSample {
   limited: string | null;
   latencyMs: number;
   stages: Record<string, number>;
+  /**
+   * Whether the wish extraction answered in time (YOY-149 AC-4); null when
+   * the response was not served by Engine v2's find path.
+   */
+  extractionInTime: boolean | null;
 }
 
 export interface SetSummary {
@@ -240,6 +245,11 @@ export interface SetSummary {
   limited: number;
   /** Responses served by exact-query intent reuse: a masked sample (AC-6). */
   reused: number;
+  /**
+   * Share of Engine v2 samples composed without the wish extraction, 0–1
+   * (YOY-149 AC-4); null when no sample reported it.
+   */
+  withoutExtraction: number | null;
   routes: Record<string, number>;
   /** Mean ms per stage over the samples that ran it; absent when none did. */
   meanStages: Record<string, number>;
@@ -278,9 +288,17 @@ export function summarize(
     degraded: samples.filter((sample) => sample.degraded).length,
     limited: samples.filter((sample) => sample.limited !== null).length,
     reused: samples.filter((sample) => sample.routeReason === "intent-reuse").length,
+    withoutExtraction: shareWithoutExtraction(samples),
     routes,
     meanStages,
   };
+}
+
+function shareWithoutExtraction(samples: readonly ProbeSample[]): number | null {
+  const reported = samples.filter((sample) => sample.extractionInTime !== null);
+  return reported.length === 0
+    ? null
+    : reported.filter((sample) => sample.extractionInTime === false).length / reported.length;
 }
 
 export interface Breach {
@@ -334,6 +352,9 @@ export function formatSummary(summary: SetSummary): string {
   return [
     `[${summary.set}] n=${summary.n} p50=${summary.p50} ms p95=${summary.p95} ms` +
       ` under-1s=${Math.round(summary.underOneSecond * 100)}%` +
+      (summary.withoutExtraction === null
+        ? ""
+        : ` no-extraction=${Math.round(summary.withoutExtraction * 100)}%`) +
       ` degraded=${summary.degraded} limited=${summary.limited} reused=${summary.reused} routes: ${routes}`,
     `  mean per stage: ${stages === "" ? "(none)" : stages}`,
   ].join("\n");
@@ -369,6 +390,7 @@ interface PlaygroundBody {
     latencyMs: number;
     limited: string | null;
     stages: Record<string, number>;
+    extractionInTime?: boolean | null;
   };
 }
 
@@ -412,6 +434,7 @@ async function probeOnce(
     limited: body.details.limited,
     latencyMs: body.details.latencyMs,
     stages: body.details.stages ?? {},
+    extractionInTime: body.details.extractionInTime ?? null,
   };
 }
 

@@ -16,6 +16,7 @@ import {
   PREVIEW_DEBOUNCE_MS,
   searchPlayground,
   sendPlaygroundClick,
+  type RemovedChip,
 } from "./search-client";
 import {
   closeMatchesHeadingText,
@@ -53,6 +54,8 @@ interface PagingState {
   query: string;
   previousIntent: ProxyIntent | null;
   removeChip?: ProxyChip;
+  /** The engine v2 removal list that produced page 1 (YOY-149). */
+  removedChips?: readonly RemovedChip[];
   nextPage: number;
   shown: number;
   total: number;
@@ -124,12 +127,20 @@ export function PlaygroundPage({
   useEffect(() => {
     heldIntentRef.current = heldIntent;
   }, [heldIntent]);
+  // Engine v2 chip removal (YOY-149 AC-15): every chip removed so far in
+  // this search chain. A v2 response echoes no intent, so a removal re-asks
+  // the same query with this whole list; a search the visitor submits
+  // starts a new chain with an empty one.
+  const removedChipsRef = useRef<RemovedChip[]>([]);
 
   const run = useCallback(
     async (
       text: string,
       preview: boolean,
-      refinement?: { removeChip?: ProxyChip },
+      refinement?: {
+        removeChip?: ProxyChip;
+        removedChips?: readonly RemovedChip[];
+      },
     ) => {
       const trimmed = text.trim();
       if (trimmed === "") {
@@ -140,8 +151,11 @@ export function PlaygroundPage({
       requestRef.current = controller;
 
       // A preview is classic-only by contract, so it never carries the held
-      // intent: refinement is a submitted-search idea (YOY-68, AC-2).
-      const held = preview ? null : heldIntentRef.current;
+      // intent: refinement is a submitted-search idea (YOY-68, AC-2). An
+      // engine v2 removal (YOY-149) carries its removal list and no intent.
+      const removedChips = preview ? undefined : refinement?.removedChips;
+      const held =
+        preview || removedChips !== undefined ? null : heldIntentRef.current;
 
       pagingRef.current = null;
       setLoadingMore(false);
@@ -155,6 +169,7 @@ export function PlaygroundPage({
           ...(refinement?.removeChip === undefined
             ? {}
             : { removeChip: refinement.removeChip }),
+          ...(removedChips === undefined ? {} : { removedChips }),
           // Every submit asks for page 1 (YOY-146 AC-1); a preview is
           // never paged.
           ...(preview ? {} : { paging: { page: 1, pageSize: PAGE_SIZE } }),
@@ -173,6 +188,7 @@ export function PlaygroundPage({
               ...(refinement?.removeChip === undefined
                 ? {}
                 : { removeChip: refinement.removeChip }),
+              ...(removedChips === undefined ? {} : { removedChips }),
               nextPage: (next.page ?? 1) + 1,
               shown: next.results.length,
               total: next.totalCount ?? next.results.length,
@@ -239,6 +255,9 @@ export function PlaygroundPage({
         ...(state.removeChip === undefined
           ? {}
           : { removeChip: state.removeChip }),
+        ...(state.removedChips === undefined
+          ? {}
+          : { removedChips: state.removedChips }),
         paging: { page: state.nextPage, pageSize: PAGE_SIZE },
       });
       if (pagingRef.current !== state) {
@@ -292,6 +311,7 @@ export function PlaygroundPage({
         debounceRef.current = null;
       }
       submittedQueryRef.current = (text ?? query).trim();
+      removedChipsRef.current = [];
       void run(text ?? query, false);
     },
     [query, run],
@@ -303,7 +323,17 @@ export function PlaygroundPage({
         clearTimeout(debounceRef.current);
         debounceRef.current = null;
       }
-      void run(query, false, { removeChip: chip });
+      if (heldIntentRef.current !== null) {
+        void run(query, false, { removeChip: chip });
+        return;
+      }
+      // Engine v2 (YOY-149 AC-15): no intent to adjust — the same query,
+      // page 1, with every chip removed in this chain, the new one included.
+      removedChipsRef.current = [
+        ...removedChipsRef.current,
+        { field: chip.field, value: chip.value },
+      ];
+      void run(query, false, { removedChips: removedChipsRef.current });
     },
     [query, run],
   );
@@ -320,6 +350,7 @@ export function PlaygroundPage({
     }
     setQuery("");
     submittedQueryRef.current = null;
+    removedChipsRef.current = [];
     setHeldIntent(null);
     setResponse(null);
     setAttributableSearchId(null);
@@ -356,8 +387,13 @@ export function PlaygroundPage({
   // Chips belong to AI-routed responses only: never on a preview, never on
   // classic results, never on a degraded one — a degraded response is
   // classic results wearing the AI route's name (AC-1, AC-4, W-7).
+  // An engine v2 response (YOY-149, `intent: null`) carries chips on
+  // whichever route its judge took and sends none it did not apply; a
+  // preview or a classic v1 response carries none.
   const chips =
-    response !== null && response.route === "ai" && !response.degraded
+    response !== null &&
+    !response.degraded &&
+    (response.route === "ai" || response.intent === null)
       ? response.chips
       : [];
 

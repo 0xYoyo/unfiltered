@@ -1044,6 +1044,59 @@ runs one page.
   operation `judge`), cache hits (searches served `judge-cached`) and the
   hit rate, hits over hits plus calls.
 
+## Engine v2: stated wishes, chips and code labels (YOY-149)
+
+The three kinds of wishes (docs/PRD.md §3) applied by code. Packages:
+`packages/engine/src/extract.ts` (the extraction), `app/search/wishes.server.ts`
+(the composer), `config/currency-rates.json` (the rates).
+
+- **Extraction.** `createWishExtractor` makes one Flash-Lite call (operation
+  `extract`, `GEMINI_EXTRACT_MODEL`, thinking level low) that starts with
+  the search, in parallel with find, under a throttle or cap too. It returns
+  only price max/min, currency, size, in stock, excluded terms (as typed and
+  in English) and whether price or size was firm. `parseExtractAnswer`
+  keeps a price only when its digits appear in the sentence (thousands
+  separators ignored) and a size or excluded term only when it appears
+  verbatim, ignoring case. When find finishes, the page waits at most
+  `EXTRACTION_GRACE_MS` (300) for it; a late or failed extraction is
+  aborted and the page composes without it — no chips, no tiers, no code
+  labels, no exclusion filter. `extractionInTime` on every find-path
+  response (and in playground `details`) records which; the score table's
+  "no extraction" column and the latency probe's `no-extraction=` give the
+  share composed without it.
+- **Removed chips.** Both APIs take `removedChips` (a JSON array of
+  `{ field, value }`, at most 20). A removed fact is not applied and its
+  chip is absent.
+- **Composer** (`composeWishes`, the `compose` stage), over every result of
+  the find step before pages are cut:
+  - Walls remove products from the results and the count: a firm price
+    (cheapest variant over the cap); a firm size (no in-stock variant in
+    that size — a product that does not offer the size has none); a stated
+    "in stock" (sold-out products); an exclusion (every variant carries
+    the term as an option value, or the card facts state it — typed or
+    English form, a whole word in any script).
+  - Number tiers sort the find set: every number wish met, then the price
+    within `PRICE_NEAR_PERCENT` (10) over the cap with the rest met, then
+    other misses — each tier in find order; the keyword tail keeps its
+    order after the find set. The judge orders within the page.
+  - A size matches a variant option value, ignoring case: offered and in
+    stock is met, offered and sold out a miss, not offered met.
+  - A cap in a currency other than the product's converts through USD with
+    `config/currency-rates.json` (hand-entered, with `asOf`); an unlisted
+    pair leaves the number unapplied while its chip still shows.
+- **Code labels.** `price-near` / `price-far` carry the product's cheapest
+  price in its currency and the cap as stated (`"105 USD"`, `"400 ILS"`);
+  `size-missing` carries the size and up to two in-stock values nearest it
+  in the merchant's option order. A code label replaces the judge's on the
+  same card and holds after a judge timeout, error or cap.
+- **Judge exclusions.** The judge answer gains `x`, the numbers of products
+  the shopper excluded; `orderByVerdict` drops them from the page and they
+  carry no label. `JUDGE_PROMPT_VERSION` is 2.
+- **Chips.** One per kept fact, fields `priceMax`, `priceMin`, `size`,
+  `availability`, `exclude`. A price chip's value is the shopper's own
+  number with `currency` when they stated one; an exclude chip's value is
+  the term as typed.
+
 ## Storefront search API over the app proxy (YOY-46)
 
 The storefront widget reaches the orchestrator through a Shopify app proxy:

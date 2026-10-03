@@ -80,8 +80,12 @@ function candidate(id: string, overrides: Partial<JudgeCandidate> = {}): JudgeCa
  * (verdict E/V/C/N, missed wishes -/F/D/B, label F/C/X) and the side list of
  * fact-differs values.
  */
-function answer(codes: string[], d: Array<{ n: number; p: string; a: string }> = []) {
-  return { c: codes, d };
+function answer(
+  codes: string[],
+  d: Array<{ n: number; p: string; a: string }> = [],
+  x: number[] = [],
+) {
+  return { c: codes, d, x };
 }
 
 /** An LLM port answering a fixed sequence, recording every request. */
@@ -179,7 +183,7 @@ describe("the judge's answer (AC-3, AC-4, AC-9)", () => {
   const page = [candidate("a"), candidate("b"), candidate("c")];
 
   it("is fixed-schema JSON with short codes and no prose field", () => {
-    expect(Object.keys(JUDGE_SCHEMA.properties as object).sort()).toEqual(["c", "d"]);
+    expect(Object.keys(JUDGE_SCHEMA.properties as object).sort()).toEqual(["c", "d", "x"]);
     const side = (JUDGE_SCHEMA.properties as { d: { items: { properties: object } } }).d.items;
     expect(Object.keys(side.properties).sort()).toEqual(["a", "n", "p"]);
     // 4 verdicts × 4 missed-wish flags × 3 label templates.
@@ -199,24 +203,41 @@ describe("the judge's answer (AC-3, AC-4, AC-9)", () => {
       page,
     );
     expect(verdicts).toEqual([
-      { id: "a", verdict: "exact", missed: [], label: null },
+      { id: "a", verdict: "exact", missed: [], label: null, excluded: false },
       {
         id: "b",
         verdict: "other-variant",
         missed: ["fact"],
         label: { template: "fact-differs", values: ["navy", "black"] },
+        excluded: false,
       },
       {
         id: "c",
         verdict: "close",
         missed: ["description"],
         label: { template: "close-match", values: [] },
+        excluded: false,
       },
     ]);
     expect(parseJudgeAnswer(answer(["NBX", "E-X", "E-X"]), page)![0]!.missed).toEqual([
       "fact",
       "description",
     ]);
+  });
+
+  it("flags excluded candidates and never labels them; x names each candidate once, in range (YOY-149 AC-11)", () => {
+    const verdicts = parseJudgeAnswer(answer(["E-X", "CDC", "E-X"], [], [2]), page)!;
+    expect(verdicts.map((entry) => [entry.id, entry.excluded, entry.label])).toEqual([
+      ["a", false, null],
+      ["b", true, null],
+      ["c", false, null],
+    ]);
+    // An answer without x reads as no exclusions.
+    expect(parseJudgeAnswer({ c: ["E-X", "E-X", "E-X"], d: [] }, page)!.every((entry) => !entry.excluded)).toBe(true);
+    for (const x of [[0], [4], [2, 2], [1.5]]) {
+      expect(parseJudgeAnswer(answer(["E-X", "E-X", "E-X"], [], x), page)).toBeNull();
+    }
+    expect(buildJudgePrompt("dress, not black", [candidate("a")])).toContain("x: the numbers of every product");
   });
 
   it("rejects an answer that misses or invents a candidate, or breaks the schema", () => {
@@ -293,11 +314,28 @@ describe("the judge's answer (AC-3, AC-4, AC-9)", () => {
 });
 
 describe("verdict order (AC-5, AC-8)", () => {
-  const verdict = (id: string, code: "exact" | "other-variant" | "close" | "not-relevant") => ({
+  const verdict = (
+    id: string,
+    code: "exact" | "other-variant" | "close" | "not-relevant",
+    excluded = false,
+  ) => ({
     id,
     verdict: code,
     missed: [],
     label: null,
+    excluded,
+  });
+
+  it("drops a product the judge flagged as excluded (YOY-149 AC-11)", () => {
+    const ordered = orderByVerdict(
+      ["a", "b", "c"],
+      [verdict("a", "exact", true), verdict("b", "close"), verdict("c", "exact")],
+    );
+    expect(ordered.map((item) => item.item)).toEqual(["c", "b"]);
+    // The reject-all rule reads the products left on the page.
+    expect(
+      orderByVerdict(["a", "b"], [verdict("a", "exact", true), verdict("b", "not-relevant")]),
+    ).toEqual([{ item: "b", verdict: "not-relevant", label: { template: "close-match", values: [] } }]);
   });
 
   it("ranks by verdict, ties in find order, not relevant last and never removed", () => {

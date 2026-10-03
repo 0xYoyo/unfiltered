@@ -181,7 +181,9 @@ Hidden-half scores per language. "Under 1 s" is the latency probe's share
 of searches under 1,000 ms server-side against the deployment
 (`scripts/latency-probe.mts --runs 5 --set all`, docs/LATENCY.md); the
 score runner's own under-1-s column times a local run and is not the
-deployment's.
+deployment's. The runner's "no extraction" column (YOY-149 AC-4) is the
+share of Engine v2 searches composed without the wish extraction — it
+answered after the grace or failed — and "—" on the old engine.
 
 | Run | Engine | en | he | ar | ru | fr | es | Under 1 s | Cost |
 |-----|--------|----|----|----|----|----|----|-----------|------|

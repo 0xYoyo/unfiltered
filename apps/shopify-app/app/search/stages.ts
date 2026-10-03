@@ -6,8 +6,9 @@
  * backfill plus relaxed retrieval). `find` is Engine v2's find step
  * (YOY-145 AC-11): the raw-sentence embedding, the card-index query and the
  * keyword search together; `judge` is its judge step (YOY-147 AC-12): the
- * page's rows read and the one judge call, deadline included. A stage that
- * did not run is absent.
+ * page's rows read and the one judge call, deadline included; `compose` is
+ * the stated wishes applied to the find order (YOY-149): the catalog rows
+ * read, the walls and the number tiers. A stage that did not run is absent.
  *
  * Shared between the server (the orchestrator's ledger, the playground
  * serializer) and the client (the engine-details panel renders the rows in
@@ -19,6 +20,7 @@ export const SEARCH_STAGES = [
   "embed",
   "retrieve",
   "find",
+  "compose",
   "classic",
   "hydrate",
   "judge",

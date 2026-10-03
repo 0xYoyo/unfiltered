@@ -7,6 +7,7 @@ import type {
   SearchPaging,
   SearchResponse,
 } from "./orchestrator.server";
+import type { RemovedChip } from "./wishes.server";
 
 /**
  * The playground's one search call (YOY-140 AC-6): the mode-to-request
@@ -35,6 +36,8 @@ export interface PlaygroundSearchInput {
   engine?: SearchEngine;
   /** One page of results (YOY-145 AC-4); `limit` is then ignored. */
   paging?: SearchPaging;
+  /** Chips removed from an Engine v2 response (YOY-149 AC-15). */
+  removedChips?: RemovedChip[];
 }
 
 export interface PlaygroundSearchResult {
@@ -53,6 +56,9 @@ export async function runPlaygroundSearch(
     limit: input.limit ?? PLAYGROUND_RESULT_LIMIT,
     ...(input.engine !== undefined ? { engine: input.engine } : {}),
     ...(input.paging !== undefined ? { paging: input.paging } : {}),
+    ...(input.removedChips !== undefined && input.preview !== true && input.classic !== true
+      ? { removedChips: input.removedChips }
+      : {}),
     ...(input.preview === true
       ? { preview: true }
       : input.classic === true

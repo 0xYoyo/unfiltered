@@ -71,6 +71,12 @@ export interface PlaygroundSearchDetails {
    * for. Null on the old engine. The storefront wire carries none of it.
    */
   judge: PlaygroundJudgeDetails | null;
+  /**
+   * Whether the wish extraction answered in time to compose the page
+   * (YOY-149 AC-4); null on a response the find path did not serve. The
+   * latency probe reports the share of searches composed without it.
+   */
+  extractionInTime: boolean | null;
 }
 
 /** The judge's part of the playground details (YOY-147 AC-12). */
@@ -96,7 +102,7 @@ export interface PlaygroundSearchResponse extends ProxySearchResponse {
  */
 export function serializePlaygroundSearchResponse(
   response: SearchResponse,
-  details: Omit<PlaygroundSearchDetails, "judge">,
+  details: Omit<PlaygroundSearchDetails, "judge" | "extractionInTime">,
 ): PlaygroundSearchResponse {
   return {
     ...serializeProxySearchResponse(response),
@@ -108,6 +114,7 @@ export function serializePlaygroundSearchResponse(
       intentTier: details.intentTier,
       engine: details.engine,
       judge: judgeDetails(response),
+      extractionInTime: response.extractionInTime ?? null,
     },
   };
 }

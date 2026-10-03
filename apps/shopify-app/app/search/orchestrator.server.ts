@@ -18,6 +18,8 @@ import {
   type QueryRoute,
   type RetrievalConstraints,
   type Retriever,
+  type ExtractedWishes,
+  type WishExtractor,
 } from "@unfiltered/engine";
 
 import type { ClassicCardHit } from "./classic-store.server";
@@ -29,6 +31,18 @@ import {
   runJudgeStep,
 } from "./judge-step.server";
 import { SEARCH_STAGES, type SearchStage, type SearchStages } from "./stages";
+import {
+  composeWishes,
+  DEFAULT_EXTRACTION_GRACE_MS,
+  DEFAULT_PRICE_NEAR_PERCENT,
+  hasAppliedWishes,
+  keepUnremoved,
+  loadWishProducts,
+  wishChips,
+  type CodeLabel,
+  type RemovedChip,
+  type WishChip,
+} from "./wishes.server";
 
 export { SEARCH_STAGES, type SearchStage, type SearchStages } from "./stages";
 
@@ -313,6 +327,12 @@ export interface SearchRequest {
    */
   resolvedIntent?: Intent;
   /**
+   * Chips the shopper removed from an Engine v2 response (YOY-149 AC-15):
+   * the facts they name are not applied and their chips are absent. Ignored
+   * on the old engine.
+   */
+  removedChips?: RemovedChip[];
+  /**
    * Force the classic path without consulting the classifier — zero LLM
    * calls (YOY-47 throttle). The response is served `degraded: true` with
    * reason `forceClassicReason`, "throttled" when absent. Takes precedence
@@ -382,10 +402,11 @@ export interface ProductCard {
    */
   colorUnknown: boolean;
   /**
-   * The judge's label (YOY-147 AC-9): on every Engine v2 card, null when it
-   * carries none; absent on the old engine.
+   * The card's label (YOY-147 AC-9): on every Engine v2 card, null when it
+   * carries none; absent on the old engine. A code-computed label (YOY-149
+   * AC-12) replaces the judge's.
    */
-  label?: JudgeLabel | null;
+  label?: JudgeLabel | CodeLabel | null;
   /**
    * The judge's verdict (YOY-147 AC-12): diagnostic, for the playground's
    * details only — the storefront wire never carries it. Absent when the
@@ -410,8 +431,12 @@ export interface SearchResponse {
   intent: Intent | null;
   /** Ranked primary results. */
   hits: ProductCard[];
-  /** Applied-constraint chips; only AI-resolved searches carry any. */
-  chips: AppliedConstraint[];
+  /**
+   * Applied-constraint chips; on the old engine only AI-resolved searches
+   * carry any. Engine v2 answers one chip per kept stated fact (YOY-149
+   * AC-14).
+   */
+  chips: Array<AppliedConstraint | WishChip>;
   /** True when an AI-path failure was silently served as classic results. */
   degraded: boolean;
   /** Classic close matches, populated only on AI zero-hit responses. */
@@ -449,6 +474,12 @@ export interface SearchResponse {
    * page's labels arrive through the labels endpoint. Absent otherwise.
    */
   labelsPending?: true;
+  /**
+   * Whether the wish extraction answered in time to compose this page
+   * (YOY-149 AC-4): present on every Engine v2 find-path response, false
+   * when it was late, failed, or no extractor is wired.
+   */
+  extractionInTime?: boolean;
 }
 
 /**
@@ -532,6 +563,15 @@ export interface SearchOrchestratorOptions {
    * start; 6,000 ms by default (YOY-148 AC-6).
    */
   judgeGiveUpMs?: number;
+  /**
+   * Engine v2's wish extraction (YOY-149). Absent means v2 pages compose
+   * with no stated wishes.
+   */
+  wishExtractor?: WishExtractor;
+  /** How long the page waits for the extraction after find; 300 ms by default (AC-3). */
+  extractionGraceMs?: number;
+  /** How far over the cap a price is still near, in percent; 10 by default (AC-5, AC-12). */
+  priceNearPercent?: number;
 }
 
 export function createSearchOrchestrator(
@@ -549,6 +589,9 @@ export function createSearchOrchestrator(
     judge,
     judgeDeadlineMs = DEFAULT_JUDGE_DEADLINE_MS,
     judgeGiveUpMs = DEFAULT_JUDGE_GIVE_UP_MS,
+    wishExtractor,
+    extractionGraceMs = DEFAULT_EXTRACTION_GRACE_MS,
+    priceNearPercent = DEFAULT_PRICE_NEAR_PERCENT,
   } = options;
 
   /** Hydrate ranked hits into display cards, preserving hit order. Hits
@@ -652,12 +695,34 @@ export function createSearchOrchestrator(
   ): Promise<StagelessResponse> {
     const searchId = request.searchId ?? randomUUID();
     const { page, pageSize } = request.paging ?? { page: 1, pageSize: DEFAULT_PAGE_SIZE };
+    // The extraction starts with the search, in parallel with find (YOY-149
+    // AC-1) — under a throttle or cap too, so the code's labels still hold
+    // there (AC-13).
+    const extraction = startExtraction(request, searchId);
     const found = await stages.time("find", () =>
       findStep.find({ shopDomain: request.shopDomain, query: request.query, searchId }),
     );
+    const extracted = await extraction.settle();
+    const wishes =
+      extracted === null ? null : keepUnremoved(extracted, request.removedChips ?? []);
+    let ordered = { productIds: found.productIds, findSetCount: found.findSetCount };
+    let codeLabels = new Map<string, CodeLabel>();
+    if (wishes !== null && hasAppliedWishes(wishes)) {
+      const composed = await stages.time("compose", async () =>
+        composeWishes(
+          found.productIds,
+          found.findSetCount,
+          await loadWishProducts(db, request.shopDomain, found.productIds),
+          wishes,
+          { nearPercent: priceNearPercent },
+        ),
+      );
+      ordered = composed;
+      codeLabels = composed.labels;
+    }
     const pageStart = (page - 1) * pageSize;
-    const pageIds = found.productIds.slice(pageStart, pageStart + pageSize);
-    const inFindSet = new Set(pageIds.slice(0, Math.max(0, found.findSetCount - pageStart)));
+    const pageIds = ordered.productIds.slice(pageStart, pageStart + pageSize);
+    const inFindSet = new Set(pageIds.slice(0, Math.max(0, ordered.findSetCount - pageStart)));
     const hydrated = await stages.time("hydrate", () =>
       hydrateCards(
         request.shopDomain,
@@ -703,19 +768,73 @@ export function createSearchOrchestrator(
         ...tail,
       ];
     }
+    // A code-computed label replaces the judge's on the same card (AC-12).
+    hits = hits.map((card) => {
+      const codeLabel = codeLabels.get(card.productId);
+      return codeLabel === undefined ? card : { ...card, label: codeLabel };
+    });
     return {
       searchId,
       route: judgeStarted ? "ai" : "classic",
       routeReason,
       intent: null,
       hits,
-      chips: [],
+      chips: wishes === null ? [] : wishChips(wishes),
       degraded: found.degraded,
       closeMatches: [],
       closeMatchesRelaxed: [],
       page,
-      totalCount: found.productIds.length,
+      totalCount: ordered.productIds.length,
       ...(labelsPending ? { labelsPending: true as const } : {}),
+      extractionInTime: extracted !== null,
+    };
+  }
+
+  /**
+   * Start the wish extraction (YOY-149 AC-1, AC-3). `settle` waits for it
+   * no longer than the grace after the call to `settle` — made when find
+   * finishes — and answers null when it is late, failed, or not wired; a
+   * late call is then aborted, and the page composes without it.
+   */
+  function startExtraction(
+    request: SearchRequest,
+    searchId: string,
+  ): { settle(): Promise<ExtractedWishes | null> } {
+    if (wishExtractor === undefined) {
+      return { settle: () => Promise.resolve(null) };
+    }
+    const controller = new AbortController();
+    const answer = wishExtractor
+      .extract({
+        sentence: request.query,
+        storeId: request.shopDomain,
+        searchId,
+        signal: controller.signal,
+      })
+      .then(
+        (wishes): ExtractedWishes | null => wishes,
+        (error: unknown) => {
+          console.warn(
+            "[search] wish extraction failed; composing without it",
+            JSON.stringify({ searchId, error: error instanceof Error ? error.name : String(error) }),
+          );
+          return null;
+        },
+      );
+    return {
+      async settle() {
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const grace = new Promise<"late">((resolve) => {
+          timer = setTimeout(() => resolve("late"), extractionGraceMs);
+        });
+        const settled = await Promise.race([answer, grace]);
+        clearTimeout(timer);
+        if (settled === "late") {
+          controller.abort();
+          return null;
+        }
+        return settled;
+      },
     };
   }
 

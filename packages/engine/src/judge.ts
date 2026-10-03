@@ -28,7 +28,7 @@ export const DEFAULT_JUDGE_PROVIDER: JudgeProvider = "gemini";
  * Bump it with every change to `buildJudgePrompt`, `judgeRow` or the
  * answer schema.
  */
-export const JUDGE_PROMPT_VERSION = 1;
+export const JUDGE_PROMPT_VERSION = 2;
 
 /** Characters one candidate row is cut to (AC-2; raised to 480 by AC-17). */
 export const DEFAULT_JUDGE_ROW_CHARS = 480;
@@ -106,6 +106,11 @@ export interface JudgeVerdict {
   missed: JudgeMissedWish[];
   /** Null when the template is none or a value broke the word limit (AC-9). */
   label: JudgeLabel | null;
+  /**
+   * The product is something the shopper said they do not want (YOY-149
+   * AC-11): it is dropped from the page and never labelled.
+   */
+  excluded: boolean;
 }
 
 export interface Judge {
@@ -168,7 +173,8 @@ export const JUDGE_ANSWER_CODES: readonly string[] = Object.keys(JUDGE_VERDICT_C
  * JSON Schema of the judge's answer (AC-3): `c` holds one code per
  * candidate, in page order — its verdict, missed-wish flags and label
  * template — and `d` holds, for each `fact-differs` label, the candidate's
- * number `n` with the product's value `p` and the asked value `a`. Short
+ * number `n` with the product's value `p` and the asked value `a`; `x`
+ * lists the numbers of products the shopper excluded (YOY-149 AC-11). Short
  * codes only; no prose field exists.
  */
 export const JUDGE_SCHEMA: JsonSchema = {
@@ -187,8 +193,9 @@ export const JUDGE_SCHEMA: JsonSchema = {
         required: ["n", "p", "a"],
       },
     },
+    x: { type: "array", items: { type: "integer" } },
   },
-  required: ["c", "d"],
+  required: ["c", "d", "x"],
 };
 
 /** The provider `JUDGE_PROVIDER` names; unset means gemini, an unknown name fails. */
@@ -277,6 +284,9 @@ export function buildJudgePrompt(
     "number, p the product's value and a the asked value, each at most three words, in the",
     "language of the search. d is empty when no label is F.",
     "",
+    "x: the numbers of every product that is something the shopper said they do NOT want",
+    "(\"not black\" and the product is black; \"no wool\" and it is wool). x is empty when none.",
+    "",
     "Example: E-X is an exact match; CDC is close, a described wish not shown.",
     "",
     `Query: ${oneLine(sentence)}`,
@@ -326,7 +336,7 @@ export function parseJudgeAnswer(
   if (typeof answer !== "object" || answer === null) {
     return null;
   }
-  const { c, d } = answer as Record<string, unknown>;
+  const { c, d, x } = answer as Record<string, unknown>;
   const count = candidates.length;
   if (
     !Array.isArray(c) ||
@@ -356,6 +366,20 @@ export function parseJudgeAnswer(
     }
     values.set(n, { p, a });
   }
+  // The excluded list (YOY-149 AC-11): candidate numbers, each at most once.
+  // Absent is read as none, so an answer without it still parses.
+  const excluded = new Set<number>();
+  if (x !== undefined) {
+    if (!Array.isArray(x)) {
+      return null;
+    }
+    for (const n of x) {
+      if (typeof n !== "number" || !Number.isInteger(n) || n < 1 || n > count || excluded.has(n)) {
+        return null;
+      }
+      excluded.add(n);
+    }
+  }
   return candidates.map((candidate, index) => {
     const [verdict, missed, label] = [...(c[index] as string)];
     const pair = values.get(index + 1);
@@ -363,7 +387,10 @@ export function parseJudgeAnswer(
       id: candidate.id,
       verdict: JUDGE_VERDICT_CODES[verdict!]!,
       missed: [...JUDGE_MISSED_CODES[missed!]!],
-      label: labelOf(JUDGE_LABEL_CODES[label!]!, pair?.p ?? null, pair?.a ?? null),
+      label: excluded.has(index + 1)
+        ? null
+        : labelOf(JUDGE_LABEL_CODES[label!]!, pair?.p ?? null, pair?.a ?? null),
+      excluded: excluded.has(index + 1),
     };
   });
 }
@@ -448,18 +475,23 @@ export interface JudgedItem<T> {
  * Order a page by verdict (AC-5, AC-8): verdict rank, ties in find order,
  * "not relevant" last and never removed. When every candidate is "not
  * relevant", the page stays in find order and every item carries
- * `close-match`. `items` and `verdicts` are parallel, in find order.
+ * `close-match`. A product the judge flagged as excluded is dropped from
+ * the page (YOY-149 AC-11). `items` and `verdicts` are parallel, in find
+ * order.
  */
 export function orderByVerdict<T>(
   items: readonly T[],
   verdicts: readonly JudgeVerdict[],
 ): JudgedItem<T>[] {
-  const judged = items.map((item, index) => ({
-    item,
-    verdict: verdicts[index]!.verdict,
-    label: verdicts[index]!.label,
-    index,
-  }));
+  const judged = items
+    .map((item, index) => ({
+      item,
+      verdict: verdicts[index]!.verdict,
+      label: verdicts[index]!.label,
+      excluded: verdicts[index]!.excluded,
+      index,
+    }))
+    .filter((entry) => !entry.excluded);
   if (judged.length > 0 && judged.every((entry) => entry.verdict === "not-relevant")) {
     return judged.map(({ item, verdict }) => ({
       item,

@@ -4,10 +4,12 @@ import db from "../db.server";
 import {
   fixtureOutcome,
   pageOfFixture,
+  parseFixtureRemovedChips,
   playgroundFixturesEnabled,
   selectFixture,
   selectFixtureForRemoval,
   sleep,
+  withoutRemovedChips,
 } from "../playground/fixture-mode.server";
 import {
   clientIp,
@@ -83,13 +85,21 @@ export const loader = async ({
     // text, because the query has not changed — only the constraint set has.
     // Paged like the real endpoint (YOY-146): page parameters in, that
     // page plus `page` and `totalCount` out.
+    // An engine v2 removal (YOY-149) re-asks the same query, so the query
+    // still picks the fixture; `removedChips` takes those chips off it.
+    const removedChips = parseFixtureRemovedChips(
+      url.searchParams.get("removedChips"),
+    );
+    const selected = fixtureOutcome(
+      body.removeChip !== undefined
+        ? selectFixtureForRemoval(body.removeChip)
+        : selectFixture(body.query, body.mode !== undefined),
+      body.paging,
+    );
     const outcome = pageOfFixture(
-      fixtureOutcome(
-        body.removeChip !== undefined
-          ? selectFixtureForRemoval(body.removeChip)
-          : selectFixture(body.query, body.mode !== undefined),
-        body.paging,
-      ),
+      removedChips === null
+        ? selected
+        : withoutRemovedChips(selected, removedChips),
       body.mode === "preview" ? undefined : body.paging,
     );
     await sleep(outcome.delayMs);
@@ -143,6 +153,7 @@ export const loader = async ({
       limited: limited !== null,
       resolvedIntent,
       previousIntent: body.previousIntent,
+      ...(body.removedChips !== undefined ? { removedChips: body.removedChips } : {}),
       ...(engineParam !== null ? { engine: engineParam } : {}),
       ...(body.paging !== undefined ? { paging: body.paging } : {}),
     });

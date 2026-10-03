@@ -107,7 +107,16 @@ const CONTRACT_KEYS = [
   "searchId",
 ].sort();
 
-const DETAIL_KEYS = ["engine", "intentTier", "judge", "latencyMs", "limited", "routeReason", "stages"].sort();
+const DETAIL_KEYS = [
+  "engine",
+  "extractionInTime",
+  "intentTier",
+  "judge",
+  "latencyMs",
+  "limited",
+  "routeReason",
+  "stages",
+].sort();
 
 const RESULT_KEYS = [
   "available",
@@ -299,6 +308,8 @@ describe("the response contract (AC-2)", () => {
     expect((body.details as { limited: unknown }).limited).toBeNull();
     // The old engine has no judge details (YOY-147 AC-12).
     expect((body.details as { judge: unknown }).judge).toBeNull();
+    // Nor the wish extraction's flag (YOY-149 AC-4).
+    expect((body.details as { extractionInTime: unknown }).extractionInTime).toBeNull();
     expect(
       (body.details as { latencyMs: number }).latencyMs,
     ).toBeGreaterThanOrEqual(0);

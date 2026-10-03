@@ -69,6 +69,7 @@ function sample(overrides: Partial<ProbeSample>): ProbeSample {
     limited: null,
     latencyMs: 1000,
     stages: { classify: 40, intent: 600, embed: 100, retrieve: 200, hydrate: 10 },
+    extractionInTime: null,
     ...overrides,
   };
 }
@@ -113,6 +114,21 @@ describe("set summaries", () => {
     expect(formatSummary(summary!)).toContain(
       "p50=300 ms p95=1100 ms under-1s=75% degraded=2 limited=1 reused=1",
     );
+  });
+
+  it("reports the share of v2 samples composed without the extraction (YOY-149 AC-4)", () => {
+    const summary = summarize("ai-en", [
+      sample({ extractionInTime: true }),
+      sample({ extractionInTime: false }),
+      sample({ extractionInTime: true }),
+      sample({ extractionInTime: true }),
+      sample({}),
+    ])!;
+    expect(summary.withoutExtraction).toBe(0.25);
+    expect(formatSummary(summary)).toContain(" no-extraction=25%");
+    const v1 = summarize("ai-en", [sample({})])!;
+    expect(v1.withoutExtraction).toBeNull();
+    expect(formatSummary(v1)).not.toContain("no-extraction");
   });
 
   it("counts a search as under 1 s only below 1,000 ms (YOY-141 AC-9)", () => {

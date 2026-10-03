@@ -16,6 +16,10 @@ import type { PlaygroundLocale, PlaygroundStrings } from "../strings";
  * inside a merchant theme (W-3, W-4), which is why only the anatomy is
  * shared.
  *
+ * Engine v2 chips (YOY-149) need nothing new here: `chipLabel` reads a price
+ * chip's own currency off the chip, and the v2 `exclude` field is in the
+ * shared negation set, so it takes the exclusion tint below.
+ *
  * A NEGATED constraint (`isNegationChip`, shared with the widget so the two
  * surfaces cannot disagree about what an exclusion is) is tinted:
  * `--surface-accent-soft` behind `--border-accent`, the one place the
@@ -115,6 +119,7 @@ export function ChipRow({
               className={className}
               data-testid="playground-chip"
               data-chip-field={chip.field}
+              data-field={chip.field}
               data-chip-value={chip.value}
               data-chip-negated={negated ? "true" : undefined}
               aria-label={strings.removeFilter.replace("{label}", label)}

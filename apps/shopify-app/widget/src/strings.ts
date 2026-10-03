@@ -50,6 +50,17 @@ export interface WidgetStrings {
   /** Quiet empty state while a keystroke preview has no matches (YOY-68
    * AC-4) — deliberately softer than the submitted `noResults` panel. */
   previewEmpty: string;
+  /**
+   * Chip labels (YOY-149 AC-16; the v1 wording moved here unchanged).
+   * {money} is the shopper's number, with its currency when the chip
+   * carries one; {value} is the chip's value as typed.
+   */
+  chipPriceMax: string;
+  chipPriceMin: string;
+  chipSize: string;
+  chipInStock: string;
+  /** The word an exclusion chip leads with; the value after it is struck. */
+  chipNegator: string;
 }
 
 export const STRING_CATALOG: Record<WidgetLocale, WidgetStrings> = {
@@ -74,6 +85,11 @@ export const STRING_CATALOG: Record<WidgetLocale, WidgetStrings> = {
     soldOut: "Sold out",
     colorNotConfirmed: "Color not confirmed",
     previewEmpty: "Keep typing…",
+    chipPriceMax: "Under {money}",
+    chipPriceMin: "Over {money}",
+    chipSize: "Size {value}",
+    chipInStock: "In stock",
+    chipNegator: "Not",
   },
   he: {
     inputPlaceholder: "חיפוש",
@@ -96,6 +112,11 @@ export const STRING_CATALOG: Record<WidgetLocale, WidgetStrings> = {
     soldOut: "אזל מהמלאי",
     colorNotConfirmed: "צבע לא מאומת",
     previewEmpty: "המשיכו להקליד…",
+    chipPriceMax: "עד {money}",
+    chipPriceMin: "מעל {money}",
+    chipSize: "מידה {value}",
+    chipInStock: "במלאי",
+    chipNegator: "לא",
   },
 };
 

@@ -15,8 +15,12 @@ import { SCORE_LANGUAGES, type ScoreSetEntry } from "./set.server";
  */
 
 const LANGUAGE = `(?:${SCORE_LANGUAGES.join("|")})`;
-const TABLE_HEADER = /^language\s+score\s+searches\s+model-written\s+under 1 s\s+failed$/;
-const TABLE_ROW = new RegExp(`^${LANGUAGE}\\s+\\d+\\.\\d{3}\\s+\\d+\\s+(?:yes|no)\\s+\\d+%\\s+\\d+$`);
+const TABLE_HEADER =
+  /^language\s+score\s+searches\s+model-written\s+under 1 s\s+no extraction\s+failed$/;
+// The "no extraction" cell (YOY-149 AC-4) is a share or an em dash.
+const TABLE_ROW = new RegExp(
+  `^${LANGUAGE}\\s+\\d+\\.\\d{3}\\s+\\d+\\s+(?:yes|no)\\s+\\d+%\\s+(?:\\d+%|—)\\s+\\d+$`,
+);
 const COST_LINE = /^cost \$\d+\.\d{4} over \d+ model calls$/;
 const FAILURE_LINE = /^failed (?:search|grade) [A-Za-z_$][\w$]{0,63} \d+$/;
 const STRICT_LINES = [TABLE_HEADER, TABLE_ROW, COST_LINE, FAILURE_LINE];

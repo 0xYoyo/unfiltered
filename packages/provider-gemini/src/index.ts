@@ -124,6 +124,12 @@ export const DEFAULT_CARD_MODEL = "gemini-3.5-flash-lite";
  * find set. Override with `GEMINI_JUDGE_MODEL`.
  */
 export const DEFAULT_JUDGE_MODEL = "gemini-3.5-flash-lite";
+/**
+ * Default wish-extraction model (YOY-149 AC-1): Flash-Lite, one small call
+ * per submitted v2 search, in parallel with the find step. Override with
+ * `GEMINI_EXTRACT_MODEL`.
+ */
+export const DEFAULT_EXTRACT_MODEL = "gemini-3.5-flash-lite";
 export const DEFAULT_EMBEDDING_DIMENSION = 768;
 /** Thinking level the intent client runs at unless the env overrides it. */
 export const DEFAULT_INTENT_THINKING_LEVEL = "low";
@@ -152,6 +158,14 @@ export const DEFAULT_CARD_THINKING_LEVEL = "low";
  * thinkingConfig).
  */
 export const DEFAULT_JUDGE_THINKING_LEVEL = "low";
+/**
+ * Thinking level of the wish extraction (YOY-149 AC-1): minimal, explicit
+ * (`GEMINI_EXTRACT_THINKING_LEVEL`; `model-default` sends no thinkingConfig).
+ * Measured 2026-10-03 on six EN/HE wishes: minimal answered all six
+ * correctly at the same latency as low (~0.8–1.0 s), where low once invented
+ * an exclusion and once dropped a Hebrew price's currency.
+ */
+export const DEFAULT_EXTRACT_THINKING_LEVEL = "minimal";
 /**
  * Per-request abort timeout of the lite intent call (YOY-116): the lite
  * tier exists to be fast, and a hung lite call escalates to the accuracy
@@ -213,6 +227,13 @@ export interface GeminiModelConfig {
    * own default (`GEMINI_JUDGE_THINKING_LEVEL=model-default`).
    */
   judgeThinkingLevel: string | undefined;
+  /** For the wish extraction (YOY-149): one call per submitted v2 search. */
+  extractModel: string;
+  /**
+   * Thinking level for the extraction, or undefined to leave the model at
+   * its own default (`GEMINI_EXTRACT_THINKING_LEVEL=model-default`).
+   */
+  extractThinkingLevel: string | undefined;
   /**
    * Thinking level for the intent client, or undefined to leave the model at
    * its own default (`GEMINI_INTENT_THINKING_LEVEL=model-default`).
@@ -265,6 +286,12 @@ export function geminiModelsFromEnv(
       "GEMINI_JUDGE_THINKING_LEVEL",
       env.GEMINI_JUDGE_THINKING_LEVEL,
       DEFAULT_JUDGE_THINKING_LEVEL,
+    ),
+    extractModel: env.GEMINI_EXTRACT_MODEL ?? DEFAULT_EXTRACT_MODEL,
+    extractThinkingLevel: parseThinkingLevel(
+      "GEMINI_EXTRACT_THINKING_LEVEL",
+      env.GEMINI_EXTRACT_THINKING_LEVEL,
+      DEFAULT_EXTRACT_THINKING_LEVEL,
     ),
     intentThinkingLevel: parseThinkingLevel(
       "GEMINI_INTENT_THINKING_LEVEL",

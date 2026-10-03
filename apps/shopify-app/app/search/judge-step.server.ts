@@ -306,7 +306,7 @@ function storedVerdicts(
     if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
       return null;
     }
-    const { id, verdict, missed, label } = raw as Record<string, unknown>;
+    const { id, verdict, missed, label, excluded } = raw as Record<string, unknown>;
     if (
       id !== candidates[index]!.id ||
       typeof verdict !== "string" ||
@@ -334,6 +334,7 @@ function storedVerdicts(
       verdict: verdict as JudgeVerdictCode,
       missed: missed as JudgeVerdict["missed"],
       label: parsedLabel,
+      excluded: excluded === true,
     });
   }
   return verdicts;
@@ -369,6 +370,7 @@ async function storeAnswer(
     verdict: entry.verdict,
     missed: [...entry.missed],
     label: entry.label === null ? null : { template: entry.label.template, values: [...entry.label.values] },
+    excluded: entry.excluded,
   })) as Prisma.InputJsonValue;
   try {
     await db.judgeAnswer.upsert({

@@ -367,6 +367,8 @@ export function createOverlay(options: OverlayOptions): Overlay {
     button.className = negated ? "chip chip--negated" : "chip";
     button.setAttribute("data-testid", CHIP_TESTID);
     button.setAttribute("data-chip-field", chip.field);
+    // The field under its short name too (YOY-149 verify steps).
+    button.setAttribute("data-field", chip.field);
     button.setAttribute("data-chip-value", chip.value);
     if (negated) {
       button.setAttribute("data-chip-negated", "true");
@@ -452,7 +454,12 @@ export function createOverlay(options: OverlayOptions): Overlay {
       // Chip row (AC-1): AI-resolved responses only. Degraded responses
       // carry no chips by the endpoint contract (AC-6), so this hides the
       // row for them naturally.
-      const chips = response.route === "ai" ? response.chips : [];
+      // An engine v2 response (YOY-149, `intent: null`) carries chips on
+      // whichever route its judge took; it sends none it did not apply.
+      const chips =
+        response.route === "ai" || response.intent === null
+          ? response.chips
+          : [];
       // Hebrew price chips carry the currency (YOY-50 AC-4), read from the
       // response's echoed intent — display-only; the intent itself still
       // round-trips verbatim.

@@ -23,6 +23,7 @@ import degradedFixture from "./fixtures/degraded.json";
 import emptyFixture from "./fixtures/empty.json";
 import previewFixture from "./fixtures/preview.json";
 import resultsFixture from "./fixtures/results.json";
+import v2BudgetFixture from "./fixtures/v2-budget.json";
 
 import type { PlaygroundSearchResponse } from "./api.server";
 
@@ -51,7 +52,10 @@ export type PlaygroundFixtureName =
   // order whose page 2 fails.
   | "paged"
   | "paged-fail"
-  | "paged-slow";
+  | "paged-slow"
+  // YOY-149: an engine v2 response — `intent: null`, chips of the v2
+  // fields (a price cap with its currency, size, availability, exclude).
+  | "v2-budget";
 
 /** How long the `delayed` fixture waits — long enough to observe loading. */
 export const FIXTURE_DELAY_MS = 700;
@@ -104,6 +108,10 @@ export function selectFixture(
     if (has("wool")) {
       // A negated attribute (YOY-133 AC-5): "ai winter coat not wool".
       return "ai-negation";
+    }
+    if (has("budget")) {
+      // Engine v2 chips (YOY-149): "budget dress under 400".
+      return "v2-budget";
     }
     if (has("ai")) {
       return has("delayed") ? "ai-delayed" : "ai";
@@ -238,6 +246,8 @@ export function fixtureOutcome(
       };
     case "degraded":
       return { delayMs: 0, status: 200, body: asResponse(degradedFixture) };
+    case "v2-budget":
+      return { delayMs: 0, status: 200, body: asResponse(v2BudgetFixture) };
     case "color-unknown":
       return {
         delayMs: 0,
@@ -276,6 +286,92 @@ export function selectFixtureForRemoval(
     default:
       return "ai";
   }
+}
+
+/** A removed engine v2 chip as `removedChips` carries it (YOY-149). */
+export interface FixtureRemovedChip {
+  field: string;
+  value: string;
+}
+
+/**
+ * The `removedChips` query parameter, read the way the endpoint's parse
+ * layer reads it: a JSON array of `{field, value}`. Anything else is
+ * treated as absent — fixture mode answers, it does not validate.
+ */
+export function parseFixtureRemovedChips(
+  raw: string | null,
+): FixtureRemovedChip[] | null {
+  if (raw === null) {
+    return null;
+  }
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return null;
+    }
+    return parsed.filter(
+      (chip): chip is FixtureRemovedChip =>
+        typeof chip === "object" &&
+        chip !== null &&
+        typeof (chip as FixtureRemovedChip).field === "string" &&
+        typeof (chip as FixtureRemovedChip).value === "string",
+    );
+  } catch {
+    return null;
+  }
+}
+
+/** The product the `v2-budget` cap keeps out until its chip is removed. */
+const OVER_BUDGET_CARD = {
+  productId: "p-v2-over",
+  title: "Silk Evening Dress",
+  url: "https://example.test/products/p-v2-over",
+  imageUrl:
+    "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 4'><rect width='4' height='4' fill='%23bdb6ab'/></svg>",
+  priceMin: 640,
+  priceMax: 640,
+  currencyCode: "ILS",
+  available: true,
+  colorUnknown: false,
+};
+
+/**
+ * An engine v2 removal (YOY-149 AC-15) answers a contract-correct echo: the
+ * same response with every chip in `removedChips` gone — the server
+ * re-runs the same query without those constraints — and, once the price
+ * cap is among them, the product the cap kept out back in the set. A
+ * fixture with no v2 chips answers unchanged.
+ */
+export function withoutRemovedChips(
+  outcome: FixtureOutcome,
+  removed: readonly FixtureRemovedChip[],
+): FixtureOutcome {
+  if (outcome.body === null || outcome.body.intent !== null) {
+    return outcome;
+  }
+  const gone = (chip: { field: string; value: string }): boolean =>
+    removed.some(
+      (entry) => entry.field === chip.field && entry.value === chip.value,
+    );
+  const capRemoved = outcome.body.chips.some(
+    (chip) => chip.field === "priceMax" && gone(chip),
+  );
+  const results = capRemoved
+    ? [...outcome.body.results, OVER_BUDGET_CARD]
+    : outcome.body.results;
+  return {
+    ...outcome,
+    body: {
+      ...outcome.body,
+      searchId: `${outcome.body.searchId}-removed-${removed.length}`,
+      chips: outcome.body.chips.filter((chip) => !gone(chip)),
+      results,
+      ...(outcome.body.totalCount === undefined
+        ? {}
+        : { totalCount: results.length }),
+    },
+  };
 }
 
 export function sleep(ms: number): Promise<void> {

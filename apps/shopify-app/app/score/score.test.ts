@@ -864,14 +864,21 @@ describe("the hidden run's leak check (YOY-141 AC-3)", () => {
   ];
   const table = formatScoreTable({
     languages: [
-      { language: "en", score: 0.5, searches: 12, modelWritten: false, underOneSecond: 0.5, failed: 0 },
-      { language: "he", score: 0.25, searches: 12, modelWritten: false, underOneSecond: 1, failed: 1 },
+      { language: "en", score: 0.5, searches: 12, modelWritten: false, underOneSecond: 0.5, withoutExtraction: 0.25, failed: 0 },
+      { language: "he", score: 0.25, searches: 12, modelWritten: false, underOneSecond: 1, withoutExtraction: null, failed: 1 },
     ],
     cost: { usd: 0.0812, calls: 96 },
     failures: [
       { stage: "search", className: "GeminiTimeoutError", count: 2 },
       { stage: "grade", className: "Error", count: 1 },
     ],
+  });
+
+  it("prints the share composed without the extraction per language, a dash when none reported (YOY-149 AC-4)", () => {
+    const [header, en, he] = table.split("\n");
+    expect(header).toMatch(/under 1 s\s+no extraction\s+failed$/);
+    expect(en).toMatch(/\s50%\s+25%\s+0$/);
+    expect(he).toMatch(/\s100%\s+—\s+1$/);
   });
 
   it("passes a clean score table, even when hidden searches are table words", () => {
