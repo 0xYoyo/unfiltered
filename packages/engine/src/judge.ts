@@ -12,6 +12,7 @@
  * outside the provider adapter names a judge model (AC-1).
  */
 
+import { previousChainLine } from "./extract.js";
 import type { JsonSchema, LlmClient } from "./index.js";
 
 /** Env var naming which provider answers the judge call (AC-1). */
@@ -28,7 +29,7 @@ export const DEFAULT_JUDGE_PROVIDER: JudgeProvider = "gemini";
  * Bump it with every change to `buildJudgePrompt`, `judgeRow` or the
  * answer schema.
  */
-export const JUDGE_PROMPT_VERSION = 2;
+export const JUDGE_PROMPT_VERSION = 3;
 
 /** Characters one candidate row is cut to (AC-2; raised to 480 by AC-17). */
 export const DEFAULT_JUDGE_ROW_CHARS = 480;
@@ -36,6 +37,8 @@ export const DEFAULT_JUDGE_ROW_CHARS = 480;
 export const JUDGE_DESCRIPTION_CHARS = 200;
 /** Words a `fact-differs` value may hold; a longer one drops the label (AC-3, AC-9). */
 export const JUDGE_LABEL_MAX_WORDS = 3;
+/** Words the second reading may hold; a longer one is dropped (YOY-150 AC-7). */
+export const JUDGE_READING_MAX_WORDS = 4;
 
 /**
  * The verdict codes (AC-3), best first: exactly what was asked; the same
@@ -92,6 +95,12 @@ export interface JudgeCandidate {
 /** One judge call: a page of candidates in find order. */
 export interface JudgeRequest {
   sentence: string;
+  /**
+   * The chain the sentence follows (YOY-150 AC-2): the client's
+   * `previousQuery`, sentences separated by newlines. Absent on a fresh
+   * search.
+   */
+  previousSentence?: string;
   candidates: JudgeCandidate[];
   storeId?: string;
   searchId?: string;
@@ -113,6 +122,18 @@ export interface JudgeVerdict {
   excluded: boolean;
 }
 
+/** The judge's answer for one page. */
+export interface JudgeAnswer {
+  /** One verdict per candidate, in candidate order. */
+  verdicts: JudgeVerdict[];
+  /**
+   * A second reading of the sentence that at least one candidate fits
+   * (YOY-150 AC-7): at most four words, in the shopper's language. Null
+   * when there is none, when no candidate fits it, or when it is too long.
+   */
+  otherReading: string | null;
+}
+
 export interface Judge {
   /**
    * Which provider and model answer, e.g. `gemini:gemini-3.5-flash-lite`
@@ -121,11 +142,11 @@ export interface Judge {
    */
   readonly identity?: string;
   /**
-   * One verdict per candidate, in candidate order. Rejects with
-   * `JudgeAnswerError` when the answer is invalid twice (AC-4), and with
-   * the port's own error when the call fails.
+   * One verdict per candidate, in candidate order, and the second reading
+   * when there is one. Rejects with `JudgeAnswerError` when the answer is
+   * invalid twice (AC-4), and with the port's own error when the call fails.
    */
-  judge(request: JudgeRequest): Promise<JudgeVerdict[]>;
+  judge(request: JudgeRequest): Promise<JudgeAnswer>;
 }
 
 /** The judge's answer failed the schema or the coverage check twice (AC-4). */
@@ -174,8 +195,10 @@ export const JUDGE_ANSWER_CODES: readonly string[] = Object.keys(JUDGE_VERDICT_C
  * candidate, in page order — its verdict, missed-wish flags and label
  * template — and `d` holds, for each `fact-differs` label, the candidate's
  * number `n` with the product's value `p` and the asked value `a`; `x`
- * lists the numbers of products the shopper excluded (YOY-149 AC-11). Short
- * codes only; no prose field exists.
+ * lists the numbers of products the shopper excluded (YOY-149 AC-11); `r`
+ * is a second reading of the sentence ("" when none) and `rn` the numbers
+ * of the products that fit it (YOY-150 AC-7). Short codes and one short
+ * phrase only; no prose field exists.
  */
 export const JUDGE_SCHEMA: JsonSchema = {
   type: "object",
@@ -194,8 +217,10 @@ export const JUDGE_SCHEMA: JsonSchema = {
       },
     },
     x: { type: "array", items: { type: "integer" } },
+    r: { type: "string" },
+    rn: { type: "array", items: { type: "integer" } },
   },
-  required: ["c", "d", "x"],
+  required: ["c", "d", "x", "r", "rn"],
 };
 
 /** The provider `JUDGE_PROVIDER` names; unset means gemini, an unknown name fails. */
@@ -252,15 +277,28 @@ export function judgeRow(candidate: JudgeCandidate, maxChars = DEFAULT_JUDGE_ROW
   return row.slice(0, maxChars);
 }
 
-/** The judge prompt; its `Query:` line keys replay recordings. */
+/**
+ * The judge prompt; its `Query:` line keys replay recordings. With a
+ * previous sentence (YOY-150 AC-2) it shows the previous search and says
+ * the new one may refine or replace it.
+ */
 export function buildJudgePrompt(
   sentence: string,
   candidates: readonly JudgeCandidate[],
   maxRowChars = DEFAULT_JUDGE_ROW_CHARS,
+  previousSentence?: string,
 ): string {
   const rows = candidates.map(
     (candidate, index) => `${index + 1}. ${judgeRow(candidate, maxRowChars)}`,
   );
+  const previous =
+    previousSentence === undefined || previousSentence.trim() === ""
+      ? []
+      : [
+          `Previous search: ${previousChainLine(previousSentence)}`,
+          "The search below may refine the previous one (keep its wishes and add or change some)",
+          "or replace it with a different search. Judge against what the shopper wants now.",
+        ];
   return [
     "You judge store search results. Read the shopper's search, then every numbered product.",
     "Products are listed in search order. Answer with one three-letter code per product in c,",
@@ -287,8 +325,15 @@ export function buildJudgePrompt(
     "x: the numbers of every product that is something the shopper said they do NOT want",
     "(\"not black\" and the product is black; \"no wool\" and it is wool). x is empty when none.",
     "",
+    "r: when the search can honestly mean a second, different kind of product (\"wedding dress\":",
+    "a bridal gown, or a dress to wear as a guest) and at least one listed product fits that",
+    "other meaning, r names it in at most four words, in the language of the search (\"Bridal",
+    "gowns\"), and rn lists the numbers of the products that fit it. Otherwise r is \"\" and rn",
+    "is empty.",
+    "",
     "Example: E-X is an exact match; CDC is close, a described wish not shown.",
     "",
+    ...previous,
     `Query: ${oneLine(sentence)}`,
     "Products:",
     ...rows,
@@ -325,18 +370,36 @@ function labelOf(
 }
 
 /**
+ * The second reading an answer carries (YOY-150 AC-7): kept only when it
+ * is a non-empty phrase of at most four words and at least one listed
+ * product number fits it. Anything else is no reading, never an invalid
+ * answer.
+ */
+function readingOf(r: unknown, rn: unknown, count: number): string | null {
+  if (typeof r !== "string" || !Array.isArray(rn)) {
+    return null;
+  }
+  const reading = oneLine(r);
+  const fits = rn.some(
+    (n) => typeof n === "number" && Number.isInteger(n) && n >= 1 && n <= count,
+  );
+  return reading === "" || !fits || wordCount(reading) > JUDGE_READING_MAX_WORDS ? null : reading;
+}
+
+/**
  * Validate one answer against the schema and against the page (AC-4):
  * exactly one known code per candidate, and a side list naming each
- * candidate at most once. Null when invalid.
+ * candidate at most once. Null when invalid. The second reading is never
+ * a reason to reject: a malformed one is simply absent (YOY-150 AC-7).
  */
 export function parseJudgeAnswer(
   answer: unknown,
   candidates: readonly JudgeCandidate[],
-): JudgeVerdict[] | null {
+): JudgeAnswer | null {
   if (typeof answer !== "object" || answer === null) {
     return null;
   }
-  const { c, d, x } = answer as Record<string, unknown>;
+  const { c, d, x, r, rn } = answer as Record<string, unknown>;
   const count = candidates.length;
   if (
     !Array.isArray(c) ||
@@ -380,7 +443,7 @@ export function parseJudgeAnswer(
       excluded.add(n);
     }
   }
-  return candidates.map((candidate, index) => {
+  const verdicts = candidates.map((candidate, index) => {
     const [verdict, missed, label] = [...(c[index] as string)];
     const pair = values.get(index + 1);
     return {
@@ -393,6 +456,7 @@ export function parseJudgeAnswer(
       excluded: excluded.has(index + 1),
     };
   });
+  return { verdicts, otherReading: readingOf(r, rn, count) };
 }
 
 export interface LlmJudgeOptions {
@@ -414,7 +478,12 @@ export function createLlmJudge(options: LlmJudgeOptions): Judge {
   return {
     ...(options.identity !== undefined ? { identity: options.identity } : {}),
     async judge(request) {
-      const prompt = buildJudgePrompt(request.sentence, request.candidates, maxRowChars);
+      const prompt = buildJudgePrompt(
+        request.sentence,
+        request.candidates,
+        maxRowChars,
+        request.previousSentence,
+      );
       for (let attempt = 1; attempt <= 2; attempt += 1) {
         const answer = await llm.completeStructured({
           prompt,
@@ -425,9 +494,9 @@ export function createLlmJudge(options: LlmJudgeOptions): Judge {
           searchId: request.searchId,
           signal: request.signal,
         });
-        const verdicts = parseJudgeAnswer(answer, request.candidates);
-        if (verdicts !== null) {
-          return verdicts;
+        const parsed = parseJudgeAnswer(answer, request.candidates);
+        if (parsed !== null) {
+          return parsed;
         }
       }
       throw new JudgeAnswerError(

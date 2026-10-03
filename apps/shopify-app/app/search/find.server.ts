@@ -21,6 +21,10 @@ import { queryCardIndex, type CardIndexHit } from "./card-retrieval.server";
  *   order. A product appears once, and so does a family: a vector hit and a
  *   keyword hit may be different colourways of one family, and the earlier
  *   one speaks for it.
+ * - Refinement (YOY-150 AC-1): with a previous sentence, one embedding call
+ *   embeds the new sentence alone and the previous chain plus the new
+ *   sentence together; the two nearest sets merge by distance, each product
+ *   once at its nearer distance. Keyword matches stay on the new sentence.
  * - Embedding failure (AC-8): the keyword order alone, flagged `degraded`.
  *   A card-index failure takes the same fallback — both are the vector half
  *   of the find step; a keyword-store failure is an outage and propagates,
@@ -99,6 +103,28 @@ export function mergeFindOrder(
   return merged;
 }
 
+/**
+ * Merge nearest-product sets (YOY-150 AC-1): by distance, nearest first,
+ * each product once at its nearest distance; ties keep the earlier set's
+ * order. Pure.
+ */
+export function mergeNearest(sets: ReadonlyArray<ReadonlyArray<CardIndexHit>>): CardIndexHit[] {
+  const best = new Map<string, { hit: CardIndexHit; order: number }>();
+  let order = 0;
+  for (const set of sets) {
+    for (const hit of set) {
+      const kept = best.get(hit.productId);
+      if (kept === undefined || hit.distance < kept.hit.distance) {
+        best.set(hit.productId, { hit, order: kept?.order ?? order });
+      }
+      order += 1;
+    }
+  }
+  return [...best.values()]
+    .sort((a, b) => a.hit.distance - b.hit.distance || a.order - b.order)
+    .map((entry) => entry.hit);
+}
+
 /** The find step's answer: every found product in merged order. */
 export interface FindResult {
   productIds: string[];
@@ -115,6 +141,12 @@ export interface FindResult {
 export interface FindRequest {
   shopDomain: string;
   query: string;
+  /**
+   * The chain the query follows (YOY-150 AC-1): the client's
+   * `previousQuery`, sentences separated by newlines. Absent on a fresh
+   * search.
+   */
+  previousQuery?: string;
   /** Correlation ID for the embedding call's ledger row. */
   searchId: string;
 }
@@ -144,25 +176,59 @@ export function createFindStep(options: FindStepOptions): FindStep {
   const nearest = options.nearest ?? queryCardIndex;
   const vectors = new Map<string, number[]>();
 
-  async function embedQuery(text: string, shopDomain: string, searchId: string): Promise<number[]> {
-    const cached = vectors.get(text);
-    if (cached !== undefined) {
-      return cached;
+  /**
+   * One vector per text, in order, from at most one embedding call: the
+   * texts not cached are embedded together (YOY-150 AC-1).
+   */
+  async function embedQueries(
+    texts: readonly string[],
+    shopDomain: string,
+    searchId: string,
+  ): Promise<number[][]> {
+    const missing = texts.filter((text, index) => !vectors.has(text) && texts.indexOf(text) === index);
+    const found = new Map<string, number[]>();
+    for (const text of texts) {
+      const vector = vectors.get(text);
+      if (vector !== undefined) {
+        found.set(text, vector);
+      }
     }
-    const [vector] = await embeddings.embed({
-      texts: [text],
-      operation: "embedding",
-      storeId: shopDomain,
-      searchId,
-    });
-    if (vector === undefined) {
-      throw new Error("embedding port returned no vector for the query");
+    if (missing.length > 0) {
+      const embedded = await embeddings.embed({
+        texts: missing,
+        operation: "embedding",
+        storeId: shopDomain,
+        searchId,
+      });
+      missing.forEach((text, index) => {
+        const vector = embedded[index];
+        if (vector === undefined) {
+          throw new Error("embedding port returned no vector for the query");
+        }
+        vectors.set(text, vector);
+        found.set(text, vector);
+      });
+      while (vectors.size > QUERY_VECTOR_CACHE_SIZE) {
+        vectors.delete(vectors.keys().next().value!);
+      }
     }
-    vectors.set(text, vector);
-    if (vectors.size > QUERY_VECTOR_CACHE_SIZE) {
-      vectors.delete(vectors.keys().next().value!);
+    // Read from `found`, not the cache: the eviction above may already have
+    // dropped an old entry this search reads.
+    return texts.map((text) => found.get(text)!);
+  }
+
+  /** The nearest products to every vector, merged nearest first, each product once. */
+  async function nearestTo(
+    vectorsToQuery: readonly number[][],
+    shopDomain: string,
+  ): Promise<CardIndexHit[]> {
+    const sets = await Promise.all(
+      vectorsToQuery.map((vector) => nearest({ db, shopDomain, vector, limit: findSetSize })),
+    );
+    if (sets.length === 1) {
+      return sets[0]!;
     }
-    return vector;
+    return mergeNearest(sets);
   }
 
   /** Keep the first product of each family, in order (one family, one card). */
@@ -189,12 +255,16 @@ export function createFindStep(options: FindStepOptions): FindStep {
   }
 
   return {
-    async find({ shopDomain, query, searchId }) {
+    async find({ shopDomain, query, searchId, previousQuery }) {
       const text = query.trim();
+      const previous = previousQuery?.trim() ?? "";
+      // A refinement embeds the new sentence alone and the chain plus the
+      // new sentence, in one call (YOY-150 AC-1).
+      const texts = previous === "" ? [text] : [text, `${previous}\n${text}`];
       // The two halves run side by side; the vector half's failure is a
       // value, so it cannot reject unobserved while the keyword half runs.
-      const vectorHalf = embedQuery(text, shopDomain, searchId)
-        .then((vector) => nearest({ db, shopDomain, vector, limit: findSetSize }))
+      const vectorHalf = embedQueries(texts, shopDomain, searchId)
+        .then((queryVectors) => nearestTo(queryVectors, shopDomain))
         .then(
           (hits) => ({ ok: true as const, hits }),
           (error: unknown) => ({ ok: false as const, error }),

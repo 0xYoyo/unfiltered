@@ -18,7 +18,9 @@ import { normalizeReuseQuery } from "./events.server";
  * script, the extraction prompt version and the model id; the row holds the
  * validated wishes. Persistent, so it survives deploys; not keyed by tenant,
  * because the answer depends on the sentence alone. Reads and writes never
- * fail a search: a broken cache is a miss.
+ * fail a search: a broken cache is a miss. A refinement's previous chain
+ * (YOY-150 AC-2) is part of the key: "cheaper" after "black dress" is
+ * another question than "cheaper" alone.
  */
 
 /** The sentence's language by script class: he, ar, ru, else en. */
@@ -31,6 +33,7 @@ export function sentenceLanguage(text: string): "en" | "he" | "ar" | "ru" {
 
 export function extractionCacheKey(input: {
   sentence: string;
+  previousSentence?: string;
   modelId: string;
   promptVersion?: number;
 }): string {
@@ -41,6 +44,9 @@ export function extractionCacheKey(input: {
         sentenceLanguage(input.sentence),
         input.promptVersion ?? EXTRACT_PROMPT_VERSION,
         input.modelId,
+        ...(input.previousSentence !== undefined && input.previousSentence.trim() !== ""
+          ? [input.previousSentence.split("\n").map(normalizeReuseQuery)]
+          : []),
       ]),
     )
     .digest("hex");
@@ -75,6 +81,7 @@ function storedWishes(value: Prisma.JsonValue): ExtractedWishes | null {
     typeof record.inStock !== "boolean" ||
     typeof record.priceFirm !== "boolean" ||
     typeof record.sizeFirm !== "boolean" ||
+    !(record.refines === undefined || typeof record.refines === "boolean") ||
     !Array.isArray(record.excluded)
   ) {
     return null;
@@ -96,6 +103,7 @@ function storedWishes(value: Prisma.JsonValue): ExtractedWishes | null {
     excluded,
     priceFirm: record.priceFirm,
     sizeFirm: record.sizeFirm,
+    ...(typeof record.refines === "boolean" ? { refines: record.refines } : {}),
   };
 }
 
@@ -112,6 +120,7 @@ export async function extractThroughCache(
 ): Promise<CachedExtraction> {
   const cacheKey = extractionCacheKey({
     sentence: request.sentence,
+    ...(request.previousSentence !== undefined ? { previousSentence: request.previousSentence } : {}),
     modelId: extractor.modelId ?? "unknown",
   });
   try {

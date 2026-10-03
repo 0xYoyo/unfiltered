@@ -10,6 +10,7 @@ import {
   orderByVerdict,
   VISION_NOT_APPLICABLE,
   type Judge,
+  type JudgeAnswer,
   type JudgeCandidate,
   type JudgeCandidateAttribute,
   type JudgeCandidateOption,
@@ -227,6 +228,11 @@ export interface JudgeStepResult<T> {
   labelsPending: boolean;
   /** The page in verdict order when judged or cached; otherwise in find order. */
   items: JudgeStepItem<T>[];
+  /**
+   * The judge's second reading of the sentence (YOY-150 AC-7) when it
+   * answered in time or from the cache; null otherwise.
+   */
+  otherReading: string | null;
 }
 
 export interface JudgeStepRequest<T extends { productId: string }> {
@@ -234,6 +240,8 @@ export interface JudgeStepRequest<T extends { productId: string }> {
   db: PrismaClient;
   shopDomain: string;
   sentence: string;
+  /** The chain the sentence follows (YOY-150 AC-2); absent on a fresh search. */
+  previousSentence?: string;
   /** The page's judged part, in find order. */
   items: readonly T[];
   searchId: string;
@@ -260,10 +268,13 @@ export interface JudgeStepRequest<T extends { productId: string }> {
  * The answer-cache key (YOY-148 AC-1): the SHA-256 of the normalized search
  * text, the candidate ids in order, each candidate's card text hash (empty
  * for a product with no written card), the judge's provider and model, and
- * the prompt version. Price and stock are not in it (AC-3).
+ * the prompt version. Price and stock are not in it (AC-3). A refinement's
+ * previous chain (YOY-150 AC-2) is part of it: the same words after another
+ * search are another question.
  */
 export function judgeCacheKey(input: {
   sentence: string;
+  previousSentence?: string;
   candidates: ReadonlyArray<{ id: string; cardTextHash: string }>;
   identity: string;
   promptVersion?: number;
@@ -272,6 +283,9 @@ export function judgeCacheKey(input: {
     .update(
       JSON.stringify([
         normalizeReuseQuery(input.sentence),
+        ...(input.previousSentence !== undefined && input.previousSentence.trim() !== ""
+          ? [input.previousSentence.split("\n").map(normalizeReuseQuery)]
+          : []),
         input.candidates.map((candidate) => [candidate.id, candidate.cardTextHash]),
         input.identity,
         input.promptVersion ?? JUDGE_PROMPT_VERSION,
@@ -299,12 +313,24 @@ const TEMPLATE_SET: ReadonlySet<string> = new Set(JUDGE_LABEL_TEMPLATES);
 
 /**
  * A stored answer read back, or null when it no longer fits: one well-formed
- * verdict per candidate, in candidate order. A row that fails is a miss.
+ * verdict per candidate, in candidate order, and the second reading
+ * (YOY-150 AC-7). A row that fails is a miss. A row written before the
+ * reading existed is a bare verdict array and reads as no reading.
  */
-function storedVerdicts(
-  value: Prisma.JsonValue,
+function storedAnswer(
+  stored: Prisma.JsonValue,
   candidates: readonly JudgeCandidate[],
-): JudgeVerdict[] | null {
+): JudgeAnswer | null {
+  let value: Prisma.JsonValue = stored;
+  let otherReading: string | null = null;
+  if (typeof stored === "object" && stored !== null && !Array.isArray(stored)) {
+    const reading = stored.otherReading;
+    if (!(reading === null || typeof reading === "string")) {
+      return null;
+    }
+    otherReading = reading;
+    value = stored.verdicts ?? null;
+  }
   if (!Array.isArray(value) || value.length !== candidates.length) {
     return null;
   }
@@ -344,7 +370,7 @@ function storedVerdicts(
       excluded: excluded === true,
     });
   }
-  return verdicts;
+  return { verdicts, otherReading };
 }
 
 async function readCachedAnswer(
@@ -352,13 +378,13 @@ async function readCachedAnswer(
   shopDomain: string,
   cacheKey: string,
   candidates: readonly JudgeCandidate[],
-): Promise<JudgeVerdict[] | null> {
+): Promise<JudgeAnswer | null> {
   try {
     const row = await db.judgeAnswer.findUnique({
       where: { shopDomain_cacheKey: { shopDomain, cacheKey } },
       select: { verdicts: true },
     });
-    return row === null ? null : storedVerdicts(row.verdicts, candidates);
+    return row === null ? null : storedAnswer(row.verdicts, candidates);
   } catch (error) {
     warnJudgeStore("cache read", error);
     return null;
@@ -370,15 +396,21 @@ async function storeAnswer(
   db: PrismaClient,
   shopDomain: string,
   cacheKey: string,
-  verdicts: readonly JudgeVerdict[],
+  answer: JudgeAnswer,
 ): Promise<void> {
-  const value = verdicts.map((entry) => ({
-    id: entry.id,
-    verdict: entry.verdict,
-    missed: [...entry.missed],
-    label: entry.label === null ? null : { template: entry.label.template, values: [...entry.label.values] },
-    excluded: entry.excluded,
-  })) as Prisma.InputJsonValue;
+  const value = {
+    verdicts: answer.verdicts.map((entry) => ({
+      id: entry.id,
+      verdict: entry.verdict,
+      missed: [...entry.missed],
+      label:
+        entry.label === null
+          ? null
+          : { template: entry.label.template, values: [...entry.label.values] },
+      excluded: entry.excluded,
+    })),
+    otherReading: answer.otherReading,
+  } as Prisma.InputJsonValue;
   try {
     await db.judgeAnswer.upsert({
       where: { shopDomain_cacheKey: { shopDomain, cacheKey } },
@@ -480,7 +512,8 @@ export function resetPendingLabels(): void {
 export async function runJudgeStep<T extends { productId: string }>(
   request: JudgeStepRequest<T>,
 ): Promise<JudgeStepResult<T>> {
-  const { judge, db, shopDomain, sentence, items, searchId, deadlineMs } = request;
+  const { judge, db, shopDomain, sentence, previousSentence, items, searchId, deadlineMs } =
+    request;
   const giveUpMs = Math.max(request.giveUpMs ?? DEFAULT_JUDGE_GIVE_UP_MS, deadlineMs);
   const page = request.page ?? 1;
   const positionOffset = request.positionOffset ?? 0;
@@ -499,6 +532,7 @@ export async function runJudgeStep<T extends { productId: string }>(
     started,
     labelsPending,
     items: items.map((item) => ({ item, verdict: null, label: null })),
+    otherReading: null,
   });
   let candidates: JudgeCandidate[];
   let cacheKey: string;
@@ -511,6 +545,7 @@ export async function runJudgeStep<T extends { productId: string }>(
     candidates = loaded;
     cacheKey = judgeCacheKey({
       sentence,
+      ...(previousSentence !== undefined ? { previousSentence } : {}),
       candidates: candidates.map((candidate) => ({
         id: candidate.id,
         cardTextHash: hashes.get(candidate.id) ?? "",
@@ -529,9 +564,10 @@ export async function runJudgeStep<T extends { productId: string }>(
   }
 
   const serve = async (
-    verdicts: JudgeVerdict[],
+    answer: JudgeAnswer,
     outcome: "judged" | "judge-cached",
   ): Promise<JudgeStepResult<T>> => {
+    const { verdicts } = answer;
     const served = order(verdicts);
     await writeVerdictRows(db, {
       shopDomain,
@@ -542,7 +578,13 @@ export async function runJudgeStep<T extends { productId: string }>(
       verdicts,
       cached: outcome === "judge-cached",
     });
-    return { outcome, started: outcome === "judged", labelsPending: false, items: served };
+    return {
+      outcome,
+      started: outcome === "judged",
+      labelsPending: false,
+      items: served,
+      otherReading: answer.otherReading,
+    };
   };
 
   const cached = await readCachedAnswer(db, shopDomain, cacheKey, candidates);
@@ -557,15 +599,22 @@ export async function runJudgeStep<T extends { productId: string }>(
   // The call's failure is a value, so a rejection after the deadline won is
   // never unobserved.
   const call = judge
-    .judge({ sentence, candidates, storeId: shopDomain, searchId, signal: controller.signal })
+    .judge({
+      sentence,
+      ...(previousSentence !== undefined ? { previousSentence } : {}),
+      candidates,
+      storeId: shopDomain,
+      searchId,
+      signal: controller.signal,
+    })
     .then(
-      (verdicts) => ({ kind: "answered" as const, verdicts }),
+      (answer) => ({ kind: "answered" as const, answer }),
       (error: unknown) => ({ kind: "failed" as const, error }),
     )
     .then(async (settled) => {
       clearTimeout(giveUp);
       if (settled.kind === "answered") {
-        await storeAnswer(db, shopDomain, cacheKey, settled.verdicts);
+        await storeAnswer(db, shopDomain, cacheKey, settled.answer);
       }
       return settled;
     });
@@ -585,7 +634,7 @@ export async function runJudgeStep<T extends { productId: string }>(
         return {};
       }
       return Object.fromEntries(
-        order(late.verdicts).map((entry) => [entry.item.productId, entry.label]),
+        order(late.answer.verdicts).map((entry) => [entry.item.productId, entry.label]),
       );
     });
     pendingLabels.set(key, { shopDomain, labels });
@@ -602,7 +651,7 @@ export async function runJudgeStep<T extends { productId: string }>(
     warnJudgeFailure(searchId, "judge-error", settled.error);
     return findOrder("judge-error");
   }
-  return serve(settled.verdicts, "judged");
+  return serve(settled.answer, "judged");
 }
 
 function warnJudgeFailure(searchId: string, outcome: JudgeOutcome, error: unknown): void {

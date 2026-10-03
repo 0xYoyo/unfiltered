@@ -130,6 +130,9 @@ async function handleSearch(
     // Chips removed from an Engine v2 response (YOY-149 AC-15).
     const removed =
       body.removedChips !== undefined ? { removedChips: body.removedChips } : {};
+    // The refinement chain (YOY-150 AC-1); Engine v2 reads it, v1 ignores it.
+    const chain =
+      body.previousQuery !== undefined ? { previousQuery: body.previousQuery } : {};
     const response = await orchestrator.runSearch(
       preview
         ? { query: body.query, shopDomain: shop, preview: true }
@@ -142,7 +145,7 @@ async function handleSearch(
               ...paging,
             }
         : throttled
-        ? { query: body.query, shopDomain: shop, forceClassic: true, ...paging, ...removed }
+        ? { query: body.query, shopDomain: shop, forceClassic: true, ...paging, ...removed, ...chain }
         : resolvedIntent !== undefined
           ? { query: body.query, shopDomain: shop, resolvedIntent, ...paging }
           : {
@@ -150,6 +153,7 @@ async function handleSearch(
               shopDomain: shop,
               ...paging,
               ...removed,
+              ...chain,
               ...(body.previousIntent !== undefined
                 ? { previousIntent: body.previousIntent }
                 : {}),

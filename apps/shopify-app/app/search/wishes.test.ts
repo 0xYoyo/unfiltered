@@ -65,6 +65,7 @@ describe("the extraction keeps only what the sentence states (AC-1, AC-2)", () =
       "priceFirm",
       "priceMax",
       "priceMin",
+      "refines",
       "size",
       "sizeFirm",
     ]);

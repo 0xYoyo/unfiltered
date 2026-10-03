@@ -154,6 +154,7 @@ export const loader = async ({
       resolvedIntent,
       previousIntent: body.previousIntent,
       ...(body.removedChips !== undefined ? { removedChips: body.removedChips } : {}),
+      ...(body.previousQuery !== undefined ? { previousQuery: body.previousQuery } : {}),
       ...(engineParam !== null ? { engine: engineParam } : {}),
       ...(body.paging !== undefined ? { paging: body.paging } : {}),
     });

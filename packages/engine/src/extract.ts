@@ -20,7 +20,7 @@ import type { JsonSchema, LlmClient } from "./index.js";
  * Bump it with every change to `buildExtractPrompt`, `EXTRACT_SCHEMA` or
  * `parseExtractAnswer`.
  */
-export const EXTRACT_PROMPT_VERSION = 2;
+export const EXTRACT_PROMPT_VERSION = 3;
 
 /** One term the shopper excluded, as typed and in English (AC-1). */
 export interface ExcludedTerm {
@@ -47,6 +47,12 @@ export interface ExtractedWishes {
   excluded: ExcludedTerm[];
   priceFirm: boolean;
   sizeFirm: boolean;
+  /**
+   * Present only when a previous sentence was given (YOY-150 AC-2, AC-3):
+   * true when the new sentence refines the previous one, false when it
+   * replaces it. The wishes then cover the whole chain when it refines.
+   */
+  refines?: boolean;
 }
 
 /** No wishes at all: the extraction's empty answer. */
@@ -82,6 +88,8 @@ export const EXTRACT_SCHEMA: JsonSchema = {
     },
     priceFirm: { type: ["boolean", "null"] },
     sizeFirm: { type: ["boolean", "null"] },
+    // YOY-150 AC-2: does the new sentence refine the previous one or replace it.
+    refines: { type: ["boolean", "null"] },
   },
   required: [
     "priceMax",
@@ -95,8 +103,43 @@ export const EXTRACT_SCHEMA: JsonSchema = {
   ],
 };
 
-/** The extraction prompt; its `Query:` line keys replay recordings. */
-export function buildExtractPrompt(sentence: string): string {
+/** One line of the previous chain as the prompts show it: its sentences joined by " / ". */
+export function previousChainLine(previousSentence: string): string {
+  return previousSentence
+    .split("\n")
+    .map((part) => part.replace(/\s+/g, " ").trim())
+    .filter((part) => part !== "")
+    .join(" / ");
+}
+
+/**
+ * The text a refining answer is validated against (YOY-150 AC-2): the
+ * previous chain and the new sentence; the new sentence alone otherwise.
+ */
+export function wishesText(sentence: string, previousSentence?: string): string {
+  return previousSentence === undefined || previousSentence.trim() === ""
+    ? sentence
+    : `${previousSentence}\n${sentence}`;
+}
+
+/**
+ * The extraction prompt; its `Query:` line keys replay recordings. With a
+ * previous sentence (YOY-150 AC-2) the prompt shows it, says the new search
+ * may refine or replace it, and asks which.
+ */
+export function buildExtractPrompt(sentence: string, previousSentence?: string): string {
+  const previous =
+    previousSentence === undefined || previousSentence.trim() === ""
+      ? []
+      : [
+          "",
+          `Previous search: ${previousChainLine(previousSentence)}`,
+          "The shopper's new search may REFINE the previous one (\"same but cheaper\", \"in black\",",
+          "\"without sleeves\") or REPLACE it with a different search (\"running shoes\").",
+          "refines: true when it refines, false when it replaces. When it refines, return every wish",
+          "of the previous search that the new one keeps, together with the new wishes; when it",
+          "replaces, return only the new search's wishes.",
+        ];
   return [
     "Read a shopper's store search and return ONLY what the shopper stated. Never guess.",
     "",
@@ -114,6 +157,7 @@ export function buildExtractPrompt(sentence: string): string {
     "\"at most\", \"only\", \"must be\", \"לא יותר מ\", \"מקסימום\"); \"under\", \"up to\", \"below\",",
     "\"around\" and \"עד\" are NOT firm. Else null.",
     "sizeFirm: true only when the size was stated as a hard requirement (\"only\", \"must be\"); else null.",
+    ...previous,
     "",
     `Query: ${sentence.replace(/\s+/g, " ").trim()}`,
   ].join("\n");
@@ -180,13 +224,23 @@ function withoutNegation(term: string): string {
  * appears verbatim, ignoring case. Anything else is discarded. Null when the
  * answer is not the schema's shape at all.
  */
-export function parseExtractAnswer(answer: unknown, sentence: string): ExtractedWishes | null {
+export function parseExtractAnswer(
+  answer: unknown,
+  sentence: string,
+  previousSentence?: string,
+): ExtractedWishes | null {
   if (typeof answer !== "object" || answer === null || Array.isArray(answer)) {
     return null;
   }
   const record = answer as Record<string, unknown>;
+  const hasPrevious = previousSentence !== undefined && previousSentence.trim() !== "";
+  // A missing or null `refines` is read as refining (YOY-150 AC-3).
+  const refines = hasPrevious ? record.refines !== false : undefined;
+  // A refining answer may carry the previous chain's wishes (YOY-150 AC-2):
+  // it is validated against the chain and the new sentence together.
+  const text = refines === true ? wishesText(sentence, previousSentence) : sentence;
   const price = (value: unknown): StatedPrice | null =>
-    typeof value === "number" && Number.isFinite(value) && value > 0 && sentenceHasNumber(sentence, value)
+    typeof value === "number" && Number.isFinite(value) && value > 0 && sentenceHasNumber(text, value)
       ? { amount: value, raw: digitsOf(value) }
       : null;
   const priceMax = price(record.priceMax);
@@ -204,7 +258,7 @@ export function parseExtractAnswer(answer: unknown, sentence: string): Extracted
         continue;
       }
       const typed = withoutNegation(typedRaw);
-      if (typed === "" || !sentenceHasText(sentence, typed)) {
+      if (typed === "" || !sentenceHasText(text, typed)) {
         continue;
       }
       const english =
@@ -217,7 +271,7 @@ export function parseExtractAnswer(answer: unknown, sentence: string): Extracted
       }
     }
   }
-  const size = sizeRaw !== "" && sentenceHasText(sentence, sizeRaw) ? sizeRaw : null;
+  const size = sizeRaw !== "" && sentenceHasText(text, sizeRaw) ? sizeRaw : null;
   return {
     priceMax,
     priceMin,
@@ -226,17 +280,23 @@ export function parseExtractAnswer(answer: unknown, sentence: string): Extracted
         ? null
         : CURRENCY_CODE.test(currencyRaw)
           ? currencyRaw
-          : statedCurrency(sentence),
+          : statedCurrency(text),
     size,
     inStock: record.inStock === true,
     excluded,
     priceFirm: record.priceFirm === true && (priceMax !== null || priceMin !== null),
     sizeFirm: record.sizeFirm === true && size !== null,
+    ...(refines !== undefined ? { refines } : {}),
   };
 }
 
 export interface ExtractRequest {
   sentence: string;
+  /**
+   * The chain so far (YOY-150 AC-2): the client's `previousQuery`, its
+   * sentences separated by newlines. Absent on a fresh search.
+   */
+  previousSentence?: string;
   storeId?: string;
   searchId?: string;
   signal?: AbortSignal;
@@ -260,7 +320,7 @@ export function createWishExtractor(options: { llm: LlmClient; modelId?: string 
     ...(options.modelId !== undefined ? { modelId: options.modelId } : {}),
     async extract(request) {
       const answer = await options.llm.completeStructured({
-        prompt: buildExtractPrompt(request.sentence),
+        prompt: buildExtractPrompt(request.sentence, request.previousSentence),
         schema: EXTRACT_SCHEMA,
         operation: "extract",
         temperature: 0,
@@ -268,7 +328,7 @@ export function createWishExtractor(options: { llm: LlmClient; modelId?: string 
         searchId: request.searchId,
         signal: request.signal,
       });
-      const wishes = parseExtractAnswer(answer, request.sentence);
+      const wishes = parseExtractAnswer(answer, request.sentence, request.previousSentence);
       if (wishes === null) {
         throw new ExtractAnswerError("extraction answer is not the schema's shape");
       }

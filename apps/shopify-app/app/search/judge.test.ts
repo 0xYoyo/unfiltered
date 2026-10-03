@@ -183,7 +183,7 @@ describe("the judge's answer (AC-3, AC-4, AC-9)", () => {
   const page = [candidate("a"), candidate("b"), candidate("c")];
 
   it("is fixed-schema JSON with short codes and no prose field", () => {
-    expect(Object.keys(JUDGE_SCHEMA.properties as object).sort()).toEqual(["c", "d", "x"]);
+    expect(Object.keys(JUDGE_SCHEMA.properties as object).sort()).toEqual(["c", "d", "r", "rn", "x"]);
     const side = (JUDGE_SCHEMA.properties as { d: { items: { properties: object } } }).d.items;
     expect(Object.keys(side.properties).sort()).toEqual(["a", "n", "p"]);
     // 4 verdicts × 4 missed-wish flags × 3 label templates.
@@ -202,7 +202,7 @@ describe("the judge's answer (AC-3, AC-4, AC-9)", () => {
       answer(["E-X", "VFF", "CDC"], [{ n: 2, p: "navy", a: "black" }]),
       page,
     );
-    expect(verdicts).toEqual([
+    expect(verdicts!.verdicts).toEqual([
       { id: "a", verdict: "exact", missed: [], label: null, excluded: false },
       {
         id: "b",
@@ -219,21 +219,23 @@ describe("the judge's answer (AC-3, AC-4, AC-9)", () => {
         excluded: false,
       },
     ]);
-    expect(parseJudgeAnswer(answer(["NBX", "E-X", "E-X"]), page)![0]!.missed).toEqual([
+    expect(parseJudgeAnswer(answer(["NBX", "E-X", "E-X"]), page)!.verdicts[0]!.missed).toEqual([
       "fact",
       "description",
     ]);
   });
 
   it("flags excluded candidates and never labels them; x names each candidate once, in range (YOY-149 AC-11)", () => {
-    const verdicts = parseJudgeAnswer(answer(["E-X", "CDC", "E-X"], [], [2]), page)!;
+    const { verdicts } = parseJudgeAnswer(answer(["E-X", "CDC", "E-X"], [], [2]), page)!;
     expect(verdicts.map((entry) => [entry.id, entry.excluded, entry.label])).toEqual([
       ["a", false, null],
       ["b", true, null],
       ["c", false, null],
     ]);
     // An answer without x reads as no exclusions.
-    expect(parseJudgeAnswer({ c: ["E-X", "E-X", "E-X"], d: [] }, page)!.every((entry) => !entry.excluded)).toBe(true);
+    expect(
+      parseJudgeAnswer({ c: ["E-X", "E-X", "E-X"], d: [] }, page)!.verdicts.every((entry) => !entry.excluded),
+    ).toBe(true);
     for (const x of [[0], [4], [2, 2], [1.5]]) {
       expect(parseJudgeAnswer(answer(["E-X", "E-X", "E-X"], [], x), page)).toBeNull();
     }
@@ -271,7 +273,7 @@ describe("the judge's answer (AC-3, AC-4, AC-9)", () => {
         ],
       ),
       page,
-    )!;
+    )!.verdicts;
     expect(first).toMatchObject({ verdict: "close", label: null });
     expect(second!.label).toEqual({ template: "fact-differs", values: ["dark navy blue", "pure black"] });
     // No values for a fact-differs label: no label.
@@ -281,7 +283,7 @@ describe("the judge's answer (AC-3, AC-4, AC-9)", () => {
   it("asks once more after an invalid answer, then fails (AC-4)", async () => {
     const valid = answer(["E-X", "CDC", "E-X"]);
     const recovers = scriptedLlm([answer(["E-X"]), valid]);
-    const verdicts = await createLlmJudge({ llm: recovers }).judge({ sentence: "dress", candidates: page });
+    const { verdicts } = await createLlmJudge({ llm: recovers }).judge({ sentence: "dress", candidates: page });
     expect(verdicts.map((verdict) => verdict.verdict)).toEqual(["exact", "close", "exact"]);
     expect(recovers.requests).toHaveLength(2);
 
