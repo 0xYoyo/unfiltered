@@ -35,6 +35,7 @@ import {
   composeWishes,
   DEFAULT_EXTRACTION_GRACE_MS,
   DEFAULT_PRICE_NEAR_PERCENT,
+  DEFAULT_TIER_FRONT_SIZE,
   hasAppliedWishes,
   keepUnremoved,
   loadWishProducts,
@@ -577,6 +578,8 @@ export interface SearchOrchestratorOptions {
   extractionGraceMs?: number;
   /** How far over the cap a price is still near, in percent; 10 by default (AC-5, AC-12). */
   priceNearPercent?: number;
+  /** How many find candidates the number tiers reorder; 48 by default (AC-5). */
+  tierFrontSize?: number;
 }
 
 export function createSearchOrchestrator(
@@ -597,6 +600,7 @@ export function createSearchOrchestrator(
     wishExtractor,
     extractionGraceMs = DEFAULT_EXTRACTION_GRACE_MS,
     priceNearPercent = DEFAULT_PRICE_NEAR_PERCENT,
+    tierFrontSize = DEFAULT_TIER_FRONT_SIZE,
   } = options;
 
   /** Hydrate ranked hits into display cards, preserving hit order. Hits
@@ -720,7 +724,7 @@ export function createSearchOrchestrator(
           found.findSetCount,
           await loadWishProducts(db, request.shopDomain, found.productIds),
           wishes,
-          { nearPercent: priceNearPercent },
+          { nearPercent: priceNearPercent, tierFront: tierFrontSize },
         ),
       );
       ordered = composed;

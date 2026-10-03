@@ -23,6 +23,16 @@ export const DEFAULT_EXTRACTION_GRACE_MS = 800;
 export const PRICE_NEAR_PERCENT_ENV = "PRICE_NEAR_PERCENT";
 /** A price within this percentage over the cap is near; beyond it is far. */
 export const DEFAULT_PRICE_NEAR_PERCENT = 10;
+/** Env var naming how many find candidates the number tiers reorder (AC-5). */
+export const TIER_FRONT_SIZE_ENV = "TIER_FRONT_SIZE";
+/**
+ * The find front the number tiers sort (AC-5, rewritten 2026-10-03): the
+ * first 48 candidates in find order — two pages. A soft budget never
+ * outranks relevance: a candidate past the front keeps find order and never
+ * jumps ahead, so a cap below every relevant product cannot fill page 1 with
+ * cheap, unrelated ones.
+ */
+export const DEFAULT_TIER_FRONT_SIZE = 48;
 
 function nonNegativeIntFromEnv(
   env: Record<string, string | undefined>,
@@ -45,6 +55,13 @@ export function extractionGraceMsFromEnv(
   env: Record<string, string | undefined> = process.env,
 ): number {
   return nonNegativeIntFromEnv(env, EXTRACTION_GRACE_MS_ENV, DEFAULT_EXTRACTION_GRACE_MS);
+}
+
+/** The tier front from `TIER_FRONT_SIZE`; unset means 48. A malformed value fails at construction. */
+export function tierFrontSizeFromEnv(
+  env: Record<string, string | undefined> = process.env,
+): number {
+  return nonNegativeIntFromEnv(env, TIER_FRONT_SIZE_ENV, DEFAULT_TIER_FRONT_SIZE);
 }
 
 /** The near band from `PRICE_NEAR_PERCENT`; unset means 10. A malformed value fails at construction. */
@@ -346,6 +363,8 @@ function capsFor(
 export interface ComposeOptions {
   nearPercent?: number;
   rates?: CurrencyRates;
+  /** How many find candidates, after the walls, the tiers reorder; 48 by default (AC-5). */
+  tierFront?: number;
 }
 
 /** Where a product stands against the kept wishes. */
@@ -415,9 +434,12 @@ export interface ComposedResults {
 /**
  * Apply the kept wishes to the find step's merged order (AC-5 – AC-10,
  * AC-12): walls remove products from the results and the count; the find
- * set is sorted into number tiers before pages are cut, each tier in find
- * order; the keyword tail keeps its order after it. A product with no
- * catalog row is kept where it stands, unlabelled.
+ * front — the first `tierFront` surviving candidates in find order — is
+ * sorted into number tiers before pages are cut, each tier in find order;
+ * the rest of the find set and the keyword tail keep their order after it.
+ * Within a page the judge then orders by verdict, ties in this order
+ * (verdict, then tier, then find order). A product with no catalog row is
+ * kept where it stands, unlabelled.
  */
 export function composeWishes(
   productIds: readonly string[],
@@ -429,6 +451,7 @@ export function composeWishes(
   const resolved: Required<ComposeOptions> = {
     nearPercent: options.nearPercent ?? DEFAULT_PRICE_NEAR_PERCENT,
     rates: options.rates ?? CURRENCY_RATES,
+    tierFront: options.tierFront ?? DEFAULT_TIER_FRONT_SIZE,
   };
   const labels = new Map<string, CodeLabel>();
   const rank = (ids: readonly string[]) =>
@@ -446,12 +469,15 @@ export function composeWishes(
       }
       return [{ productId, tier: standing.tier, index }];
     });
-  const findSet = rank(productIds.slice(0, findSetCount)).sort(
-    (a, b) => a.tier - b.tier || a.index - b.index,
-  );
+  const findSet = rank(productIds.slice(0, findSetCount));
+  const front = findSet
+    .slice(0, resolved.tierFront)
+    .sort((a, b) => a.tier - b.tier || a.index - b.index);
   const tail = rank(productIds.slice(findSetCount));
   return {
-    productIds: [...findSet, ...tail].map((entry) => entry.productId),
+    productIds: [...front, ...findSet.slice(resolved.tierFront), ...tail].map(
+      (entry) => entry.productId,
+    ),
     findSetCount: findSet.length,
     labels,
   };

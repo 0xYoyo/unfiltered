@@ -1086,10 +1086,14 @@ The three kinds of wishes (docs/PRD.md §3) applied by code. Packages:
     "in stock" (sold-out products); an exclusion (every variant carries
     the term as an option value, or the card facts state it — typed or
     English form, a whole word in any script).
-  - Number tiers sort the find set: every number wish met, then the price
-    within `PRICE_NEAR_PERCENT` (10) over the cap with the rest met, then
-    other misses — each tier in find order; the keyword tail keeps its
-    order after the find set. The judge orders within the page.
+  - Number tiers sort the find front only — the first `TIER_FRONT_SIZE`
+    (48) surviving candidates in find order: every number wish met, then
+    the price within `PRICE_NEAR_PERCENT` (10) over the cap with the rest
+    met, then other misses, each tier in find order. Candidates past the
+    front and the keyword tail keep their order and never jump ahead
+    (2026-10-03: a soft budget never outranks relevance). Within a page the
+    judge orders by verdict, then tier, then find order; on a judge
+    timeout, error or cap the page keeps tier-then-find order.
   - A size matches a variant option value, ignoring case: offered and in
     stock is met, offered and sold out a miss, not offered met.
   - A cap in a currency other than the product's converts through USD with

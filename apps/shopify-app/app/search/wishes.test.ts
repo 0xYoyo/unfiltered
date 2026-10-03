@@ -39,6 +39,7 @@ import {
   holdsWholeWord,
   keepUnremoved,
   priceNearPercentFromEnv,
+  tierFrontSizeFromEnv,
   wishChips,
   type CurrencyRates,
   type WishProduct,
@@ -265,6 +266,51 @@ describe("composing the wishes (AC-5 – AC-10, AC-12)", () => {
     expect(composed.labels.get("near")).toEqual({ template: "price-near", values: ["105 USD", "100 USD"] });
     expect(composed.labels.get("far")).toEqual({ template: "price-far", values: ["200 USD", "100 USD"] });
     expect(composed.labels.get("ok1")).toBeUndefined();
+  });
+
+  it("tiers only the find front: a candidate past it keeps find order and never jumps ahead (AC-5, 2026-10-03)", () => {
+    // Five over-budget dresses lead the find order; two cheap, unrelated
+    // products sit past a front of 3.
+    const products = new Map(
+      [
+        product("dress1", 300),
+        product("dress2", 310),
+        product("dress3", 50),
+        product("dress4", 320),
+        product("dress5", 330),
+        product("cheap-sock", 5),
+        product("cheap-tee", 9),
+      ].map((entry) => [entry.productId, entry]),
+    );
+    const ids = ["dress1", "dress2", "dress3", "dress4", "dress5", "cheap-sock", "cheap-tee"];
+    const composed = composeWishes(ids, 7, products, wishes({ priceMax: { amount: 100, raw: "100" } }), {
+      rates,
+      tierFront: 3,
+    });
+    expect(composed.productIds).toEqual(["dress3", "dress1", "dress2", "dress4", "dress5", "cheap-sock", "cheap-tee"]);
+    expect(composed.findSetCount).toBe(7);
+    expect(composed.labels.get("dress1")?.template).toBe("price-far");
+    // The default front is 48 candidates.
+    expect(tierFrontSizeFromEnv({})).toBe(48);
+    expect(tierFrontSizeFromEnv({ TIER_FRONT_SIZE: "24" })).toBe(24);
+    expect(() => tierFrontSizeFromEnv({ TIER_FRONT_SIZE: "x" })).toThrow(/TIER_FRONT_SIZE/);
+  });
+
+  it("counts the front after the walls", () => {
+    const products = new Map(
+      [product("a", 50, { available: false }), product("b", 200), product("c", 50)].map((entry) => [
+        entry.productId,
+        entry,
+      ]),
+    );
+    const composed = composeWishes(
+      ["a", "b", "c"],
+      3,
+      products,
+      wishes({ priceMax: { amount: 100, raw: "100" }, inStock: true }),
+      { rates, tierFront: 2 },
+    );
+    expect(composed.productIds).toEqual(["c", "b"]);
   });
 
   it("converts the cap from the stated currency and labels with the cap as stated", () => {
@@ -701,5 +747,31 @@ describe("wishes on Engine v2 (on the database)", () => {
       "ar",
       "en",
     ]);
+  });
+  it("puts the judge's verdict above the tier within a page, and keeps tier order when the judge times out (AC-5, 2026-10-03)", async () => {
+    await seed(db, [
+      { productId: "cheap", title: "Cheap Dress", y: 0.1, price: 50 },
+      { productId: "dear", title: "Dear Dress", y: 0.2, price: 300 },
+    ]);
+    const stated = wishes({ priceMax: { amount: 100, raw: "100" } });
+    // Tiers put "cheap" (in budget) first; the judge finds "dear" exact and "cheap" only close.
+    const judged = await search(
+      orchestrator({ extractor: fixedExtractor(stated), judge: judgeLlm(["CDC", "E-X"]) }),
+    );
+    expect(judged.routeReason).toBe("judged");
+    expect(judged.hits.map((hit) => hit.productId)).toEqual(["dear", "cheap"]);
+    expect(judged.hits[0]!.label).toEqual({ template: "price-far", values: ["300 USD", "100 USD"] });
+
+    await db.judgeAnswer.deleteMany();
+    await db.extractionAnswer.deleteMany();
+    const timedOut = await search(
+      orchestrator({
+        extractor: fixedExtractor(stated),
+        judge: judgeLlm(["CDC", "E-X"], [], 300),
+        judgeDeadlineMs: 20,
+      }),
+    );
+    expect(timedOut.routeReason).toBe("judge-timeout");
+    expect(timedOut.hits.map((hit) => hit.productId)).toEqual(["cheap", "dear"]);
   });
 });

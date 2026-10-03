@@ -43,6 +43,7 @@ import { createPgVectorRetrievalStore } from "./retrieval-store.server";
 import {
   extractionGraceMsFromEnv,
   priceNearPercentFromEnv,
+  tierFrontSizeFromEnv,
   type CodeLabelTemplate,
   type RemovedChip,
   type WishChipField,
@@ -862,6 +863,7 @@ export function createProxySearchOrchestrator(
     }),
     extractionGraceMs: extractionGraceMsFromEnv(),
     priceNearPercent: priceNearPercentFromEnv(),
+    tierFrontSize: tierFrontSizeFromEnv(),
   });
 }
 
