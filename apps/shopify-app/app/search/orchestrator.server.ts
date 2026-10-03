@@ -23,7 +23,11 @@ import {
 import type { ClassicCardHit } from "./classic-store.server";
 import { findReusableIntent, normalizeReuseQuery } from "./events.server";
 import type { FindStep } from "./find.server";
-import { DEFAULT_JUDGE_DEADLINE_MS, runJudgeStep } from "./judge-step.server";
+import {
+  DEFAULT_JUDGE_DEADLINE_MS,
+  DEFAULT_JUDGE_GIVE_UP_MS,
+  runJudgeStep,
+} from "./judge-step.server";
 import { SEARCH_STAGES, type SearchStage, type SearchStages } from "./stages";
 
 export { SEARCH_STAGES, type SearchStage, type SearchStages } from "./stages";
@@ -239,7 +243,8 @@ function warnIntentFailure(
  * the judge's outcome: "judged", "judge-timeout" or "judge-error" when a
  * judge call started, "capped" when a throttle or cap kept it from
  * starting, and "find-only" when the page had nothing to judge — beyond the
- * find set, or no judge wired.
+ * find set, or no judge wired. "judge-cached" (YOY-148 AC-2) is a page
+ * served from a stored judge answer with no call; its route is classic.
  */
 export type SearchRouteReason =
   | ClassificationReason
@@ -255,6 +260,7 @@ export type V2RouteReason =
   | "judged"
   | "judge-timeout"
   | "judge-error"
+  | "judge-cached"
   | "capped"
   | "find-only";
 
@@ -438,6 +444,11 @@ export interface SearchResponse {
   page?: number;
   /** Results across every page (YOY-145 AC-4); present exactly when `page` is. */
   totalCount?: number;
+  /**
+   * True when the judge missed its deadline and runs on (YOY-148 AC-7): the
+   * page's labels arrive through the labels endpoint. Absent otherwise.
+   */
+  labelsPending?: true;
 }
 
 /**
@@ -516,6 +527,11 @@ export interface SearchOrchestratorOptions {
   judge?: Judge;
   /** How long the judge may take after its call started; 1,500 ms by default (AC-6). */
   judgeDeadlineMs?: number;
+  /**
+   * When a judge call past its deadline is given up, counted from its
+   * start; 6,000 ms by default (YOY-148 AC-6).
+   */
+  judgeGiveUpMs?: number;
 }
 
 export function createSearchOrchestrator(
@@ -532,6 +548,7 @@ export function createSearchOrchestrator(
     engineV2 = false,
     judge,
     judgeDeadlineMs = DEFAULT_JUDGE_DEADLINE_MS,
+    judgeGiveUpMs = DEFAULT_JUDGE_GIVE_UP_MS,
   } = options;
 
   /** Hydrate ranked hits into display cards, preserving hit order. Hits
@@ -653,6 +670,7 @@ export function createSearchOrchestrator(
 
     let routeReason: V2RouteReason;
     let judgeStarted = false;
+    let labelsPending = false;
     let hits = cards;
     if (request.forceClassic === true) {
       routeReason = "capped";
@@ -668,10 +686,14 @@ export function createSearchOrchestrator(
           items: judgedPart,
           searchId,
           deadlineMs: judgeDeadlineMs,
+          giveUpMs: judgeGiveUpMs,
+          page,
+          positionOffset: pageStart,
         }),
       );
       routeReason = judged.outcome;
       judgeStarted = judged.started;
+      labelsPending = judged.labelsPending;
       hits = [
         ...judged.items.map(({ item, verdict, label }) => ({
           ...item,
@@ -693,6 +715,7 @@ export function createSearchOrchestrator(
       closeMatchesRelaxed: [],
       page,
       totalCount: found.productIds.length,
+      ...(labelsPending ? { labelsPending: true as const } : {}),
     };
   }
 

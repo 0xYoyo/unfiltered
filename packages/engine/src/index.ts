@@ -99,6 +99,7 @@ export {
   JudgeAnswerError,
   judgeProviderFromEnv,
   judgeRow,
+  JUDGE_PROMPT_VERSION,
   orderByVerdict,
   parseJudgeAnswer,
   type Judge,

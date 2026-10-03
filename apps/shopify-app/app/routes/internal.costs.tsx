@@ -76,6 +76,16 @@ export default function InternalCosts() {
           ? "n/a"
           : usd(aggregates.avgCostPerSearchUsd)}
       </p>
+      <section>
+        <h2>Judge cache</h2>
+        <p>
+          Judge calls: {aggregates.judge.calls} · cache hits: {aggregates.judge.cacheHits} · hit
+          rate:{" "}
+          {aggregates.judge.hitRate === null
+            ? "n/a"
+            : `${(aggregates.judge.hitRate * 100).toFixed(1)}%`}
+        </p>
+      </section>
     </main>
   );
 }

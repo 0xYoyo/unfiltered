@@ -26,6 +26,7 @@ import {
 } from "@unfiltered/engine";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
+import { aggregateCosts } from "../ai/cost-aggregates.server";
 import { createReplayLlmClient, type LlmRecording } from "../eval/replay.server";
 import { serializePlaygroundSearchResponse } from "../playground/api.server";
 import { createTestDb } from "../testing/helpers.server";
@@ -35,14 +36,19 @@ import {
   DEFAULT_JUDGE_DEADLINE_MS,
   judgeDeadlineMsFromEnv,
   judgeRowCharsFromEnv,
+  awaitPendingLabels,
+  judgeCacheKey,
+  judgeGiveUpMsFromEnv,
   loadJudgeCandidates,
+  resetPendingLabels,
 } from "./judge-step.server";
 import {
   createSearchOrchestrator,
   type SearchOrchestrator,
   type SearchRequest,
 } from "./orchestrator.server";
-import { serializeProxySearchResponse } from "./proxy.server";
+import { writeClickEvent, writeSearchEvent } from "./events.server";
+import { parseLabelsParams, serializeLabels, serializeProxySearchResponse } from "./proxy.server";
 
 // The judge (YOY-147): the engine's prompt, schema and ordering as pure
 // units, then the whole v2 path on the embedded PGlite database — the real
@@ -348,6 +354,28 @@ describe("the one factory and its configuration (AC-1, AC-2, AC-6)", () => {
     expect(judgeRowCharsFromEnv({})).toBe(480);
     expect(judgeRowCharsFromEnv({ JUDGE_ROW_CHARS: "200" })).toBe(200);
     expect(() => judgeRowCharsFromEnv({ JUDGE_ROW_CHARS: "x" })).toThrow(/JUDGE_ROW_CHARS/);
+    expect(judgeGiveUpMsFromEnv({})).toBe(6_000);
+    expect(judgeGiveUpMsFromEnv({ JUDGE_GIVE_UP_MS: "4000" })).toBe(4_000);
+    expect(() => judgeGiveUpMsFromEnv({ JUDGE_GIVE_UP_MS: "-1" })).toThrow(/JUDGE_GIVE_UP_MS/);
+  });
+
+  it("names the provider and model the factory built, for the cache key (YOY-148 AC-1)", () => {
+    const judge = createJudge({
+      provider: "gemini",
+      clients: { gemini: () => scriptedLlm([]) },
+      modelIds: { gemini: "flash-lite-x" },
+    });
+    expect(judge.identity).toBe("gemini:flash-lite-x");
+    expect(createJudge({ provider: "gemini", clients: { gemini: () => scriptedLlm([]) } }).identity).toBe(
+      "gemini:unknown",
+    );
+  });
+
+  it("parses a labels request: a searchId and a whole page of 1 or more (YOY-148 AC-8)", () => {
+    expect(parseLabelsParams(new URLSearchParams("searchId=s1&page=2"))).toEqual({ searchId: "s1", page: 2 });
+    for (const bad of ["page=1", "searchId=s1", "searchId=&page=1", "searchId=s1&page=0", "searchId=s1&page=1.5", `searchId=${"x".repeat(201)}&page=1`]) {
+      expect(parseLabelsParams(new URLSearchParams(bad))).toBeNull();
+    }
   });
 });
 
@@ -485,6 +513,9 @@ describe("the judge on Engine v2 (on the database)", () => {
     await db.$executeRawUnsafe(`DELETE FROM "CardEmbedding"`);
     await db.productCard.deleteMany();
     await db.productEnrichment.deleteMany();
+    await db.judgeAnswer.deleteMany();
+    await db.judgeVerdict.deleteMany();
+    resetPendingLabels();
     await db.productVariant.deleteMany();
     await db.catalogProduct.deleteMany();
   });
@@ -495,7 +526,7 @@ describe("the judge on Engine v2 (on the database)", () => {
 
   function orchestrator(
     llm: LlmClient | undefined,
-    options: { deadlineMs?: number; findSetSize?: number } = {},
+    options: { deadlineMs?: number; giveUpMs?: number; findSetSize?: number } = {},
   ): SearchOrchestrator {
     return createSearchOrchestrator({
       db,
@@ -510,6 +541,7 @@ describe("the judge on Engine v2 (on the database)", () => {
       engineV2: true,
       ...(llm !== undefined ? { judge: createLlmJudge({ llm }) } : {}),
       ...(options.deadlineMs !== undefined ? { judgeDeadlineMs: options.deadlineMs } : {}),
+      ...(options.giveUpMs !== undefined ? { judgeGiveUpMs: options.giveUpMs } : {}),
     });
   }
 
@@ -640,14 +672,16 @@ describe("the judge on Engine v2 (on the database)", () => {
     expect(response).toMatchObject({ route: "ai", routeReason: "judge-error" });
   });
 
-  it("serves find order when the judge misses its deadline, and aborts the call (AC-6)", async () => {
+  it("serves find order when the judge misses its deadline, and gives the call up at the give-up time (AC-6; YOY-148 AC-6)", async () => {
     await seed(db, FOUR);
     let aborted = false;
     const slow: LlmClient = {
       completeStructured: (request) =>
-        new Promise((resolve) => {
+        new Promise((resolve, reject) => {
+          // Like the provider adapter: an abort rejects the call.
           request.signal?.addEventListener("abort", () => {
             aborted = true;
+            reject(new Error("aborted"));
           });
           // Answers, but long after the deadline.
           setTimeout(
@@ -657,10 +691,13 @@ describe("the judge on Engine v2 (on the database)", () => {
         }),
     };
     const startedAt = Date.now();
-    const response = await search(orchestrator(slow, { deadlineMs: 30 }));
+    const response = await search(orchestrator(slow, { deadlineMs: 30, giveUpMs: 100 }));
     expect(Date.now() - startedAt).toBeLessThan(450);
     expect(response.hits.map((hit) => hit.productId)).toEqual(["p1", "p2", "p3", "p4"]);
-    expect(response).toMatchObject({ route: "ai", routeReason: "judge-timeout" });
+    expect(response).toMatchObject({ route: "ai", routeReason: "judge-timeout", labelsPending: true });
+    // Not aborted at the deadline: the call runs on to the give-up time.
+    expect(aborted).toBe(false);
+    expect(await awaitPendingLabels(SHOP, response.searchId, 1)).toEqual({});
     expect(aborted).toBe(true);
   });
 
@@ -758,5 +795,227 @@ describe("the judge on Engine v2 (on the database)", () => {
     for (const result of serializeProxySearchResponse(v1).results) {
       expect(result).not.toHaveProperty("label");
     }
+  });
+  // YOY-148: the answer cache, the verdict log and late labels.
+
+  it("serves a repeat of the same page from the cache: no call, judge-cached, classic route, same order (YOY-148 AC-1, AC-2)", async () => {
+    await seed(db, FOUR);
+    const llm = scriptedLlm([answer(["VFF", "N-X", "E-X", "CDC"], [{ n: 1, p: "navy", a: "black" }])]);
+    const engine = orchestrator(llm);
+    const first = await search(engine);
+    const second = await search(engine, { query: "  An Outfit   for tonight " });
+    expect(llm.requests).toHaveLength(1);
+    expect(first).toMatchObject({ route: "ai", routeReason: "judged" });
+    expect(second).toMatchObject({ route: "classic", routeReason: "judge-cached" });
+    expect(second.hits.map((hit) => hit.productId)).toEqual(first.hits.map((hit) => hit.productId));
+    expect(second.hits.map((hit) => hit.label)).toEqual(first.hits.map((hit) => hit.label));
+    expect(second.hits.map((hit) => hit.verdict)).toEqual(["exact", "other-variant", "close", "not-relevant"]);
+    const playground = serializePlaygroundSearchResponse(second, {
+      routeReason: second.routeReason,
+      latencyMs: 1,
+      limited: null,
+      stages: second.stages,
+      intentTier: null,
+      engine: "v2",
+    });
+    expect(playground.details.judge?.outcome).toBe("judge-cached");
+  });
+
+  it("keys the cache on the sentence, the ids in order, card text hashes, the judge and the prompt version (YOY-148 AC-1)", () => {
+    const base = {
+      sentence: "Black Dress",
+      candidates: [
+        { id: "a", cardTextHash: "h1" },
+        { id: "b", cardTextHash: "" },
+      ],
+      identity: "gemini:flash-lite",
+      promptVersion: 1,
+    };
+    const key = judgeCacheKey(base);
+    expect(key).toMatch(/^[0-9a-f]{64}$/);
+    expect(judgeCacheKey({ ...base, sentence: " black   dress " })).toBe(key);
+    expect(judgeCacheKey({ ...base, sentence: "black dresses" })).not.toBe(key);
+    expect(judgeCacheKey({ ...base, candidates: [...base.candidates].reverse() })).not.toBe(key);
+    expect(
+      judgeCacheKey({ ...base, candidates: [{ id: "a", cardTextHash: "h2" }, base.candidates[1]!] }),
+    ).not.toBe(key);
+    expect(judgeCacheKey({ ...base, identity: "gemini:other" })).not.toBe(key);
+    expect(judgeCacheKey({ ...base, promptVersion: 2 })).not.toBe(key);
+  });
+
+  it("still hits after a price or stock change, and misses after a card text change (YOY-148 AC-3)", async () => {
+    await seed(db, FOUR.map((product) => ({ ...product, facts: `Facts of ${product.productId}` })));
+    await db.productCard.updateMany({ data: { cardTextHash: "card-v1" } });
+    const llm = scriptedLlm([answer(["E-X", "E-X", "E-X", "E-X"])]);
+    const engine = orchestrator(llm);
+    await search(engine);
+
+    await db.catalogProduct.updateMany({
+      where: { shopDomain: SHOP, productId: "p2" },
+      data: { priceMin: 5, priceMax: 9, available: false },
+    });
+    expect(await search(engine)).toMatchObject({ routeReason: "judge-cached" });
+    expect(llm.requests).toHaveLength(1);
+
+    await db.productCard.updateMany({
+      where: { shopDomain: SHOP, productId: "p2" },
+      data: { cardTextHash: "card-v2" },
+    });
+    expect(await search(engine)).toMatchObject({ routeReason: "judged", route: "ai" });
+    expect(llm.requests).toHaveLength(2);
+  });
+
+  it("logs one verdict row per product for judged and cached pages, and a click marks its row (YOY-148 AC-4, AC-5)", async () => {
+    await seed(db, FOUR);
+    const llm = scriptedLlm([answer(["VFF", "N-X", "E-X", "CDC"], [{ n: 1, p: "navy", a: "black" }])]);
+    const engine = orchestrator(llm);
+    const judged = await search(engine, { paging: { page: 1, pageSize: 24 } });
+    const cached = await search(engine, { paging: { page: 1, pageSize: 24 } });
+
+    const rows = await db.judgeVerdict.findMany({ orderBy: [{ cached: "asc" }, { position: "asc" }] });
+    expect(rows).toHaveLength(8);
+    expect(
+      rows
+        .filter((row) => !row.cached)
+        .map(({ searchId, shopDomain, productId, page, position, verdict, missed, labelTemplate }) => ({
+          searchId,
+          shopDomain,
+          productId,
+          page,
+          position,
+          verdict,
+          missed,
+          labelTemplate,
+        })),
+    ).toEqual([
+      { searchId: judged.searchId, shopDomain: SHOP, productId: "p3", page: 1, position: 0, verdict: "exact", missed: [], labelTemplate: null },
+      { searchId: judged.searchId, shopDomain: SHOP, productId: "p1", page: 1, position: 1, verdict: "other-variant", missed: ["fact"], labelTemplate: "fact-differs" },
+      { searchId: judged.searchId, shopDomain: SHOP, productId: "p4", page: 1, position: 2, verdict: "close", missed: ["description"], labelTemplate: "close-match" },
+      { searchId: judged.searchId, shopDomain: SHOP, productId: "p2", page: 1, position: 3, verdict: "not-relevant", missed: [], labelTemplate: null },
+    ]);
+    expect(rows.filter((row) => row.cached).map((row) => [row.searchId, row.productId])).toEqual([
+      [cached.searchId, "p3"],
+      [cached.searchId, "p1"],
+      [cached.searchId, "p4"],
+      [cached.searchId, "p2"],
+    ]);
+    expect(rows.every((row) => row.clickedAt === null)).toBe(true);
+
+    await writeSearchEvent(db, {
+      searchId: judged.searchId,
+      shopDomain: SHOP,
+      sessionId: "s",
+      query: "an outfit for tonight",
+      route: judged.route,
+      routeReason: judged.routeReason,
+      degraded: false,
+      latencyMs: 1,
+      resultCount: 4,
+    });
+    expect(
+      await writeClickEvent(db, {
+        searchId: judged.searchId,
+        shopDomain: SHOP,
+        sessionId: "s",
+        productId: "p4",
+        position: 2,
+      }),
+    ).toBe(true);
+    const clicked = await db.judgeVerdict.findMany({ where: { clickedAt: { not: null } } });
+    expect(clicked.map((row) => [row.searchId, row.productId])).toEqual([[judged.searchId, "p4"]]);
+  });
+
+  it("writes page 2's rows at whole-order positions", async () => {
+    await seed(db, FOUR);
+    const llm = scriptedLlm([answer(["C-X", "E-X"])]);
+    const response = await search(orchestrator(llm), { paging: { page: 2, pageSize: 2 } });
+    expect(response.hits.map((hit) => hit.productId)).toEqual(["p4", "p3"]);
+    const rows = await db.judgeVerdict.findMany({ orderBy: { position: "asc" } });
+    expect(rows.map((row) => [row.productId, row.page, row.position])).toEqual([
+      ["p4", 2, 2],
+      ["p3", 2, 3],
+    ]);
+  });
+
+  it("serves a deadline miss with labelsPending, hands the late labels to the labels endpoint, and caches the answer (YOY-148 AC-6 – AC-9)", async () => {
+    await seed(db, FOUR);
+    let calls = 0;
+    const slow: LlmClient = {
+      completeStructured: () => {
+        calls += 1;
+        return new Promise((resolve) =>
+          setTimeout(
+            () => resolve(answer(["VFF", "N-X", "E-X", "CDC"], [{ n: 1, p: "navy", a: "black" }])),
+            80,
+          ),
+        );
+      },
+    };
+    const engine = orchestrator(slow, { deadlineMs: 20, giveUpMs: 2_000 });
+    const response = await search(engine);
+    expect(response).toMatchObject({ route: "ai", routeReason: "judge-timeout", labelsPending: true });
+    expect(response.hits.map((hit) => hit.productId)).toEqual(["p1", "p2", "p3", "p4"]);
+    expect(serializeProxySearchResponse(response).labelsPending).toBe(true);
+
+    // Another shop's request for the same search gets nothing.
+    expect(await awaitPendingLabels("other-shop.myshopify.com", response.searchId, 1)).toEqual({});
+    const labels = await awaitPendingLabels(SHOP, response.searchId, 1);
+    expect(labels).toEqual({
+      p1: { template: "fact-differs", values: ["navy", "black"] },
+      p2: null,
+      p3: null,
+      p4: { template: "close-match", values: [] },
+    });
+    // Labels only, never an order (AC-9).
+    expect(serializeLabels(labels)).toEqual({ labels });
+    expect(JSON.stringify(serializeLabels(labels))).not.toMatch(/position|order|verdict/);
+
+    const again = await search(engine);
+    expect(again).toMatchObject({ routeReason: "judge-cached", route: "classic" });
+    expect(again).not.toHaveProperty("labelsPending");
+    expect(calls).toBe(1);
+  });
+
+  it("answers an empty set for a page with nothing pending, and when the judge fails late", async () => {
+    await seed(db, FOUR);
+    expect(await awaitPendingLabels(SHOP, "never-ran", 1)).toEqual({});
+    const failing: LlmClient = {
+      completeStructured: () =>
+        new Promise((_, reject) => setTimeout(() => reject(new Error("upstream 503")), 50)),
+    };
+    const response = await search(orchestrator(failing, { deadlineMs: 10 }));
+    expect(response.labelsPending).toBe(true);
+    expect(await awaitPendingLabels(SHOP, response.searchId, 1)).toEqual({});
+    expect(await db.judgeAnswer.count()).toBe(0);
+  });
+
+  it("leaves labelsPending off the wire when the judge answered in time", async () => {
+    await seed(db, FOUR);
+    const response = await search(orchestrator(scriptedLlm([answer(["E-X", "E-X", "E-X", "E-X"])])));
+    expect(response).not.toHaveProperty("labelsPending");
+    expect(serializeProxySearchResponse(response)).not.toHaveProperty("labelsPending");
+  });
+
+  it("shows judge calls, cache hits and the hit rate on the cost admin (YOY-148 AC-10)", async () => {
+    await db.aiCall.deleteMany();
+    await db.searchEvent.deleteMany();
+    expect((await aggregateCosts(db)).judge).toEqual({ calls: 0, cacheHits: 0, hitRate: null });
+    for (const operation of ["judge", "judge", "judge", "embedding"]) {
+      await db.aiCall.create({
+        data: { provider: "google", modelId: "m", operation, inputTokens: 1, outputTokens: 1, costUsd: 0 },
+      });
+    }
+    await writeSearchEvent(db, {
+      searchId: "cached-1",
+      shopDomain: SHOP,
+      sessionId: "s",
+      query: "q",
+      route: "classic",
+      routeReason: "judge-cached",
+      degraded: false,
+      latencyMs: 1,
+      resultCount: 4,
+    });
+    expect((await aggregateCosts(db)).judge).toEqual({ calls: 3, cacheHits: 1, hitRate: 0.25 });
   });
 });

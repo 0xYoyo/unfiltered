@@ -304,6 +304,45 @@ model CardEmbedding {
 // Shopper search log (YOY-47): exactly one row per proxy search request —
 // including degraded, zero-hit, and throttled searches — for the dashboard
 // and attribution work of later milestones. Write-only in this milestone.
+// The judge answer cache (YOY-148 AC-1): one stored answer per cache key —
+// the SHA-256 of the normalized search text, the page's candidate product
+// ids in order, each candidate's card text hash, the judge provider and
+// model, and the prompt version. Price and stock are not in the key (AC-3).
+// `verdicts` is the parsed answer, one entry per candidate in candidate
+// order. Never evicted or expired (NG-1); kept at uninstall (NG-4).
+model JudgeAnswer {
+  id         String   @id @default(uuid())
+  shopDomain String
+  cacheKey   String
+  verdicts   Json
+  createdAt  DateTime @default(now())
+
+  @@unique([shopDomain, cacheKey])
+}
+
+// The verdict log (YOY-148 AC-4): one row per product on every judged or
+// cache-served page — which search, page and whole-order position, the
+// verdict, the missed-wish flags, the label template, whether the cache
+// answered — and when the shopper clicked it (AC-5). Write-only: nothing
+// reads it (NG-3); kept at uninstall (NG-4).
+model JudgeVerdict {
+  id            String    @id @default(uuid())
+  searchId      String
+  shopDomain    String
+  productId     String
+  page          Int
+  position      Int
+  verdict       String
+  missed        String[]
+  labelTemplate String?
+  cached        Boolean
+  clickedAt     DateTime?
+  createdAt     DateTime  @default(now())
+
+  // The click beacon marks rows by search and product.
+  @@index([searchId, productId])
+}
+
 model SearchEvent {
   id          String   @id @default(uuid())
   searchId    String

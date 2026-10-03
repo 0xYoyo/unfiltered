@@ -992,8 +992,8 @@ runs one page.
   value, drops that label. Every v2 result on the wire carries `label`
   (`{ template, values }` or null); the old engine's wire has no `label` key.
   The verdict never reaches the storefront.
-- **Fallbacks.** The deadline aborts the call and serves find order
-  (`judge-timeout`); a failed call or an answer invalid twice serves find
+- **Fallbacks.** The deadline serves find order (`judge-timeout`) without
+  aborting the call (YOY-148, below); a failed call or an answer invalid twice serves find
   order (`judge-error`); a throttled session or a playground cap — the
   requests that force classic — serve find order with no call (`capped`).
   The client-timeout rescue stays the keyword path. No error reaches the
@@ -1001,13 +1001,48 @@ runs one page.
 - **Route and caps.** `route` is `ai` exactly when a paid judge call started,
   so the session throttle and the playground's daily caps (both counted from
   `route = "ai"`) count judged searches and nothing else. `routeReason` is
-  one of `judged`, `judge-timeout`, `judge-error`, `capped`, `find-only`.
+  one of `judged`, `judge-timeout`, `judge-error`, `judge-cached`, `capped`,
+  `find-only`.
 - **Diagnostics.** The `judge` stage times the rows and the call. Playground
   `details.judge` is `{ outcome, verdicts: [{ productId, verdict }] }` on a
   find-path response (verdict null where the judge did not answer), null
   otherwise. `scripts/latency-probe.mts --engine v2` sends `engine=v2` to the
   playground API, so the deployment's judge can be timed with `ENGINE_V2`
   off.
+
+### Answer cache, verdict log and late labels (YOY-148)
+
+- **Answer cache.** `JudgeAnswer` holds one answer per tenant and cache key:
+  the SHA-256 of the normalized search text (trimmed, whitespace-collapsed,
+  case-folded), the page's candidate ids in order, each candidate's
+  `ProductCard.cardTextHash` ("" with no written card), the judge's
+  `identity` (`provider:model`, from `createJudge`'s `modelIds`) and
+  `JUDGE_PROMPT_VERSION` — bump that constant with every prompt, row or
+  schema change. Price and stock are not in the key, so a price or stock
+  change still hits; a card rewrite misses. A hit makes no call and serves
+  the stored verdict order with `routeReason: "judge-cached"` and route
+  `classic` (so caps and the throttle do not count it). No eviction or
+  expiry; kept at uninstall.
+- **Verdict log.** `JudgeVerdict`: one row per product on every judged or
+  cache-served page — search id, store, product, page, whole-order position
+  as served, verdict, missed-wish flags, label template, `cached`. A click
+  beacon (`writeClickEvent`, both APIs) sets `clickedAt` on the clicked
+  product's row. Nothing reads the table yet.
+- **Late labels.** The deadline no longer aborts the call: it runs on until
+  it answers or `JUDGE_GIVE_UP_MS` (default 6,000, counted from the call's
+  start) aborts it, and an answer is stored in the cache either way. A
+  response served on a deadline miss carries `labelsPending: true` (absent
+  otherwise). `GET /apps/unfiltered/labels` (proxy-signed; alias `/labels`)
+  and `GET /api/playground/labels` take `searchId` and `page`, hold until
+  the judge answers or gives up, and answer `{ labels: { productId: label |
+  null } }` — or `{ labels: {} }` when it gave up, failed, or nothing is held
+  for that shop's search and page. Never an order: positions already served
+  stand. The pending answers live in process memory
+  (`app/search/judge-step.server.ts`), kept 60 s after they settle. No
+  client calls the endpoint yet.
+- **Costs.** `/internal/costs` shows judge calls (ledger rows under
+  operation `judge`), cache hits (searches served `judge-cached`) and the
+  hit rate, hits over hits plus calls.
 
 ## Storefront search API over the app proxy (YOY-46)
 

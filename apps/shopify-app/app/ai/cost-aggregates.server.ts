@@ -15,11 +15,24 @@ export interface CostAggregates {
   perSearch: GroupTotals[];
   /** Mean cost across the searches in perSearch; null when there are none. */
   avgCostPerSearchUsd: number | null;
+  /** The judge and its answer cache (YOY-148 AC-10). */
+  judge: JudgeCacheTotals;
+}
+
+/**
+ * Judge calls (ledger rows under operation `judge`, retries included),
+ * cache hits (searches served `judge-cached`), and the hit rate: hits over
+ * hits plus calls — null when there are neither.
+ */
+export interface JudgeCacheTotals {
+  calls: number;
+  cacheHits: number;
+  hitRate: number | null;
 }
 
 /** Aggregate the AI-call ledger for the internal cost admin. */
 export async function aggregateCosts(db: PrismaClient): Promise<CostAggregates> {
-  const [totals, byModel, byOperation, perSearch] = await Promise.all([
+  const [totals, byModel, byOperation, perSearch, judgeCalls, cacheHits] = await Promise.all([
     db.aiCall.aggregate({ _count: true, _sum: { costUsd: true } }),
     db.aiCall.groupBy({
       by: ["modelId"],
@@ -40,6 +53,8 @@ export async function aggregateCosts(db: PrismaClient): Promise<CostAggregates> 
       _sum: { costUsd: true },
       orderBy: { searchId: "asc" },
     }),
+    db.aiCall.count({ where: { operation: "judge" } }),
+    db.searchEvent.count({ where: { routeReason: "judge-cached" } }),
   ]);
 
   const perSearchTotals = perSearch.map((group) => ({
@@ -67,5 +82,10 @@ export async function aggregateCosts(db: PrismaClient): Promise<CostAggregates> 
         ? null
         : perSearchTotals.reduce((sum, s) => sum + s.costUsd, 0) /
           perSearchTotals.length,
+    judge: {
+      calls: judgeCalls,
+      cacheHits,
+      hitRate: judgeCalls + cacheHits === 0 ? null : cacheHits / (judgeCalls + cacheHits),
+    },
   };
 }

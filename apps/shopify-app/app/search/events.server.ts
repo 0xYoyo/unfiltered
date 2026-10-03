@@ -149,5 +149,21 @@ export async function writeClickEvent(
     return false;
   }
   await db.clickEvent.create({ data: event });
+  // The verdict log's clicked-at time (YOY-148 AC-5): the first click on a
+  // product of a judged or cache-served page marks its row. Never fails the
+  // beacon: the log is an observer.
+  try {
+    await db.judgeVerdict.updateMany({
+      where: {
+        searchId: event.searchId,
+        shopDomain: event.shopDomain,
+        productId: event.productId,
+        clickedAt: null,
+      },
+      data: { clickedAt: new Date() },
+    });
+  } catch (error) {
+    console.error(`judge-verdict click mark failed for search ${event.searchId}:`, error);
+  }
   return true;
 }

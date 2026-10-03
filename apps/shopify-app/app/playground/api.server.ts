@@ -116,6 +116,7 @@ const V2_ROUTE_REASONS: ReadonlySet<string> = new Set<V2RouteReason>([
   "judged",
   "judge-timeout",
   "judge-error",
+  "judge-cached",
   "capped",
   "find-only",
 ]);
