@@ -334,6 +334,22 @@ export function init(config: WidgetConfig): void {
      */
     let removedChips: RemovedChip[] = [];
     /**
+     * The refinement chain (YOY-150), in memory only (AC-6): `heldCarry` is
+     * the last submitted Engine v2 response's `carry`, which every
+     * submitted search sends as `previousQuery` (AC-4); `chainQuery` is the
+     * `previousQuery` that produced the response on screen, which a chip
+     * removal re-asks with. A v1 response carries no `carry`, so nothing is
+     * held and nothing is sent.
+     */
+    let heldCarry: string | null = null;
+    let chainQuery: string | null = null;
+    /** Forget the chain: the next search starts afresh (YOY-150 AC-5, AC-9). */
+    const dropChain = (): void => {
+      heldCarry = null;
+      chainQuery = null;
+      removedChips = [];
+    };
+    /**
      * The query the native results view is currently showing or fetching.
      * Distinct from `lastQuery` (refinement memory, which only a SETTLED
      * submitted response updates): the mirror is entered at the loading
@@ -366,7 +382,8 @@ export function init(config: WidgetConfig): void {
         // results; the next query is sent without previousIntent.
         heldIntent = null;
         lastQuery = "";
-        removedChips = [];
+        // YOY-150 AC-5: "New search" clears the held carry too.
+        dropChain();
         input.value = "";
         overlay.showIdle();
         input.focus();
@@ -583,9 +600,23 @@ export function init(config: WidgetConfig): void {
         // The response's echoed intent replaces the held one (AC-4) — also
         // when it is null (a classic response holds no intent to refine).
         heldIntent = response.intent;
+        if (context?.submitted === true) {
+          // The response's carry is the chain the next submit refines
+          // (YOY-150 AC-3). One with no earlier sentence started a new
+          // chain: the old chain's removals end with it, and a removal
+          // re-asks it afresh.
+          const carry = response.carry ?? null;
+          const chained = carry !== null && carry.includes("\n");
+          heldCarry = carry;
+          chainQuery = chained ? (context.previousQuery ?? null) : null;
+          if (!chained) {
+            removedChips = [];
+          }
+        }
         overlay.showResponse(response, {
           onCardClick,
           onChipRemove,
+          onPickReading,
           pages: pageLoader(sequence, (next) =>
             client.search(query, getSessionId(), { ...context, paging: next }),
           ),
@@ -655,7 +686,28 @@ export function init(config: WidgetConfig): void {
         ...removedChips,
         { field: chip.field, value: chip.value },
       ];
-      void runSearch(lastQuery, { removedChips });
+      // The removal re-asks the chain that produced this response (YOY-150).
+      void runSearch(lastQuery, {
+        removedChips,
+        ...(chainQuery !== null ? { previousQuery: chainQuery } : {}),
+      });
+    };
+
+    /**
+     * The second-reading chip (YOY-150 AC-9): the reading becomes the
+     * query and runs as a new search with no `previousQuery` — never a
+     * re-ordering of the results on screen (NG-3).
+     */
+    const onPickReading = (reading: string): void => {
+      if (inert) {
+        return;
+      }
+      debouncePending = false;
+      window.clearTimeout(debounceTimer);
+      dropChain();
+      heldIntent = null;
+      input.value = reading;
+      void runSearch(reading, { submitted: true });
     };
 
     const onType = (): void => {
@@ -770,12 +822,18 @@ export function init(config: WidgetConfig): void {
         overlay.showIdle();
         return;
       }
-      // A search the shopper submits starts a new chain (YOY-149 AC-15).
-      removedChips = [];
-      void runSearch(
-        query,
-        heldIntent !== null ? { previousIntent: heldIntent } : undefined,
-      );
+      // A search the shopper submits refines the held chain and keeps its
+      // removed chips (YOY-150 AC-4, AC-11); with no chain held it starts a
+      // new one (YOY-149 AC-15).
+      if (heldCarry === null) {
+        removedChips = [];
+      }
+      void runSearch(query, {
+        submitted: true,
+        ...(heldIntent !== null ? { previousIntent: heldIntent } : {}),
+        ...(heldCarry !== null ? { previousQuery: heldCarry } : {}),
+        ...(heldCarry !== null && removedChips.length > 0 ? { removedChips } : {}),
+      });
       // Theme search-UI reset (YOY-99 AC-2): on the native view the results
       // render in the page itself, so the theme's search modal/drawer and
       // page dim — which a native submit's navigation would have discarded

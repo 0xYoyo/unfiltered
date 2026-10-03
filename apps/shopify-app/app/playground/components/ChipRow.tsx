@@ -118,7 +118,13 @@ export function ChipRow({
             data-testid="playground-other-reading"
             onClick={() => onPickReading?.(reading)}
           >
-            {strings.otherReading.replace("{reading}", reading)}
+            {/* The reading is the shopper's phrase in any script: isolated,
+                so a Latin reading in Hebrew chrome keeps its "?" in place. */}
+            <span>
+              {strings.otherReading.split("{reading}")[0]}
+              <bdi>{reading}</bdi>
+              {strings.otherReading.split("{reading}")[1]}
+            </span>
           </button>
         </li>
       )}

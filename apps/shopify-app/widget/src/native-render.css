@@ -61,6 +61,13 @@
   border-width: calc(var(--unfiltered-chip-border-width, 1px) + 1px);
 }
 
+/* The second reading (YOY-150 AC-8): no fill, a dashed hairline in the
+   theme's own colour — a question, not an applied filter (W-3). */
+.unfiltered-native__chip--reading {
+  background: transparent;
+  border-style: dashed;
+}
+
 .unfiltered-native__chip-value {
   text-decoration: line-through;
 }
