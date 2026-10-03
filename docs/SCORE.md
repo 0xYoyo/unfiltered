@@ -93,6 +93,16 @@ A run with more than 2 failed searches of 72 is not a baseline: its cause
 is fixed first and the run is dispatched again. Only a
 clean output is printed to the log and written to the job summary.
 
+**Which languages gate (2026-10-03, YOY-150 decision A).** A hidden-run
+gate binds on the languages with real log searches — en and he: neither
+may fall below the run it is compared with by more than its noise band.
+The model-written languages — ar, ru, fr and es — are tracked, not gated:
+a drop beyond the band in one of them is recorded under Results with the
+run that must re-check it, and two consecutive hidden runs below the
+reference value in the same language make a fix issue before the next
+engine issue is picked. Run 4's fr (−0.069 against run 3) is the first
+such record; hidden run 5 re-checks fr against run 3's 0.569.
+
 ## Rubric
 
 The grader's prompt carries this text verbatim (a test holds the two equal):
@@ -306,6 +316,9 @@ $0.2128. The public half on the same branch the same day (`npm run
 score:public -- --engine v2`, one pass, 0 failed, $0.2251): en 0.692,
 he 0.278, ar 0.462, ru 0.419, fr 0.432, es 0.530 — fr +0.026 against the
 public reference, so the hidden fr drop does not show on the public half.
+Decision A (2026-10-03): en and he hold, so the gate is met; fr is tracked
+and re-checked at hidden run 5 against run 3's 0.569 (see "Which languages
+gate" under The hidden run).
 
 Speed and judge cost (YOY-147 AC-15), measured locally on the public half
 (78 searches over the seed fixture, `ENGINE_V2=1`, 2026-10-02; a local run
