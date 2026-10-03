@@ -175,6 +175,23 @@ Read from each run's cost ledger (the run's cost line): one public run —
 (runs: $0.0597, $0.0595, $0.0594). Hidden run 1 — 72 searches, 255 model
 calls — costs **$0.0571**, read from the cost line in its workflow log.
 
+## Public reference after AC-17 (main, 2026-10-03)
+
+The public half on `main` at `7251eda` (YOY-147's facts rows and YOY-148
+merged), Engine v2, `JUDGE_DEADLINE_MS=4000`, one pass, 78 searches, 0
+failed, $0.1837 over 234 model calls
+([posted on YOY-147](https://linear.app/0xyoyo/issue/YOY-147/m6-the-judge-one-call-per-page-verdict-order-deadline-and-reject-all#comment-cb087bde)).
+This is the public comparison for every issue from YOY-149 on — not the
+2026-10-02 "run-3 public" numbers, which predate AC-17. Judge a change by
+the noise band of the M5 baseline above.
+
+| | en | he | ar | ru | fr | es |
+|---|---|---|---|---|---|---|
+| Reference | 0.590 | 0.368 | 0.470 | 0.402 | 0.406 | 0.581 |
+
+Every score run now prints its engine on its first line and refuses to
+start when `ENGINE_V2` is unset and no `--engine v1|v2` is given.
+
 ## Results
 
 Hidden-half scores per language. "Under 1 s" is the latency probe's share

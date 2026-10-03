@@ -26,8 +26,18 @@ const COST_LINE = /^cost \$\d+\.\d{4} over \d+ model calls$/;
 const FAILURE_LINE = /^failed (?:search|grade) [A-Za-z_$][\w$]{0,63} \d+$/;
 // A multi-pass run's pass header and each pass's extraction-call count (YOY-149 AC-18).
 const PASS_LINE = /^pass \d+$/;
+// The engine line every run starts with (YOY-149, decision 2026-10-03).
+const ENGINE_LINE = /^engine (?:v1|v2|synthetic)$/;
 const EXTRACT_LINE = /^extract calls \d+$/;
-const STRICT_LINES = [TABLE_HEADER, TABLE_ROW, COST_LINE, FAILURE_LINE, PASS_LINE, EXTRACT_LINE];
+const STRICT_LINES = [
+  TABLE_HEADER,
+  TABLE_ROW,
+  COST_LINE,
+  FAILURE_LINE,
+  PASS_LINE,
+  EXTRACT_LINE,
+  ENGINE_LINE,
+];
 
 /**
  * The query as whole words: not preceded or followed by a letter or digit,
