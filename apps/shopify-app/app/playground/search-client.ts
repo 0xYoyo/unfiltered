@@ -80,6 +80,11 @@ export interface PlaygroundSearchRequest {
    */
   removedChips?: readonly RemovedChip[];
   /**
+   * The held `carry` of the last Engine v2 response (YOY-150 AC-1): the
+   * search refines or replaces that chain. Never on a preview.
+   */
+  previousQuery?: string;
+  /**
    * The page a submitted search asks for (YOY-146): every submit carries
    * one; a keystroke preview never does.
    */
@@ -95,6 +100,7 @@ export function playgroundSearchUrl(request: {
   previousIntent?: ProxyIntent;
   removeChip?: ProxyChip;
   removedChips?: readonly RemovedChip[];
+  previousQuery?: string;
   paging?: { page: number; pageSize: number };
 }): string {
   const params = new URLSearchParams({
@@ -126,6 +132,9 @@ export function playgroundSearchUrl(request: {
       ),
     );
   }
+  if (request.previousQuery !== undefined && request.previousQuery !== "" && !request.preview) {
+    params.set("previousQuery", request.previousQuery);
+  }
   if (request.paging !== undefined && !request.preview) {
     params.set("page", String(request.paging.page));
     params.set("pageSize", String(request.paging.pageSize));
@@ -151,6 +160,9 @@ export async function searchPlayground(
     ...(request.removedChips === undefined
       ? {}
       : { removedChips: request.removedChips }),
+    ...(request.previousQuery === undefined
+      ? {}
+      : { previousQuery: request.previousQuery }),
     ...(request.paging === undefined ? {} : { paging: request.paging }),
   });
   const response = await fetch(url, {

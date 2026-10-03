@@ -410,6 +410,18 @@ html:has(.playground) {
     transform var(--dur-chip-out) var(--ease-standard);
 }
 
+/* The second reading (YOY-150 AC-8): a question, not a filter — a ghost
+   pill like "New search", no fill and no ×, so it never reads as a
+   constraint the engine applied. */
+.chipReading {
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.chipReading:hover {
+  color: var(--text-body);
+}
+
 .chipRemove {
   color: var(--text-muted);
   transition: var(--motion-hover);

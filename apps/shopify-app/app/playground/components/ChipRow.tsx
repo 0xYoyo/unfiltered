@@ -34,6 +34,11 @@ import type { PlaygroundLocale, PlaygroundStrings } from "../strings";
  * Never rendered for a preview or a classic-routed response — the caller
  * enforces that, because a chip on classic results would claim an
  * understanding the engine did not have.
+ *
+ * The second reading (YOY-150 AC-8) leads the row as one chip, "{reading}
+ * instead?": the same pill with no `×`, because it is not a filter to
+ * remove — tapping it searches the reading afresh (AC-9). No dialog, no
+ * question that blocks the results (AC-10).
  */
 
 /** Kept in step with `--dur-chip-out` in tokens.css. */
@@ -57,12 +62,17 @@ export function ChipRow({
   strings,
   currency,
   onRemove,
+  otherReading,
+  onPickReading,
 }: {
   chips: ProxyChip[];
   locale: PlaygroundLocale;
   strings: PlaygroundStrings;
   currency?: string;
   onRemove: (chip: ProxyChip) => void;
+  /** The judge's second reading (YOY-150 AC-7); no reading chip when absent. */
+  otherReading?: string;
+  onPickReading?: (reading: string) => void;
 }) {
   const [leaving, setLeaving] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -88,7 +98,9 @@ export function ChipRow({
     [onRemove],
   );
 
-  if (chips.length === 0) {
+  const reading =
+    otherReading === undefined || onPickReading === undefined ? null : otherReading;
+  if (chips.length === 0 && reading === null) {
     return null;
   }
 
@@ -98,6 +110,18 @@ export function ChipRow({
       aria-label={strings.appliedFilters}
       data-testid="playground-chips"
     >
+      {reading === null ? null : (
+        <li key="other-reading">
+          <button
+            type="button"
+            className="chip chipReading"
+            data-testid="playground-other-reading"
+            onClick={() => onPickReading?.(reading)}
+          >
+            {strings.otherReading.replace("{reading}", reading)}
+          </button>
+        </li>
+      )}
       {chips.map((chip) => {
         const label = chipLabel(chip, {
           locale,

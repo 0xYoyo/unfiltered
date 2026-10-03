@@ -771,8 +771,11 @@ export function createSearchOrchestrator(
     );
     const settled = await extraction.settle();
     const extracted = settled?.wishes ?? null;
-    const wishes =
-      extracted === null ? null : keepUnremoved(extracted, request.removedChips ?? []);
+    // Removed chips belong to their chain (YOY-150 AC-11): they hold across
+    // a refinement, and a query that replaces the chain starts with none.
+    const removedChips =
+      previousQuery !== undefined && extracted?.refines === false ? [] : (request.removedChips ?? []);
+    const wishes = extracted === null ? null : keepUnremoved(extracted, removedChips);
     let ordered = { productIds: found.productIds, findSetCount: found.findSetCount };
     let codeLabels = new Map<string, CodeLabel>();
     if (wishes !== null && hasAppliedWishes(wishes)) {
@@ -825,7 +828,7 @@ export function createSearchOrchestrator(
           page,
           positionOffset: pageStart,
           // A removed `exclude` chip is not applied through the judge either (AC-15).
-          applyExcluded: !(request.removedChips ?? []).some((chip) => chip.field === "exclude"),
+          applyExcluded: !removedChips.some((chip) => chip.field === "exclude"),
         }),
       );
       routeReason = judged.outcome;

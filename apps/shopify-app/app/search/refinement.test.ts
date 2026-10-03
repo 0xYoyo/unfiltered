@@ -382,6 +382,21 @@ describe("refinement and the second reading on Engine v2 (on the database)", () 
     expect(response.carry).toBe("running shoes");
   });
 
+  it("keeps a removed chip removed across a refinement, and drops the chain's removals on a replacement (AC-11)", async () => {
+    const stated = { ...NO_WISHES, size: "M" };
+    const removedChips = [{ field: "size", value: "M" }];
+    const refining = await search(
+      orchestrator({ embeddings: recordingEmbeddings(), extractor: recordingExtractor({ ...stated, refines: true }) }),
+      { previousQuery: "dress size M", removedChips },
+    );
+    expect(refining.chips).toEqual([]);
+    const replacing = await search(
+      orchestrator({ embeddings: recordingEmbeddings(), extractor: recordingExtractor({ ...stated, refines: false }) }),
+      { query: "coat size M", previousQuery: "dress size M", removedChips },
+    );
+    expect(replacing.chips).toEqual([{ field: "size", value: "M" }]);
+  });
+
   it("treats a late extraction as refining (AC-3)", async () => {
     const late = recordingExtractor({ ...NO_WISHES, refines: false }, 200);
     const response = await search(
