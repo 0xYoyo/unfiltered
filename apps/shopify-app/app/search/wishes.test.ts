@@ -615,6 +615,9 @@ describe("wishes on Engine v2 (on the database)", () => {
     expect(response.chips).toEqual([]);
     expect(response.hits.map((hit) => hit.productId)).toEqual(["p1", "p2", "p3", "p4"]);
     expect(response.hits.every((hit) => hit.label === null)).toBe(true);
+    // The late call runs on and fills the cache (AC-18): let it land here,
+    // not inside the next test.
+    await new Promise((resolve) => setTimeout(resolve, 250));
   });
 
   it("records the extraction as not in time when none is wired", async () => {
