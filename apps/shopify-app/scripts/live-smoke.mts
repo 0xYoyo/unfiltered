@@ -12,12 +12,16 @@
  *   (1) GET /healthz → HTTP 200 and `engine.version` equals the `version`
  *       exported by packages/engine/src/index.ts — the stale-dist class of
  *       regression (YOY-104).
- *   (2) classic `dress` → route=classic, not degraded, ≥ 1 result, 0 chips,
- *       details.latencyMs ≤ classicMaxMs.
- *   (3) EN AI `elegant evening dress under 400` → route=ai, not degraded,
- *       ≥ 1 chip, ≥ 1 result, latencyMs ≤ aiMaxMs — the intent-failure
- *       class of regression (YOY-109).
- *   (4) HE AI `שמלה אלגנטית לערב מתחת ל-400` → the same assertions.
+ *   (2) preview `dress` (`mode=preview`, the keystroke preview) →
+ *       route=classic, not degraded, ≥ 1 result, 0 chips,
+ *       details.latencyMs ≤ classicMaxMs — the keyword-path canary: keyword
+ *       only, zero model calls (YOY-153 AC-4).
+ *   (3) EN `elegant evening dress under 400`, submitted → the Engine v2
+ *       shape: not degraded, ≥ 1 result, `page` and `totalCount` present,
+ *       details.engine "v2", latencyMs ≤ aiMaxMs (YOY-153 AC-4). No route
+ *       or chip assertion: under v2 the route says whether the judge ran,
+ *       and the chips are the shopper's own wishes.
+ *   (4) HE `שמלה אלגנטית לערב מתחת ל-400`, submitted → the same assertions.
  *
  * Ceilings come from scripts/live-smoke.config.json. Every probe runs even
  * after an earlier failure, so one alert carries the whole picture. Output:
@@ -40,13 +44,15 @@ export interface SmokeConfig {
 }
 
 export interface ProbeResult {
-  name: "healthz" | "classic" | "ai-en" | "ai-he";
+  name: "healthz" | "preview" | "ai-en" | "ai-he";
   pass: boolean;
   searchId: string | null;
   latencyMs: number | null;
   route: string | null;
   routeReason: string | null;
   chips: number | null;
+  /** `details.engine` as answered; null for healthz or when missing. */
+  engine: string | null;
   /** Every assertion that failed, in order; empty when the probe passed. */
   failures: string[];
 }
@@ -61,9 +67,9 @@ export interface SmokeReport {
   exitCode: 0 | 1;
 }
 
-/** The query each search probe submits; fixed, so a failure is comparable day to day. */
+/** The query each search probe sends; fixed, so a failure is comparable day to day. */
 export const SMOKE_QUERIES = {
-  classic: "dress",
+  preview: "dress",
   "ai-en": "elegant evening dress under 400",
   "ai-he": "שמלה אלגנטית לערב מתחת ל-400",
 } as const;
@@ -123,7 +129,9 @@ interface PlaygroundBody {
   degraded?: boolean;
   results?: unknown[];
   chips?: unknown[];
-  details?: { routeReason?: string; latencyMs?: number };
+  page?: unknown;
+  totalCount?: unknown;
+  details?: { routeReason?: string; latencyMs?: number; engine?: string };
 }
 
 function emptyResult(name: ProbeResult["name"]): ProbeResult {
@@ -135,6 +143,7 @@ function emptyResult(name: ProbeResult["name"]): ProbeResult {
     route: null,
     routeReason: null,
     chips: null,
+    engine: null,
     failures: [],
   };
 }
@@ -193,7 +202,8 @@ async function probeSearch(
 ): Promise<ProbeResult> {
   const result = emptyResult(name);
   const query = SMOKE_QUERIES[name];
-  const params = new URLSearchParams({ query, sessionId });
+  const preview = name === "preview";
+  const params = new URLSearchParams({ query, sessionId, ...(preview ? { mode: "preview" } : {}) });
   const answer = await getJson(fetchImpl, `${base}/api/playground/search?${params}`);
   if ("error" in answer) {
     result.failures.push(`GET /api/playground/search (${JSON.stringify(query)}) failed: ${answer.error}`);
@@ -209,27 +219,38 @@ async function probeSearch(
   result.routeReason = body.details?.routeReason ?? null;
   result.latencyMs = typeof body.details?.latencyMs === "number" ? body.details.latencyMs : null;
   result.chips = Array.isArray(body.chips) ? body.chips.length : null;
+  result.engine = typeof body.details?.engine === "string" ? body.details.engine : null;
   const results = Array.isArray(body.results) ? body.results.length : 0;
 
-  const expectedRoute = name === "classic" ? "classic" : "ai";
-  if (result.route !== expectedRoute) {
-    result.failures.push(`route is ${JSON.stringify(result.route)}, expected "${expectedRoute}"`);
-  }
   if (body.degraded !== false) {
     result.failures.push(`degraded is ${JSON.stringify(body.degraded ?? null)}, expected false`);
   }
   if (results < 1) {
     result.failures.push(`results: ${results}, expected ≥ 1`);
   }
-  if (name === "classic") {
-    if (result.chips !== 0) {
-      result.failures.push(`chips: ${result.chips ?? "missing"}, expected 0 on the classic route`);
+  if (preview) {
+    // The keystroke preview is the keyword path on either engine: classic,
+    // no chips, no model call.
+    if (result.route !== "classic") {
+      result.failures.push(`route is ${JSON.stringify(result.route)}, expected "classic"`);
     }
-  } else if (result.chips === null || result.chips < 1) {
-    result.failures.push(`chips: ${result.chips ?? "missing"}, expected ≥ 1 on the AI route`);
+    if (result.chips !== 0) {
+      result.failures.push(`chips: ${result.chips ?? "missing"}, expected 0 on the preview`);
+    }
+  } else {
+    // The Engine v2 shape (YOY-153 AC-4): a paged answer from v2.
+    if (typeof body.page !== "number") {
+      result.failures.push(`page: ${JSON.stringify(body.page ?? null)}, expected a number`);
+    }
+    if (typeof body.totalCount !== "number") {
+      result.failures.push(`totalCount: ${JSON.stringify(body.totalCount ?? null)}, expected a number`);
+    }
+    if (result.engine !== "v2") {
+      result.failures.push(`details.engine is ${JSON.stringify(result.engine)}, expected "v2"`);
+    }
   }
-  const ceiling = name === "classic" ? config.classicMaxMs : config.aiMaxMs;
-  const ceilingName = name === "classic" ? "classicMaxMs" : "aiMaxMs";
+  const ceiling = preview ? config.classicMaxMs : config.aiMaxMs;
+  const ceilingName = preview ? "classicMaxMs" : "aiMaxMs";
   if (result.latencyMs === null) {
     result.failures.push("details.latencyMs missing");
   } else if (result.latencyMs > ceiling) {
@@ -256,7 +277,7 @@ export async function runSmoke(options: RunSmokeOptions): Promise<SmokeReport> {
   const base = options.url.replace(/\/+$/, "");
   const probes: ProbeResult[] = [
     await probeHealthz(fetchImpl, base, options.expectedEngineVersion),
-    await probeSearch(fetchImpl, base, "classic", options.config, sessionId()),
+    await probeSearch(fetchImpl, base, "preview", options.config, sessionId()),
     await probeSearch(fetchImpl, base, "ai-en", options.config, sessionId()),
     await probeSearch(fetchImpl, base, "ai-he", options.config, sessionId()),
   ];
@@ -277,6 +298,7 @@ export function formatSummary(report: SmokeReport): string {
   const rows = report.probes.map((probe) => {
     const verdict = probe.pass ? "PASS" : "FAIL";
     const facts = [
+      probe.engine === null ? null : `engine=${probe.engine}`,
       probe.route === null ? null : `route=${probe.route}`,
       probe.routeReason === null ? null : `reason=${probe.routeReason}`,
       probe.latencyMs === null ? null : `${probe.latencyMs} ms`,

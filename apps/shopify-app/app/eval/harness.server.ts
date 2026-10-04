@@ -12,9 +12,11 @@ import {
   DEFAULT_INTENT_ESCALATION_THRESHOLD,
   expandCategoryConstraint,
   parseIntent,
+  type EmbeddingClient,
   type Intent,
   type IntentEscalation,
   type IntentTier,
+  type LlmClient,
 } from "@unfiltered/engine";
 
 import { createPrismaCostRecorder } from "../ai/cost-recorder.server";
@@ -862,6 +864,78 @@ export function findViolations(
   return violations;
 }
 
+/**
+ * Seed the eval catalog into `shopDomain` and index it exactly the way
+ * production does: the snapshot rows and listing images, then the real
+ * enrichment (text and vision) and embedding pipelines over the given
+ * ports. Shared by the eval run and the Engine v2 Constructor suite
+ * (YOY-153 AC-2). Returns how many products carry listing images.
+ */
+export async function indexEvalCatalog({
+  db,
+  shopDomain,
+  catalog,
+  llm,
+  embeddings,
+}: {
+  db: PrismaClient;
+  shopDomain: string;
+  catalog: EvalProduct[];
+  llm: LlmClient;
+  embeddings: EmbeddingClient;
+}): Promise<number> {
+  let visionProducts = 0;
+  for (const { sourceUpdatedAt, images, ...product } of catalog) {
+    await db.catalogProduct.create({
+      data: {
+        ...product,
+        shopDomain,
+        sourceUpdatedAt: new Date(sourceUpdatedAt),
+        contentHash: computeContentHash(product),
+        // Same family rule every ingestion path applies (YOY-117 AC-1).
+        familyKey: computeFamilyKey(product),
+      },
+    });
+    // Listing images (YOY-122): one ProductImage row per fixture file, its
+    // bytes hashed exactly as image capture hashes a CDN's — the key the
+    // vision pass re-analyses on.
+    for (const [position, file] of (images ?? []).entries()) {
+      const bytes = readFileSync(join(VISION_FIXTURES_DIR, file));
+      await db.productImage.create({
+        data: {
+          shopDomain,
+          productId: product.productId,
+          position,
+          url: `${FIXTURE_IMAGE_URL_PREFIX}${file}`,
+          contentHash: hashImageBytes(bytes),
+          fetchedAt: new Date(sourceUpdatedAt),
+        },
+      });
+    }
+    if ((images ?? []).length > 0) {
+      visionProducts += 1;
+    }
+  }
+  // Text enrichment plus the vision pass (YOY-122), both answered from
+  // recordings: the same replay client serves operation "vision".
+  const enrichResult = await enrichCatalog({
+    db,
+    shopDomain,
+    llm,
+    vision: { llm, fetchImage: fixtureImageFetch },
+  });
+  if (enrichResult.failed > 0) {
+    throw new Error(`eval enrichment failed for ${enrichResult.failed} products`);
+  }
+  if ((enrichResult.vision?.failed ?? 0) > 0) {
+    throw new Error(
+      `eval vision pass failed for ${enrichResult.vision?.failed} products — a vision recording is missing or broken; regenerate with REGEN_SCOPE=goldens`,
+    );
+  }
+  await embedCatalog({ db, shopDomain, embeddings });
+  return visionProducts;
+}
+
 /** Run the full eval and print the per-query scorecard (AC-6). */
 export async function runEval(db: PrismaClient): Promise<EvalRunResult> {
   const shopDomain = "eval-shop.example.com";
@@ -969,57 +1043,7 @@ export async function runEval(db: PrismaClient): Promise<EvalRunResult> {
     costRecorder,
   });
 
-  // Index the sparse catalog exactly the way production does: seed the
-  // snapshot, then run the real enrichment and embedding pipelines.
-  let visionProducts = 0;
-  for (const { sourceUpdatedAt, images, ...product } of catalog) {
-    await db.catalogProduct.create({
-      data: {
-        ...product,
-        shopDomain,
-        sourceUpdatedAt: new Date(sourceUpdatedAt),
-        contentHash: computeContentHash(product),
-        // Same family rule every ingestion path applies (YOY-117 AC-1).
-        familyKey: computeFamilyKey(product),
-      },
-    });
-    // Listing images (YOY-122): one ProductImage row per fixture file, its
-    // bytes hashed exactly as image capture hashes a CDN's — the key the
-    // vision pass re-analyses on.
-    for (const [position, file] of (images ?? []).entries()) {
-      const bytes = readFileSync(join(VISION_FIXTURES_DIR, file));
-      await db.productImage.create({
-        data: {
-          shopDomain,
-          productId: product.productId,
-          position,
-          url: `${FIXTURE_IMAGE_URL_PREFIX}${file}`,
-          contentHash: hashImageBytes(bytes),
-          fetchedAt: new Date(sourceUpdatedAt),
-        },
-      });
-    }
-    if ((images ?? []).length > 0) {
-      visionProducts += 1;
-    }
-  }
-  // Text enrichment plus the vision pass (YOY-122), both answered from
-  // recordings: the same replay client serves operation "vision".
-  const enrichResult = await enrichCatalog({
-    db,
-    shopDomain,
-    llm,
-    vision: { llm, fetchImage: fixtureImageFetch },
-  });
-  if (enrichResult.failed > 0) {
-    throw new Error(`eval enrichment failed for ${enrichResult.failed} products`);
-  }
-  if ((enrichResult.vision?.failed ?? 0) > 0) {
-    throw new Error(
-      `eval vision pass failed for ${enrichResult.vision?.failed} products — a vision recording is missing or broken; regenerate with REGEN_SCOPE=goldens`,
-    );
-  }
-  await embedCatalog({ db, shopDomain, embeddings });
+  const visionProducts = await indexEvalCatalog({ db, shopDomain, catalog, llm, embeddings });
 
   const classifier = createQueryClassifier({ llm });
   // The production ladder over the two replay tiers (YOY-116 AC-5): the

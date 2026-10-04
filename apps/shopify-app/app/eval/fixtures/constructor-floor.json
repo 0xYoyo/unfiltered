@@ -3,5 +3,24 @@
   "recordedAt": "2026-08-28",
   "overallHitRatePercent": 100,
   "mustNotViolationsMax": 0,
-  "mustNotCleanRatePercent": 100
+  "mustNotCleanRatePercent": 100,
+  "v2": {
+    "$comment": "Engine v2 floor (YOY-153 AC-3), measured 2026-10-04 by constructor-v2.test.ts on the committed v2 recordings (cards, wish extraction, Jev judge): per group, the hit rate (an expected product in the top 10), rounded down, and the measured top-10 mustNot leak. On v2 a forbidden product is not removed by a price cap or an occasion — the judge ranks it after the matches as close or not relevant — so the price-cap and occasion groups show it lower in the top 10 (8 and 12 appearances), never leading; negations are removed (0). Same rule as the old engine's fields above: tighten only from a measured run, never loosen to absorb a regression.",
+    "recordedAt": "2026-10-04",
+    "judge": "jev:typesafe/jev-1.13",
+    "byGroup": {
+      "negation": {
+        "hitRatePercent": 100,
+        "mustNotViolationsMax": 0
+      },
+      "priceCap": {
+        "hitRatePercent": 100,
+        "mustNotViolationsMax": 8
+      },
+      "occasionVsCategory": {
+        "hitRatePercent": 100,
+        "mustNotViolationsMax": 12
+      }
+    }
+  }
 }

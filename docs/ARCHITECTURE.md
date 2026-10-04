@@ -899,8 +899,11 @@ default per request and `paging: { page, pageSize }` for one page, and the
 response gains `engine` and — on a paged response only — `page` and
 `totalCount`.
 
-- **The switch.** `ENGINE_V2=1` makes v2 the default (`engineV2FromEnv`);
-  anything else is the old engine. Only the playground API reads a request's
+- **The switch.** Engine v2 is the default (YOY-153): with `ENGINE_V2`
+  unset, or any value but `0`, a submitted search runs v2
+  (`engineV2FromEnv`); `ENGINE_V2=0` serves the old engine, which stays one
+  env value away until it is deleted. Keystroke previews stay the keyword
+  path on either engine. Only the playground API reads a request's
   `engine=v1|v2` (an unknown value answers 400); the storefront proxy never
   parses it, so the storefront takes the env default. `.github/workflows/
   score.yml` takes an `engine` input that sets `ENGINE_V2` for a hidden run.
@@ -1007,9 +1010,10 @@ runs one page.
 - **Diagnostics.** The `judge` stage times the rows and the call. Playground
   `details.judge` is `{ outcome, verdicts: [{ productId, verdict }] }` on a
   find-path response (verdict null where the judge did not answer), null
-  otherwise. `scripts/latency-probe.mts --engine v2` sends `engine=v2` to the
-  playground API, so the deployment's judge can be timed with `ENGINE_V2`
-  off.
+  otherwise. `scripts/latency-probe.mts --engine v1|v2` sends that `engine`
+  to the playground API, so either engine can be timed whatever the
+  deployment's default; without it the probe times the engine the
+  deployment serves.
 
 ### Answer cache, verdict log and late labels (YOY-148)
 

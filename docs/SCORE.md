@@ -407,6 +407,33 @@ keeps both for the Flash-Lite judge; the follow-up is YOY-158.
 unchanged by this slice), so a hidden run scores the production judge only
 when dispatched with `-f judge=jev`.
 
+### The public half at the Engine v2 default (YOY-153 AC-8, 2026-10-04)
+
+At the ship of YOY-153 (Engine v2 on by default), on its branch, `npm run
+score:public -- --engine v2` with `JUDGE_PROVIDER=jev` — the production
+default judge — one pass, 0 failed, 2,106 model calls (78 embeddings, 78
+extractions, 78 grades, 1,872 one-product Jev questions), $0.1135:
+
+| | en | he | ar | ru | fr | es |
+|---|---|---|---|---|---|---|
+| YOY-153 ship (v2, Jev) | **0.748** | **0.248** | 0.449 | 0.427 | 0.462 | 0.573 |
+| Last recorded public (run-4 branch, v2, Flash-Lite judge) | 0.692 | 0.278 | 0.462 | 0.419 | 0.432 | 0.530 |
+| Difference | +0.056 | −0.030 | −0.013 | +0.008 | +0.030 | +0.043 |
+| Band (`max(M5 band, 0.03)`) | 0.111 | 0.090 | 0.030 | 0.055 | 0.030 | 0.060 |
+
+The gate (en and he not below the last public numbers by more than their
+bands) is **met**: en +0.056, he −0.030 inside its 0.090 band. The
+model-written languages are tracked, not gated (decision of 2026-10-03):
+ar −0.013 is inside its band, the rest are up.
+
+An earlier pass the same day ran with the Flash-Lite judge by mistake: the
+runner loads the local `.env`, whose `JUDGE_PROVIDER` named `gemini`, so
+that pass measured the fallback, not the default (312 model calls, one judge
+call per search; en 0.675, he 0.363, ar 0.449, ru 0.436, fr 0.423, es 0.526;
+$0.2326). It is superseded by the Jev pass above and recorded only so the
+spend is accounted for. Pass `JUDGE_PROVIDER` explicitly on the command line
+when a local `.env` sets it — the environment wins over the file.
+
 Speed and judge cost (YOY-147 AC-15), measured locally on the public half
 (78 searches over the seed fixture, `ENGINE_V2=1`, 2026-10-02; a local run
 from Israel, not the deployment): search latency median **1,510 ms**,

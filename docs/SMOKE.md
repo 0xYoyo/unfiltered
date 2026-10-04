@@ -18,11 +18,27 @@ single slow sample; the AI ceiling is the bar itself, because a single AI
 sample over 3500 ms is exactly the hedge-tail regression worth waking
 someone for.
 
+**Engine v2 (YOY-153 AC-4, 2026-10-04).** Engine v2 is the default, so the
+two submitted probes run v2, and `aiMaxMs` is restated from a v2
+measurement as `max(3500, 2 × the v2 median)`, rounded up to the next
+500 ms. One `latency-probe.mts --runs 1 --engine v2` against the deployment
+(`main` at `5c5adfe`, PR #182 live, Jev judge) measured the v2 median at
+**1,538 ms** on 2026-10-04 (10 submitted EN and HE searches, p95 2,298 ms;
+docs/LATENCY.md "Recorded measurements"). 2 × 1,538 = 3,076 ms, so
+`aiMaxMs` stays **3,500 ms**. `classicMaxMs` stays **800 ms** and now
+guards the keystroke preview: the `dress` probe sends `mode=preview`, the
+keyword path the shopper sees while typing — keyword only, zero model
+calls — and the canary for the parity floor (a one-word query must still
+work). Under Engine v2 that preview is the only "classic" there is.
+
 What the four probes assert is in the script's header comment; in one line:
-`/healthz` is 200 and reports the engine version the source exports;
-classic `dress` is classic, not degraded, has results and no chips, under
-0.8 s; EN and HE AI queries are AI-routed, not degraded, have chips and
-results, under 3.5 s.
+`/healthz` is 200 and reports the engine version the source exports; the
+preview `dress` (`mode=preview`) is classic, not degraded, has results and
+no chips, under 0.8 s; the submitted EN and HE queries have the Engine v2
+shape — not degraded, results, `page` and `totalCount` present,
+`details.engine` `"v2"` — under 3.5 s. The submitted probes assert no route
+and no chips: under v2 the route only says whether the judge ran, and the
+chips are the shopper's own wishes (an HE price chip is fine).
 
 ## Phone checklist — creating the routine at https://claude.ai/code/routines
 
@@ -73,10 +89,15 @@ You are the daily live smoke for the unfiltered deployment. You are READ-ONLY: n
 - `healthz`: `engine.version` mismatch → the deployment runs a stale build
   or the engine source moved without a deploy (YOY-104 class). HTTP ≠ 200 →
   the service is down or asleep.
-- `classic`: chips ≠ 0 or route ≠ classic → routing regression; over
+- `preview`: chips ≠ 0 or route ≠ classic → a keystroke preview reached a
+  model — the keyword path regressed (the preview must stay keyword only,
+  zero model calls); no results → the keyword store regressed; over
   `classicMaxMs` → the database path regressed (YOY-115 measured 19 ms p95).
-- `ai-en` / `ai-he`: `degraded: true` or no chips → intent extraction is
-  failing (YOY-109 class); over `aiMaxMs` → the LLM path regressed.
+- `ai-en` / `ai-he`: `details.engine` ≠ `"v2"` → the deployment serves the
+  old engine (`ENGINE_V2=0` set, or a stale build); `page` or `totalCount`
+  missing → the v2 page shape regressed; `degraded: true` or no results →
+  the find step failed; over `aiMaxMs` → the v2 path (find, extraction,
+  judge) regressed — docs/LATENCY.md has its per-stage means.
 - All four failing with a network error → the environment allowlist (step
   4) is missing the host, or the host is wrong.
 

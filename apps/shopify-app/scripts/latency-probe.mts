@@ -23,9 +23,11 @@
  *     [--ai-per-minute 10] [--engine v1|v2]
  *
  * `--engine` (YOY-147 AC-13) is sent to the playground API as its `engine`
- * parameter, so the probe can time Engine v2 — the find step and the judge —
- * on a deployment whose `ENGINE_V2` is off. Absent, no parameter is sent and
- * the deployment's default engine answers.
+ * parameter, so the probe can time one engine whatever the deployment's
+ * default. Absent — the default (YOY-153 AC-5) — no parameter is sent and the
+ * engine the deployment serves answers: Engine v2 unless its `ENGINE_V2=0`.
+ * Every set reports its under-1-s share and, for v2 samples, the share
+ * composed without the wish extraction (`no-extraction`).
  *
  * Exit 1 on any asserted breach or any failed request; exit 0 otherwise.
  */

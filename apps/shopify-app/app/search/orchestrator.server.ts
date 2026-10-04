@@ -602,8 +602,9 @@ export interface SearchOrchestratorOptions {
    */
   find?: FindStep;
   /**
-   * The default engine is v2 (`ENGINE_V2=1`, YOY-145 AC-1); off unless set
-   * (NG-3). A request's own `engine` overrides it.
+   * Whether a request that names no engine runs v2. Production passes
+   * `engineV2FromEnv()`, which is on unless `ENGINE_V2=0` (YOY-153 AC-1);
+   * absent here means off. A request's own `engine` overrides it.
    */
   engineV2?: boolean;
   /**
