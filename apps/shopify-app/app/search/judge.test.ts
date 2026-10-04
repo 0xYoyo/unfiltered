@@ -573,6 +573,13 @@ describe("the decision judge (YOY-152 AC-2, AC-3)", () => {
     const page = ["a", "b", "c", "d"].map((id) => candidate(id));
     const answered = await createDecisionJudge({ decisions }).judge({ sentence: "dress", candidates: page });
     expect(answered.verdicts.map((entry) => entry.verdict)).toEqual(["exact", "not-relevant", "close", "not-relevant"]);
+    // A stand-in verdict marks the answer partial, so it is never cached.
+    expect(answered.partial).toBe(true);
+    const whole = await createDecisionJudge({ decisions: scriptedDecisions({ a: { verdict: "exact" } }) }).judge({
+      sentence: "dress",
+      candidates: [candidate("a")],
+    });
+    expect(whole).not.toHaveProperty("partial");
     // "d" answered an unknown choice: invalid, read as not relevant too.
     expect(answered.verdicts[1]).toEqual({ id: "b", verdict: "not-relevant", missed: [], label: null, excluded: false });
   });
@@ -844,7 +851,7 @@ describe("the judge on Engine v2 (on the database)", () => {
 
   function orchestrator(
     llm: LlmClient | undefined,
-    options: { deadlineMs?: number; giveUpMs?: number; findSetSize?: number } = {},
+    options: { deadlineMs?: number; giveUpMs?: number; findSetSize?: number; judge?: Judge } = {},
   ): SearchOrchestrator {
     return createSearchOrchestrator({
       db,
@@ -857,7 +864,11 @@ describe("the judge on Engine v2 (on the database)", () => {
         ...(options.findSetSize !== undefined ? { findSetSize: options.findSetSize } : {}),
       }),
       engineV2: true,
-      ...(llm !== undefined ? { judge: createLlmJudge({ llm }) } : {}),
+      ...(options.judge !== undefined
+        ? { judge: options.judge }
+        : llm !== undefined
+          ? { judge: createLlmJudge({ llm }) }
+          : {}),
       ...(options.deadlineMs !== undefined ? { judgeDeadlineMs: options.deadlineMs } : {}),
       ...(options.giveUpMs !== undefined ? { judgeGiveUpMs: options.giveUpMs } : {}),
     });
@@ -1137,6 +1148,48 @@ describe("the judge on Engine v2 (on the database)", () => {
       engine: "v2",
     });
     expect(playground.details.judge?.outcome).toBe("judge-cached");
+  });
+
+  it("serves a page with a failed per-product question but never caches it; a fully answered page is cached (YOY-152)", async () => {
+    await seed(db, FOUR);
+    // Answers by the product's title; "Beach Sandal" fails on the first
+    // search only, like a transient 429 among the parallel calls.
+    let sandalFails = true;
+    const calls: string[] = [];
+    const decisions: DecisionClient = {
+      async decide(request) {
+        const row = String((request.state as Record<string, unknown>).product);
+        calls.push(row);
+        if (row.startsWith("Beach Sandal") && sandalFails) {
+          throw new Error("HTTP 429");
+        }
+        const verdict = row.startsWith("Black Midi") ? "exact" : row.startsWith("Beach") ? "close" : "not-relevant";
+        return {
+          verdict: { type: "choice", choice: verdict },
+          fact: { type: "yes-no", yes: 0.1 },
+          description: { type: "yes-no", yes: 0.1 },
+          excluded: { type: "yes-no", yes: 0.1 },
+        };
+      },
+    };
+    const engine = orchestrator(undefined, { judge: createDecisionJudge({ decisions }) });
+
+    const first = await search(engine);
+    expect(first).toMatchObject({ route: "ai", routeReason: "judged" });
+    expect(first.hits.find((hit) => hit.productId === "p2")?.verdict).toBe("not-relevant");
+    expect(first.hits[0]!.productId).toBe("p3");
+    expect(await db.judgeAnswer.count()).toBe(0);
+
+    sandalFails = false;
+    const second = await search(engine);
+    expect(second).toMatchObject({ routeReason: "judged" });
+    expect(second.hits.find((hit) => hit.productId === "p2")?.verdict).toBe("close");
+    expect(calls).toHaveLength(8);
+    expect(await db.judgeAnswer.count()).toBe(1);
+
+    const third = await search(engine);
+    expect(third).toMatchObject({ routeReason: "judge-cached" });
+    expect(calls).toHaveLength(8);
   });
 
   it("keys the cache on the sentence, the ids in order, card text hashes, the judge and the prompt version (YOY-148 AC-1)", () => {

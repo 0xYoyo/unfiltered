@@ -137,6 +137,14 @@ export interface JudgeAnswer {
    * when there is none, when no candidate fits it, or when it is too long.
    */
   otherReading: string | null;
+  /**
+   * True when a candidate's verdict is a stand-in for an answer that never
+   * came — the decision judge reads a failed or invalid per-product answer
+   * as not relevant (YOY-152 AC-2). The page is served, but the answer is
+   * never cached: a transient failure must not pin a product down for every
+   * later identical search. Absent on a fully answered page.
+   */
+  partial?: true;
 }
 
 export interface Judge {
@@ -619,7 +627,8 @@ export interface DecisionJudgeOptions {
  * The judge over the decision port (YOY-152 AC-1 – AC-3): one request per
  * product, every product of the page in parallel, under ledger operation
  * `judge`. The same answer shape as the LLM judge. One failed or invalid
- * answer reads its product as not relevant; when every product fails, the
+ * answer reads its product as not relevant and marks the answer `partial`,
+ * so it is served but never cached; when every product fails, the
  * call rejects, so the page is served as a judge error like a failed LLM
  * call. Never a second reading: a decision model writes no text.
  */
@@ -677,6 +686,7 @@ export function createDecisionJudge(options: DecisionJudgeOptions): Judge {
       return {
         verdicts: verdicts.map((verdict, index) => verdict ?? notRelevant(request.candidates[index]!)),
         otherReading: null,
+        ...(verdicts.some((verdict) => verdict === null) ? { partial: true as const } : {}),
       };
     },
   };

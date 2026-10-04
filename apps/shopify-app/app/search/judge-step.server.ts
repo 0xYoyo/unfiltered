@@ -613,7 +613,9 @@ export async function runJudgeStep<T extends { productId: string }>(
     )
     .then(async (settled) => {
       clearTimeout(giveUp);
-      if (settled.kind === "answered") {
+      // A partial answer holds stand-in verdicts for failed questions
+      // (YOY-152): served, never cached.
+      if (settled.kind === "answered" && settled.answer.partial !== true) {
         await storeAnswer(db, shopDomain, cacheKey, settled.answer);
       }
       return settled;
