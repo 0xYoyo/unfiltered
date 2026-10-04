@@ -146,6 +146,22 @@ test("AC-6: a label wider than its card is not shown — never truncated or wrap
   await expect(card(page, "Wide Weave Dress").locator(".cardLabel")).toHaveCount(0);
 });
 
+test("AC-6: a dropped label stays dropped when the page re-renders", async ({
+  page,
+}) => {
+  await open(page, "en");
+  await submit(page, "label overflow");
+  await expect(cards(page)).toHaveCount(2);
+  await expect(card(page, "Wide Weave Dress").locator(".cardLabel")).toHaveCount(0);
+  // The engine-details toggle re-renders the page and every card on it
+  // without a new search: the verdict must survive, never come back clipped.
+  for (let toggle = 0; toggle < 2; toggle += 1) {
+    await page.getByTestId("playground-details-toggle").click();
+    await expect(card(page, "Wide Weave Dress").locator(".cardLabel")).toHaveCount(0);
+  }
+  await expect(card(page, "Satin Slip Dress").getByTestId("playground-card-label")).toBeVisible();
+});
+
 test("verify 6: late labels fill reserved lines — one request, no card moves, order unchanged", async ({
   page,
 }) => {

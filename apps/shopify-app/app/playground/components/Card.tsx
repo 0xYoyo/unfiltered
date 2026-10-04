@@ -38,7 +38,10 @@ export interface PlaygroundCard {
  * The label line (YOY-151 AC-3, W-11): one line directly under the price,
  * `--text-muted` at `--size-caption`. A label wider than the card is not
  * shown at all — never truncated, never wrapped (AC-6) — and the width is
- * measured before paint, so an overflowing label never flashes. While the
+ * measured before paint, so an overflowing label never flashes. The verdict
+ * is held per filled text: a dropped label stays dropped through every
+ * later re-render of the page, and only a different text is measured
+ * again (a dropped label has no element left to measure). While the
  * page's labels are pending the line is reserved empty (AC-8), at the
  * label's own fixed height, so the label lands without moving the card.
  */
@@ -50,12 +53,20 @@ function CardLabel({
   reserved: boolean;
 }) {
   const ref = useRef<HTMLSpanElement | null>(null);
-  const [overflows, setOverflows] = useState(false);
+  const text = segments?.map((segment) => segment.text).join("") ?? "";
+  const [verdict, setVerdict] = useState<{
+    text: string;
+    overflows: boolean;
+  } | null>(null);
   useLayoutEffect(() => {
-    setOverflows(ref.current !== null && labelOverflows(ref.current));
-  }, [segments]);
+    if (text === "" || verdict?.text === text || ref.current === null) {
+      return;
+    }
+    setVerdict({ text, overflows: labelOverflows(ref.current) });
+  }, [text, verdict]);
 
-  const shown = segments !== null && !overflows;
+  const shown =
+    segments !== null && !(verdict?.text === text && verdict.overflows);
   if (!shown && !reserved) {
     return null;
   }
@@ -97,7 +108,6 @@ export function Card({
   onOpen: (card: PlaygroundCard, position: number) => void;
 }) {
   const label = labelSegments(strings, card.label);
-  const labelKey = label?.map((segment) => segment.text).join("") ?? "";
   const body = (
     <>
       {card.imageUrl === null ? (
@@ -126,9 +136,7 @@ export function Card({
           {formatPrice(card.priceMin, card.priceMax, card.currencyCode)}
         </bdi>
       </span>
-      {/* Keyed by its text, so a label that arrives late is measured
-          afresh rather than inheriting an earlier one's verdict. */}
-      <CardLabel key={labelKey} segments={label} reserved={labelPending} />
+      <CardLabel segments={label} reserved={labelPending} />
       {card.available ? null : (
         <span className="cardSoldOut" data-testid="playground-card-soldout">
           {strings.soldOut}
