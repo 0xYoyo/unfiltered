@@ -21,12 +21,13 @@ import type { DecisionClient, DecisionQuestion, JsonSchema, LlmClient } from "./
 export const JUDGE_PROVIDER_ENV = "JUDGE_PROVIDER";
 
 /**
- * Providers the factory can select; `gemini` is the default (AC-1, NG-4).
- * `jev` is the decision-model challenger (YOY-152 AC-1).
+ * Providers the factory can select. `jev` is the default: the founder named
+ * it the winner of the M6 judge comparison (YOY-152 AC-9, 2026-10-04);
+ * `gemini` stays selectable as the fallback behind the same swap point.
  */
 export const JUDGE_PROVIDERS = ["gemini", "jev"] as const;
 export type JudgeProvider = (typeof JUDGE_PROVIDERS)[number];
-export const DEFAULT_JUDGE_PROVIDER: JudgeProvider = "gemini";
+export const DEFAULT_JUDGE_PROVIDER: JudgeProvider = "jev";
 
 /**
  * The judge prompt's version (YOY-148 AC-1): part of the answer-cache key,
@@ -236,7 +237,7 @@ export const JUDGE_SCHEMA: JsonSchema = {
   required: ["c", "d", "x", "r", "rn"],
 };
 
-/** The provider `JUDGE_PROVIDER` names; unset means gemini, an unknown name fails. */
+/** The provider `JUDGE_PROVIDER` names; unset means jev, an unknown name fails. */
 export function judgeProviderFromEnv(
   env: Record<string, string | undefined>,
 ): JudgeProvider {

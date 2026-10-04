@@ -80,6 +80,8 @@ gh run view --log
 
 Two choice inputs pick what is scored: `engine` (`v1` or `v2`, sets
 `ENGINE_V2`) and `judge` (`gemini` or `jev`, sets `JUDGE_PROVIDER`; YOY-152).
+The input defaults to `gemini`; production's default judge is `jev` (see
+"Decision — Jev is the default judge"), so pass `-f judge=jev` to score it.
 A judge input that is not on the default branch's workflow yet is dispatched
 with `--ref <branch>`, so the branch's own workflow file runs.
 
@@ -379,8 +381,31 @@ median is under a third of it. Jev's cost is ≈ 30,000 input tokens per page
 output free) — above the PRD's ≈ $0.30–0.40 estimate; Flash-Lite's is above
 the $0.958 measured at YOY-147 because the rows are now facts rows (AC-17).
 
-The winner is the founder's to name on YOY-152 (AC-8); the decision and the
-new default are recorded here by the closing slice (AC-9).
+#### Decision — Jev is the default judge (founder, 2026-10-04)
+
+The founder named **`jev`** on YOY-152 (AC-8, 2026-10-04). From YOY-152's
+closing slice (AC-9) on, `JUDGE_PROVIDER` unset means `jev`
+(`DEFAULT_JUDGE_PROVIDER` in `packages/engine/src/judge.ts`); `gemini` stays
+selectable behind the same swap point, with its tests green. No automatic
+failover between the two (NG-2). The reasons, from the table above:
+
+1. **Quality is a tie.** The gated languages are equal inside their noise
+   bands (en −0.033, band 0.111; he +0.018, band 0.090); ar and fr move
+   just past 0.030 in opposite directions.
+2. **Speed.** Jev's judge median is 469 ms against Flash-Lite's 1,504 ms at
+   the 1,500 ms production deadline, so Jev's labels arrive with page 1.
+3. **Stability and cost.** Jev gave identical verdicts 95.8 % of the time
+   against 75.8 %, at $0.815 against $2.266 per 1,000 uncached searches
+   (judge only, measured 2026-10-04).
+
+Accepted with it: under Jev the merchant-fact label ("in grey, not black")
+and the two-meanings chip are dormant — Jev answers `close-match` where
+Flash-Lite writes `fact-differs`, and writes no second reading. The code
+keeps both for the Flash-Lite judge; the follow-up is YOY-158.
+
+`score.yml`'s `judge` input still defaults to `gemini` (a sensitive path,
+unchanged by this slice), so a hidden run scores the production judge only
+when dispatched with `-f judge=jev`.
 
 Speed and judge cost (YOY-147 AC-15), measured locally on the public half
 (78 searches over the seed fixture, `ENGINE_V2=1`, 2026-10-02; a local run
