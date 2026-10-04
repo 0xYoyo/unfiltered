@@ -56,6 +56,15 @@ describe("AI price table", () => {
     );
   });
 
+  it("prices the Jev judge input-only at $0.042 per million tokens (YOY-152 AC-5)", () => {
+    expect(getModelPrice("typesafe/jev-1.13")).toMatchObject({
+      inputUsdPerMTok: 0.042,
+      outputUsdPerMTok: 0,
+    });
+    // One product's questions: 500 in, 70 out (free).
+    expect(computeCostUsd("typesafe/jev-1.13", 500, 70)).toBeCloseTo(0.000021, 10);
+  });
+
   it("throws on a model ID missing from the table", () => {
     expect(() => computeCostUsd("made-up-model", 10, 10)).toThrow(
       /made-up-model.*ai-prices\.json/,

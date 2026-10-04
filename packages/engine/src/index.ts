@@ -80,8 +80,10 @@ export {
 
 export {
   buildJudgePrompt,
+  createDecisionJudge,
   createJudge,
   createLlmJudge,
+  DECISION_JUDGE_QUESTIONS,
   DEFAULT_JUDGE_PROVIDER,
   DEFAULT_JUDGE_ROW_CHARS,
   JUDGE_ANSWER_CODES,
@@ -103,6 +105,7 @@ export {
   JUDGE_READING_MAX_WORDS,
   orderByVerdict,
   parseJudgeAnswer,
+  type DecisionJudgeOptions,
   type Judge,
   type JudgeAnswer,
   type JudgeCandidate,
@@ -274,6 +277,43 @@ export interface InlineImage {
 export interface LlmClient {
   /** Complete the prompt into schema-conforming JSON, parsed and returned. */
   completeStructured(request: StructuredCompletionRequest): Promise<unknown>;
+}
+
+/**
+ * One typed question to a decision model (YOY-152 AC-2): `choice` picks one
+ * of the criteria's keys, each described by its value; `yes-no` answers a
+ * probability that the answer is yes.
+ */
+export type DecisionQuestion =
+  | { type: "choice"; instructions: string; criteria: Record<string, string> }
+  | { type: "yes-no"; instructions: string; criteria: { yes: string; no: string } };
+
+/** One decision request: the text the questions are about, and the questions by key. */
+export interface DecisionRequest {
+  /** What the questions are asked about: plain text or a JSON object. */
+  state: string | Record<string, unknown>;
+  questions: Record<string, DecisionQuestion>;
+  /** Cost-ledger operation label, e.g. "judge". */
+  operation: string;
+  /** Store (tenant) the call is made on behalf of, for metering, when known. */
+  storeId?: string;
+  /** Correlation ID tying together every call serving one search. */
+  searchId?: string;
+  /** Caller's abort signal; implementations abort the request when it fires. */
+  signal?: AbortSignal;
+}
+
+/** A typed answer: the chosen key, or the probability of yes (0–1). */
+export type DecisionAnswer = { type: "choice"; choice: string } | { type: "yes-no"; yes: number };
+
+/**
+ * Port for a decision model (YOY-152): typed answers to typed questions,
+ * no free text. Implementations live outside the engine; the engine
+ * depends on this vendor-free surface only.
+ */
+export interface DecisionClient {
+  /** One answer per question key, as the model returned them. */
+  decide(request: DecisionRequest): Promise<Record<string, DecisionAnswer>>;
 }
 
 /** One batch embedding request. */

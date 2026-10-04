@@ -1,5 +1,5 @@
 {
-  "$comment": "USD per 1M tokens, paid-tier rates from https://ai.google.dev/gemini-api/docs/pricing. Keys are provider model IDs. Cost computation fails loudly on any model ID missing from this table.",
+  "$comment": "USD per 1M tokens, paid-tier rates from https://ai.google.dev/gemini-api/docs/pricing (Gemini) and OpenRouter's model page (typesafe/*). Keys are provider model IDs. Cost computation fails loudly on any model ID missing from this table.",
   "models": {
     "gemini-3.5-flash-lite": {
       "$comment": "Classification and lite-intent model, and the vision model chosen in docs/VISION-MODEL.md (YOY-119 decision; YOY-120 AC-4): image tokens are billed at the input rate as usageMetadata reports them.",
@@ -11,6 +11,11 @@
       "inputUsdPerMTok": 0.75,
       "outputUsdPerMTok": 3.75
     },
-    "gemini-embedding-001": { "inputUsdPerMTok": 0.15, "outputUsdPerMTok": 0 }
+    "gemini-embedding-001": { "inputUsdPerMTok": 0.15, "outputUsdPerMTok": 0 },
+    "typesafe/jev-1.13": {
+      "$comment": "The judge challenger via OpenRouter (YOY-152 AC-5; docs/PRD.md §3 Refinement 1, verified 28 Sep 2026): input only, output tokens free.",
+      "inputUsdPerMTok": 0.042,
+      "outputUsdPerMTok": 0
+    }
   }
 }

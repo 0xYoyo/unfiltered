@@ -3,8 +3,10 @@ import { randomUUID } from "node:crypto";
 import type { PrismaClient } from "@prisma/client";
 import {
   buildJudgePrompt,
+  createDecisionJudge,
   createJudge,
   createLlmJudge,
+  DECISION_JUDGE_QUESTIONS,
   DEFAULT_JUDGE_ROW_CHARS,
   JUDGE_ANSWER_CODES,
   JUDGE_SCHEMA,
@@ -16,8 +18,12 @@ import {
   parseJudgeAnswer,
   type AiCallUsage,
   type CostRecorder,
+  type DecisionAnswer,
+  type DecisionClient,
+  type DecisionRequest,
   type EmbeddingClient,
   type IntentExtractor,
+  type Judge,
   type JudgeCandidate,
   type LlmClient,
   type QueryClassifier,
@@ -98,6 +104,43 @@ function scriptedLlm(
       client.requests.push(request);
       const next = answers[Math.min(client.requests.length - 1, answers.length - 1)];
       return typeof next === "function" ? (next as () => Promise<unknown>)() : next;
+    },
+  };
+  return client;
+}
+
+/** What a scripted decision model answers for one product. */
+interface ScriptedDecision {
+  verdict: string;
+  fact?: number;
+  description?: number;
+  excluded?: number;
+}
+
+/**
+ * A decision port answering per product — found by the `Product <id>` title
+ * in the request's row — recording every request. A product scripted as an
+ * Error rejects; one missing from the script answers an unknown choice.
+ */
+function scriptedDecisions(
+  script: Record<string, ScriptedDecision | Error>,
+): DecisionClient & { requests: DecisionRequest[] } {
+  const client = {
+    requests: [] as DecisionRequest[],
+    async decide(request: DecisionRequest): Promise<Record<string, DecisionAnswer>> {
+      client.requests.push(request);
+      const row = String((request.state as Record<string, unknown>).product);
+      const id = /^Product (\S+)/.exec(row)?.[1] ?? "";
+      const scripted = script[id];
+      if (scripted instanceof Error) {
+        throw scripted;
+      }
+      return {
+        verdict: { type: "choice", choice: scripted?.verdict ?? "unknown" },
+        fact: { type: "yes-no", yes: scripted?.fact ?? 0.02 },
+        description: { type: "yes-no", yes: scripted?.description ?? 0.02 },
+        excluded: { type: "yes-no", yes: scripted?.excluded ?? 0.01 },
+      };
     },
   };
   return client;
@@ -364,11 +407,229 @@ describe("verdict order (AC-5, AC-8)", () => {
   });
 });
 
+/** One product's intended answer, written once and spoken in each judge's wire form. */
+interface PlannedVerdict {
+  id: string;
+  verdict: "exact" | "other-variant" | "close" | "not-relevant";
+  fact?: boolean;
+  description?: boolean;
+  excluded?: boolean;
+}
+
+const VERDICT_LETTER = { exact: "E", "other-variant": "V", close: "C", "not-relevant": "N" } as const;
+
+/** A judge implementation under the shared suite, with a port that fails or answers a plan. */
+interface JudgeImplementation {
+  name: string;
+  answering(plan: PlannedVerdict[]): { judge: Judge; requests: () => Array<{ operation: string; storeId?: string; searchId?: string; signal?: AbortSignal }> };
+  failing(error: Error): Judge;
+}
+
+const IMPLEMENTATIONS: JudgeImplementation[] = [
+  {
+    name: "gemini (one call per page)",
+    answering(plan) {
+      // A close or other-variant product carries C (close-match), the label
+      // both judges can write; an excluded one is listed in x.
+      const codes = plan.map((entry) => {
+        const missed = entry.fact && entry.description ? "B" : entry.fact ? "F" : entry.description ? "D" : "-";
+        const label = entry.verdict === "close" || entry.verdict === "other-variant" ? "C" : "X";
+        return `${VERDICT_LETTER[entry.verdict]}${missed}${label}`;
+      });
+      const x = plan.flatMap((entry, index) => (entry.excluded ? [index + 1] : []));
+      const llm = scriptedLlm([{ c: codes, d: [], x, r: "", rn: [] }]);
+      return { judge: createLlmJudge({ llm }), requests: () => llm.requests };
+    },
+    failing(error) {
+      return createLlmJudge({ llm: scriptedLlm([() => Promise.reject(error)]) });
+    },
+  },
+  {
+    name: "jev (one question set per product, in parallel)",
+    answering(plan) {
+      const decisions = scriptedDecisions(
+        Object.fromEntries(
+          plan.map((entry) => [
+            entry.id,
+            {
+              verdict: entry.verdict,
+              fact: entry.fact ? 0.9 : 0.1,
+              description: entry.description ? 0.8 : 0.2,
+              excluded: entry.excluded ? 0.95 : 0.05,
+            },
+          ]),
+        ),
+      );
+      return { judge: createDecisionJudge({ decisions }), requests: () => decisions.requests };
+    },
+    failing(error) {
+      return createDecisionJudge({
+        decisions: { decide: () => Promise.reject(error) },
+      });
+    },
+  },
+];
+
+// One shared suite for both judges (YOY-152 AC-4): the same plan, spoken
+// in each judge's wire form, must come back as the same answer.
+describe.each(IMPLEMENTATIONS)("the shared judge suite: $name (YOY-152 AC-4)", (implementation) => {
+  const page = ["a", "b", "c", "d", "e"].map((id) => candidate(id));
+
+  it("answers one verdict per candidate, in candidate order, with its missed wishes", async () => {
+    const { judge } = implementation.answering([
+      { id: "a", verdict: "not-relevant" },
+      { id: "b", verdict: "close", description: true },
+      { id: "c", verdict: "exact" },
+      { id: "d", verdict: "other-variant", fact: true },
+      { id: "e", verdict: "close", fact: true, description: true },
+    ]);
+    const answered = await judge.judge({ sentence: "long sleeve dress", candidates: page });
+    expect(answered.verdicts).toEqual([
+      { id: "a", verdict: "not-relevant", missed: [], label: null, excluded: false },
+      { id: "b", verdict: "close", missed: ["description"], label: { template: "close-match", values: [] }, excluded: false },
+      { id: "c", verdict: "exact", missed: [], label: null, excluded: false },
+      { id: "d", verdict: "other-variant", missed: ["fact"], label: { template: "close-match", values: [] }, excluded: false },
+      { id: "e", verdict: "close", missed: ["fact", "description"], label: { template: "close-match", values: [] }, excluded: false },
+    ]);
+    expect(answered.otherReading).toBeNull();
+    expect(orderByVerdict(page, answered.verdicts).map((entry) => entry.item.id)).toEqual(["c", "d", "b", "e", "a"]);
+  });
+
+  it("flags an excluded candidate and never labels it", async () => {
+    const { judge } = implementation.answering([
+      { id: "a", verdict: "close", excluded: true },
+      { id: "b", verdict: "exact" },
+    ]);
+    const answered = await judge.judge({ sentence: "dress not in black", candidates: page.slice(0, 2) });
+    expect(answered.verdicts[0]).toMatchObject({ id: "a", excluded: true, label: null });
+    expect(answered.verdicts[1]).toMatchObject({ id: "b", excluded: false });
+    expect(orderByVerdict(page.slice(0, 2), answered.verdicts).map((entry) => entry.item.id)).toEqual(["b"]);
+  });
+
+  it("calls under operation judge with the caller's store, search and signal", async () => {
+    const { judge, requests } = implementation.answering([{ id: "a", verdict: "exact" }]);
+    const signal = new AbortController().signal;
+    await judge.judge({ sentence: "dress", candidates: page.slice(0, 1), storeId: SHOP, searchId: "s-1", signal });
+    expect(requests().length).toBeGreaterThan(0);
+    for (const request of requests()) {
+      expect(request).toMatchObject({ operation: "judge", storeId: SHOP, searchId: "s-1", signal });
+    }
+  });
+
+  it("rejects when the port fails, so the page is served in find order", async () => {
+    await expect(
+      implementation.failing(new Error("upstream down")).judge({ sentence: "dress", candidates: page }),
+    ).rejects.toThrow(/upstream down/);
+  });
+});
+
+describe("the decision judge (YOY-152 AC-2, AC-3)", () => {
+  it("asks one question set per product, all 24 in parallel: the verdict as pick-one, each flag and the exclusion as yes/no", async () => {
+    const page = Array.from({ length: 24 }, (_, index) => candidate(`p${index}`));
+    let inFlight = 0;
+    let peak = 0;
+    const requests: DecisionRequest[] = [];
+    const decisions: DecisionClient = {
+      async decide(request) {
+        requests.push(request);
+        inFlight += 1;
+        peak = Math.max(peak, inFlight);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        inFlight -= 1;
+        return {
+          verdict: { type: "choice", choice: "close" },
+          fact: { type: "yes-no", yes: 0.1 },
+          description: { type: "yes-no", yes: 0.7 },
+          excluded: { type: "yes-no", yes: 0.1 },
+        };
+      },
+    };
+    const answered = await createDecisionJudge({ decisions }).judge({ sentence: "  long   sleeve dress ", candidates: page });
+    expect(requests).toHaveLength(24);
+    expect(peak).toBe(24);
+    expect(answered.verdicts).toHaveLength(24);
+    expect(requests[3]!.state).toEqual({ search: "long sleeve dress", product: judgeRow(page[3]!) });
+    expect(requests[0]!.questions).toEqual(DECISION_JUDGE_QUESTIONS);
+    expect(Object.fromEntries(Object.entries(DECISION_JUDGE_QUESTIONS).map(([key, question]) => [key, question.type]))).toEqual({
+      verdict: "choice",
+      fact: "yes-no",
+      description: "yes-no",
+      excluded: "yes-no",
+    });
+    expect(Object.keys((DECISION_JUDGE_QUESTIONS.verdict as { criteria: Record<string, string> }).criteria)).toEqual([
+      "exact",
+      "other-variant",
+      "close",
+      "not-relevant",
+    ]);
+  });
+
+  it("fails only the candidate whose question failed, into not relevant", async () => {
+    const decisions = scriptedDecisions({
+      a: { verdict: "exact" },
+      b: new Error("one question failed"),
+      c: { verdict: "close", description: 0.9 },
+    });
+    const page = ["a", "b", "c", "d"].map((id) => candidate(id));
+    const answered = await createDecisionJudge({ decisions }).judge({ sentence: "dress", candidates: page });
+    expect(answered.verdicts.map((entry) => entry.verdict)).toEqual(["exact", "not-relevant", "close", "not-relevant"]);
+    // A stand-in verdict marks the answer partial, so it is never cached.
+    expect(answered.partial).toBe(true);
+    const whole = await createDecisionJudge({ decisions: scriptedDecisions({ a: { verdict: "exact" } }) }).judge({
+      sentence: "dress",
+      candidates: [candidate("a")],
+    });
+    expect(whole).not.toHaveProperty("partial");
+    // "d" answered an unknown choice: invalid, read as not relevant too.
+    expect(answered.verdicts[1]).toEqual({ id: "b", verdict: "not-relevant", missed: [], label: null, excluded: false });
+  });
+
+  it("returns close-match where Flash-Lite writes fact-differs, which Jev cannot write (AC-3)", async () => {
+    const page = [candidate("a")];
+    const gemini = await createLlmJudge({
+      llm: scriptedLlm([answer(["VFF"], [{ n: 1, p: "grey", a: "black" }])]),
+    }).judge({ sentence: "black dress", candidates: page });
+    const jev = await createDecisionJudge({
+      decisions: scriptedDecisions({ a: { verdict: "other-variant", fact: 0.9 } }),
+    }).judge({ sentence: "black dress", candidates: page });
+    expect(gemini.verdicts[0]!.label).toEqual({ template: "fact-differs", values: ["grey", "black"] });
+    expect(jev.verdicts[0]).toEqual({ ...gemini.verdicts[0], label: { template: "close-match", values: [] } });
+  });
+
+  it("sends the previous search with the refine-or-replace note, and never a second reading", async () => {
+    const decisions = scriptedDecisions({ a: { verdict: "exact" } });
+    const answered = await createDecisionJudge({ decisions }).judge({
+      sentence: "in red",
+      previousSentence: "linen dress",
+      candidates: [candidate("a")],
+    });
+    expect(decisions.requests[0]!.state).toMatchObject({ previous_search: "linen dress", search: "in red" });
+    for (const question of Object.values(decisions.requests[0]!.questions)) {
+      expect(question.instructions).toMatch(/^The search may refine the previous search/);
+    }
+    expect(answered.otherReading).toBeNull();
+  });
+
+  it("rejects with JudgeAnswerError when no product's answer is valid, and with the caller's reason when aborted", async () => {
+    await expect(
+      createDecisionJudge({ decisions: scriptedDecisions({}) }).judge({ sentence: "dress", candidates: [candidate("a")] }),
+    ).rejects.toBeInstanceOf(JudgeAnswerError);
+    const controller = new AbortController();
+    const reason = new Error("deadline");
+    const pending = createDecisionJudge({
+      decisions: { decide: (request) => new Promise((_, reject) => request.signal?.addEventListener("abort", () => reject(new Error("aborted")))) },
+    }).judge({ sentence: "dress", candidates: [candidate("a")], signal: controller.signal });
+    controller.abort(reason);
+    await expect(pending).rejects.toBe(reason);
+  });
+});
+
 describe("the one factory and its configuration (AC-1, AC-2, AC-6)", () => {
   it("selects the provider from JUDGE_PROVIDER, gemini by default, and builds only that client", async () => {
     expect(judgeProviderFromEnv({})).toBe("gemini");
     expect(judgeProviderFromEnv({ JUDGE_PROVIDER: "gemini" })).toBe("gemini");
-    expect(() => judgeProviderFromEnv({ JUDGE_PROVIDER: "jev" })).toThrow(/JUDGE_PROVIDER/);
+    expect(judgeProviderFromEnv({ JUDGE_PROVIDER: "jev" })).toBe("jev");
+    expect(() => judgeProviderFromEnv({ JUDGE_PROVIDER: "gpt" })).toThrow(/JUDGE_PROVIDER/);
 
     let built = 0;
     const llm = scriptedLlm([answer(["E-X"])]);
@@ -379,11 +640,32 @@ describe("the one factory and its configuration (AC-1, AC-2, AC-6)", () => {
           built += 1;
           return llm;
         },
+        jev: () => {
+          throw new Error("the jev client is built only when selected");
+        },
       },
     });
     await judge.judge({ sentence: "dress", candidates: [candidate("a")] });
     expect(built).toBe(1);
     expect(llm.requests[0]!.operation).toBe("judge");
+  });
+
+  it("selects the decision judge with JUDGE_PROVIDER=jev and builds only its client (YOY-152 AC-1)", async () => {
+    const decisions = scriptedDecisions({ a: { verdict: "exact" } });
+    const judge = createJudge({
+      provider: judgeProviderFromEnv({ JUDGE_PROVIDER: "jev" }),
+      clients: {
+        gemini: () => {
+          throw new Error("the gemini client is built only when selected");
+        },
+        jev: () => decisions,
+      },
+      modelIds: { gemini: "flash-lite-x", jev: "typesafe/jev-1.13" },
+    });
+    expect(judge.identity).toBe("jev:typesafe/jev-1.13");
+    const answered = await judge.judge({ sentence: "dress", candidates: [candidate("a")] });
+    expect(answered.verdicts[0]!.verdict).toBe("exact");
+    expect(decisions.requests).toHaveLength(1);
   });
 
   it("reads the deadline and the row length from the environment", () => {
@@ -402,13 +684,16 @@ describe("the one factory and its configuration (AC-1, AC-2, AC-6)", () => {
   it("names the provider and model the factory built, for the cache key (YOY-148 AC-1)", () => {
     const judge = createJudge({
       provider: "gemini",
-      clients: { gemini: () => scriptedLlm([]) },
+      clients: { gemini: () => scriptedLlm([]), jev: () => scriptedDecisions({}) },
       modelIds: { gemini: "flash-lite-x" },
     });
     expect(judge.identity).toBe("gemini:flash-lite-x");
-    expect(createJudge({ provider: "gemini", clients: { gemini: () => scriptedLlm([]) } }).identity).toBe(
-      "gemini:unknown",
-    );
+    expect(
+      createJudge({
+        provider: "gemini",
+        clients: { gemini: () => scriptedLlm([]), jev: () => scriptedDecisions({}) },
+      }).identity,
+    ).toBe("gemini:unknown");
   });
 
   it("parses a labels request: a searchId and a whole page of 1 or more (YOY-148 AC-8)", () => {
@@ -566,7 +851,7 @@ describe("the judge on Engine v2 (on the database)", () => {
 
   function orchestrator(
     llm: LlmClient | undefined,
-    options: { deadlineMs?: number; giveUpMs?: number; findSetSize?: number } = {},
+    options: { deadlineMs?: number; giveUpMs?: number; findSetSize?: number; judge?: Judge } = {},
   ): SearchOrchestrator {
     return createSearchOrchestrator({
       db,
@@ -579,7 +864,11 @@ describe("the judge on Engine v2 (on the database)", () => {
         ...(options.findSetSize !== undefined ? { findSetSize: options.findSetSize } : {}),
       }),
       engineV2: true,
-      ...(llm !== undefined ? { judge: createLlmJudge({ llm }) } : {}),
+      ...(options.judge !== undefined
+        ? { judge: options.judge }
+        : llm !== undefined
+          ? { judge: createLlmJudge({ llm }) }
+          : {}),
       ...(options.deadlineMs !== undefined ? { judgeDeadlineMs: options.deadlineMs } : {}),
       ...(options.giveUpMs !== undefined ? { judgeGiveUpMs: options.giveUpMs } : {}),
     });
@@ -859,6 +1148,48 @@ describe("the judge on Engine v2 (on the database)", () => {
       engine: "v2",
     });
     expect(playground.details.judge?.outcome).toBe("judge-cached");
+  });
+
+  it("serves a page with a failed per-product question but never caches it; a fully answered page is cached (YOY-152)", async () => {
+    await seed(db, FOUR);
+    // Answers by the product's title; "Beach Sandal" fails on the first
+    // search only, like a transient 429 among the parallel calls.
+    let sandalFails = true;
+    const calls: string[] = [];
+    const decisions: DecisionClient = {
+      async decide(request) {
+        const row = String((request.state as Record<string, unknown>).product);
+        calls.push(row);
+        if (row.startsWith("Beach Sandal") && sandalFails) {
+          throw new Error("HTTP 429");
+        }
+        const verdict = row.startsWith("Black Midi") ? "exact" : row.startsWith("Beach") ? "close" : "not-relevant";
+        return {
+          verdict: { type: "choice", choice: verdict },
+          fact: { type: "yes-no", yes: 0.1 },
+          description: { type: "yes-no", yes: 0.1 },
+          excluded: { type: "yes-no", yes: 0.1 },
+        };
+      },
+    };
+    const engine = orchestrator(undefined, { judge: createDecisionJudge({ decisions }) });
+
+    const first = await search(engine);
+    expect(first).toMatchObject({ route: "ai", routeReason: "judged" });
+    expect(first.hits.find((hit) => hit.productId === "p2")?.verdict).toBe("not-relevant");
+    expect(first.hits[0]!.productId).toBe("p3");
+    expect(await db.judgeAnswer.count()).toBe(0);
+
+    sandalFails = false;
+    const second = await search(engine);
+    expect(second).toMatchObject({ routeReason: "judged" });
+    expect(second.hits.find((hit) => hit.productId === "p2")?.verdict).toBe("close");
+    expect(calls).toHaveLength(8);
+    expect(await db.judgeAnswer.count()).toBe(1);
+
+    const third = await search(engine);
+    expect(third).toMatchObject({ routeReason: "judge-cached" });
+    expect(calls).toHaveLength(8);
   });
 
   it("keys the cache on the sentence, the ids in order, card text hashes, the judge and the prompt version (YOY-148 AC-1)", () => {

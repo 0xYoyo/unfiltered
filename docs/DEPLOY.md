@@ -112,6 +112,7 @@ All of these live in the `unfiltered-prod` group (see above).
 | `DATABASE_URL` | Neon dashboard → connection string, **pooled** | Must be Neon's pooled host — `ep-<name>-<id>-pooler.<region>.aws.neon.tech` — with `pgbouncer=true&sslmode=require` (YOY-115 AC-4/AC-5). Serves every query; the pooler is PgBouncer in transaction mode. Written by `render-migrate.mts pool-database-url unfiltered-prod`, never by hand. |
 | `DIRECT_DATABASE_URL` | the same string on the **direct** (unpooled) host | Prisma's `directUrl`: `prisma migrate deploy` runs over it on every boot. `pool-database-url` writes it as the previous unpooled `DATABASE_URL`; the entrypoint defaults it to `DATABASE_URL` when unset, so an unpooled deployment keeps working. |
 | `GEMINI_API_KEY` | Google AI Studio | Required — the playground search route builds its metered Gemini clients per request and 500s without it. |
+| `OPENROUTER_API_KEY` | OpenRouter dashboard → Keys | Required only when `JUDGE_PROVIDER=jev` (YOY-152): the Jev judge client is built only for that provider and fails at construction without the key (`OpenRouterConfigError`). Also the `OPENROUTER_API_KEY` repository secret, for `score.yml -f judge=jev`. |
 | `SHOPIFY_API_KEY` | `npm run env -- pull --workspace app`, or the Partner dashboard | Client ID of the app record. |
 | `SHOPIFY_API_SECRET` | same | Client secret. |
 | `SHOPIFY_APP_URL` | this service's own URL | `https://<service>.onrender.com`, or the custom domain once attached. Not written back to the Shopify app record. |
@@ -124,7 +125,8 @@ All of these live in the `unfiltered-prod` group (see above).
 | `PLAYGROUND_DAILY_AI_CAP` | optional | Default `2000` AI searches/day across all playground catalogs. |
 | `PLAYGROUND_CATALOG_DAILY_AI_CAP` | optional | Default `500` AI searches/day per catalog. |
 | `GEMINI_*_MODEL`, `GEMINI_EMBEDDING_DIMENSION` | optional | Pin a model instead of the documented defaults in `packages/provider-gemini`. |
-| `JUDGE_PROVIDER` | optional | Which provider answers Engine v2's judge call (YOY-147); default `gemini`, the only one. An unknown name fails loudly when the orchestrator is built. The judge model is the provider's own: `GEMINI_JUDGE_MODEL` (default `gemini-3.5-flash-lite`). |
+| `JUDGE_PROVIDER` | optional | Which provider answers Engine v2's judge call (YOY-147); default `gemini`, or `jev` — TypeSafe's Jev via OpenRouter, one typed question set per product in parallel (YOY-152). An unknown name fails loudly when the orchestrator is built. The judge model is the provider's own: `GEMINI_JUDGE_MODEL` (default `gemini-3.5-flash-lite`) or `OPENROUTER_JUDGE_MODEL`. |
+| `OPENROUTER_JUDGE_MODEL` | optional | The `jev` judge's model (YOY-152 AC-1); default `typesafe/jev-1.13`. Must have a row in `config/ai-prices.json`, or the first metered call fails loudly. |
 | `GEMINI_JUDGE_THINKING_LEVEL` | optional | Thinking level of the judge call; default `low`. `model-default` sends no thinking config; an empty value fails loudly (`GeminiConfigError`). |
 | `GEMINI_EXTRACT_MODEL` | optional | Model of the wish extraction (YOY-149 AC-1); default `gemini-3.5-flash-lite`. |
 | `GEMINI_EXTRACT_THINKING_LEVEL` | optional | Thinking level of the wish extraction; default `low`. `model-default` sends no thinking config; an empty value fails loudly (`GeminiConfigError`). |
