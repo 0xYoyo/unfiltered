@@ -1,5 +1,5 @@
 # Unfiltered — PRD
-Version: 3.2 · Date: 2026-10-03
+Version: 3.3 · Date: 2026-10-04
 Supersedes v2; decisions in docs/RESET-2026-09-27.md. Refinements of
 2026-09-30 in §3 Engine v2 (binding where they differ from the text above
 them). Amendments of 2026-10-01 (budget rules, hidden-set home, label values,
@@ -11,6 +11,7 @@ v3.2 (2026-10-03, YOY-149): the 2026-10-01 amendments are version-bound —
 §3 Three kinds of wishes: a stated "in stock" is a firm filter; capability
 6: on judge failure the page keeps the code-computed price, size and stock
 labels.
+v3.3 (2026-10-04, YOY-152): the judge comparison was measured and decided — Jev (TypeSafe, via OpenRouter) is the default judge and Gemini 3.5 Flash-Lite the selectable fallback; measured judge costs replace the estimates in §3 and §8; the merchant-fact label and the two-meanings chip are dormant under Jev (YOY-158).
 
 Product type: B2B web SaaS, delivered first as a native Shopify app
 (self-serve). The engine is catalog-agnostic by design: a universal script
@@ -250,6 +251,7 @@ Topics are infinite; kinds are three. A new topic never adds code.
   thing the shopper asked for. Brown pants never answer "brown shirt".
 - Merchant facts decide whether it comes in what they asked; misses on
   colour/size/stock are shown on the same item with a label.
+- Under the Jev judge (default since 2026-10-04) the two-value merchant-fact label is dormant: such a product shows the generic "close match" line until YOY-158 lands. The code-computed price, size and stock labels are unaffected.
 - "Only black" / "must be M" moves that wish into the firm set for this
   search.
 
@@ -259,6 +261,7 @@ Topics are infinite; kinds are three. A new topic never adds code.
 - When both meanings have stock: show the likelier meaning; one tappable
   chip at the top switches ("Bridal gowns instead?"). No popup, no
   blocking question.
+- Under the Jev judge (default since 2026-10-04) the chip is dormant: a decision model writes no phrase. The Flash-Lite judge still produces it; a Jev version is assessed in YOY-158.
 
 **Scale and server-side pages.**
 - Vector find is sub-100 ms at millions of products.
@@ -285,6 +288,7 @@ the judge may compare images. Milestone 8.
 - Measured on the hidden score: quality, per-language quality, speed,
   stability (same search ×5). Winner takes page 1; the other is fallback.
   One swap point in code.
+- **Decided 2026-10-04 (YOY-152, hidden run 5, measured):** quality tied inside the noise bands (en 0.667 Flash-Lite vs 0.634 Jev, band 0.111; he 0.389 vs 0.407, band 0.090). Jev judged in 469 ms median against Flash-Lite's 1,504 ms (at the 1,500 ms deadline), gave identical verdicts 95.8 % vs 75.8 % of the time, and cost $0.82 vs $2.27 per 1,000 uncached searches (judge only). **Jev is the default judge (`JUDGE_PROVIDER` unset); Flash-Lite stays selectable.** Accepted with it: under Jev the merchant-fact label ("in grey, not black") and the two-meanings chip are dormant; a Jev version built from closed-list picks is YOY-158. Details: docs/SCORE.md "Decision — Jev is the default judge".
 - Speed fallback: if the judge misses ~1.5 s, page 1 shows the find-stage
   ranking with the code-computed price, size and stock labels at once; the
   judge's labels are added when it answers (amended 2026-10-01); positions
@@ -295,8 +299,7 @@ the judge may compare images. Milestone 8.
 Agreed in the co-manager plan review of 29–30 Sep 2026. Numbers marked
 "estimate" are the chat's estimates and are measured in M6.
 
-1. **One judge model.** Gemini 3.5 Flash-Lite, thinking level low, behind one
-   swap point in code. The M6 judge comparison tests exactly one challenger:
+1. **One judge model.** Jev (TypeSafe, `typesafe/jev-1.13` via OpenRouter) is the default from 2026-10-04 (YOY-152); Gemini 3.5 Flash-Lite, thinking level low, is the selectable fallback behind the same swap point in code. The M6 judge comparison tests exactly one challenger:
    Jev via OpenRouter (`typesafe/jev-1.13`; $0.042 per million input tokens,
    output free; 32,000-token context; answers yes/no, pick-one and score
    questions with confidence; no free text; one item per question, so a
@@ -309,8 +312,7 @@ Agreed in the co-manager plan review of 29–30 Sep 2026. Numbers marked
    values: the merchant-fact label carries two — the product's value and the
    asked value, each at most three words, in the language of the shopper's
    sentence — not one parameter (v3.1; see "The query path", amended
-   2026-10-01). Estimate: ≈ $1 per 1,000 uncached searches (replaces
-   the $2–4 figure, which assumed prose output).
+   2026-10-01). Measured 2026-10-04 (YOY-152): Flash-Lite ≈ $2.27 and Jev ≈ $0.82 per 1,000 uncached searches, judge only; the earlier ≈ $1 estimate is superseded.
 3. **Labels from code where the fact is the merchant's.** Size, stock and
    price labels are computed by code from the variants table, never by the
    judge. The judge judges the description side only. A stock or price
@@ -567,12 +569,9 @@ validated by measurement):
   products; cents/month for changes. Cards are written in priority order with
   raw-text find until a card exists (Refinement 9); a lazy
   full-card-on-first-hit variant stays an option if card cost matters.
-- Judge, uncached, short-code answers (estimate): Gemini ≈ $20/month; Jev ≈ $7/month. The answer cache cuts both; the real cache hit rate is measured in M6.
+- Judge, uncached, measured 2026-10-04 (YOY-152) at the typical store's 20,000 searches a month: Jev ≈ $16, Flash-Lite ≈ $45 (judge only). The answer cache cuts both; the real cache hit rate is measured on the live tail.
 - Hosting share $5–10.
-- At $99/month for the typical store above (20k searches): Gemini judge with short codes ≈ 70–75 % margin before cache (estimate: ≈ $20 judge + $5–10 hosting); Jev judge ≈ 85 %. At the tier's full allowance (50k searches) the Gemini judge margin falls to ≈ 45 % before cache — the answer cache hit rate and the judge comparison decide the tier limits. 500-product store ≈ $3–10/month cost.
-  200k-product/500k-search store → enterprise tier. Pricing tiers by
-  catalog size and search volume. The M6 judge comparison decides on
-  quality first, cost second.
+- At $99/month for the typical store above (20k searches), before cache, estimates from the measured judge cost plus $5–10 hosting: Jev judge ≈ 74–79 % margin; Flash-Lite judge ≈ 44–49 %. At the tier's full allowance (50k searches) Jev ≈ 48–54 % and Flash-Lite falls below zero — which is why Jev is the default (YOY-152, 2026-10-04) and the cache hit rate decides the tier limits. 500-product store ≈ $3–10/month cost. 200k-product/500k-search store → enterprise tier. Pricing tiers by catalog size and search volume.
 - Gross margin target: ≥60% per tier — re-validated after the M6 judge comparison (RESET §4); measured, not assumed.
 - Monthly profit scenarios at avg. $60/store revenue and 65% margin:
   pessimistic (30 stores): ~$1.2K; realistic (150 stores): ~$5.9K; good
