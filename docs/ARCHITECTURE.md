@@ -943,9 +943,10 @@ response gains `engine` and — on a paged response only — `page` and
 
 `packages/engine/src/judge.ts` holds the one judge interface (`Judge`) and
 the one factory (`createJudge({ provider, clients, maxRowChars? })`):
-`JUDGE_PROVIDER` (default `gemini`, `judgeProviderFromEnv`) picks which
-provider's `LlmClient` answers, and only that client is built. The judge
-model is the provider's own config (`GEMINI_JUDGE_MODEL`, Flash-Lite,
+`JUDGE_PROVIDER` (`judgeProviderFromEnv`; default `jev` since YOY-152
+AC-9, `gemini` the selectable fallback) picks which provider's client
+answers, and only that client is built. The judge model is the provider's
+own config (`OPENROUTER_JUDGE_MODEL`, Jev; `GEMINI_JUDGE_MODEL`, Flash-Lite,
 thinking level low); no other code names it. The orchestrator takes the
 judge as `judge` and its deadline as `judgeDeadlineMs`
 (`JUDGE_DEADLINE_MS`, default 1,500); `app/search/judge-step.server.ts`
