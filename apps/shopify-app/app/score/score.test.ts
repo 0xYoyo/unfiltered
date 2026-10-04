@@ -1082,6 +1082,12 @@ describe("the score workflow (YOY-141 AC-1, AC-2)", () => {
     expect(workflow).toContain("ENGINE_V2: ${{ inputs.engine == 'v2' && '1' || '0' }}");
   });
 
+  it("scores with the judge the dispatch names: gemini or jev into JUDGE_PROVIDER, gemini by default (YOY-152 AC-6)", () => {
+    expect(triggers).toMatch(/judge:\n(?:\s+.*\n)*?\s+default: gemini\n\s+type: choice\n\s+options:\n\s+- gemini\n\s+- jev\n/);
+    expect(workflow).toContain("JUDGE_PROVIDER: ${{ inputs.judge }}");
+    expect(workflow).toContain("OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}");
+  });
+
   it("gives the judge 4,000 ms on a score run, here and in score:public (YOY-147 AC-18)", () => {
     expect(workflow).toContain('JUDGE_DEADLINE_MS: "4000"');
     const manifest = JSON.parse(

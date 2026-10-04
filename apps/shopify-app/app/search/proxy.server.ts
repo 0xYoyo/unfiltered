@@ -24,6 +24,7 @@ import {
   createQueuedCostRecorder,
   type CostRecorder,
 } from "../ai/cost-recorder.server";
+import { createOpenRouterDecisionClient, openRouterModelsFromEnv } from "../ai/openrouter.server";
 import { createPgTrgmClassicStore } from "./classic-store.server";
 import { createFindStep, findSetSizeFromEnv } from "./find.server";
 import {
@@ -808,6 +809,7 @@ export function createProxySearchOrchestrator(
   }: { costRecorder?: CostRecorder; requestTimeoutMs?: number } = {},
 ): SearchOrchestrator {
   const models = geminiModelsFromEnv();
+  const openRouterModels = openRouterModelsFromEnv();
   const reuseWindowMs = intentReuseWindowMsFromEnv();
   const embeddings = createGeminiEmbeddingClient({
     modelId: models.embeddingModel,
@@ -881,7 +883,8 @@ export function createProxySearchOrchestrator(
     // Engine v2's judge (YOY-147): one call per page inside the find set,
     // through the one factory — `JUDGE_PROVIDER` picks the client, and the
     // model is the provider's own config (AC-1). Built only for the
-    // selected provider.
+    // selected provider; `jev` is the decision-model challenger over
+    // OpenRouter (YOY-152 AC-1).
     judge: createJudge({
       provider: judgeProviderFromEnv(process.env),
       clients: {
@@ -892,9 +895,15 @@ export function createProxySearchOrchestrator(
             thinkingLevel: models.judgeThinkingLevel,
             ...(requestTimeoutMs !== undefined ? { requestTimeoutMs } : {}),
           }),
+        jev: () =>
+          createOpenRouterDecisionClient({
+            modelId: openRouterModels.judgeModel,
+            costRecorder,
+            ...(requestTimeoutMs !== undefined ? { requestTimeoutMs } : {}),
+          }),
       },
       // The answer-cache key names the model (YOY-148 AC-1).
-      modelIds: { gemini: models.judgeModel },
+      modelIds: { gemini: models.judgeModel, jev: openRouterModels.judgeModel },
       maxRowChars: judgeRowCharsFromEnv(),
     }),
     judgeDeadlineMs: judgeDeadlineMsFromEnv(),

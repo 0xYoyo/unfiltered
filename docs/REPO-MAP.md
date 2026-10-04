@@ -48,6 +48,8 @@ apps/
         cost-aggregates.server.ts
         cost-recorder.server.ts
         cost-recorder.test.ts
+        openrouter.server.ts
+        openrouter.test.ts
         pricing.server.ts
         pricing.test.ts
       catalog-embedding.test.ts
@@ -364,6 +366,8 @@ apps/
         extraction-cache.server.ts
         find-recall.test.ts
         find.server.ts
+        judge-compare.server.ts
+        judge-compare.test.ts
         judge-step.server.ts
         judge.test.ts
         orchestrator.server.ts
@@ -500,6 +504,7 @@ apps/
       evidence.mts
       ingest-public.mts
       ingest.mts
+      judge-compare.mts
       latency-probe-queries.json
       latency-probe.mts
       latency-probe.test.ts
@@ -1212,6 +1217,7 @@ vitest.setup.ts
 - apps/shopify-app/app/ai-costs.test.ts → apps/shopify-app/app/ai/cost-aggregates.server.ts, apps/shopify-app/app/ai/cost-recorder.server.ts, apps/shopify-app/app/db.server.ts, apps/shopify-app/app/routes/internal.costs.tsx, apps/shopify-app/app/testing/helpers.server.ts
 - apps/shopify-app/app/ai/cost-recorder.server.ts → apps/shopify-app/app/ai/pricing.server.ts
 - apps/shopify-app/app/ai/cost-recorder.test.ts → apps/shopify-app/app/ai/cost-recorder.server.ts, apps/shopify-app/app/testing/helpers.server.ts
+- apps/shopify-app/app/ai/openrouter.test.ts → apps/shopify-app/app/ai/openrouter.server.ts
 - apps/shopify-app/app/ai/pricing.server.ts → config/ai-prices.json (unresolved)
 - apps/shopify-app/app/ai/pricing.test.ts → apps/shopify-app/app/ai/pricing.server.ts
 - apps/shopify-app/app/catalog-embedding.test.ts → apps/shopify-app/app/ai/cost-recorder.server.ts, apps/shopify-app/app/catalog/embed.server.ts, apps/shopify-app/app/catalog/mapping.server.ts, apps/shopify-app/app/catalog/mapping.test.ts, apps/shopify-app/app/testing/helpers.server.ts
@@ -1337,13 +1343,15 @@ vitest.setup.ts
 - apps/shopify-app/app/search/extraction-cache.server.ts → apps/shopify-app/app/search/events.server.ts
 - apps/shopify-app/app/search/find-recall.test.ts → apps/shopify-app/app/score/cli.server.ts, apps/shopify-app/app/score/fixture.server.ts, apps/shopify-app/app/search/card-retrieval.server.ts, apps/shopify-app/app/search/classic-store.server.ts, apps/shopify-app/app/search/find.server.ts, apps/shopify-app/app/testing/helpers.server.ts
 - apps/shopify-app/app/search/find.server.ts → apps/shopify-app/app/search/card-retrieval.server.ts
+- apps/shopify-app/app/search/judge-compare.server.ts → apps/shopify-app/app/ai/cost-recorder.server.ts, apps/shopify-app/app/score/cli.server.ts, apps/shopify-app/app/score/fixture.server.ts, apps/shopify-app/app/score/set.server.ts, apps/shopify-app/app/search/orchestrator.server.ts, apps/shopify-app/app/search/playground-search.server.ts, apps/shopify-app/app/search/proxy.server.ts, apps/shopify-app/app/testing/helpers.server.ts
+- apps/shopify-app/app/search/judge-compare.test.ts → apps/shopify-app/app/search/judge-compare.server.ts
 - apps/shopify-app/app/search/judge-step.server.ts → apps/shopify-app/app/search/events.server.ts
 - apps/shopify-app/app/search/judge.test.ts → apps/shopify-app/app/ai/cost-aggregates.server.ts, apps/shopify-app/app/eval/replay.server.ts, apps/shopify-app/app/playground/api.server.ts, apps/shopify-app/app/search/classic-store.server.ts, apps/shopify-app/app/search/events.server.ts, apps/shopify-app/app/search/find.server.ts, apps/shopify-app/app/search/judge-step.server.ts, apps/shopify-app/app/search/orchestrator.server.ts, apps/shopify-app/app/search/proxy.server.ts, apps/shopify-app/app/testing/helpers.server.ts
 - apps/shopify-app/app/search/orchestrator.server.ts → apps/shopify-app/app/search/classic-store.server.ts, apps/shopify-app/app/search/events.server.ts, apps/shopify-app/app/search/extraction-cache.server.ts, apps/shopify-app/app/search/find.server.ts, apps/shopify-app/app/search/judge-step.server.ts, apps/shopify-app/app/search/stages.ts, apps/shopify-app/app/search/wishes.server.ts
 - apps/shopify-app/app/search/orchestrator.test.ts → apps/shopify-app/app/ai/cost-recorder.server.ts, apps/shopify-app/app/search/classic-store.server.ts, apps/shopify-app/app/search/orchestrator.server.ts, apps/shopify-app/app/search/retrieval-store.server.ts, apps/shopify-app/app/testing/helpers.server.ts, apps/shopify-app/widget/src/search-client.ts
 - apps/shopify-app/app/search/playground-search.server.ts → apps/shopify-app/app/playground/api.server.ts, apps/shopify-app/app/search/orchestrator.server.ts, apps/shopify-app/app/search/wishes.server.ts
 - apps/shopify-app/app/search/proxy-contract.test.ts → apps/shopify-app/app/search/orchestrator.server.ts, apps/shopify-app/app/search/proxy.server.ts, apps/shopify-app/widget/src/search-client.ts
-- apps/shopify-app/app/search/proxy.server.ts → apps/shopify-app/app/ai/cost-recorder.server.ts, apps/shopify-app/app/search/classic-store.server.ts, apps/shopify-app/app/search/find.server.ts, apps/shopify-app/app/search/judge-step.server.ts, apps/shopify-app/app/search/orchestrator.server.ts, apps/shopify-app/app/search/retrieval-store.server.ts, apps/shopify-app/app/search/wishes.server.ts
+- apps/shopify-app/app/search/proxy.server.ts → apps/shopify-app/app/ai/cost-recorder.server.ts, apps/shopify-app/app/ai/openrouter.server.ts, apps/shopify-app/app/search/classic-store.server.ts, apps/shopify-app/app/search/find.server.ts, apps/shopify-app/app/search/judge-step.server.ts, apps/shopify-app/app/search/orchestrator.server.ts, apps/shopify-app/app/search/retrieval-store.server.ts, apps/shopify-app/app/search/wishes.server.ts
 - apps/shopify-app/app/search/refinement.test.ts → apps/shopify-app/app/playground/api.server.ts, apps/shopify-app/app/search/classic-store.server.ts, apps/shopify-app/app/search/extraction-cache.server.ts, apps/shopify-app/app/search/find.server.ts, apps/shopify-app/app/search/judge-step.server.ts, apps/shopify-app/app/search/orchestrator.server.ts, apps/shopify-app/app/search/proxy.server.ts, apps/shopify-app/app/testing/helpers.server.ts
 - apps/shopify-app/app/search/retrieval-store.server.ts → apps/shopify-app/app/catalog/hnsw.server.ts
 - apps/shopify-app/app/search/retrieval-store.test.ts → apps/shopify-app/app/search/retrieval-store.server.ts, apps/shopify-app/app/testing/helpers.server.ts
@@ -1371,6 +1379,7 @@ vitest.setup.ts
 - apps/shopify-app/app/workspace-resolution.test.ts → apps/shopify-app/app/eval/source-guard.server.ts, apps/shopify-app/vite.config.ts, vitest.config.ts
 - apps/shopify-app/scripts/ingest-public.mts → apps/shopify-app/app/catalog/card.server.ts, apps/shopify-app/app/catalog/embed.server.ts, apps/shopify-app/app/catalog/enrich.server.ts, apps/shopify-app/app/playground/ingest-public-cli.server.ts, apps/shopify-app/app/playground/jsonld-crawl-source.server.ts, apps/shopify-app/app/playground/polite-fetch.server.ts
 - apps/shopify-app/scripts/ingest.mts → apps/shopify-app/app/catalog/card-embed.server.ts, apps/shopify-app/app/catalog/card.server.ts, apps/shopify-app/app/catalog/embed.server.ts, apps/shopify-app/app/catalog/enrich.server.ts, apps/shopify-app/app/catalog/ingest.server.ts, apps/shopify-app/app/catalog/offline-token.server.ts
+- apps/shopify-app/scripts/judge-compare.mts → apps/shopify-app/app/search/judge-compare.server.ts
 - apps/shopify-app/scripts/latency-probe.mts → apps/shopify-app/app/search/stages.ts
 - apps/shopify-app/scripts/latency-probe.test.ts → apps/shopify-app/app/search/events.server.ts, apps/shopify-app/app/search/stages.ts, apps/shopify-app/scripts/latency-probe.mts
 - apps/shopify-app/scripts/live-smoke.test.ts → apps/shopify-app/app/testing/fake-store.server.ts, apps/shopify-app/scripts/live-smoke.mts

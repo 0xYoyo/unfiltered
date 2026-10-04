@@ -9,17 +9,22 @@
  * Vendor-free by the engine's boundary rule: the judge speaks to the
  * `LlmClient` port, and the model behind it is the consumer's concern. The
  * one factory, `createJudge`, picks the port from `JUDGE_PROVIDER`; no code
- * outside the provider adapter names a judge model (AC-1).
+ * outside the provider adapter names a judge model (AC-1). The challenger
+ * (YOY-152) speaks to the `DecisionClient` port instead: one typed question
+ * set per product, asked in parallel.
  */
 
 import { previousChainLine } from "./extract.js";
-import type { JsonSchema, LlmClient } from "./index.js";
+import type { DecisionClient, DecisionQuestion, JsonSchema, LlmClient } from "./index.js";
 
 /** Env var naming which provider answers the judge call (AC-1). */
 export const JUDGE_PROVIDER_ENV = "JUDGE_PROVIDER";
 
-/** Providers the factory can select; `gemini` is the default (AC-1, NG-4). */
-export const JUDGE_PROVIDERS = ["gemini"] as const;
+/**
+ * Providers the factory can select; `gemini` is the default (AC-1, NG-4).
+ * `jev` is the decision-model challenger (YOY-152 AC-1).
+ */
+export const JUDGE_PROVIDERS = ["gemini", "jev"] as const;
 export type JudgeProvider = (typeof JUDGE_PROVIDERS)[number];
 export const DEFAULT_JUDGE_PROVIDER: JudgeProvider = "gemini";
 
@@ -506,11 +511,185 @@ export function createLlmJudge(options: LlmJudgeOptions): Judge {
   };
 }
 
+/**
+ * The questions the decision judge asks about each product (YOY-152 AC-2):
+ * the verdict as pick-one, each missed-wish flag and the exclusion as
+ * yes/no. A decision model writes no text, so there is no label question:
+ * the label follows the verdict (AC-3), and no second reading is asked.
+ */
+export const DECISION_JUDGE_QUESTIONS: Record<
+  "verdict" | "fact" | "description" | "excluded",
+  DecisionQuestion
+> = {
+  verdict: {
+    type: "choice",
+    instructions: "How well does the product match the shopper's search? Judge it only by what the product row says.",
+    criteria: {
+      exact: "Every wish the shopper stated is met by the product row.",
+      "other-variant": "The item the shopper asked for, but only in another colour or size than asked.",
+      close:
+        "The right kind of product, but a stated wish the row contradicts or does not mention (long sleeves asked and the row says sleeveless or says nothing of sleeves).",
+      "not-relevant": "The wrong kind of product.",
+    },
+  },
+  fact: {
+    type: "yes-no",
+    instructions:
+      "Does a merchant fact the shopper asked for (material, colour, size, price, an option) differ in the product row, or is it not shown?",
+    criteria: {
+      yes: "A merchant fact the shopper asked for differs or is not shown.",
+      no: "Every merchant fact the shopper asked for is shown and matches, or none was asked.",
+    },
+  },
+  description: {
+    type: "yes-no",
+    instructions:
+      "Does a described quality the shopper asked for (style, look, sleeves, length, fit, occasion) go unmet in the product row, or is it not shown?",
+    criteria: {
+      yes: "A described quality the shopper asked for is not met or not shown.",
+      no: "Every described quality the shopper asked for is met, or none was asked.",
+    },
+  },
+  excluded: {
+    type: "yes-no",
+    instructions:
+      "Is the product something the shopper said they do NOT want (\"not black\" and the product is black; \"no wool\" and it is wool)?",
+    criteria: {
+      yes: "The product is something the shopper ruled out.",
+      no: "The shopper ruled nothing out that this product is.",
+    },
+  },
+};
+
+/** The note the decision judge adds to each question when a previous search is sent. */
+const DECISION_PREVIOUS_NOTE =
+  "The search may refine the previous search (keep its wishes and add or change some) or replace it with a different search. Judge against what the shopper wants now. ";
+
+/** A yes/no answer reads as yes from this probability. */
+const DECISION_YES_AT = 0.5;
+
+/** One product's typed answers as a verdict, or null when an answer is missing or unknown. */
+function decisionVerdict(
+  candidate: JudgeCandidate,
+  answers: Record<string, unknown>,
+): JudgeVerdict | null {
+  const verdictAnswer = answers.verdict as { type?: unknown; choice?: unknown } | undefined;
+  const choice = verdictAnswer?.type === "choice" ? verdictAnswer.choice : undefined;
+  if (typeof choice !== "string" || !(JUDGE_VERDICTS as readonly string[]).includes(choice)) {
+    return null;
+  }
+  const flags: Record<string, boolean> = {};
+  for (const key of ["fact", "description", "excluded"]) {
+    const answer = answers[key] as { type?: unknown; yes?: unknown } | undefined;
+    if (answer?.type !== "yes-no" || typeof answer.yes !== "number" || !Number.isFinite(answer.yes)) {
+      return null;
+    }
+    flags[key] = answer.yes >= DECISION_YES_AT;
+  }
+  const verdict = choice as JudgeVerdictCode;
+  const excluded = flags.excluded === true;
+  return {
+    id: candidate.id,
+    verdict,
+    missed: JUDGE_MISSED_WISHES.filter((wish) => flags[wish] === true),
+    // No text, so no `fact-differs` values (AC-3): a product off the ask
+    // in any way carries `close-match`, the label a `fact-differs` becomes.
+    label:
+      !excluded && (verdict === "other-variant" || verdict === "close")
+        ? { template: "close-match", values: [] }
+        : null,
+    excluded,
+  };
+}
+
+/** A failed or unanswerable question: the candidate is read as not relevant. */
+function notRelevant(candidate: JudgeCandidate): JudgeVerdict {
+  return { id: candidate.id, verdict: "not-relevant", missed: [], label: null, excluded: false };
+}
+
+export interface DecisionJudgeOptions {
+  decisions: DecisionClient;
+  /** Provider and model, for the answer-cache key (YOY-148 AC-1). */
+  identity?: string;
+  /** Characters a candidate row is cut to (AC-2). */
+  maxRowChars?: number;
+}
+
+/**
+ * The judge over the decision port (YOY-152 AC-1 – AC-3): one request per
+ * product, every product of the page in parallel, under ledger operation
+ * `judge`. The same answer shape as the LLM judge. One failed or invalid
+ * answer reads its product as not relevant; when every product fails, the
+ * call rejects, so the page is served as a judge error like a failed LLM
+ * call. Never a second reading: a decision model writes no text.
+ */
+export function createDecisionJudge(options: DecisionJudgeOptions): Judge {
+  const { decisions } = options;
+  const maxRowChars = options.maxRowChars ?? DEFAULT_JUDGE_ROW_CHARS;
+  return {
+    ...(options.identity !== undefined ? { identity: options.identity } : {}),
+    async judge(request) {
+      const previous =
+        request.previousSentence === undefined || request.previousSentence.trim() === ""
+          ? undefined
+          : previousChainLine(request.previousSentence);
+      const questions = Object.fromEntries(
+        Object.entries(DECISION_JUDGE_QUESTIONS).map(([key, question]) => [
+          key,
+          previous === undefined
+            ? question
+            : { ...question, instructions: `${DECISION_PREVIOUS_NOTE}${question.instructions}` },
+        ]),
+      );
+      const settled = await Promise.allSettled(
+        request.candidates.map((candidate) =>
+          decisions.decide({
+            state: {
+              ...(previous !== undefined ? { previous_search: previous } : {}),
+              search: oneLine(request.sentence),
+              product: judgeRow(candidate, maxRowChars),
+            },
+            questions,
+            operation: "judge",
+            storeId: request.storeId,
+            searchId: request.searchId,
+            signal: request.signal,
+          }),
+        ),
+      );
+      if (request.signal?.aborted) {
+        throw request.signal.reason ?? new Error("judge aborted");
+      }
+      const verdicts = request.candidates.map((candidate, index) => {
+        const outcome = settled[index]!;
+        return outcome.status === "fulfilled"
+          ? decisionVerdict(candidate, outcome.value as Record<string, unknown>)
+          : null;
+      });
+      if (request.candidates.length > 0 && verdicts.every((verdict) => verdict === null)) {
+        const failure = settled.find((outcome) => outcome.status === "rejected");
+        throw failure !== undefined
+          ? (failure as PromiseRejectedResult).reason
+          : new JudgeAnswerError(
+              `no decision answer for any of the ${request.candidates.length} candidates was valid`,
+            );
+      }
+      return {
+        verdicts: verdicts.map((verdict, index) => verdict ?? notRelevant(request.candidates[index]!)),
+        otherReading: null,
+      };
+    },
+  };
+}
+
 export interface JudgeFactoryOptions {
   /** Which provider answers; `judgeProviderFromEnv` reads it from `JUDGE_PROVIDER`. */
   provider: JudgeProvider;
-  /** The provider's LLM client for the judge call, built only for the selected one. */
-  clients: Record<JudgeProvider, () => LlmClient>;
+  /**
+   * Each provider's client for the judge call, built only for the selected
+   * one: an LLM for `gemini`, a decision model for `jev` (YOY-152 AC-1).
+   */
+  clients: { gemini: () => LlmClient; jev: () => DecisionClient };
   /** The model each provider's client calls, for the answer-cache key (YOY-148 AC-1). */
   modelIds?: Partial<Record<JudgeProvider, string>>;
   maxRowChars?: number;
@@ -519,11 +698,11 @@ export interface JudgeFactoryOptions {
 /** The one judge factory (AC-1): the selected provider's client behind the one judge. */
 export function createJudge(options: JudgeFactoryOptions): Judge {
   const modelId = options.modelIds?.[options.provider] ?? "unknown";
-  return createLlmJudge({
-    llm: options.clients[options.provider](),
-    identity: `${options.provider}:${modelId}`,
-    ...(options.maxRowChars !== undefined ? { maxRowChars: options.maxRowChars } : {}),
-  });
+  const identity = `${options.provider}:${modelId}`;
+  const rows = options.maxRowChars !== undefined ? { maxRowChars: options.maxRowChars } : {};
+  return options.provider === "jev"
+    ? createDecisionJudge({ decisions: options.clients.jev(), identity, ...rows })
+    : createLlmJudge({ llm: options.clients.gemini(), identity, ...rows });
 }
 
 const VERDICT_RANK: Record<JudgeVerdictCode, number> = {
