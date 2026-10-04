@@ -78,6 +78,11 @@ gh workflow run score.yml -f ref=main   # ref: any branch, tag or SHA
 gh run view --log
 ```
 
+Two choice inputs pick what is scored: `engine` (`v1` or `v2`, sets
+`ENGINE_V2`) and `judge` (`gemini` or `jev`, sets `JUDGE_PROVIDER`; YOY-152).
+A judge input that is not on the default branch's workflow yet is dispatched
+with `--ref <branch>`, so the branch's own workflow file runs.
+
 The workflow runs on `workflow_dispatch` only — never on push or pull
 request, never inside `ci.yml`. It checks out `ref`, writes the secret to
 the runner's temp directory, runs `score-run.mts --hidden-set` with
@@ -249,6 +254,8 @@ line.
 | 2 | Engine v2 find step (`ENGINE_V2=1`) | 0.597 | 0.278 | 0.569 | 0.569 | 0.574 | 0.384 | — (not deployed) | $0.0276 |
 | 3 | Engine v2 find step + judge reading facts (`ENGINE_V2=1`, judge deadline 4,000 ms) | 0.644 | 0.366 | 0.491 | 0.676 | 0.569 | 0.431 | — (not deployed) | $0.1858 |
 | 4 | Engine v2 + stated wishes (YOY-149) + refinement and second reading (YOY-150) (`ENGINE_V2=1`, judge deadline 4,000 ms) | 0.671 | 0.407 | 0.500 | 0.657 | 0.500 | 0.421 | — (not deployed) | $0.2128 |
+| 5 (gemini judge) | Engine v2 as run 4, judge `JUDGE_PROVIDER=gemini` (YOY-152 branch) | 0.667 | 0.389 | 0.537 | 0.657 | 0.583 | 0.394 | — (not deployed) | $0.2054 |
+| 5 (jev judge) | Engine v2 as run 4, judge `JUDGE_PROVIDER=jev` (YOY-152 branch) | 0.634 | 0.407 | 0.574 | 0.657 | 0.542 | 0.398 | — (not deployed) | $0.1053 |
 | 3 (first, superseded) | Engine v2 find step + judge reading the summary (`ENGINE_V2=1`, deadline 1,500 ms) | 0.597 | 0.292 | 0.556 | 0.648 | 0.542 | 0.403 | — (not deployed) | $0.0928 |
 | 1 (invalid: 18 failures) | M5 engine | 0.306 | 0.032 | 0.181 | 0.083 | 0.167 | 0.106 | — | $0.0391 |
 
@@ -319,6 +326,61 @@ public reference, so the hidden fr drop does not show on the public half.
 Decision A (2026-10-03): en and he hold, so the gate is met; fr is tracked
 and re-checked at hidden run 5 against run 3's 0.569 (see "Which languages
 gate" under The hidden run).
+
+Run 5 — the judge comparison (YOY-152 AC-7): dispatched twice on
+2026-10-04 with `ref=YOY-152-jev-judge`, `engine=v2` and `--ref
+YOY-152-jev-judge` (the `judge` input exists only on the branch), once per
+judge: [run 37217854638](https://github.com/0xYoyo/unfiltered/actions/runs/37217854638)
+(`judge=gemini`) and [run 37217856382](https://github.com/0xYoyo/unfiltered/actions/runs/37217856382)
+(`judge=jev`). Both green, leak check clean (72 checked), **0 failed
+searches**. Everything but the judge is the same: run 4's engine with the
+Flash-Lite extraction and Flash-Lite grader. The Jev run's 1,944 model calls
+are 72 embeddings, 72 extractions, 72 grades and 1,728 one-product judge
+questions (24 per page). fr re-check (decision A): the Gemini judge's fr is
+0.583, above run 3's 0.569 — the run-4 drop does not repeat; the Jev judge's
+fr is 0.542, 0.027 under run 3, inside the 0.030 band.
+
+### Judge comparison — Flash-Lite versus Jev (YOY-152, 2026-10-04)
+
+Per-language score: hidden run 5 above. Median latency, cost and stability:
+`npx tsx scripts/judge-compare.mts --judge gemini|jev` — the public half (78
+searches) over the seed fixture on a scratch database, Engine v2, the
+production orchestrator with the score run's 4,000 ms judge deadline, a
+local run from Israel (not the deployment). Latency is the judge stage's
+median over the 78 judged searches; cost is the judge's ledger rows
+(operation `judge`) over those searches, per 1,000; stability is the first
+five public searches run five times each, the answer cache emptied before
+every run, as the share of page-1 products whose verdict was identical in
+all five runs.
+
+| | Flash-Lite (gemini) | Jev (jev) |
+|---|---|---|
+| en (gated) | **0.667** | 0.634 |
+| he (gated) | 0.389 | **0.407** |
+| ar | 0.537 | **0.574** |
+| ru | 0.657 | 0.657 |
+| fr | **0.583** | 0.542 |
+| es | 0.394 | **0.398** |
+| Judge median latency | 1,504 ms | **469 ms** |
+| Cost per 1,000 uncached searches (judge only) | $2.266 | **$0.815** |
+| Stability (5 searches × 5 runs, identical verdicts) | 75.8 % (91/120) | **95.8 %** (113/118) |
+| Merchant-fact label possible ("in grey, not black") | **yes** | no |
+| Second-reading chip possible (YOY-150's two meanings) | **yes** | no |
+| Hidden run 5 total cost (72 searches, grades included) | $0.2054 | $0.1053 |
+
+Against each language's band (`max(M5 band, 0.03)`): en −0.033 for Jev
+(band 0.111) and he +0.018 for Jev (band 0.090) — the gated languages are
+equal within noise. ar +0.037 for Jev and fr −0.041 for Jev each sit just
+past the 0.030 band, in opposite directions; ru and es are equal. Flash-Lite's
+median sits at the production deadline (1,500 ms), so about half its
+page-1 calls would serve find order first and add labels late; Jev's
+median is under a third of it. Jev's cost is ≈ 30,000 input tokens per page
+(24 products × the questions and one row each, ≈ 716 tokens per product,
+output free) — above the PRD's ≈ $0.30–0.40 estimate; Flash-Lite's is above
+the $0.958 measured at YOY-147 because the rows are now facts rows (AC-17).
+
+The winner is the founder's to name on YOY-152 (AC-8); the decision and the
+new default are recorded here by the closing slice (AC-9).
 
 Speed and judge cost (YOY-147 AC-15), measured locally on the public half
 (78 searches over the seed fixture, `ENGINE_V2=1`, 2026-10-02; a local run
