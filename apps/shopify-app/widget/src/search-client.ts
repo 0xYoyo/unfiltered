@@ -32,6 +32,18 @@ export interface ProxyResult {
    * responses from a server predating the field.
    */
   colorUnknown?: boolean;
+  /**
+   * How the result misses a stated wish (YOY-147 AC-9, YOY-149 AC-12): a
+   * template name and its values, rendered as the card's one label line
+   * (YOY-151). Null when it misses nothing; absent from the old engine.
+   */
+  label?: ProxyLabel | null;
+}
+
+/** A label as the proxy serves it; the widget fills the template (YOY-151). */
+export interface ProxyLabel {
+  template: string;
+  values: string[];
 }
 
 /** One applied-constraint chip as the proxy serves it. */
@@ -100,6 +112,11 @@ export interface ProxySearchResponse {
    * "{reading} instead?" at the start of the chip row.
    */
   otherReading?: string;
+  /**
+   * Present (true) only when the judge missed its deadline (YOY-148 AC-7):
+   * this page's labels arrive later from the labels endpoint (YOY-151 AC-8).
+   */
+  labelsPending?: true;
 }
 
 /** One page of a submitted search (YOY-146 AC-1): 1-based, and its size. */
@@ -301,6 +318,16 @@ export interface SearchClient {
     productId: string;
     position: number;
   }): void;
+  /**
+   * One page's late labels (YOY-148 AC-8, YOY-151 AC-8): the labels
+   * endpoint holds until the judge answers or gives up, then answers a
+   * label (or null) per product id — never an order. Rejects on any
+   * failure; the caller leaves the reserved lines empty.
+   */
+  fetchLabels(
+    searchId: string,
+    page: number,
+  ): Promise<Record<string, ProxyLabel | null>>;
 }
 
 export function createSearchClient(
@@ -372,6 +399,23 @@ export function createSearchClient(
         { classic: true, ...(paging !== undefined ? { paging } : {}) },
         fallbackTimeoutMs,
       );
+    },
+
+    async fetchLabels(searchId, page) {
+      const params = new URLSearchParams({ searchId, page: String(page) });
+      const response = await fetch(`${basePath}/labels?${params}`, {
+        method: "GET",
+      });
+      if (!response.ok) {
+        throw new Error(`labels failed: ${response.status}`);
+      }
+      const body = (await response.json()) as {
+        labels?: Record<string, ProxyLabel | null>;
+      };
+      if (typeof body !== "object" || body === null || typeof body.labels !== "object" || body.labels === null) {
+        throw new Error("labels response not contract-shaped");
+      }
+      return body.labels;
     },
 
     sendClickBeacon(beacon) {

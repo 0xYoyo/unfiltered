@@ -1,10 +1,18 @@
+import { useLayoutEffect, useRef, useState } from "react";
+
 import { formatPrice } from "../../../widget/src/format";
+import {
+  labelOverflows,
+  labelSegments,
+  type LabelLike,
+  type LabelSegment,
+} from "../../../widget/src/labels";
 import type { PlaygroundStrings } from "../strings";
 
 /**
  * One result card (YOY-92 AC-6), with the widget's card anatomy so what the
  * playground previews is what a store gets (P-5, W-6): square cover image,
- * title, price, sold-out pill, and nothing else.
+ * title, price, the label line (YOY-151), sold-out pill, and nothing else.
  *
  * `formatPrice` is imported from the widget rather than reimplemented — the
  * one import NG-3 allows — so a price never reads differently on the two
@@ -22,19 +30,74 @@ export interface PlaygroundCard {
   available: boolean;
   /** Passed a colour filter without colour evidence (YOY-93 AC-4). */
   colorUnknown?: boolean;
+  /** How it misses a stated wish (YOY-147, YOY-149), or null (YOY-151). */
+  label?: LabelLike | null;
+}
+
+/**
+ * The label line (YOY-151 AC-3, W-11): one line directly under the price,
+ * `--text-muted` at `--size-caption`. A label wider than the card is not
+ * shown at all — never truncated, never wrapped (AC-6) — and the width is
+ * measured before paint, so an overflowing label never flashes. While the
+ * page's labels are pending the line is reserved empty (AC-8), at the
+ * label's own fixed height, so the label lands without moving the card.
+ */
+function CardLabel({
+  segments,
+  reserved,
+}: {
+  segments: LabelSegment[] | null;
+  reserved: boolean;
+}) {
+  const ref = useRef<HTMLSpanElement | null>(null);
+  const [overflows, setOverflows] = useState(false);
+  useLayoutEffect(() => {
+    setOverflows(ref.current !== null && labelOverflows(ref.current));
+  }, [segments]);
+
+  const shown = segments !== null && !overflows;
+  if (!shown && !reserved) {
+    return null;
+  }
+  return (
+    <span
+      ref={ref}
+      className="cardLabel"
+      data-testid={shown ? "playground-card-label" : undefined}
+      data-label-slot={reserved ? "" : undefined}
+    >
+      {/* A sentence in the chrome's language, so it takes the page's
+          direction; each value is isolated, so a Latin amount inside a
+          Hebrew sentence keeps its own order (X-7). */}
+      {shown
+        ? segments.map((segment, index) =>
+            segment.value ? (
+              <bdi key={index}>{segment.text}</bdi>
+            ) : (
+              segment.text
+            ),
+          )
+        : null}
+    </span>
+  );
 }
 
 export function Card({
   card,
   position,
   strings,
+  labelPending = false,
   onOpen,
 }: {
   card: PlaygroundCard;
   position: number;
   strings: PlaygroundStrings;
+  /** This card's page is waiting for its late labels (YOY-151 AC-8). */
+  labelPending?: boolean;
   onOpen: (card: PlaygroundCard, position: number) => void;
 }) {
+  const label = labelSegments(strings, card.label);
+  const labelKey = label?.map((segment) => segment.text).join("") ?? "";
   const body = (
     <>
       {card.imageUrl === null ? (
@@ -63,6 +126,9 @@ export function Card({
           {formatPrice(card.priceMin, card.priceMax, card.currencyCode)}
         </bdi>
       </span>
+      {/* Keyed by its text, so a label that arrives late is measured
+          afresh rather than inheriting an earlier one's verdict. */}
+      <CardLabel key={labelKey} segments={label} reserved={labelPending} />
       {card.available ? null : (
         <span className="cardSoldOut" data-testid="playground-card-soldout">
           {strings.soldOut}

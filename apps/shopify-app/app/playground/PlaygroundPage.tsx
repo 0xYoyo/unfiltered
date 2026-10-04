@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import type { ProxyChip, ProxyIntent } from "../search/proxy.server";
+import type {
+  ProxyChip,
+  ProxyIntent,
+  ProxyLabel,
+} from "../search/proxy.server";
 import type { PlaygroundSearchResponse } from "./api.server";
 import type { PlaygroundCard } from "./components/Card";
 import { ChipRow } from "./components/ChipRow";
@@ -14,6 +18,7 @@ import { StatusLine } from "./components/StatusLine";
 import { StoreLine } from "./components/StoreLine";
 import {
   PREVIEW_DEBOUNCE_MS,
+  fetchPlaygroundLabels,
   searchPlayground,
   sendPlaygroundClick,
   type RemovedChip,
@@ -100,6 +105,17 @@ export function PlaygroundPage({
   const [more, setMore] = useState<PlaygroundCard[]>([]);
   const [loadingMore, setLoadingMore] = useState(false);
   const pagingRef = useRef<PagingState | null>(null);
+  // Late labels (YOY-151 AC-8): the cards whose page answered with
+  // `labelsPending` reserve their label line, and the labels endpoint's
+  // answer lands here by product id — never re-ordering a card (AC-9).
+  // `labelsGenRef` counts responses, so an answer for a replaced one drops.
+  const [labelsPending, setLabelsPending] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  const [lateLabels, setLateLabels] = useState<
+    Record<string, ProxyLabel | null>
+  >({});
+  const labelsGenRef = useRef(0);
   // The searchId a click beacon may carry: the last SUBMITTED response's,
   // or null while the cards on screen belong to a keystroke preview. A
   // preview writes no SearchEvent row (YOY-68 AC-3), so its searchId is not
@@ -146,6 +162,45 @@ export function PlaygroundPage({
   const carryRef = useRef<string | null>(null);
   const chainRef = useRef<string | null>(null);
   const [carryHeld, setCarryHeld] = useState(false);
+
+  /**
+   * Reserve a pending page's label lines and ask once for its labels
+   * (YOY-151 AC-8). `fresh` starts a new response's set; a later page
+   * adds to the one on screen.
+   */
+  const awaitLabels = useCallback(
+    (page: PlaygroundSearchResponse, fresh: boolean, labelled = true) => {
+      const generation = fresh
+        ? (labelsGenRef.current += 1)
+        : labelsGenRef.current;
+      if (fresh) {
+        setLateLabels({});
+      }
+      if (!labelled || page.labelsPending !== true) {
+        if (fresh) {
+          setLabelsPending(new Set());
+        }
+        return;
+      }
+      const ids = page.results.map((card) => card.productId);
+      setLabelsPending((held) => new Set([...(fresh ? [] : held), ...ids]));
+      fetchPlaygroundLabels({
+        searchId: page.searchId,
+        page: page.page ?? 1,
+        ...(catalog === undefined ? {} : { catalog }),
+      }).then(
+        (labels) => {
+          if (labelsGenRef.current === generation) {
+            setLateLabels((held) => ({ ...held, ...labels }));
+          }
+        },
+        () => {
+          // The reserved lines stay empty; nothing is said (F-6).
+        },
+      );
+    },
+    [catalog],
+  );
 
   const run = useCallback(
     async (
@@ -204,6 +259,8 @@ export function PlaygroundPage({
         }
         setResponse(next);
         setMore([]);
+        // A keystroke preview carries no labels (NG-2).
+        awaitLabels(next, true, !preview);
         pagingRef.current = preview
           ? null
           : {
@@ -261,7 +318,7 @@ export function PlaygroundPage({
         setPhase("settled");
       }
     },
-    [catalog],
+    [catalog, awaitLabels],
   );
 
   /**
@@ -310,6 +367,7 @@ export function PlaygroundPage({
         state.stopped = true;
       }
       setMore((shown) => [...shown, ...next.results]);
+      awaitLabels(next, false);
     } catch {
       if (pagingRef.current === state) {
         state.stopped = true;
@@ -320,7 +378,7 @@ export function PlaygroundPage({
         setLoadingMore(false);
       }
     }
-  }, [catalog]);
+  }, [catalog, awaitLabels]);
 
   // Stable, so the grid's last-card watch re-arms only when cards change.
   const appendNextPage = useCallback(() => {
@@ -411,6 +469,9 @@ export function PlaygroundPage({
     dropChain();
     setHeldIntent(null);
     setResponse(null);
+    labelsGenRef.current += 1;
+    setLabelsPending(new Set());
+    setLateLabels({});
     setAttributableSearchId(null);
     setFailed(false);
     setPhase("initial");
@@ -461,9 +522,20 @@ export function PlaygroundPage({
       ? response.chips
       : [];
 
+  // A late label replaces the card's own; card order is the response's,
+  // untouched by any label (YOY-151 AC-9). Keystroke-preview cards — the
+  // ones no click can be attributed to — carry no label at all (NG-2).
+  const previewCards = attributableSearchId === null;
   const cards = useMemo(
-    () => [...(response?.results ?? []), ...more],
-    [response, more],
+    () =>
+      [...(response?.results ?? []), ...more].map((card) =>
+        previewCards
+          ? { ...card, label: null }
+          : card.productId in lateLabels
+            ? { ...card, label: lateLabels[card.productId] ?? null }
+            : card,
+      ),
+    [response, more, lateLabels, previewCards],
   );
   const closeMatches = response?.closeMatches ?? [];
   const zeroHit =
@@ -612,6 +684,7 @@ export function PlaygroundPage({
           cards={cards}
           strings={strings}
           skeleton={phase === "loading" && cards.length === 0}
+          labelsPending={labelsPending}
           onOpen={openCard}
           onLastCardVisible={appendNextPage}
         />

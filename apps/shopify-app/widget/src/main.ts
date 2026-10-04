@@ -12,6 +12,7 @@ import {
   type PageRequest,
   type ProxyChip,
   type ProxyIntent,
+  type ProxyLabel,
   type ProxySearchResponse,
   type RemovedChip,
   type SearchRequestContext,
@@ -452,6 +453,26 @@ export function init(config: WidgetConfig): void {
       },
     });
 
+    /**
+     * The late labels of one submitted search (YOY-151 AC-8): one request
+     * per page whose response has `labelsPending`, refused once the search
+     * was superseded or dismissed, so a late answer never lands on a newer
+     * search's cards.
+     */
+    const labelLoader =
+      (sequence: number, searchId: string) =>
+      async (page: number): Promise<Record<string, ProxyLabel | null>> => {
+        const current = (): boolean => !inert && sequence === requestSequence;
+        if (!current()) {
+          throw new Error("search superseded");
+        }
+        const labels = await client.fetchLabels(searchId, page);
+        if (!current()) {
+          throw new Error("search superseded");
+        }
+        return labels;
+      };
+
     /** A debounced preview is pending or a request is in flight (YOY-69
      * AC-2): the window in which dismissal must cancel, not just hide. */
     const searchActive = (): boolean =>
@@ -620,6 +641,7 @@ export function init(config: WidgetConfig): void {
           pages: pageLoader(sequence, (next) =>
             client.search(query, getSessionId(), { ...context, paging: next }),
           ),
+          labels: labelLoader(sequence, response.searchId),
         });
       } catch (error) {
         if (inert || sequence !== requestSequence) {

@@ -71,7 +71,8 @@ Each is imperative, atomic, and checkable from a screenshot or the diff.
   behavior, not aesthetics. Nothing in it exists to look like Unfiltered.
 - **W-2 Footprint ≤ chips-level.** Shopper-visible additions are limited
   to: the results overlay/grid, the removable filter chips, one
-  new-search/close control, and status text. No logo, badge, watermark,
+  new-search/close control, status text, and the one label line a card
+  may carry (W-11). No logo, badge, watermark,
   "powered by", or branded color anywhere in the shopper path.
 - **W-3 No foreign hue.** The widget introduces no hue the host page does
   not already have. Fixed fallback values are achromatic (grays derived
@@ -88,7 +89,7 @@ Each is imperative, atomic, and checkable from a screenshot or the diff.
   is modified. The only host element the widget touches is the search
   input it takes over, and only its placeholder and value.
 - **W-6 Result cards mirror the host.** Card anatomy is image / title /
-  price / availability in that order and nothing else; card proportions
+  price / label line (W-11) / availability in that order and nothing else; card proportions
   follow the host's product grid where detectable (square image
   fallback). No ratings, badges, or CTAs the store's own grid lacks.
 - **W-7 Chips are removable filters, not tags.** Every chip shows its
@@ -114,6 +115,7 @@ Each is imperative, atomic, and checkable from a screenshot or the diff.
 - **W-10 Removal leaves no trace.** After self-removal or uninstall, the
   page is visually identical to never having installed the widget
   (placeholder restored, no orphaned host node or style).
+- **W-11 One honest label line.** A result that misses a stated wish may carry one line of text directly under the card's price: one line, no wrap, smaller and quieter than the price, in the inherited colour — no hue, border, fill, icon or badge of ours. It is omitted entirely when its text does not fit the card's inline size or the storefront's language has no templates. On the theme-native path it is the only element added to a theme card.
 
 **Theme-native path (Mirror Bar, PRD amendment 2026-08-16; YOY-100).**
 When the widget renders results through the theme's own surfaces — the
@@ -123,7 +125,8 @@ content is judged against the theme's own rendering, not against W-3–W-6:
 the bar is "indistinguishable from the store's native results page for
 these results", and the count line states the widget's result count in the
 theme's own wording and language. Owned chrome on that page — the filter
-chips and their immediate controls, and status text — still judges against
+chips and their immediate controls, status text, and the label line
+appended after a theme card (W-11) — still judges against
 the W-* invariants (inherit-first, no foreign hue, chips-level footprint).
 On this path the light-DOM placement of that owned chrome is the mechanism,
 not a W-5 violation: its rules are prefixed to its own elements and never
@@ -360,7 +363,8 @@ face per role serves both scripts and there is no separate Hebrew stack.
   `--border-accent` (P-9). Removal animates out over `--dur-chip-out`.
   "New search" is a ghost pill of the same shape with no fill.
 - **Cards:** image at 3/4 cover, title at `--size-body` medium, price in
-  `--font-mono` muted, availability pill when sold out. Hover lifts with
+  `--font-mono` muted, the label line (W-11) directly under the price in
+  `--text-muted` at `--size-caption`, availability pill when sold out. Hover lifts with
   `--shadow-2` and changes nothing else.
 - **Engine panel (P-4):** `--surface-inverse` with `--text-inverse`,
   `--font-mono` at `--size-caption`; collapses out of the DOM when off.

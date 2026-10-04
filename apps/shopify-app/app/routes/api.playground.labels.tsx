@@ -1,7 +1,11 @@
 import type { LoaderFunctionArgs } from "react-router";
 
 import db from "../db.server";
-import { playgroundFixturesEnabled } from "../playground/fixture-mode.server";
+import {
+  fixtureLabels,
+  playgroundFixturesEnabled,
+  sleep,
+} from "../playground/fixture-mode.server";
 import {
   PLAYGROUND_RESPONSE_HEADERS,
   resolveCatalog,
@@ -15,8 +19,9 @@ import { parseLabelsParams, serializeLabels } from "../search/proxy.server";
  * `catalog` (or the seed). Holds until the judge answers or gives up, then
  * answers one label per product id, or an empty set — never an order. A
  * searchId from another catalog answers an empty set: labels are held per
- * tenant. No client calls it yet (NG-2). Fixture mode answers an empty set
- * with no database.
+ * tenant. The playground asks it once per page answered with
+ * `labelsPending` (YOY-151 AC-8). Fixture mode answers with no database:
+ * the `labels-pending` fixture's late labels, or an empty set.
  */
 
 function emptyResponse(status: number): Response {
@@ -33,7 +38,11 @@ export const loader = async ({ request }: LoaderFunctionArgs): Promise<Response>
     return emptyResponse(400);
   }
   if (playgroundFixturesEnabled()) {
-    return Response.json(serializeLabels({}), { headers: PLAYGROUND_RESPONSE_HEADERS });
+    const fixture = fixtureLabels(params.searchId);
+    await sleep(fixture.delayMs);
+    return Response.json(serializeLabels(fixture.labels), {
+      headers: PLAYGROUND_RESPONSE_HEADERS,
+    });
   }
   const catalog = await resolveCatalog(db, url.searchParams.get("catalog"));
   if ("status" in catalog) {

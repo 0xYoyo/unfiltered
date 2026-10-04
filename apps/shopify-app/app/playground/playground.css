@@ -652,6 +652,22 @@ html:has(.playground) {
   color: var(--text-muted);
 }
 
+/* The label line (YOY-151 AC-3, W-11): one line directly under the price,
+   muted, at caption size, with no hue, border, fill, icon or badge. Never
+   wrapped or truncated — Card.tsx drops a label wider than the card
+   (AC-6), and `overflow: hidden` is what makes that measurable. The fixed
+   block size makes a line reserved for a late label (AC-8) exactly as tall
+   as the label that fills it. */
+.cardLabel {
+  display: block;
+  color: var(--text-muted);
+  font-size: var(--size-caption);
+  line-height: var(--lh-tight);
+  block-size: calc(var(--size-caption) * var(--lh-tight));
+  white-space: nowrap;
+  overflow: hidden;
+}
+
 .cardSoldOut {
   align-self: flex-start;
   padding-inline: var(--space-2);

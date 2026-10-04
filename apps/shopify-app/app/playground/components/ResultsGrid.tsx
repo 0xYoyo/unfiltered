@@ -22,12 +22,18 @@ export function ResultsGrid({
   cards,
   strings,
   skeleton = false,
+  labelsPending,
   onOpen,
   onLastCardVisible,
 }: {
   cards: PlaygroundCard[];
   strings: PlaygroundStrings;
   skeleton?: boolean;
+  /**
+   * The cards whose page waits on late labels (YOY-151 AC-8): each
+   * reserves its label line so the labels land without moving anything.
+   */
+  labelsPending?: ReadonlySet<string>;
   onOpen: (card: PlaygroundCard, position: number) => void;
   /**
    * Called when the last card enters the viewport (YOY-146 AC-6): the page
@@ -87,6 +93,7 @@ export function ResultsGrid({
               card={card}
               position={index}
               strings={strings}
+              labelPending={labelsPending?.has(card.productId) ?? false}
               onOpen={onOpen}
             />
           ))}

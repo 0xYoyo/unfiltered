@@ -375,6 +375,80 @@
         ],
       });
 
+      /**
+       * The label line (YOY-151): an engine v2 response with one card per
+       * label template and one that misses nothing (`fixture=labels`), a
+       * label over its template's maximum (`label-too-long`), a label
+       * under its maximum but wider than its card (`label-overflow`), and
+       * the same cards served with `labelsPending` whose labels the labels
+       * endpoint answers late (`labels-pending`).
+       */
+      const LABELS = [
+        { template: "price-near", values: ["420 ILS", "400 ILS"] },
+        { template: "price-far", values: ["640 ILS", "400 ILS"] },
+        { template: "size-missing", values: ["M", "S", "L"] },
+        { template: "fact-differs", values: ["linen", "silk"] },
+        { template: "close-match", values: [] },
+        null,
+      ];
+      const labelCard = (index, title, price, label) => ({
+        productId: `gid://shopify/Product/label-${index}`,
+        title,
+        url: `/products/label-${index}`,
+        imageUrl: PIXEL,
+        priceMin: price,
+        priceMax: price,
+        currencyCode: "ILS",
+        available: true,
+        colorUnknown: false,
+        label,
+      });
+      const LABEL_RESULTS = [
+        labelCard(1, "Satin Slip Dress", 420, LABELS[0]),
+        labelCard(2, "Silk Evening Dress", 640, LABELS[1]),
+        labelCard(3, "Jersey Midi Dress", 245, LABELS[2]),
+        labelCard(4, "Linen Wrap Dress", 310, LABELS[3]),
+        labelCard(5, "Cotton Shirt Dress", 290, LABELS[4]),
+        labelCard(6, "Crepe Shift Dress", 350, LABELS[5]),
+      ];
+      const labelResponse = (searchId, results, extra = {}) => ({
+        searchId,
+        route: "ai",
+        degraded: false,
+        results,
+        chips: [
+          { field: "priceMax", value: "400", currency: "ILS" },
+          { field: "size", value: "M" },
+        ],
+        intent: null,
+        ...extra,
+      });
+      const LABEL_FIXTURES = {
+        labels: labelResponse("harness-labels-1", LABEL_RESULTS),
+        "label-too-long": labelResponse("harness-label-too-long-1", [
+          labelCard(7, "Long Label Dress", 310, {
+            template: "fact-differs",
+            values: ["recycled organic linen blend", "pure mulberry silk"],
+          }),
+          LABEL_RESULTS[0],
+        ]),
+        "label-overflow": labelResponse("harness-label-overflow-1", [
+          labelCard(8, "Wide Weave Dress", 310, {
+            template: "fact-differs",
+            values: ["WWWWWWWWWWWW", "MMMMMMMMMMMM"],
+          }),
+          LABEL_RESULTS[0],
+        ]),
+        "labels-pending": labelResponse(
+          "harness-labels-pending-1",
+          LABEL_RESULTS.map((result) => ({ ...result, label: null })),
+          { labelsPending: true },
+        ),
+      };
+      // How long the labels endpoint holds a pending page's answer.
+      const LABELS_DELAY_MS = 600;
+      window.__labelsRequests = [];
+
       const realFetch = window.fetch.bind(window);
       window.fetch = (input, requestInit) => {
         const url = typeof input === "string" ? input : input.url;
@@ -482,6 +556,8 @@
               },
             ], request);          } else if (request.removeChip !== undefined) {
             body = chipRemovalResponse(request);
+          } else if (fixture in LABEL_FIXTURES) {
+            body = LABEL_FIXTURES[fixture];
           } else if (fixture === "ai" || fixture === "ai-delayed") {
             body = AI_RESPONSE;
           } else if (fixture === "ai-localized") {
@@ -537,6 +613,29 @@
             );
           }
           return Promise.resolve(jsonResponse(body));
+        }
+        if (url.startsWith("/apps/unfiltered/labels")) {
+          // The late labels (YOY-151 AC-8): logged, then answered after a
+          // hold — the `labels` fixture's labels by product id for the
+          // pending search, an empty set for any other.
+          const params = new URL(url, window.location.origin).searchParams;
+          const request = {
+            searchId: params.get("searchId"),
+            page: Number(params.get("page")),
+          };
+          window.__labelsRequests.push(request);
+          const labels =
+            request.searchId === LABEL_FIXTURES["labels-pending"].searchId
+              ? Object.fromEntries(
+                  LABEL_RESULTS.map((result) => [result.productId, result.label]),
+                )
+              : {};
+          return new Promise((resolve) =>
+            setTimeout(
+              () => resolve(jsonResponse({ labels })),
+              LABELS_DELAY_MS,
+            ),
+          );
         }
         if (url.startsWith("/apps/unfiltered/click")) {
           const log = JSON.parse(

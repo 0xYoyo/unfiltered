@@ -12,7 +12,12 @@
  * common, and those come from the server module.
  */
 
-import type { ProxyChip, ProxyIntent } from "../search/proxy.server";
+import type {
+  ProxyChip,
+  ProxyIntent,
+  ProxyLabel,
+  ProxyLabelsResponse,
+} from "../search/proxy.server";
 import type { PlaygroundSearchResponse } from "./api.server";
 
 export const PREVIEW_DEBOUNCE_MS = 200;
@@ -172,6 +177,31 @@ export async function searchPlayground(
     throw new Error(`playground search failed: ${response.status}`);
   }
   return (await response.json()) as PlaygroundSearchResponse;
+}
+
+/**
+ * One page's late labels (YOY-148 AC-8, YOY-151 AC-8): the endpoint holds
+ * until the judge answers or gives up, then answers a label (or null) per
+ * product id — never an order. Throws on a non-200; the caller leaves the
+ * reserved lines empty.
+ */
+export async function fetchPlaygroundLabels(request: {
+  searchId: string;
+  page: number;
+  catalog?: string;
+}): Promise<Record<string, ProxyLabel | null>> {
+  const params = new URLSearchParams({
+    searchId: request.searchId,
+    page: String(request.page),
+  });
+  if (request.catalog !== undefined) {
+    params.set("catalog", request.catalog);
+  }
+  const response = await fetch(`/api/playground/labels?${params.toString()}`);
+  if (!response.ok) {
+    throw new Error(`playground labels failed: ${response.status}`);
+  }
+  return ((await response.json()) as ProxyLabelsResponse).labels;
 }
 
 /**
