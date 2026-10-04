@@ -66,6 +66,17 @@ export interface WidgetStrings {
   chipInStock: string;
   /** The word an exclusion chip leads with; the value after it is struck. */
   chipNegator: string;
+  /**
+   * The label line's five templates (YOY-151 AC-1), filled by `labelText`
+   * in labels.ts: {price} and {cap} are formatted amounts, {size} the size
+   * asked for, {sizes} the in-stock sizes comma-joined, {have} the
+   * product's value and {asked} the shopper's.
+   */
+  labelPriceNear: string;
+  labelPriceFar: string;
+  labelSizeMissing: string;
+  labelFactDiffers: string;
+  labelCloseMatch: string;
 }
 
 export const STRING_CATALOG: Record<WidgetLocale, WidgetStrings> = {
@@ -96,6 +107,11 @@ export const STRING_CATALOG: Record<WidgetLocale, WidgetStrings> = {
     chipSize: "Size {value}",
     chipInStock: "In stock",
     chipNegator: "Not",
+    labelPriceNear: "{price}, slightly over {cap}",
+    labelPriceFar: "{price}, over your {cap}",
+    labelSizeMissing: "no {size} — {sizes} in stock",
+    labelFactDiffers: "in {have}, not {asked}",
+    labelCloseMatch: "close match",
   },
   he: {
     inputPlaceholder: "חיפוש",
@@ -124,6 +140,11 @@ export const STRING_CATALOG: Record<WidgetLocale, WidgetStrings> = {
     chipSize: "מידה {value}",
     chipInStock: "במלאי",
     chipNegator: "לא",
+    labelPriceNear: "{price}, מעט מעל {cap}",
+    labelPriceFar: "{price}, מעל ה-{cap} שביקשת",
+    labelSizeMissing: "אין {size} — יש {sizes} במלאי",
+    labelFactDiffers: "ב{have}, לא {asked}",
+    labelCloseMatch: "התאמה קרובה",
   },
 };
 

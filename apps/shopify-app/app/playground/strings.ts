@@ -90,6 +90,18 @@ export interface PlaygroundStrings {
   newSearch: string;
   /** Label on a card that passed a colour filter without colour evidence. */
   colorNotConfirmed: string;
+  /**
+   * The card's label line (YOY-151 AC-1), the widget's five templates
+   * verbatim, filled by `labelText` in widget/src/labels.ts: {price} and
+   * {cap} are formatted amounts, {size} the size asked for, {sizes} the
+   * in-stock sizes comma-joined, {have} the product's value and {asked}
+   * the visitor's.
+   */
+  labelPriceNear: string;
+  labelPriceFar: string;
+  labelSizeMissing: string;
+  labelFactDiffers: string;
+  labelCloseMatch: string;
   /** The engine-details toggle (P-4), off by default. */
   engineDetailsToggle: string;
   /** Field labels inside the engine-details panel. */
@@ -165,6 +177,11 @@ export const PLAYGROUND_STRING_CATALOG: Record<
     relaxedCategory: "other categories",
     newSearch: "New search",
     colorNotConfirmed: "Color not confirmed",
+    labelPriceNear: "{price}, slightly over {cap}",
+    labelPriceFar: "{price}, over your {cap}",
+    labelSizeMissing: "no {size} — {sizes} in stock",
+    labelFactDiffers: "in {have}, not {asked}",
+    labelCloseMatch: "close match",
     engineDetailsToggle: "How it understood you",
     detailsRoute: "Route",
     detailsRouteReason: "Reason",
@@ -222,6 +239,11 @@ export const PLAYGROUND_STRING_CATALOG: Record<
     relaxedCategory: "קטגוריות אחרות",
     newSearch: "חיפוש חדש",
     colorNotConfirmed: "הצבע לא אומת",
+    labelPriceNear: "{price}, מעט מעל {cap}",
+    labelPriceFar: "{price}, מעל ה-{cap} שביקשת",
+    labelSizeMissing: "אין {size} — יש {sizes} במלאי",
+    labelFactDiffers: "ב{have}, לא {asked}",
+    labelCloseMatch: "התאמה קרובה",
     engineDetailsToggle: "איך זה הבין אתכם",
     detailsRoute: "מסלול",
     detailsRouteReason: "סיבה",

@@ -1,0 +1,105 @@
+{
+  "searchId": "fixture-labels-pending",
+  "route": "ai",
+  "degraded": false,
+  "results": [
+    {
+      "productId": "p-label-1",
+      "title": "Satin Slip Dress",
+      "url": "https://example.test/products/p-label-1",
+      "imageUrl": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 4'><rect width='4' height='4' fill='%23d9d4cd'/></svg>",
+      "priceMin": 420,
+      "priceMax": 420,
+      "currencyCode": "ILS",
+      "available": true,
+      "colorUnknown": false,
+      "label": null
+    },
+    {
+      "productId": "p-label-2",
+      "title": "Silk Evening Dress",
+      "url": "https://example.test/products/p-label-2",
+      "imageUrl": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 4'><rect width='4' height='4' fill='%23cfc9c1'/></svg>",
+      "priceMin": 640,
+      "priceMax": 640,
+      "currencyCode": "ILS",
+      "available": true,
+      "colorUnknown": false,
+      "label": null
+    },
+    {
+      "productId": "p-label-3",
+      "title": "Jersey Midi Dress",
+      "url": "https://example.test/products/p-label-3",
+      "imageUrl": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 4'><rect width='4' height='4' fill='%23c8c2b8'/></svg>",
+      "priceMin": 245,
+      "priceMax": 245,
+      "currencyCode": "ILS",
+      "available": true,
+      "colorUnknown": false,
+      "label": null
+    },
+    {
+      "productId": "p-label-4",
+      "title": "Linen Wrap Dress",
+      "url": "https://example.test/products/p-label-4",
+      "imageUrl": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 4'><rect width='4' height='4' fill='%23bdb6ab'/></svg>",
+      "priceMin": 310,
+      "priceMax": 310,
+      "currencyCode": "ILS",
+      "available": true,
+      "colorUnknown": false,
+      "label": null
+    },
+    {
+      "productId": "p-label-5",
+      "title": "Cotton Shirt Dress",
+      "url": "https://example.test/products/p-label-5",
+      "imageUrl": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 4'><rect width='4' height='4' fill='%23e3ddd3'/></svg>",
+      "priceMin": 290,
+      "priceMax": 290,
+      "currencyCode": "ILS",
+      "available": true,
+      "colorUnknown": false,
+      "label": null
+    },
+    {
+      "productId": "p-label-6",
+      "title": "Crepe Shift Dress",
+      "url": "https://example.test/products/p-label-6",
+      "imageUrl": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 4'><rect width='4' height='4' fill='%23d2ccc3'/></svg>",
+      "priceMin": 350,
+      "priceMax": 350,
+      "currencyCode": "ILS",
+      "available": true,
+      "colorUnknown": false,
+      "label": null
+    }
+  ],
+  "chips": [
+    {
+      "field": "priceMax",
+      "value": "400",
+      "currency": "ILS"
+    },
+    {
+      "field": "size",
+      "value": "M"
+    }
+  ],
+  "intent": null,
+  "details": {
+    "routeReason": "judge-timeout",
+    "latencyMs": 912,
+    "limited": null,
+    "stages": {
+      "find": 71,
+      "hydrate": 9,
+      "judge": 702
+    },
+    "intentTier": null,
+    "engine": "v2",
+    "judge": null
+  },
+  "labelsPending": true
+}

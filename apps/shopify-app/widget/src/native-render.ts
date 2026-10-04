@@ -1,4 +1,5 @@
 import { chipLabelParts, formatPrice, isNegationChip } from "./format";
+import { labelLocale, labelOverflows, labelSegments, renderLabel } from "./labels";
 import {
   type NativeRenderConfig,
   type NativeRenderOverrides,
@@ -11,9 +12,10 @@ import {
   parseHtml,
   sanitizeThemeMarkup,
 } from "./native-page";
-import type { Overlay, ResponseHandlers } from "./overlay";
+import { LABEL_TESTID, type Overlay, type ResponseHandlers } from "./overlay";
 import type {
   ProxyChip,
+  ProxyLabel,
   ProxyResult,
   ProxySearchResponse,
 } from "./search-client";
@@ -385,6 +387,8 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
   const { config } = options;
   const locale = resolveLocale(options.locale);
   const strings = getStrings(options.locale);
+  // A storefront language with no templates shows no label (YOY-151 AC-7).
+  const labelsShown = labelLocale(options.locale) !== null;
 
   const section = document.createElement("section");
   section.className = `unfiltered-native ${config.sectionClass}`.trim();
@@ -493,6 +497,10 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
     total: number;
     pageSize: number;
     pages: Map<number, Promise<ProxyResult[]>>;
+    /** Pages whose response had `labelsPending` (YOY-151 AC-8). */
+    pendingLabels: Set<number>;
+    /** Each pending page's labels, asked for once and held. */
+    labelFetches: Map<number, Promise<Record<string, ProxyLabel | null>>>;
   }
   let current: HeldSearch | null = null;
   /** The 1-based page of that set currently on screen. */
@@ -518,7 +526,12 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
     if (loader === undefined) {
       return Promise.resolve([]);
     }
-    const pending = loader.load(page).then((next) => next.results);
+    const pending = loader.load(page).then((next) => {
+      if (next.labelsPending === true) {
+        held.pendingLabels.add(page);
+      }
+      return next.results;
+    });
     held.pages.set(page, pending);
     pending.catch(() => {
       if (held.pages.get(page) === pending) {
@@ -565,7 +578,12 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
       }
       fetchPage(held, next)
         .then((results) =>
-          buildItems(results, held.handlers, (next - 1) * held.pageSize),
+          buildItems(
+            results,
+            held.handlers,
+            (next - 1) * held.pageSize,
+            labellingFor(held, next),
+          ),
         )
         .then(
           (built) => {
@@ -573,6 +591,8 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
               return;
             }
             list.append(...built.items);
+            settleLabels(built.items);
+            fillLateLabels(held, next, built.items, token);
             if (built.items.length > 0) {
               watchLastRow(held, token, next, pageCount, true);
             }
@@ -664,6 +684,96 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
     return anchor;
   }
 
+  /**
+   * How a page of the held search carries labels (YOY-151): none on a
+   * keystroke preview (NG-2), a reserved line on every card while its
+   * labels are pending (AC-8).
+   */
+  function labellingFor(
+    held: HeldSearch,
+    page: number,
+  ): { pending: boolean } | null {
+    if (held.preview) {
+      return null;
+    }
+    return {
+      pending:
+        labelsShown &&
+        held.pendingLabels.has(page) &&
+        held.handlers.labels !== undefined,
+    };
+  }
+
+  /**
+   * Drop every shown label wider than its card (YOY-151 AC-6): absent,
+   * never truncated or wrapped. A reserved line keeps its height empty.
+   */
+  function settleLabels(items: readonly HTMLElement[]): void {
+    for (const item of items) {
+      const label = item.querySelector<HTMLElement>(
+        ":scope > .unfiltered-native__label",
+      );
+      if (label === null || label.textContent === "" || !labelOverflows(label)) {
+        continue;
+      }
+      if (label.hasAttribute("data-label-slot")) {
+        label.textContent = "";
+        label.removeAttribute("data-testid");
+      } else {
+        label.remove();
+      }
+    }
+  }
+
+  /**
+   * A pending page's late labels (YOY-151 AC-8, AC-9): asked for once per
+   * page and held, then filled into the lines its cards reserved — no card
+   * moves and nothing re-orders. A failed request leaves the lines empty.
+   */
+  function fillLateLabels(
+    held: HeldSearch,
+    page: number,
+    items: readonly HTMLElement[],
+    token: number,
+  ): void {
+    const loader = held.handlers.labels;
+    if (loader === undefined || labellingFor(held, page)?.pending !== true) {
+      return;
+    }
+    let request = held.labelFetches.get(page);
+    if (request === undefined) {
+      request = loader(page);
+      held.labelFetches.set(page, request);
+    }
+    request.then(
+      (labels) => {
+        if (token !== renderToken || current !== held) {
+          return;
+        }
+        for (const item of items) {
+          const productId = item.getAttribute("data-product-id") ?? "";
+          const slot = item.querySelector<HTMLElement>(
+            ":scope > [data-label-slot]",
+          );
+          if (slot === null || !(productId in labels)) {
+            continue;
+          }
+          const segments = labelSegments(strings, labels[productId]);
+          renderLabel(slot, segments ?? []);
+          if (segments === null) {
+            slot.removeAttribute("data-testid");
+          } else {
+            slot.setAttribute("data-testid", LABEL_TESTID);
+          }
+        }
+        settleLabels(items);
+      },
+      () => {
+        // The reserved lines stay empty; no error reaches the shopper.
+      },
+    );
+  }
+
   /** Build the grid items for a result list; resolves when every card is
    * ready so the grid swaps in one paint. */
   async function buildItems(
@@ -671,6 +781,8 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
     handlers: ResponseHandlers,
     /** The first card's place in the whole result order (YOY-146 AC-10). */
     offset = 0,
+    /** The label line (YOY-151); null on a preview. */
+    labelling: { pending: boolean } | null = null,
   ): Promise<{ items: HTMLLIElement[]; native: number; cached: number }> {
     let native = 0;
     let cached = 0;
@@ -698,6 +810,24 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
         item.appendChild(fallbackCard(result));
       } else {
         item.appendChild(produced.element);
+      }
+      // The label line (YOY-151 AC-5, W-11): appended after the theme's own
+      // card markup — the only element this adds to a theme card, styled
+      // as the overlay's (one quiet line, inherited colour, no hue).
+      if (labelling !== null && labelsShown) {
+        const segments = labelSegments(strings, result.label);
+        if (segments !== null || labelling.pending) {
+          const label = document.createElement("div");
+          label.className = "unfiltered-native__label";
+          if (labelling.pending) {
+            label.setAttribute("data-label-slot", "");
+          }
+          if (segments !== null) {
+            label.setAttribute("data-testid", LABEL_TESTID);
+            renderLabel(label, segments);
+          }
+          item.appendChild(label);
+        }
       }
       if (result.colorUnknown === true) {
         item.classList.add("unfiltered-native__item--color-unknown");
@@ -890,8 +1020,13 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
       return; // Superseded while fetching.
     }
     const [built, builtMatches] = await Promise.all([
-      buildItems(pageResults, handlers, (target - 1) * pageSize),
-      buildItems(matches, handlers),
+      buildItems(
+        pageResults,
+        handlers,
+        (target - 1) * pageSize,
+        labellingFor(held, target),
+      ),
+      buildItems(matches, handlers, 0, preview ? null : { pending: false }),
     ]);
     if (token !== renderToken) {
       return; // Superseded while fetching.
@@ -940,6 +1075,8 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
     );
     closeMatchesList.replaceChildren(...builtMatches.items);
     closeMatches.hidden = builtMatches.items.length === 0;
+    settleLabels([...built.items, ...builtMatches.items]);
+    fillLateLabels(held, target, built.items, token);
     zeroHit.hidden = !aiZeroHit;
     noResults.hidden = !(!preview && empty && response.route === "classic");
     previewEmpty.hidden = !(preview && empty);
@@ -999,7 +1136,19 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
     } else {
       pages.set(first, Promise.resolve(response.results));
     }
-    current = { response, handlers, preview, total, pageSize, pages };
+    const pendingLabels = new Set<number>(
+      response.labelsPending === true ? [first] : [],
+    );
+    current = {
+      response,
+      handlers,
+      preview,
+      total,
+      pageSize,
+      pages,
+      pendingLabels,
+      labelFetches: new Map(),
+    };
     currentPage = 1;
     void renderPage(first);
   }

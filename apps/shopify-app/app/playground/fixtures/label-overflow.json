@@ -1,0 +1,68 @@
+{
+  "searchId": "fixture-label-overflow",
+  "route": "ai",
+  "degraded": false,
+  "results": [
+    {
+      "productId": "p-label-1",
+      "title": "Wide Weave Dress",
+      "url": "https://example.test/products/p-label-1",
+      "imageUrl": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 4'><rect width='4' height='4' fill='%23bdb6ab'/></svg>",
+      "priceMin": 310,
+      "priceMax": 310,
+      "currencyCode": "ILS",
+      "available": true,
+      "colorUnknown": false,
+      "label": {
+        "template": "fact-differs",
+        "values": [
+          "WWWWWWWWWWWW",
+          "MMMMMMMMMMMM"
+        ]
+      }
+    },
+    {
+      "productId": "p-label-2",
+      "title": "Satin Slip Dress",
+      "url": "https://example.test/products/p-label-2",
+      "imageUrl": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 4'><rect width='4' height='4' fill='%23d9d4cd'/></svg>",
+      "priceMin": 420,
+      "priceMax": 420,
+      "currencyCode": "ILS",
+      "available": true,
+      "colorUnknown": false,
+      "label": {
+        "template": "price-near",
+        "values": [
+          "420 ILS",
+          "400 ILS"
+        ]
+      }
+    }
+  ],
+  "chips": [
+    {
+      "field": "priceMax",
+      "value": "400",
+      "currency": "ILS"
+    },
+    {
+      "field": "size",
+      "value": "M"
+    }
+  ],
+  "intent": null,
+  "details": {
+    "routeReason": "judged",
+    "latencyMs": 912,
+    "limited": null,
+    "stages": {
+      "find": 71,
+      "hydrate": 9,
+      "judge": 702
+    },
+    "intentTier": null,
+    "engine": "v2",
+    "judge": null
+  }
+}

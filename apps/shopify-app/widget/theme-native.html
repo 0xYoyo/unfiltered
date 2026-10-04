@@ -618,6 +618,81 @@
 <script>window.__altTemplateScriptRan = true;<\/script>
 `;
 
+      /**
+       * The label line (YOY-151), as on the overlay harness: one card per
+       * label template plus one that misses nothing (`fixture=labels`), a
+       * label over its maximum (`label-too-long`), a label wider than its
+       * card (`label-overflow`), and the same cards with `labelsPending`,
+       * whose labels the labels endpoint answers late (`labels-pending`).
+       * Each is a real product here, so its card is the theme's own.
+       */
+      const LABELS = [
+        { template: "price-near", values: ["420 ILS", "400 ILS"] },
+        { template: "price-far", values: ["640 ILS", "400 ILS"] },
+        { template: "size-missing", values: ["M", "S", "L"] },
+        { template: "fact-differs", values: ["linen", "silk"] },
+        { template: "close-match", values: [] },
+        null,
+      ];
+      const labelCard = (index, title, price, label, colour) => ({
+        productId: `gid://shopify/Product/label-${index}`,
+        title,
+        url: `/products/label-${index}`,
+        imageUrl: svg(colour),
+        priceMin: price,
+        priceMax: price,
+        currencyCode: "ILS",
+        available: true,
+        colorUnknown: false,
+        label,
+      });
+      const LABEL_RESULTS = [
+        labelCard(1, "Satin Slip Dress", 420, LABELS[0], "d9d4cd"),
+        labelCard(2, "Silk Evening Dress", 640, LABELS[1], "cfc9c1"),
+        labelCard(3, "Jersey Midi Dress", 245, LABELS[2], "c8c2b8"),
+        labelCard(4, "Linen Wrap Dress", 310, LABELS[3], "bdb6ab"),
+        labelCard(5, "Cotton Shirt Dress", 290, LABELS[4], "e3ddd3"),
+        labelCard(6, "Crepe Shift Dress", 350, LABELS[5], "d2ccc3"),
+      ];
+      const labelResponse = (searchId, results, extra = {}) => ({
+        searchId,
+        route: "ai",
+        degraded: false,
+        results,
+        chips: [
+          { field: "priceMax", value: "400", currency: "ILS" },
+          { field: "size", value: "M" },
+        ],
+        intent: null,
+        ...extra,
+      });
+      const LABEL_FIXTURES = {
+        labels: labelResponse("harness-labels-1", LABEL_RESULTS),
+        "label-too-long": labelResponse("harness-label-too-long-1", [
+          labelCard(7, "Long Label Dress", 310, {
+            template: "fact-differs",
+            values: ["recycled organic linen blend", "pure mulberry silk"],
+          }, "bdb6ab"),
+          LABEL_RESULTS[0],
+        ]),
+        "label-overflow": labelResponse("harness-label-overflow-1", [
+          labelCard(8, "Wide Weave Dress", 310, {
+            template: "fact-differs",
+            values: ["WWWWWWWWWWWW", "MMMMMMMMMMMM"],
+          }, "bdb6ab"),
+          // A short label beside it, which fits even a phone-width card.
+          LABEL_RESULTS[4],
+        ]),
+        "labels-pending": labelResponse(
+          "harness-labels-pending-1",
+          LABEL_RESULTS.map((result) => ({ ...result, label: null })),
+          { labelsPending: true },
+        ),
+      };
+      // How long the labels endpoint holds a pending page's answer.
+      const LABELS_DELAY_MS = 600;
+      window.__labelsRequests = [];
+
       const PRODUCTS = new Map(
         [
           ...RESULTS,
@@ -625,6 +700,9 @@
           // The full-set fixture's products, so paging renders the theme's
           // real cards rather than the fallback (YOY-107).
           ...manyResults(200),
+          ...LABEL_RESULTS,
+          ...LABEL_FIXTURES["label-too-long"].results,
+          ...LABEL_FIXTURES["label-overflow"].results,
         ].map((product) => [handleOf(product), product]),
       );
 
@@ -767,6 +845,8 @@
           } else if (fixture in V2_CHIPS) {
             body = v2Response(fixture, AI_RESPONSE.results, request);          } else if (request.removeChip !== undefined) {
             body = chipRemovalResponse(request);
+          } else if (fixture in LABEL_FIXTURES) {
+            body = LABEL_FIXTURES[fixture];
           } else if (fixture === "ai") {
             body = AI_RESPONSE;
           } else if (fixture === "ai-negation") {
@@ -779,6 +859,25 @@
             body = RESULTS_RESPONSE;
           }
           return settle(jsonResponse(paged(body, request)));
+        }
+        if (url.startsWith("/apps/unfiltered/labels")) {
+          // The late labels (YOY-151 AC-8): logged, then answered after a
+          // hold — the `labels` fixture's labels by product id for the
+          // pending search, an empty set for any other.
+          const request = {
+            searchId: parsed.searchParams.get("searchId"),
+            page: Number(parsed.searchParams.get("page")),
+          };
+          window.__labelsRequests.push(request);
+          const labels =
+            request.searchId === LABEL_FIXTURES["labels-pending"].searchId
+              ? Object.fromEntries(
+                  LABEL_RESULTS.map((result) => [result.productId, result.label]),
+                )
+              : {};
+          return new Promise((resolve) =>
+            setTimeout(() => resolve(jsonResponse({ labels })), LABELS_DELAY_MS),
+          );
         }
         if (url.startsWith("/apps/unfiltered/click")) {
           const log = JSON.parse(sessionStorage.getItem("harness:clickBeacons") ?? "[]");

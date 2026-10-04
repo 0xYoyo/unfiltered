@@ -21,12 +21,17 @@ import aiFixture from "./fixtures/ai.json";
 import colorUnknownFixture from "./fixtures/color-unknown.json";
 import degradedFixture from "./fixtures/degraded.json";
 import emptyFixture from "./fixtures/empty.json";
+import labelOverflowFixture from "./fixtures/label-overflow.json";
+import labelTooLongFixture from "./fixtures/label-too-long.json";
+import labelsPendingFixture from "./fixtures/labels-pending.json";
+import labelsFixture from "./fixtures/labels.json";
 import previewFixture from "./fixtures/preview.json";
 import resultsFixture from "./fixtures/results.json";
 import v2BudgetFixture from "./fixtures/v2-budget.json";
 import v2RefineFixture from "./fixtures/v2-refine.json";
 import v2TwoMeaningsFixture from "./fixtures/v2-two-meanings.json";
 
+import type { ProxyLabel } from "../search/proxy.server";
 import type { PlaygroundSearchResponse } from "./api.server";
 
 export const PLAYGROUND_FIXTURES_ENV = "PLAYGROUND_FIXTURES";
@@ -61,7 +66,13 @@ export type PlaygroundFixtureName =
   // YOY-150: an engine v2 response that carries `carry` (a refinement
   // chain), and one that also carries a second reading.
   | "v2-refine"
-  | "v2-two-meanings";
+  | "v2-two-meanings"
+  // YOY-151: one card per label template, a label over its maximum, a
+  // label wider than its card, and a page whose labels arrive late.
+  | "labels"
+  | "label-too-long"
+  | "label-overflow"
+  | "labels-pending";
 
 /** How long the `delayed` fixture waits — long enough to observe loading. */
 export const FIXTURE_DELAY_MS = 700;
@@ -122,6 +133,17 @@ export function selectFixture(
     if (has("meanings")) {
       // The second reading (YOY-150): "two meanings wedding dress".
       return "v2-two-meanings";
+    }
+    if (has("labels") || has("label")) {
+      // The label line (YOY-151): "labels", "label too long", "label
+      // overflow", "labels pending".
+      return has("pending")
+        ? "labels-pending"
+        : has("long")
+          ? "label-too-long"
+          : has("overflow")
+            ? "label-overflow"
+            : "labels";
     }
     if (has("budget")) {
       // Engine v2 chips (YOY-149): "budget dress under 400".
@@ -266,6 +288,14 @@ export function fixtureOutcome(
       return { delayMs: 0, status: 200, body: asResponse(v2RefineFixture) };
     case "v2-two-meanings":
       return { delayMs: 0, status: 200, body: asResponse(v2TwoMeaningsFixture) };
+    case "labels":
+      return { delayMs: 0, status: 200, body: asResponse(labelsFixture) };
+    case "label-too-long":
+      return { delayMs: 0, status: 200, body: asResponse(labelTooLongFixture) };
+    case "label-overflow":
+      return { delayMs: 0, status: 200, body: asResponse(labelOverflowFixture) };
+    case "labels-pending":
+      return { delayMs: 0, status: 200, body: asResponse(labelsPendingFixture) };
     case "color-unknown":
       return {
         delayMs: 0,
@@ -413,6 +443,31 @@ export function withFixtureCarry(
       ...outcome.body,
       carry: previousQuery === undefined ? sentence : `${previousQuery}\n${sentence}`,
     },
+  };
+}
+
+/**
+ * The labels endpoint in fixture mode (YOY-151 AC-8): the `labels-pending`
+ * search's late labels — the `labels` fixture's, by product id — after a
+ * delay long enough to observe the reserved lines first; every other
+ * searchId answers an empty set, as the real endpoint does for a search
+ * it holds nothing for.
+ */
+export function fixtureLabels(searchId: string): {
+  delayMs: number;
+  labels: Record<string, ProxyLabel | null>;
+} {
+  if (searchId !== asResponse(labelsPendingFixture).searchId) {
+    return { delayMs: 0, labels: {} };
+  }
+  return {
+    delayMs: FIXTURE_DELAY_MS,
+    labels: Object.fromEntries(
+      asResponse(labelsFixture).results.map((card) => [
+        card.productId,
+        card.label ?? null,
+      ]),
+    ),
   };
 }
 
