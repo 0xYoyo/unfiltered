@@ -189,6 +189,39 @@ Constructor-bar pass bar (enforced as failing tests):
   so any routing change shows as a diff, never as a silent pass.
 - Overall hit rate ≥ `overallHitRatePercent` in the same file.
 
+## The Constructor bar on Engine v2 (YOY-153)
+
+`constructor-v2.test.ts` runs the 30 Constructor-bar goldens through Engine
+v2 — the production default since YOY-153 — on its own scratch database:
+the eval catalog is indexed from the same recordings as above, then its
+cards are written and embedded, and every golden is searched through the
+v2 path (find, wish extraction, the default `jev` judge) and scored on
+page 1 (24 results). It asserts the v2 output three ways — a negation
+golden's excluded products never appear on page 1, no over-budget product
+precedes an in-budget one on a price-cap golden, and a guest-dress query
+(`co01`, `co03`) never leads with a bridal gown — and holds the per-group
+v2 floor: the `v2` object of `fixtures/constructor-floor.json`, hit rate
+and top-10 `mustNot` leak per group, beside the old engine's fields, which
+are untouched. The old engine's run of the same set stays in
+`harness.test.ts`.
+
+Its recordings are their own files: `fixtures/recorded/card.json` (the
+card writer, keyed like enrichment by `Title:` plus an image digest),
+`extract.json` (the wish extraction, keyed by `Query:`), `judge-jev.json`
+(Jev's per-product decisions, keyed by the search text plus a digest of the
+whole request — `decisionRecordingKey`) and `embeddings-v2.json` (card
+sections and the goldens' raw sentences, the same model and dimension as
+`embeddings.json`, which must agree on any shared text). Record them with
+one live run of the same pipeline, from the repository root:
+
+    LIVE_LLM_TESTS=1 REGEN_SCOPE=constructor-v2 GEMINI_API_KEY=... OPENROUTER_API_KEY=... \
+      npx vitest run apps/shopify-app/app/eval/constructor-v2-regen.test.ts
+
+It replays the old engine's enrichment, vision and product vectors (so the
+index is byte-identical and none of those files changes) and rewrites the
+four v2 files. Then run `npm test`, and raise the v2 floor only from a
+measured run.
+
 ## Regenerating the recordings
 
 `regenerate-live.test.ts` re-records every fixture output against the live

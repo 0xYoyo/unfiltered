@@ -1,0 +1,486 @@
+{
+  "modelId": "gemini-3.5-flash-lite",
+  "provenance": "live",
+  "entries": {
+    "summer dress, not white": {
+      "output": {
+        "priceMax": null,
+        "priceMin": null,
+        "currency": null,
+        "size": null,
+        "inStock": null,
+        "excluded": [
+          {
+            "typed": "white",
+            "english": "white"
+          }
+        ],
+        "priceFirm": null,
+        "sizeFirm": null
+      },
+      "inputTokens": 342,
+      "outputTokens": 87
+    },
+    "שמלת קיץ לא לבנה": {
+      "output": {
+        "priceMax": null,
+        "priceMin": null,
+        "currency": null,
+        "size": null,
+        "inStock": null,
+        "excluded": [
+          {
+            "typed": "לבנה",
+            "english": "white"
+          }
+        ],
+        "priceFirm": null,
+        "sizeFirm": null
+      },
+      "inputTokens": 344,
+      "outputTokens": 57
+    },
+    "pants, not black": {
+      "output": {
+        "priceMax": null,
+        "priceMin": null,
+        "currency": null,
+        "size": null,
+        "inStock": null,
+        "excluded": [
+          {
+            "typed": "black",
+            "english": "black"
+          }
+        ],
+        "priceFirm": null,
+        "sizeFirm": null
+      },
+      "inputTokens": 341,
+      "outputTokens": 87
+    },
+    "מכנסיים לא שחורים": {
+      "output": {
+        "priceMax": null,
+        "priceMin": null,
+        "currency": null,
+        "size": null,
+        "inStock": null,
+        "excluded": [
+          {
+            "typed": "שחורים",
+            "english": "black"
+          }
+        ],
+        "priceFirm": null,
+        "sizeFirm": null
+      },
+      "inputTokens": 345,
+      "outputTokens": 58
+    },
+    "top, no sleeves": {
+      "output": {
+        "priceMax": null,
+        "priceMin": null,
+        "currency": null,
+        "size": null,
+        "inStock": null,
+        "excluded": [
+          {
+            "typed": "sleeves",
+            "english": "sleeves"
+          }
+        ],
+        "priceFirm": null,
+        "sizeFirm": null
+      },
+      "inputTokens": 341,
+      "outputTokens": 89
+    },
+    "חולצה בלי שרוולים": {
+      "output": {
+        "priceMax": null,
+        "priceMin": null,
+        "currency": null,
+        "size": null,
+        "inStock": null,
+        "excluded": [
+          {
+            "typed": "שרוולים",
+            "english": "sleeves"
+          }
+        ],
+        "priceFirm": null,
+        "sizeFirm": null,
+        "refines": null
+      },
+      "inputTokens": 344,
+      "outputTokens": 98
+    },
+    "winter coat, not wool": {
+      "output": {
+        "priceMax": null,
+        "priceMin": null,
+        "currency": null,
+        "size": null,
+        "inStock": null,
+        "excluded": [
+          {
+            "typed": "wool",
+            "english": "wool"
+          }
+        ],
+        "priceFirm": null,
+        "sizeFirm": null
+      },
+      "inputTokens": 342,
+      "outputTokens": 87
+    },
+    "מעיל חורף לא מצמר": {
+      "output": {
+        "priceMax": null,
+        "priceMin": null,
+        "currency": null,
+        "size": null,
+        "inStock": null,
+        "excluded": [
+          {
+            "typed": "מצמר",
+            "english": "wool"
+          }
+        ],
+        "priceFirm": null,
+        "sizeFirm": null
+      },
+      "inputTokens": 345,
+      "outputTokens": 89
+    },
+    "jacket, not leather": {
+      "output": {
+        "priceMax": null,
+        "priceMin": null,
+        "currency": null,
+        "size": null,
+        "inStock": null,
+        "excluded": [
+          {
+            "typed": "leather",
+            "english": "leather"
+          }
+        ],
+        "priceFirm": null,
+        "sizeFirm": null
+      },
+      "inputTokens": 341,
+      "outputTokens": 87
+    },
+    "ז'קט לא מעור": {
+      "output": {
+        "priceMax": null,
+        "priceMin": null,
+        "currency": null,
+        "size": null,
+        "inStock": null,
+        "excluded": [
+          {
+            "typed": "מעור",
+            "english": "leather"
+          }
+        ],
+        "priceFirm": null,
+        "sizeFirm": null
+      },
+      "inputTokens": 343,
+      "outputTokens": 88
+    },
+    "dress under 150": {
+      "output": {
+        "priceMax": 150,
+        "priceMin": null,
+        "currency": null,
+        "size": null,
+        "inStock": null,
+        "excluded": [],
+        "priceFirm": null,
+        "sizeFirm": null,
+        "refines": null
+      },
+      "inputTokens": 343,
+      "outputTokens": 75
+    },
+    "שמלה מתחת ל-150": {
+      "output": {
+        "priceMax": 150,
+        "priceMin": null,
+        "currency": "ILS",
+        "size": null,
+        "inStock": null,
+        "excluded": [],
+        "priceFirm": null,
+        "sizeFirm": null
+      },
+      "inputTokens": 346,
+      "outputTokens": 66
+    },
+    "sneakers below 250": {
+      "output": {
+        "priceMax": 250,
+        "priceMin": null,
+        "currency": null,
+        "size": null,
+        "inStock": null,
+        "excluded": [],
+        "priceFirm": null,
+        "sizeFirm": null,
+        "refines": null
+      },
+      "inputTokens": 343,
+      "outputTokens": 73
+    },
+    "סניקרס עד 250": {
+      "output": {
+        "priceMax": 250,
+        "priceMin": null,
+        "currency": "ILS",
+        "size": null,
+        "inStock": null,
+        "excluded": [],
+        "priceFirm": null,
+        "sizeFirm": null
+      },
+      "inputTokens": 346,
+      "outputTokens": 48
+    },
+    "coat under ₪300": {
+      "output": {
+        "priceMax": 300,
+        "priceMin": null,
+        "currency": "ILS",
+        "size": null,
+        "inStock": null,
+        "excluded": [],
+        "priceFirm": null,
+        "sizeFirm": null,
+        "refines": null
+      },
+      "inputTokens": 344,
+      "outputTokens": 74
+    },
+    "מעיל עד ₪300": {
+      "output": {
+        "priceMax": 300,
+        "priceMin": null,
+        "currency": "ILS",
+        "size": null,
+        "inStock": null,
+        "excluded": [],
+        "priceFirm": null,
+        "sizeFirm": null,
+        "refines": null
+      },
+      "inputTokens": 345,
+      "outputTokens": 74
+    },
+    "bag under $100": {
+      "output": {
+        "priceMax": 100,
+        "priceMin": null,
+        "currency": "USD",
+        "size": null,
+        "inStock": null,
+        "excluded": [],
+        "priceFirm": null,
+        "sizeFirm": null,
+        "refines": null
+      },
+      "inputTokens": 343,
+      "outputTokens": 76
+    },
+    "תיק מתחת ל-100 ₪": {
+      "output": {
+        "priceMax": 100,
+        "priceMin": null,
+        "currency": "ILS",
+        "size": null,
+        "inStock": null,
+        "excluded": [],
+        "priceFirm": null,
+        "sizeFirm": null
+      },
+      "inputTokens": 348,
+      "outputTokens": 66
+    },
+    "skirt below 150": {
+      "output": {
+        "priceMax": 150,
+        "priceMin": null,
+        "currency": null,
+        "size": null,
+        "inStock": null,
+        "excluded": [],
+        "priceFirm": null,
+        "sizeFirm": null,
+        "refines": null
+      },
+      "inputTokens": 343,
+      "outputTokens": 75
+    },
+    "חצאית מתחת ל-150": {
+      "output": {
+        "priceMax": 150,
+        "priceMin": null,
+        "currency": "ILS",
+        "size": null,
+        "inStock": null,
+        "excluded": [],
+        "priceFirm": null,
+        "sizeFirm": null,
+        "refines": null
+      },
+      "inputTokens": 347,
+      "outputTokens": 74
+    },
+    "dress for a wedding": {
+      "output": {
+        "priceMax": null,
+        "priceMin": null,
+        "currency": null,
+        "size": null,
+        "inStock": null,
+        "excluded": [],
+        "priceFirm": null,
+        "sizeFirm": null
+      },
+      "inputTokens": 341,
+      "outputTokens": 62
+    },
+    "wedding dress": {
+      "output": {
+        "priceMax": null,
+        "priceMin": null,
+        "currency": null,
+        "size": null,
+        "inStock": null,
+        "excluded": [],
+        "priceFirm": null,
+        "sizeFirm": null
+      },
+      "inputTokens": 339,
+      "outputTokens": 62
+    },
+    "שמלה לחתונה": {
+      "output": {
+        "priceMax": null,
+        "priceMin": null,
+        "currency": null,
+        "size": null,
+        "inStock": null,
+        "excluded": [],
+        "priceFirm": null,
+        "sizeFirm": null,
+        "refines": null
+      },
+      "inputTokens": 342,
+      "outputTokens": 70
+    },
+    "שמלת כלה": {
+      "output": {
+        "priceMax": null,
+        "priceMin": null,
+        "currency": null,
+        "size": null,
+        "inStock": null,
+        "excluded": [],
+        "priceFirm": null,
+        "sizeFirm": null
+      },
+      "inputTokens": 341,
+      "outputTokens": 62
+    },
+    "shoes for a wedding": {
+      "output": {
+        "priceMax": null,
+        "priceMin": null,
+        "currency": null,
+        "size": null,
+        "inStock": null,
+        "excluded": [],
+        "priceFirm": null,
+        "sizeFirm": null
+      },
+      "inputTokens": 341,
+      "outputTokens": 62
+    },
+    "נעליים לחתונה": {
+      "output": {
+        "priceMax": null,
+        "priceMin": null,
+        "currency": null,
+        "size": null,
+        "inStock": null,
+        "excluded": [],
+        "priceFirm": null,
+        "sizeFirm": null
+      },
+      "inputTokens": 343,
+      "outputTokens": 62
+    },
+    "pants for the office": {
+      "output": {
+        "priceMax": null,
+        "priceMin": null,
+        "currency": null,
+        "size": null,
+        "inStock": null,
+        "excluded": [],
+        "priceFirm": null,
+        "sizeFirm": null
+      },
+      "inputTokens": 341,
+      "outputTokens": 62
+    },
+    "מכנסיים למשרד": {
+      "output": {
+        "priceMax": null,
+        "priceMin": null,
+        "currency": null,
+        "size": null,
+        "inStock": null,
+        "excluded": [],
+        "priceFirm": null,
+        "sizeFirm": null,
+        "refines": null
+      },
+      "inputTokens": 344,
+      "outputTokens": 70
+    },
+    "sneakers for running": {
+      "output": {
+        "priceMax": null,
+        "priceMin": null,
+        "currency": null,
+        "size": null,
+        "inStock": null,
+        "excluded": [],
+        "priceFirm": null,
+        "sizeFirm": null
+      },
+      "inputTokens": 340,
+      "outputTokens": 62
+    },
+    "סניקרס לריצה": {
+      "output": {
+        "priceMax": null,
+        "priceMin": null,
+        "currency": null,
+        "size": null,
+        "inStock": null,
+        "excluded": [],
+        "priceFirm": null,
+        "sizeFirm": null
+      },
+      "inputTokens": 344,
+      "outputTokens": 62
+    }
+  }
+}

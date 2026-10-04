@@ -14,6 +14,26 @@ Owner: founder. Amend via PR only. Established by YOY-114.
 The AI bars are strict (`<`); the classic bar is inclusive (`≤`). A bar met
 on the combined AI set but missed in one language is missed.
 
+### Engine v2 (default since YOY-153, 2026-10-04)
+
+With `ENGINE_V2` unset the deployment serves Engine v2, and every
+**submitted** search takes the v2 path — find, wish extraction, the judge
+(Jev since YOY-152) — whatever its length. So on v2:
+
+| Path | Bar | Statistic |
+|---|---|---|
+| Submitted search (all three probe sets: the short `classic` set's queries are submitted v2 searches too) | p50 **< 2000 ms** and p95 **< 3500 ms** | server-side `latencyMs` |
+| Keystroke preview (`mode=preview`, keyword only, zero model calls) | ceiling **≤ 800 ms** (a canary, not a percentile bar) | the daily smoke's preview probe, one sample a day (docs/SMOKE.md) |
+
+The classic p95 ≤ 500 ms bar belongs to the old engine's classic route,
+which v2 no longer serves for a submitted search; `ENGINE_V2=0` brings it
+back. The probe reports two v2 shares beside the percentiles, both
+tracked, neither a bar yet: `under-1s` — the PRD's "half of searches under
+1 s" gate, measured, then decided (PRD §3 Refinement 10) — and
+`no-extraction`, the share composed without the wish extraction. Without
+`--engine` the probe sends no engine parameter, so it times the engine the
+deployment serves (YOY-153 AC-5).
+
 ## The method
 
 1. **Server-side `latencyMs`.** The number is the orchestrator's wall time
@@ -231,3 +251,5 @@ links the issue comment carrying the probe's full output.
 | 2026-08-28 18:29–18:59 UTC | Frankfurt | `main` at `52a638c` (PR #141), pooled | ai-en | 100 | **1008 ms** | **2228 ms** | Both bars met. 0 degraded, 0 limited, 0 reused. Mean per stage: classify 279 · intent 1096 · embed 28 · retrieve 48 · hydrate 20 · closeMatches 25 ms. |
 | 2026-08-28 18:29–18:59 UTC | Frankfurt | `main` at `52a638c` (PR #141), pooled | ai-he | 100 | **1060 ms** | **3421 ms** | Both bars met (p95 by 79 ms). **1 degraded** (routes: ai=99, classic=1), 0 limited, 0 reused. Mean per stage: classify 232 · intent 1313 · embed 39 · retrieve 46 · classic 22 · hydrate 21 · closeMatches 28 ms. |
 | 2026-08-28 18:29–18:59 UTC | Frankfurt | `main` at `52a638c` (PR #141), pooled | ai-combined | 200 | **1017 ms** | **3275 ms** | Both bars met. 1 degraded of 200 — inside the YOY-64 AC-6 bar (≤ 2 of 200); YOY-124 AC-2's literal `degraded=0` predated that bar and was amended on 2026-08-28 (co-manager decision) to the same ≤ 1 % / ≤ 2 of 200, so this run **passes AC-2**. `--assert-classic-p95 500 --assert-ai-p50 2000 --assert-ai-p95 3500` exit 0: `assertions: all bars met`. |
+| 2026-10-04 ~18:45 UTC | Frankfurt | `main` at `5c5adfe` (PR #182: Jev default judge), `--engine v2` | v2 short queries (`classic` set) | 5 | 1666 ms | 1730 ms | YOY-153 AC-4 single sample (`--runs 1`), not a bar measurement. All 5 served v2 and judged (`routes: ai=5`), 0 degraded, 0 limited; under-1s 0 %, no-extraction 0 %. Mean per stage: find 458 · hydrate 18 · judge 893 ms. |
+| 2026-10-04 ~18:45 UTC | Frankfurt | `main` at `5c5adfe`, `--engine v2` | v2 ai-combined | 10 | **1538 ms** | 2298 ms | YOY-153 AC-4 single sample: the median the smoke's `aiMaxMs` is restated from (docs/SMOKE.md). EN p50 1538 / p95 2298; HE p50 1559 / p95 1887. 0 degraded, 1 limited (one HE request hit the per-IP throttle and was served classic). under-1s 10 %, no-extraction 0 %. Mean per stage: find 354 · compose 114 · hydrate 67 · judge 737 ms. |

@@ -21,20 +21,25 @@ import {
 const VERSION = "9.9.9";
 const CONFIG: SmokeConfig = { url: "https://fake.example", classicMaxMs: 1500, aiMaxMs: 6000 };
 
-function searchBody(query: string, overrides: Record<string, unknown> = {}) {
-  const ai = query !== SMOKE_QUERIES.classic;
+/**
+ * The playground's answer: a keystroke preview is the keyword path (classic,
+ * no chips, unpaged); a submitted search is an Engine v2 page.
+ */
+function searchBody(query: string, preview: boolean, overrides: Record<string, unknown> = {}) {
   return {
-    searchId: `search-${ai ? "ai" : "classic"}-${query.length}`,
-    route: ai ? "ai" : "classic",
+    searchId: `search-${preview ? "preview" : "v2"}-${query.length}`,
+    route: preview ? "classic" : "ai",
     degraded: false,
     results: [{ productId: "p1" }],
-    chips: ai ? [{ field: "category", value: "dress" }] : [],
+    chips: preview ? [] : [{ field: "price", value: "≤ 400" }],
     intent: null,
+    ...(preview ? {} : { page: 1, totalCount: 37 }),
     details: {
-      routeReason: ai ? "model" : "short-query",
-      latencyMs: ai ? 1800 : 24,
+      routeReason: preview ? "preview" : "judged",
+      latencyMs: preview ? 24 : 1800,
       limited: null,
       stages: {},
+      engine: "v2",
     },
     ...overrides,
   };
@@ -49,7 +54,7 @@ function healthyStore(
     "/healthz": { status: "ok", engine: { version, search: { hits: [] } } },
     "/api/playground/search": (_call, url) => {
       const query = url.searchParams.get("query") ?? "";
-      return searchBody(query, bend(query));
+      return searchBody(query, url.searchParams.get("mode") === "preview", bend(query));
     },
   });
 }
@@ -82,7 +87,7 @@ describe("live smoke (YOY-112)", () => {
     expect(report.passed).toBe(4);
     expect(report.probes.map((probe) => [probe.name, probe.pass])).toEqual([
       ["healthz", true],
-      ["classic", true],
+      ["preview", true],
       ["ai-en", true],
       ["ai-he", true],
     ]);
@@ -92,28 +97,41 @@ describe("live smoke (YOY-112)", () => {
     expect(sessions).toEqual(["session-1", "session-2", "session-3"]);
     const submitted = store.requests.slice(1).map((request) => new URL(request.url));
     expect(submitted.map((url) => url.searchParams.get("query"))).toEqual([
-      SMOKE_QUERIES.classic,
+      SMOKE_QUERIES.preview,
       SMOKE_QUERIES["ai-en"],
       SMOKE_QUERIES["ai-he"],
     ]);
+    // Only the `dress` probe is a keystroke preview (YOY-153 AC-4); the two
+    // others are submitted searches and name no engine, so the deployment's
+    // default answers.
+    expect(submitted.map((url) => url.searchParams.get("mode"))).toEqual(["preview", null, null]);
+    expect(submitted.every((url) => !url.searchParams.has("engine"))).toBe(true);
     expect(new Set(submitted.map((url) => url.searchParams.get("sessionId"))).size).toBe(3);
     // The report carries the evidence fields per probe.
     expect(report.probes[2]).toMatchObject({
-      searchId: expect.stringMatching(/^search-ai-/),
+      searchId: expect.stringMatching(/^search-v2-/),
       latencyMs: 1800,
       route: "ai",
-      routeReason: "model",
+      routeReason: "judged",
       chips: 1,
+      engine: "v2",
       failures: [],
     });
     expect(formatSummary(report)).toContain("4/4 passed → exit 0");
   });
 
   it("one failing probe: exit 1, the other three still run and pass", async () => {
-    // The EN AI probe degrades to classic with no chips — the YOY-109 class.
+    // The EN probe is answered by the old engine, degraded and unpaged —
+    // the flip did not land (YOY-153 AC-4).
     const store = healthyStore((query) =>
       query === SMOKE_QUERIES["ai-en"]
-        ? { route: "classic", degraded: true, chips: [], details: { routeReason: "model", latencyMs: 900, limited: null, stages: {} } }
+        ? {
+            route: "classic",
+            degraded: true,
+            page: undefined,
+            totalCount: undefined,
+            details: { routeReason: "model", latencyMs: 900, limited: null, stages: {}, engine: "v1" },
+          }
         : {},
     );
     const { report } = await run(store);
@@ -123,13 +141,39 @@ describe("live smoke (YOY-112)", () => {
     expect(store.requests).toHaveLength(4);
     expect(report.probes.map((probe) => probe.pass)).toEqual([true, true, false, true]);
     expect(report.probes[2]!.failures).toEqual([
-      'route is "classic", expected "ai"',
       "degraded is true, expected false",
-      "chips: 0, expected ≥ 1 on the AI route",
+      "page: null, expected a number",
+      "totalCount: null, expected a number",
+      'details.engine is "v1", expected "v2"',
     ]);
     const summary = formatSummary(report);
     expect(summary).toContain("FAIL  ai-en");
     expect(summary).toContain("3/4 passed → exit 1");
+  });
+
+  it("the preview probe stays the keyword path: a routed, chipped preview fails it (YOY-153 AC-4)", async () => {
+    // A preview that went to a model — the keystroke path regressed.
+    const store = healthyStore((query) =>
+      query === SMOKE_QUERIES.preview ? { route: "ai", chips: [{ field: "category", value: "dress" }] } : {},
+    );
+    const { report } = await run(store);
+
+    expect(report.probes.map((probe) => probe.pass)).toEqual([true, false, true, true]);
+    expect(report.probes[1]!.failures).toEqual([
+      'route is "ai", expected "classic"',
+      "chips: 1, expected 0 on the preview",
+    ]);
+  });
+
+  it("submitted probes carry no route or chip assertion under Engine v2 (YOY-153 AC-4)", async () => {
+    // Find order served with no judge and no extracted wish is still a
+    // healthy v2 page: route classic, zero chips.
+    const store = healthyStore((query) =>
+      query === SMOKE_QUERIES["ai-he"] ? { route: "classic", chips: [] } : {},
+    );
+    const { report } = await run(store);
+    expect(report.exitCode).toBe(0);
+    expect(report.probes[3]).toMatchObject({ pass: true, route: "classic", chips: 0, engine: "v2" });
   });
 
   it("version mismatch fails the healthz probe and names both versions", async () => {
@@ -145,10 +189,10 @@ describe("live smoke (YOY-112)", () => {
 
   it("a latency over its ceiling fails that probe only", async () => {
     const store = healthyStore((query) =>
-      query === SMOKE_QUERIES.classic
-        ? { details: { routeReason: "short-query", latencyMs: 1501, limited: null, stages: {} } }
+      query === SMOKE_QUERIES.preview
+        ? { details: { routeReason: "preview", latencyMs: 1501, limited: null, stages: {}, engine: "v2" } }
         : query === SMOKE_QUERIES["ai-he"]
-          ? { details: { routeReason: "model", latencyMs: 6000, limited: null, stages: {} } }
+          ? { details: { routeReason: "judged", latencyMs: 6000, limited: null, stages: {}, engine: "v2" } }
           : {},
     );
     const { report } = await run(store);
@@ -175,7 +219,8 @@ describe("live smoke (YOY-112)", () => {
   it("a non-200 healthz and a non-JSON body are reported, not thrown", async () => {
     const store = createFakeStore({
       "/healthz": new Response("gateway timeout", { status: 504 }),
-      "/api/playground/search": (_call, url) => searchBody(url.searchParams.get("query") ?? ""),
+      "/api/playground/search": (_call, url) =>
+        searchBody(url.searchParams.get("query") ?? "", url.searchParams.get("mode") === "preview"),
     });
     const { report } = await run(store);
     expect(report.probes[0]!.failures).toEqual([

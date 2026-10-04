@@ -1,0 +1,3818 @@
+{
+  "modelId": "gemini-3.5-flash-lite",
+  "provenance": "live",
+  "entries": {
+    "Hoodie#b9dfb13fe1b39b1e": {
+      "output": {
+        "facts": "Hoodie. Looks like fleece material. Long sleeves, hooded neckline, hip length, relaxed fit. Features a graphic print on the front with the word KÖNG and a crown symbol. Paired with black pants and white sneakers.",
+        "look": "A casual grey hoodie with a black graphic print reading KÖNG under a crown on the chest. It has a drawstring hood, a front kangaroo pocket, and long sleeves. Worn with dark black fitted trousers and white low-top sneakers against a colorful graffiti wall background.",
+        "read": "A sporty and casual everyday look suitable for streetwear, lounging, or casual outdoor activities. Ideal for anyone looking for comfortable and relaxed urban style.",
+        "summary": "A casual grey fleece hoodie featuring a prominent KÖNG graphic print, paired with black pants and white sneakers for an urban streetwear look.",
+        "asks": {
+          "en": [
+            "grey hoodie",
+            "KÖNG hoodie",
+            "hooded sweatshirt",
+            "casual grey top",
+            "fleece hoodie for women",
+            "sporty grey hoodie",
+            "grey sweatshirt with graphic",
+            "streetwear hoodie",
+            "long sleeve grey hoodie",
+            "comfortable casual hoodie",
+            "grey hoodie with crown logo",
+            "hip length grey hoodie",
+            "relaxed fit hoodie",
+            "grey pullover hoodie",
+            "everyday casual top"
+          ],
+          "he": [
+            "קפוצ'ון אפור",
+            "סווטשירט אפור",
+            "קפוצ'ון עם הדפס",
+            "קפוצ'ון ספורטיבי",
+            "קפוצ'ון אפור רחב",
+            "סווטשירט לנשים",
+            "קפוצ'ון קזואל",
+            "חולצה עם קפוצ'ון אפורה",
+            "קפוצ'ון אופנתי",
+            "קפוצ'ון נוח ליום יום",
+            "סווטשירט אפור עם הדפס",
+            "קפוצ'ון אפור ארוך",
+            "בגדי רחוב קפוצ'ון",
+            "קפוצ'ון ליומיום",
+            "קפוצ'ון אפור קלאסי"
+          ]
+        }
+      },
+      "inputTokens": 1566,
+      "outputTokens": 527
+    },
+    "Wrap Dress#72c4facff167f41c": {
+      "output": {
+        "facts": "The item is a wrap dress. It looks like a short-sleeved mini wrap dress featuring a v-neck and a floral pattern on a black background.",
+        "look": "A black wrap dress with a multi-colored floral print, short sleeves, a v-neckline, and a mini length. The outfit is accessorized with sunglasses, a choker, brown platform heels, and a dark red handbag.",
+        "read": "This boho-style floral wrap dress is versatile for casual daytime outings or relaxed evening events, suitable for fashion-forward women looking for a chic and effortless look.",
+        "summary": "A chic black floral wrap dress with short sleeves and a v-neckline, perfect for casual and evening wear.",
+        "asks": {
+          "en": [
+            "black floral wrap dress",
+            "short sleeve wrap dress",
+            "mini wrap dress for women",
+            "floral print mini dress",
+            "v-neck black dress",
+            "boho style wrap dress",
+            "casual floral dress",
+            "evening wrap dress",
+            "black dress with flowers",
+            "summer wrap dress",
+            "short dress with floral pattern",
+            "cute black mini dress",
+            "wrap dress for casual wear",
+            "trendy floral dress",
+            "stylish black wrap dress"
+          ],
+          "he": [
+            "שמלת מעטפת שחורה",
+            "שמלת מיני פרחונית",
+            "שמלת מעטפת פרחים",
+            "שמלת וי קלאסית",
+            "שמלה קצרה פרחונית",
+            "שמלת בוהו שחורה",
+            "שמלת מעטפת קז'ואל",
+            "שמלה שחורה עם פרחים",
+            "שמלת מיני שחורה",
+            "שמלת ערב קצרה",
+            "שמלת קיץ פרחונית",
+            "שמלת מעטפת שרוול קצר",
+            "שמלה פרחונית יפה",
+            "שמלת אופנה נשים",
+            "שמלת מעטפת שחורה פרחונית"
+          ]
+        }
+      },
+      "inputTokens": 1600,
+      "outputTokens": 508
+    },
+    "Biker Jacket#2efc062f8aa1f4a2": {
+      "output": {
+        "facts": "Biker jacket made of material that looks like leather, in black colour.",
+        "look": "Black biker jacket with long sleeves, asymmetrical metal zipper closure, lapel collar, belted hem, and silver-tone hardware including a wristwatch visible on the wrist.",
+        "read": "An edgy, rock-inspired style suitable for casual outings and evening events, worn by women wanting a bold look.",
+        "summary": "A black faux leather biker jacket with an asymmetrical zipper and metal hardware, perfect for casual and evening wear.",
+        "asks": {
+          "en": [
+            "black biker jacket",
+            "leather look jacket",
+            "womens black jacket",
+            "edgy rock style jacket",
+            "biker jacket with belt",
+            "black motorcycle jacket",
+            "casual black jacket",
+            "evening jacket for women",
+            "jacket with silver hardware",
+            "asymmetrical zip jacket",
+            "black hip length jacket",
+            "long sleeve biker jacket",
+            "collar jacket black",
+            "stylish black biker coat",
+            "cool black jacket"
+          ],
+          "he": [
+            "מעיל אופנוענים שחור",
+            "ז'קט עור שחור לנשים",
+            "מעיל רוקר שחור",
+            "ז'קט בייקר שחור",
+            "מעיל עם רוכסן אלכסוני",
+            "ז'קט קז'ואל שחור",
+            "מעיל ערב שחור",
+            "ז'קט שחור אופנתי",
+            "מעיל נשים שחור",
+            "ז'קט עם אבזם וחגורה",
+            "מעיל דמוי עור שחור",
+            "ז'קט שחור קצר",
+            "מעיל סגנון רוק",
+            "ז'קט שחור מעוצב",
+            "מעיל בייקר לאישה"
+          ]
+        }
+      },
+      "inputTokens": 1570,
+      "outputTokens": 455
+    },
+    "Striped Tee#d934885446946deb": {
+      "output": {
+        "facts": "The item is a striped top with three-quarter sleeves, a crew neckline, and a hip garment length. It has a regular fit and a stripe pattern. Looks like cotton material appearance.",
+        "look": "The top features a black and white horizontal striped pattern, three-quarter sleeves, and a crew neckline. It is styled casually, paired with a black leather vest, layered silver necklaces, blue jeans, and red sneakers.",
+        "read": "This casual striped tee is a versatile basic suitable for everyday wear, casual outings, and relaxed weekends. It is designed for women who appreciate a classic yet edgy casual style.",
+        "summary": "A classic black and white striped tee with three-quarter sleeves and a crew neckline, perfect for casual everyday wear.",
+        "asks": {
+          "en": [
+            "striped tee",
+            "black and white striped top",
+            "three quarter sleeve striped shirt",
+            "casual striped top for women",
+            "crew neck striped tee",
+            "cotton look striped shirt",
+            "striped top with three quarter sleeves",
+            "womens basic striped tee",
+            "everyday casual striped shirt",
+            "striped shirt for women",
+            "black white stripe top",
+            "regular fit striped tee"
+          ],
+          "he": [
+            "חולצת פסים",
+            "חולצת פסים שחור לבן",
+            "חולצה מוסרטת לנשים",
+            "חולצת פסים יומיומית",
+            "חולצת בסיס פסים",
+            "חולצת פסים שרוול שלושה רבעים",
+            "חולצת צווארון עגול פסים",
+            "חולצת פסים קזואל",
+            "טופ פסים לנשים",
+            "חולצת פסים אופנתית"
+          ]
+        }
+      },
+      "inputTokens": 1572,
+      "outputTokens": 422
+    },
+    "Sun Dress#30b03c58a5eb610e": {
+      "output": {
+        "facts": "The item is a sun dress. It is sleeveless with a crew neckline and a mini garment length. The fit is regular. The pattern is floral in white and blue colors. The material appearance looks like cotton.",
+        "look": "The sun dress is white with a blue floral pattern. It is sleeveless, features a crew neckline, and has a short, mini-length flared skirt. The woman is wearing it while standing outdoors on a sidewalk next to a blue and grey building, holding a leash attached to a small dog.",
+        "read": "This casual summer sun dress is styled for warm weather, beach outings, and casual daytime wear. It is designed for women looking for a cute, light, and airy outfit.",
+        "summary": "A cute white and blue floral sleeveless sun dress with a crew neckline and mini length, perfect for casual summer and beach wear.",
+        "asks": {
+          "en": [
+            "sun dress",
+            "white and blue floral dress",
+            "sleeveless mini dress",
+            "casual summer dress",
+            "cute beach dress",
+            "floral sun dress for women",
+            "mini sun dress",
+            "blue floral summer dress",
+            "sleeveless crew neck dress",
+            "cotton look sun dress",
+            "casual floral mini dress",
+            "summer beach dress",
+            "white floral dress",
+            "short floral dress",
+            "boho summer dress"
+          ],
+          "he": [
+            "שמלת קיץ",
+            "שמלת פרחים לבנה וכחולה",
+            "שמלת מיני ללא שרוולים",
+            "שמלת קזואל לקיץ",
+            "שמלת חוף פרחונית",
+            "שמלת שמש פרחונית",
+            "שמלת מיני קצרה",
+            "שמלת קיץ פרחונית",
+            "שמלה ללא שרוולים",
+            "שמלת חוף לבנה",
+            "שמלת יום קלילה",
+            "שמלת פרחים יפה",
+            "שמלת קיץ קצרה",
+            "שמלה פרחונית אופנתית",
+            "שמלת אופנת קיץ"
+          ]
+        }
+      },
+      "inputTokens": 1591,
+      "outputTokens": 517
+    },
+    "Moto Jacket#65fb64fe77b59340": {
+      "output": {
+        "facts": "Moto Jacket. Looks like black leather. Regular fit, cropped garment length, long sleeves, solid pattern, notch neckline.",
+        "look": "Black cropped moto jacket featuring long sleeves, notch neckline, and a solid pattern. It has a front zipper closure and looks like leather.",
+        "read": "An edgy and rocker-style moto jacket suitable for casual daytime wear or evening outings, perfect for fashion-forward individuals looking to add a bold statement to their outfit.",
+        "summary": "Black cropped moto jacket with long sleeves and a notch neckline, offering an edgy and rocker style suitable for casual or evening wear.",
+        "asks": {
+          "en": [
+            "black moto jacket",
+            "cropped leather jacket",
+            "edgy black jacket",
+            "rocker style jacket",
+            "womens black moto jacket",
+            "cropped moto jacket for women",
+            "black jacket for evening out",
+            "casual black leather jacket",
+            "long sleeve moto jacket",
+            "notch neckline black jacket",
+            "solid black jacket",
+            "stylish black biker jacket",
+            "fashionable cropped jacket",
+            "cool black jacket"
+          ],
+          "he": [
+            "מעיל אופנוענים שחור",
+            "מעיל עור קצוץ",
+            "מעיל רוקר שחור",
+            "מעיל שחור קצר",
+            "מעיל נשים שחור",
+            "מעיל אופנוענים נשים",
+            "מעיל שחור לערב",
+            "מעיל קזואל שחור",
+            "מעיל עם רוכסן",
+            "מעיל אופנוענים קלאסי"
+          ]
+        }
+      },
+      "inputTokens": 1569,
+      "outputTokens": 394
+    },
+    "Chinos#504dad495df281b1": {
+      "output": {
+        "facts": "Pants, chinos. Looks like cotton material.",
+        "look": "Khaki beige slim fit chinos, ankle length, solid pattern, worn with white sneakers, white t-shirt and denim jacket.",
+        "read": "Casual style pants suitable for everyday wear and smart-casual occasions, worn by men.",
+        "summary": "Khaki slim fit chino pants for men, perfect for casual and smart-casual wear.",
+        "asks": {
+          "en": [
+            "khaki chinos",
+            "slim fit chinos",
+            "beige pants for men",
+            "ankle length chinos",
+            "casual khaki pants",
+            "men casual trousers",
+            "solid khaki pants",
+            "cotton look chinos",
+            "smart casual pants",
+            "mens beige chinos",
+            "slim khaki trousers",
+            "stylish mens pants"
+          ],
+          "he": [
+            "מכנסי צ'ינו חאקי",
+            "מכנסיים בצבע חאקי לגברים",
+            "צ'ינו סלים",
+            "מכנסיים קזואל לגברים",
+            "מכנסי צ'ינו בגזרת סלים",
+            "מכנסיים בצבע בז'",
+            "מכנסיים אופנתיים לגברים",
+            "מכנסי צ'ינו לגברים",
+            "מכנסיים יומיומיים",
+            "צ'ינו חאקי ארוך",
+            "מכנסי כותנה לגברים",
+            "מכנסיים סמארט קזואל"
+          ]
+        }
+      },
+      "inputTokens": 1560,
+      "outputTokens": 382
+    },
+    "Western Shirt#e7468ed1b029aa5e": {
+      "output": {
+        "facts": "Western Shirt. Looks like a denim western shirt with long sleeves, a collar, snap closures, and chest pockets.",
+        "look": "A blue denim western shirt worn open over a long grey t-shirt, light blue skinny jeans, and white high-top sneakers, standing in front of a blue wall with graffiti.",
+        "read": "A casual streetwear look suited for everyday wear, casual outings, and urban style.",
+        "summary": "A blue denim western shirt featuring a classic collar and button-down front, styled for casual everyday wear.",
+        "asks": {
+          "en": [
+            "blue denim western shirt",
+            "mens denim shirt",
+            "western shirt for men",
+            "blue casual shirt",
+            "long sleeve denim shirt",
+            "button down denim shirt",
+            "denim top",
+            "mens western wear",
+            "blue cotton denim shirt",
+            "casual western shirt",
+            "stylish denim shirt",
+            "mens blue top"
+          ],
+          "he": [
+            "חולצת ג'ינס כחולה",
+            "חולצת ג'ינס לגבר",
+            "חולצת מערב פרוע",
+            "חולצה ארוכה ג'ינס",
+            "חולצת כפתורים ג'ינס",
+            "חולצה קזואל ג'ינס",
+            "חולצת ג'ינס אופנתית",
+            "חולצה כחולה לגברים",
+            "ג'ינס שורט לגבר",
+            "חולצת דנים גבר"
+          ]
+        }
+      },
+      "inputTokens": 1565,
+      "outputTokens": 373
+    },
+    "Winter Jacket#7f4463aa891104ad": {
+      "output": {
+        "facts": "Winter jacket. Category: jacket. Colors: blue, silver, black. Primary color: blue. Occasions: casual, sport. Fit: regular. Style: winter, puffer, streetwear. Seasons: winter. Sleeve length: long. Neckline: high-neck. Garment length: hip. Pattern: quilted. Material appearance: synthetic.",
+        "look": "A blue, silver, and black shiny puffer winter jacket with a quilted pattern, high-neck, long sleeves, and hip length.",
+        "read": "A casual streetwear winter jacket suitable for cold weather and casual or sporty occasions, worn by men.",
+        "summary": "Blue and silver winter puffer jacket with a high neck, regular fit, and hip length, perfect for casual streetwear.",
+        "asks": {
+          "en": [
+            "winter jacket",
+            "blue puffer jacket",
+            "mens winter jacket",
+            "streetwear jacket",
+            "shiny winter coat",
+            "blue silver puffer",
+            "casual winter jacket",
+            "high neck jacket",
+            "quilted winter coat",
+            "mens puffer jacket",
+            "warm winter jacket",
+            "sporty winter coat",
+            "blue jacket for men",
+            "hip length winter jacket",
+            "synthetic winter coat"
+          ],
+          "he": [
+            "מעיל חורף",
+            "מעיל פאפר כחול",
+            "מעיל חורף לגברים",
+            "מעיל סטריטרוור",
+            "מעיל פוך מבריק",
+            "מעיל חורף קזואל",
+            "מעיל עם צווארון גבוה",
+            "מעיל ממוחזר",
+            "מעיל ספורט אלגנט",
+            "מעיל חורף אופנתי",
+            "מעיל כחול לגברים",
+            "מעיל פאפר אופנתי",
+            "מעיל חורף חם",
+            "מעיל גברים מומלץ",
+            "מעיל חורף יפה"
+          ]
+        }
+      },
+      "inputTokens": 1580,
+      "outputTokens": 474
+    },
+    "Track Pants#58af23b608fc55a1": {
+      "output": {
+        "facts": "Track pants, looks like cotton material, relaxed fit, full length, solid black color.",
+        "look": "Black full-length track pants with a relaxed fit and solid pattern, paired with a red hoodie and red sneakers.",
+        "read": "Sporty and streetwear style pants suitable for casual everyday wear, sports, and lounging, worn by men.",
+        "summary": "Black relaxed-fit track pants featuring a full-length design and solid pattern, ideal for casual and sporty wear.",
+        "asks": {
+          "en": [
+            "black track pants",
+            "relaxed fit track pants",
+            "full length black pants",
+            "sporty black trousers",
+            "streetwear track pants",
+            "mens casual black pants",
+            "cotton look track pants",
+            "solid black pants for men",
+            "comfortable track pants",
+            "activewear pants black",
+            "where can I buy black track pants",
+            "stylish black sweatpants",
+            "relaxed black trousers",
+            "mens sporty pants"
+          ],
+          "he": [
+            "מכנסי טרניק שחורים",
+            "מכנסי ספורט שחורים",
+            "מכנסיים ארוכים שחורים",
+            "מכנסי טרניק גברים",
+            "מכנסי סตรีטוויר",
+            "מכנסיים רפויים שחורים",
+            "מכנסי כותנה שחורים",
+            "טרנינג שחור לגברים",
+            "מכנסי ספורט נוחים",
+            "מכנסיים קזואל שחורים",
+            "איפה לקנות מכנסי טרנינג שחורים",
+            "מכנסי אופנת רחוב",
+            "מכנסיים שחורים לגברים",
+            "טרנינג שחור אופנתי"
+          ]
+        }
+      },
+      "inputTokens": 1556,
+      "outputTokens": 453
+    },
+    "Sandals#ac4fd30e67f5107f": {
+      "output": {
+        "facts": "Sandals, shoes. Material looks like leather. Features straps, block heels, buckles.",
+        "look": "Gold and bronze metallic strappy sandals with low block heels, open toes, and delicate interwoven straps across the front and ankle strap closures.",
+        "read": "Elegant evening sandals suitable for weddings, parties, and formal events.",
+        "summary": "Elegant gold metallic strappy sandals with block heels, perfect for evening wear and special occasions.",
+        "asks": {
+          "en": [
+            "gold sandals",
+            "bronze sandals",
+            "strappy evening shoes",
+            "metallic heels",
+            "wedding guest sandals",
+            "gold block heel sandals",
+            "party shoes for women",
+            "chic strappy sandals",
+            "elegant evening footwear",
+            "gold open toe shoes",
+            "womens formal sandals",
+            "bronze party sandals"
+          ],
+          "he": [
+            "סנדלים מוזהבים",
+            "נעלי ערב מוזהבות",
+            "סנדלים עם עקב נמוך",
+            "סנדלים לאירועים",
+            "נעלי ערב לנשים",
+            "סנדלי רצועות",
+            "סנדלים בצבע ברונזה",
+            "נעלי חתונה",
+            "סנדלים אלגנטיים",
+            "נעלי עקב מוזהבות"
+          ]
+        }
+      },
+      "inputTokens": 1538,
+      "outputTokens": 327
+    },
+    "Jacket#c6c53ac48592d439": {
+      "output": {
+        "facts": "The item is a jacket made of material that looks like leather. It features a collar neckline, long sleeves, and a hip-length, regular fit. The style is biker and casual with a solid pattern.",
+        "look": "The jacket is tan or brown in color, styled as a biker jacket with a collar, long sleeves, and a hip-length cut.",
+        "read": "This casual biker jacket suits casual daily wear, outings, and cool-weather styling.",
+        "summary": "A tan biker jacket with a collar, long sleeves, and a regular fit, perfect for casual occasions.",
+        "asks": {
+          "en": [
+            "tan biker jacket",
+            "brown leather look jacket",
+            "casual tan jacket",
+            "womens brown jacket",
+            "biker jacket for women",
+            "tan leather style jacket",
+            "long sleeve casual jacket",
+            "hip length brown jacket",
+            "solid tan jacket",
+            "collar biker jacket",
+            "stylish casual outerwear",
+            "brown biker jacket",
+            "tan fall jacket"
+          ],
+          "he": [
+            "מעיל אופנוענים בז",
+            "מעיל עור חום",
+            "מעיל קזואל לנשים",
+            "מעיל בז קצר",
+            "מעיל אופנוענים חום",
+            "מעיל חום אופנתי",
+            "מעיל נשים בצבע בז",
+            "מעיל עם צווארון לנשים",
+            "מעיל ארוך שרוולים בז",
+            "מעיל דמוי עור חום"
+          ]
+        }
+      },
+      "inputTokens": 1566,
+      "outputTokens": 376
+    },
+    "Party Dress#f03763663bfc8a82": {
+      "output": {
+        "facts": "This item is a party dress. Based on the photos, it looks like silk fabric with lace inserts.",
+        "look": "This is a slim fit mini party dress with long sleeves and a crew neckline. It is black with a white star pattern and features black lace details on the shoulders, sleeves, waist, and hemline.",
+        "read": "This chic and elegant party dress is suitable for evening outings, parties, and casual chic events. It is designed for women who want a stylish and sophisticated look.",
+        "summary": "A chic black mini party dress featuring a white star print, long sleeves, a crew neckline, and delicate black lace trim.",
+        "asks": {
+          "en": [
+            "black star print party dress",
+            "mini dress with lace",
+            "long sleeve evening dress",
+            "black and white star dress",
+            "party dress for women",
+            "chic mini dress",
+            "slim fit dress",
+            "crew neck party dress",
+            "dress with star pattern",
+            "black dress with lace details"
+          ],
+          "he": [
+            "שמלת מסיבה שחורה עם כוכבים",
+            "שמלת מיני עם תחרה",
+            "שמלת ערב שרוול ארוך",
+            "שמלת כוכבים שחור ולבן",
+            "שמלת מסיבה לנשים",
+            "שמלת מיני שיקית",
+            "שמלה צמודה",
+            "שמלת ערב קצרה",
+            "שמלה עם הדפס כוכבים",
+            "שמלה שחורה עם תחרה"
+          ]
+        }
+      },
+      "inputTokens": 1571,
+      "outputTokens": 388
+    },
+    "Day Dress#42d8ee49b454862a": {
+      "output": {
+        "facts": "Day Dress. Looks like green knit fabric, regular fit, mini length, long sleeves, crew neckline, solid pattern, with a tied waist detail.",
+        "look": "Olive green mini dress featuring a crew neckline, long bishop sleeves with cuffed wrists, a regular fit, and a prominent fabric tie-belt wrapping around the waist.",
+        "read": "A chic and casual everyday dress suitable for work, casual outings, and daytime wear.",
+        "summary": "An olive green day dress featuring long sleeves, a crew neck, and a tied waist detail, perfect for casual and work wear.",
+        "asks": {
+          "en": [
+            "green day dress",
+            "olive green mini dress",
+            "long sleeve casual dress",
+            "dress with tie waist",
+            "green knit dress",
+            "crew neck mini dress",
+            "casual green work dress",
+            "eval-fixture day dress",
+            "solid green dress for women",
+            "long sleeve green dress",
+            "chic everyday dress",
+            "green dress with belt"
+          ],
+          "he": [
+            "שמלת יום ירוקה",
+            "שמלת מיני ירוקה",
+            "שמלה עם קשירה במותן",
+            "שמלה ירוקה שרוול ארוך",
+            "שמלה קזואל ירוקה",
+            "שמלה ירוקה לעבודה",
+            "שמלת סרוג ירוקה",
+            "שמלה חלקה ירוקה",
+            "שמלת מיני יום יום",
+            "שמלה עם שרוולים ארוכים",
+            "שמלת יום אופנתית"
+          ]
+        }
+      },
+      "inputTokens": 1599,
+      "outputTokens": 401
+    },
+    "Aurora Maxi Dress": {
+      "output": {
+        "facts": "Aurora Maxi Dress. Flowing ivory maxi dress.",
+        "look": "Flowing ivory maxi dress.",
+        "read": "A flowing maxi dress suitable for casual or elegant warm-weather occasions, worn by women.",
+        "summary": "An ivory flowing maxi dress by eval-fixture.",
+        "asks": {
+          "en": [
+            "ivory maxi dress",
+            "flowing maxi dress",
+            "aurora maxi dress",
+            "white maxi dress",
+            "long ivory dress",
+            "flowy ivory dress",
+            "eval fixture maxi dress",
+            "maxi dress for women",
+            "casual ivory maxi",
+            "elegant long dress",
+            "ivory flowing dress",
+            "summer maxi dress",
+            "white flowing dress",
+            "long white dress",
+            "aurora dress"
+          ],
+          "he": [
+            "שמת מקסי בצבע שמנת",
+            "שמלה ארוכה לבנה",
+            "שמלת מקסי נוזלית",
+            "שמלת מקסי אוריורה",
+            "שמלה בצבע שמנת",
+            "שמלת מקסי ארוכה",
+            "שמלה נופלת שמנת",
+            "שמלת קיץ ארוכה",
+            "שמלת מקסי אלגנטית",
+            "שמלה לבנה ארוכה",
+            "שמלת מקסי לנשים",
+            "שמלה לבנה נוזלית",
+            "שמלת ערב שמנת",
+            "שמלה ארוכה יום יומית",
+            "שמלת מקסי לבנה"
+          ]
+        }
+      },
+      "inputTokens": 449,
+      "outputTokens": 391
+    },
+    "Noir Evening Gown": {
+      "output": {
+        "facts": "dress, black, evening gown",
+        "look": "black evening gown",
+        "read": "An evening gown suited for formal evening occasions and events.",
+        "summary": "A black evening gown designed for formal evening wear.",
+        "asks": {
+          "en": [
+            "black evening gown",
+            "evening dress",
+            "black dress for evening",
+            "formal black gown",
+            "noir evening dress",
+            "black gown",
+            "elegant evening dress",
+            "black formal dress",
+            "party dress black",
+            "long black evening gown",
+            "black designer dress",
+            "evening wear black dress"
+          ],
+          "he": [
+            "שמלת ערב שחורה",
+            "שמלה שחורה לאירוע",
+            "שמלת ערב",
+            "שמלה שחורה אלגנטית",
+            "שמלת מקסי שחורה",
+            "שמלה רשמית שחורה",
+            "שמלת ערב אלגנטית",
+            "שמלה לאירועים שחורה",
+            "שמלת ערב נואר",
+            "בגדי ערב שחורים",
+            "שמלת ערב שחורה ארוכה",
+            "שמלה שחורה יוקרתית"
+          ]
+        }
+      },
+      "inputTokens": 447,
+      "outputTokens": 324
+    },
+    "שמלת ערב שחורה": {
+      "output": {
+        "facts": "שמלת ערב קלאסית. צבע: שחור.",
+        "look": "שמלת ערב בצבע שחור, עיצוב קלאסי.",
+        "read": "השמלת מתאימה לאירועים ולערב, בסגנון קלאסי ואלגנטי.",
+        "summary": "שמלת ערב שחורה וקלאסי לאירועים.",
+        "asks": {
+          "en": [
+            "black evening dress",
+            "classic black dress",
+            "formal black dress",
+            "black dress for evening",
+            "elegant black dress",
+            "black party dress",
+            "evening wear black dress",
+            "black dress for events",
+            "simple black evening dress",
+            "chic black dress"
+          ],
+          "he": [
+            "שמלת ערב שחורה",
+            "שמלה שחורה אלגנטית",
+            "שמלת ערב קלאסית",
+            "שמלה שחורה לאירוע",
+            "שמלה שחורה קלאסית",
+            "שמלת ערב שחורה קלאסית",
+            "שמלה לאירועים שחורה",
+            "שמלת מיני שחורה לאירוע",
+            "שמלת ערב קלאסי",
+            "שמלה שחורה יפה"
+          ]
+        }
+      },
+      "inputTokens": 457,
+      "outputTokens": 343
+    },
+    "Blush Midi Dress": {
+      "output": {
+        "facts": "שמדת מידי בגוון סומק רך.",
+        "look": "שמדת מידי בצבע סומק רך, באורך מידי.",
+        "read": "שמלה אלגנטית ויומיומית המתאימה לאירועים שונים וליום-יום.",
+        "summary": "שמלת מידי רכה בגוון סומק.",
+        "asks": {
+          "en": [
+            "blush midi dress",
+            "soft blush dress",
+            "midi dress in blush",
+            "pinkish midi dress",
+            "casual blush dress",
+            "midi length dress blush",
+            "blush pink dress midi",
+            "eval-fixture blush dress",
+            "dresses midi blush",
+            "simple blush dress"
+          ],
+          "he": [
+            "שמלת מידי סומק",
+            "שמלה ורודה רכה",
+            "שמלת מידי בצבע סומק",
+            "שמלה קזואל סומק",
+            "שמלת מידי אלגנטית",
+            "שמלה באורך מידי",
+            "שמלה בצבע ורוד בהיר",
+            "שמלת מידי יומיומית",
+            "שמלה רכה סומק",
+            "שמלות מידי"
+          ]
+        }
+      },
+      "inputTokens": 448,
+      "outputTokens": 330
+    },
+    "שמלת קיץ פרחונית": {
+      "output": {
+        "facts": "שמלת קיץ פרחונית",
+        "look": "שמלה עם הדפס פרחוני, מתאימה לעונת הקיץ.",
+        "read": "שמלת קיץ קלילה ופרחונית, מתאימה לימים חמים, ללבוש יומיומי ולאירועים קלילים בחוץ.",
+        "summary": "שמלת קיץ פרחונית קלילה ונעימה לעונה החמה.",
+        "asks": {
+          "en": [
+            "floral summer dress",
+            "summer dress",
+            "floral dress",
+            "light summer dress",
+            "cute floral dress",
+            "casual summer dress",
+            "warm weather dress",
+            "day dress floral",
+            "summer floral outfit",
+            "flowery summer dress"
+          ],
+          "he": [
+            "שמלת קיץ פרחונית",
+            "שמלה פרחונית",
+            "שמלת קיץ",
+            "שמלה פרחונית לקיץ",
+            "שמלה קלילה לקיץ",
+            "שמלה יומיומית פרחונית",
+            "שמלה פרחונית יפה",
+            "שמלת פרחים",
+            "שמלה לימים חמים",
+            "שמלת קיץ קלילה"
+          ]
+        }
+      },
+      "inputTokens": 440,
+      "outputTokens": 334
+    },
+    "Linen Beach Dress": {
+      "output": {
+        "facts": "שמלת חוף פשתן. עשויה פשתן אוורירי בצבע לבן. גזרה אוורירית.",
+        "look": "שמלת חוף קצרה בצבע לבן אחיד, נראית עשויה מבד פשתן קל ואוורירי עם גזרה משוחררת ומתאימה ללבוש יום ימיומי או חוף ים.",
+        "read": "שמלה קלילה ואופנתית המיועדת לימי קיץ חמים, מושלמת ללבישה מעל בגד ים בחוף הים, לטיולים קז'ואליים או לחופשה נינוחה.",
+        "summary": "שמלת חוף לבנה ואוורירית העשויה מפשתן קל, מושלמת לימי הקיץ והחופשה.",
+        "asks": {
+          "en": [
+            "white linen beach dress",
+            "breezy white dress",
+            "summer beach dress",
+            "linen dress for women",
+            "white casual dress",
+            "vacation beach dress",
+            "lightweight summer dress",
+            "white linen cover up",
+            "beachwear dress",
+            "short white linen dress",
+            "שמלת חוף לבנה",
+            "שמלת פשתן לקיץ",
+            "שמלה אוורירית לחוף",
+            "שמלת קיץ לבנה",
+            "בגדי ים וכמיסה",
+            "שמלת פשתן קצרה",
+            "שמלה לחופשה",
+            "שמלת קזואל לבנה",
+            "שמלת חוף קלילה",
+            "שמלת פשתן לבנה"
+          ],
+          "he": [
+            "שמלת חוף לבנה",
+            "שמלת פשתן לבנה",
+            "שמלת קיץ אוורירית",
+            "שמלה לחוף הים",
+            "שמלת פשתן קצרה",
+            "שמלת קזואל לבנה",
+            "שמלה לבנה לחופשה",
+            "שמלת חוף קלילה",
+            "בגדי חוף לנשים",
+            "שמלת קיץ לבנה",
+            "שמלת מעטפת לחוף",
+            "שמלת פשתן קלילה",
+            "שמלת חוף פשתן",
+            "שמלה לבנה לים",
+            "שמלת נוחות לקיץ",
+            "שמלה אוורירית לבנה",
+            "שמלת חוף אופנתית",
+            "שמלת פשתן נשים",
+            "שמלת חופשה לבנה",
+            "שמלת ים לבנה"
+          ]
+        }
+      },
+      "inputTokens": 461,
+      "outputTokens": 671
+    },
+    "Emerald Cocktail Dress": {
+      "output": {
+        "facts": "dress, cocktail dress, emerald",
+        "look": "emerald cocktail dress",
+        "read": "Evening wear suitable for cocktail parties and formal events.",
+        "summary": "An emerald cocktail dress designed for evening events.",
+        "asks": {
+          "en": [
+            "emerald cocktail dress",
+            "green dress for evening",
+            "cocktail dress",
+            "emerald dress",
+            "evening dress",
+            "green cocktail dress",
+            "party dress",
+            "emerald evening dress",
+            "formal green dress",
+            "chic cocktail dress"
+          ],
+          "he": [
+            "שמלת קוקטייל ירוקה",
+            "שמלת ערב אמרלד",
+            "שמלת קוקטייל",
+            "שמלת ערב",
+            "שמלה ירוקה לאירוע",
+            "שמלת אמרלד",
+            "שמלה אלגנטית",
+            "שמלת ערב ירוקה",
+            "שמלה לאירועים",
+            "שמלת קוקטייל אלגנטית"
+          ]
+        }
+      },
+      "inputTokens": 445,
+      "outputTokens": 273
+    },
+    "שמלת מקסי לבנה": {
+      "output": {
+        "facts": "שמלת מקסי לבנה לאירועים.",
+        "look": "שמלת מקסי בצבע לבן. נראית כמו שמלת ערב אלגנטית.",
+        "read": "שמלה בסגנון אלגנטי מתאימה לאירועים ולנשים המחפשות מראה מרשים.",
+        "summary": "שמלת מקסי לבנה לאירועים אלגנטיים.",
+        "asks": {
+          "en": [
+            "white maxi dress",
+            "white dress for events",
+            "maxi evening dress",
+            "white long dress",
+            "elegant white dress",
+            "white party dress",
+            "maxi dress white",
+            "formal white dress",
+            "white dress for women",
+            "event maxi dress",
+            "white sleeveless maxi dress",
+            "white summer maxi dress"
+          ],
+          "he": [
+            "שמלת מקסי לבנה",
+            "שמלה לבנה לאירועים",
+            "שמלת ערב לבנה",
+            "שמלה ארוכה לבנה",
+            "שמלת מקסי לאירוע",
+            "שמלה לבנה אלגנטית",
+            "שמלת ערב מקסי",
+            "שמלה לבנה יפה",
+            "שמלת מקסי לאירועים לבנה",
+            "שמלה לבנה למסיבה",
+            "שמלת מקסי לנשים",
+            "שמלה לבנה חגיגית"
+          ]
+        }
+      },
+      "inputTokens": 461,
+      "outputTokens": 368
+    },
+    "Ruby Wrap Dress": {
+      "output": {
+        "facts": "Wrap dress. Wrap silhouette. Looks like wrap fit.",
+        "look": "Ruby wrap dress with a wrap silhouette and wrap fit.",
+        "read": "A versatile wrap dress suitable for casual daytime wear, work, or evening events, designed for women who appreciate classic and effortless style.",
+        "summary": "Ruby Wrap Dress with a classic wrap silhouette, perfect for various occasions.",
+        "asks": {
+          "en": [
+            "Ruby wrap dress",
+            "red wrap dress",
+            "wrap silhouette dress",
+            "dresses for women",
+            "casual wrap dress",
+            "eval-fixture wrap dress",
+            "wrap dress with wrap silhouette",
+            "stylish wrap dress",
+            "comfortable wrap dress",
+            "womens wrap dress",
+            "elegant wrap dress",
+            "daily wear wrap dress"
+          ],
+          "he": [
+            "שמלת מעטפת אדומה",
+            "שמלת מעטפת רובי",
+            "שמלת מעטפת לנשים",
+            "שמלה אלגנטית",
+            "שמלה יומיומית",
+            "שמלת מעטפת",
+            "שמלות לנשים",
+            "שמלה עם גזרת מעטפת",
+            "שמלה יפה",
+            "שמלה לאירוע",
+            "שמלת מעטפת יפה",
+            "שמלה נוחה לנשים"
+          ]
+        }
+      },
+      "inputTokens": 431,
+      "outputTokens": 341
+    },
+    "Slate Shift Dress": {
+      "output": {
+        "facts": "Slate shift dress. Category: dress. Colors: slate. Primary color: slate. Occasions: work.",
+        "look": "A slate colored shift dress with a simple cut and shape suitable for work.",
+        "read": "A professional shift dress ideal for work settings and formal environments.",
+        "summary": "A slate shift dress designed for work occasions.",
+        "asks": {
+          "en": [
+            "slate shift dress",
+            "work dress",
+            "grey shift dress for work",
+            "slate dress",
+            "professional shift dress",
+            "office dress",
+            "grey work dress",
+            "simple shift dress",
+            "slate office wear",
+            "dresses for work"
+          ],
+          "he": [
+            "שמלת מעטפת אפורה",
+            "שמלה לעבודה",
+            "שמלה בצבע סלייט",
+            "שמלה אלגנטית למשרד",
+            "שמלת עבודה",
+            "שמלה אפורה לעבודה",
+            "שמלה יומיומית לעבודה",
+            "שמלה נשים לעבודה",
+            "בגדי עבודה נשים",
+            "שמלה קלאסית לעבודה"
+          ]
+        }
+      },
+      "inputTokens": 440,
+      "outputTokens": 300
+    },
+    "שמלת סאטן ורודה": {
+      "output": {
+        "facts": "שמלת סאטן ורודה. חומר: סאטן. צבע: ורוד.",
+        "look": "שמלת סאטן באורך מיני או מידי, צבע ורוד, מראה אלגנטי ונשי.",
+        "read": "שמלה זו מתאימה לאירועים, יציאות בערב או לאופנה יומיומית שיקית, ומיועדת לנשים.",
+        "summary": "שמלת סאטן ורודה ואלגנטית המתאימה לאירועים וליציאות.",
+        "asks": {
+          "en": [
+            "pink satin dress",
+            "satin dress for women",
+            "pink dress",
+            "evening pink dress",
+            "elegant pink satin dress",
+            "party dress pink",
+            "womens pink dress",
+            "satin pink midi dress",
+            "pink slip dress",
+            "stylish pink dress",
+            "pink dress for events",
+            "shiny pink dress",
+            "pink dress with satin fabric",
+            "trendy pink dress",
+            "formal pink dress"
+          ],
+          "he": [
+            "שמלת סאטן ורודה",
+            "שמלה ורודה",
+            "שמלת סאטן לאירוע",
+            "שמלה ורודה אלגנטית",
+            "שמלת סאטן לנשים",
+            "שמלה מבריקה ורודה",
+            "שמלת ערב ורודה",
+            "שמלת מידי ורודה",
+            "שמלה יפה ורודה",
+            "שמלת סאטן אופנתית",
+            "שמלה ורודה ליציאה",
+            "שמלת סאטן קלאסית",
+            "שמלת סאטן ורודה מומלצת",
+            "שמלה ורודה חגיגית",
+            "שמלת סאטן שיקית"
+          ]
+        }
+      },
+      "inputTokens": 440,
+      "outputTokens": 478
+    },
+    "Wool Winter Coat": {
+      "output": {
+        "facts": "Heavy black wool coat.",
+        "look": "A heavy black wool coat.",
+        "read": "A warm winter coat suitable for cold weather and formal or casual winter occasions.",
+        "summary": "A heavy black wool winter coat designed for warmth.",
+        "asks": {
+          "en": [
+            "wool winter coat",
+            "black wool coat",
+            "heavy winter coat",
+            "black coat for winter",
+            "warm wool coat",
+            "heavy black coat",
+            "winter coat",
+            "wool coat",
+            "black winter coat",
+            "mens wool winter coat",
+            "womens wool winter coat",
+            "heavy wool coat",
+            "black coat",
+            "winter wool coat",
+            "cold weather coat"
+          ],
+          "he": [
+            "מעיל צמר",
+            "מעיל שחור",
+            "מעיל חורף",
+            "מעיל צמר שחור",
+            "מעיל חורף כבד",
+            "מעיל צמר חורפי",
+            "מעיל שחור חורף",
+            "מעיל חם",
+            "מעיל צמר כבד",
+            "מעיל אלגנטי לחורף",
+            "מעיל שחור ארוך",
+            "מעיל גברים צמר",
+            "מעיל נשים צמר",
+            "מעיל קלאסי",
+            "מעיל עבה לחורף"
+          ]
+        }
+      },
+      "inputTokens": 450,
+      "outputTokens": 348
+    },
+    "מעיל צמר אפור": {
+      "output": {
+        "facts": "מעיל צמר. חומר: צמר.",
+        "look": "מעיל אפור באורך סטנדרטי.",
+        "read": "מעיל צמר חם לחורף, מתאים לימים קרים וללבוש יומי או אלגנטי.",
+        "summary": "מעיל צמר אפור וחם לחורף.",
+        "asks": {
+          "en": [
+            "gray wool coat",
+            "warm winter coat",
+            "wool coat for women",
+            "grey coat",
+            "winter wool jacket",
+            "gray coat for winter",
+            "warm gray coat",
+            "wool winter coat",
+            "grey wool jacket",
+            "long gray wool coat"
+          ],
+          "he": [
+            "מעיל צמר אפור",
+            "מעיל חורף חם",
+            "מעיל צמר",
+            "מעיל אפור",
+            "מעיל חורף אפור",
+            "מעיל צמר חם",
+            "מעיל אלגנטי אפור",
+            "מעיל ארוך אפור",
+            "מעיל צמר לחורף",
+            "מעיל פליז או צמר"
+          ]
+        }
+      },
+      "inputTokens": 454,
+      "outputTokens": 290
+    },
+    "Trench Coat Classic": {
+      "output": {
+        "facts": "מעיל טרנץ' קלאסי",
+        "look": "מעיל טרנץ' קลาสסי",
+        "read": "מעיל טרנץ' קלאסי המתאים למראה אלגנטי ויומיומי כאחד, מתאים לעונות מעבר.",
+        "summary": "מעיל טרנץ' קלאסי אלגנטי ושימושי.",
+        "asks": {
+          "en": [
+            "classic trench coat",
+            "trench coat",
+            "womens trench coat",
+            "classic coat",
+            "beige trench coat",
+            "long trench coat",
+            "spring coat",
+            "autumn coat",
+            "stylish trench",
+            "designer trench coat",
+            "waterproof trench coat",
+            "double breasted trench coat",
+            "belted trench coat",
+            "outerwear trench",
+            "classic outerwear"
+          ],
+          "he": [
+            "מעיל טרנץ",
+            "מעיל טרנץ קלאסי",
+            "מעיל נשים",
+            "מעיל ארוך",
+            "מעיל מעבר",
+            "טרנץ קלאסי",
+            "מעיל אלגנטי",
+            "מעיל בז",
+            "מעיל גשם קלאסי",
+            "מעיל אופנתי",
+            "מעיל חורף",
+            "מעיל סטייל",
+            "מעיל יפה",
+            "מעיל נשים קלאסי",
+            "מעיל לערב"
+          ]
+        }
+      },
+      "inputTokens": 431,
+      "outputTokens": 371
+    },
+    "Puffer Jacket": {
+      "output": {
+        "facts": "מעיל פאפר. קל אך חם. קטגוריה: זקט. עונות: חורף.",
+        "look": "מעיל פאפר קל משקל.",
+        "read": "מתאים לימים קרים בחורף, ללבוש יומיומי וקזואל.",
+        "summary": "מעיל פאפר קל אך חם, מושלם לעונת החורף.",
+        "asks": {
+          "en": [
+            "puffer jacket",
+            "light winter jacket",
+            "warm puffer coat",
+            "jacket for winter",
+            "lightweight puffer",
+            "winter coat",
+            "casual puffer jacket",
+            "warm winter jacket",
+            "mens puffer jacket",
+            "womens puffer jacket",
+            "light warm jacket",
+            "puffer jacket for cold weather",
+            "stylish puffer coat",
+            "comfortable winter jacket",
+            "short puffer jacket"
+          ],
+          "he": [
+            "מעיל פאפר",
+            "זקט פאפר קל",
+            "מעיל חורף",
+            "מעיל חם וקל",
+            "זקט חורפי",
+            "מעיל פאפר לנשים",
+            "מעיל פאפר לגברים",
+            "מעיל קליל לחורף",
+            "זקט מרופד",
+            "מעיל אופנתי לחורף",
+            "מעיל יומי חם",
+            "פאפר זקט",
+            "מעיל פאפר קצר",
+            "זקט לחורף הקר",
+            "מעיל נוח לחורף"
+          ]
+        }
+      },
+      "inputTokens": 432,
+      "outputTokens": 398
+    },
+    "מעיל גשם צהוב": {
+      "output": {
+        "facts": "מעיל גשם צהוב",
+        "look": "מעיל גשם בצבע צהוב",
+        "read": "מעיל גשם המתאים לימים גשומים ולשימוש יומיומי.",
+        "summary": "מעיל גשם צהוב לימים גשומים.",
+        "asks": {
+          "en": [
+            "yellow raincoat",
+            "rain coat for rain",
+            "yellow waterproof coat",
+            "rain jacket yellow",
+            "yellow coat",
+            "rainy day yellow coat",
+            "yellow rain jacket for women",
+            "yellow rain jacket for men",
+            "waterproof yellow jacket",
+            "yellow rainwear"
+          ],
+          "he": [
+            "מעיל גשם צהוב",
+            "מעיל גשם",
+            "מעיל צהוב לגשם",
+            "מעיל נגד גשם צהוב",
+            "ג'קט גשם צהוב",
+            "מעיל חורף צהוב",
+            "מעיל אטום למים צהוב",
+            "מעיל גשם צהוב יפה",
+            "מעיל לגשם בצבע צהוב",
+            "מעיל גשם מומלץ"
+          ]
+        }
+      },
+      "inputTokens": 452,
+      "outputTokens": 311
+    },
+    "Leather Biker Jacket": {
+      "output": {
+        "facts": "מעיל בייקר עור. חומר: עור אמיתי.",
+        "look": "מעיל בייקר עור בצבע ובגזרה שאינם מפורטים במלואם בטקסט, נראה כמו מעיל אופנוענים קלאסי עשוי עור.",
+        "read": "מעיל בסגנון אופנוענים קלאסי המעניק מראה קשוח ואופנתי, מתאים לעונות מעבר, ליומיום ולאירועים קז'ואליים, ונלבש על ידי נשים וגברים כאחד בהתאם לגזרה.",
+        "summary": "מעיל בייקר עשוי עור אמיתי בעיצוב קלאסי ונצחי.",
+        "asks": {
+          "en": [
+            "leather biker jacket",
+            "real leather jacket",
+            "biker jacket",
+            "black leather jacket",
+            "womens leather jacket",
+            "mens leather jacket",
+            "leather coat",
+            "cool biker jacket",
+            "leather motorcycle jacket",
+            "genuine leather jacket",
+            "stylish leather jacket",
+            "short leather jacket"
+          ],
+          "he": [
+            "מעיל עור",
+            "מעיל אופנוענים",
+            "מעיל בייקר עור",
+            "מעיל עור אמיתי",
+            "מעיל עור שחור",
+            "מעיל עור אופנתי",
+            "ג'קט עור",
+            "מעיל עור איכותי",
+            "מעיל עור לגברים",
+            "מעיל עור לנשים",
+            "מעיל קז'ואל עור"
+          ]
+        }
+      },
+      "inputTokens": 434,
+      "outputTokens": 407
+    },
+    "Camel Overcoat": {
+      "output": {
+        "facts": "מעיל עליון בצבע קאמל.",
+        "look": "מעיל עליון בצבע קאמל בגזרה קלאסית.",
+        "read": "מעיל עליון קלאסי ואלגנטי המתאים לימי החורף הקרים וללבוש רשמי או יומיומי כאחד.",
+        "summary": "מעיל עליון אופנתי בצבע קאמל המתאים לחורף.",
+        "asks": {
+          "en": [
+            "camel overcoat",
+            "camel coat for women",
+            "camel winter coat",
+            "long camel coat",
+            "classic camel overcoat",
+            "warm camel coat",
+            "stylish camel coat",
+            "elegant camel overcoat",
+            "camel coat outfit",
+            "mens camel overcoat",
+            "womens camel overcoat",
+            "heavy camel coat",
+            "designer camel coat",
+            "affordable camel coat",
+            "best camel coat"
+          ],
+          "he": [
+            "מעיל קאמל",
+            "מעיל עליון בצבע קאמל",
+            "מעיל חורף קאמל",
+            "מעיל ארוך קאמל",
+            "מעיל קלאסי צבע קאמל",
+            "מעיל חם בצבע קאמל",
+            "מעיל אלגנטי קאמל",
+            "מעיל אופנתי קאמל",
+            "מעיל קאמל לנשים",
+            "מעיל קאמל לגברים",
+            "מעיל עליון ארוך",
+            "מעיל חורף אלגנטי",
+            "מעיל בצבע חום בהיר",
+            "מעיל עליון חם",
+            "קניית מעיל קאמל"
+          ]
+        }
+      },
+      "inputTokens": 435,
+      "outputTokens": 428
+    },
+    "ג'קט ג'ינס": {
+      "output": {
+        "facts": "ג'קט ג'ינס קלאסי.",
+        "look": "ג'קט ג'ינס קלאסי.",
+        "read": "ג'קט ג'ינס קלאסי המתאים ללבוש יומיומי ולמגוון אירועים קז'ואל, מתאים לנשים ולגברים כאחד.",
+        "summary": "ג'קט ג'ינס קלאסי ורב-תכליתי.",
+        "asks": {
+          "en": [
+            "classic denim jacket",
+            "jean jacket",
+            "blue denim coat",
+            "casual jean jacket",
+            "denim outerwear",
+            "classic jean coat",
+            "mens denim jacket",
+            "womens denim jacket",
+            "everyday jean jacket",
+            "simple denim jacket"
+          ],
+          "he": [
+            "ג'קט ג'ינס",
+            "מעיל ג'ינס",
+            "ג'קט ג'ינס קלאסי",
+            "מעיל ג'ינס קלאסי",
+            "ג'קט ג'ינס יומיומי",
+            "ג'קט ג'ינס לנשים",
+            "ג'קט ג'ינס לגברים",
+            "מעיל ג'ינס אופנתי",
+            "ג'קט ג'ינס בסיסי",
+            "ג'קט ג'ינס כחול"
+          ]
+        }
+      },
+      "inputTokens": 443,
+      "outputTokens": 339
+    },
+    "White Sneakers Classic": {
+      "output": {
+        "facts": "נעלי ספורט לבנות. Everyday white.",
+        "look": "נעלי ספורט בצבע לבן קלאסי.",
+        "read": "נעליים בסגנון קלאסי יומיומי, מתאימות ללבוש יומיומי ולכל מי שמחפש נוחות וסטייל פשוט.",
+        "summary": "נעלי ספורט לבנות וקלאסיות לשימוש יומיומי.",
+        "asks": {
+          "en": [
+            "white sneakers",
+            "classic white sneakers",
+            "casual white shoes",
+            "everyday white sneakers",
+            "white shoes for women",
+            "white sneakers for men",
+            "simple white trainers",
+            "comfortable white shoes",
+            "white casual sneakers",
+            "plain white sneakers",
+            "basic white shoes",
+            "white footwear",
+            "classic sneakers",
+            "white walking shoes"
+          ],
+          "he": [
+            "נעלי ספורט לבנות",
+            "נעליים לבנות קלאסיות",
+            "סניקרס לבנות",
+            "נעלי יום יומיות לבנות",
+            "נעלי ספורט קזואל",
+            "נעליים לבנות נוחות",
+            "סניקרס לבנות קלאסיות",
+            "נעלי הליכה לבנות",
+            "נעלי ספורט לבנות יומיומיות",
+            "נעלי אופנה לבנות",
+            "סניקרס קזואל לבן",
+            "נעליים לבנות פשוטות",
+            "נעלי ספורט בצבע לבן",
+            "נעלי יום יום קלאסיות"
+          ]
+        }
+      },
+      "inputTokens": 447,
+      "outputTokens": 412
+    },
+    "נעלי עקב שחורות": {
+      "output": {
+        "facts": "נעלי עקב שחורות. חומר: נראה כמו עור. סגנון: נעלי עקב.",
+        "look": "נעלי עקב בצבע שחור, עיצוב חלק ואלגנטי.",
+        "read": "נעלי עקב שחורות מתאימות לאירועים רשמיים, יציאות ערב ולסביבת העבודה לנשים.",
+        "summary": "נעלי עקב שחורות ואלגנטיות המתאימות לאירועים ולמראה רשמי.",
+        "asks": {
+          "en": [
+            "black heels",
+            "black high heels",
+            "black shoes for women",
+            "formal black heels",
+            "evening black shoes",
+            "womens black heels",
+            "black pumps",
+            "classic black heels",
+            "black dress shoes",
+            "stylish black heels",
+            "נעלי עקב שחורות",
+            "נעלי ערב שחורות",
+            "עקב שחור"
+          ],
+          "he": [
+            "נעלי עקב שחורות",
+            "נעלי עקב שחורות לאירועים",
+            "נעלי ערב שחורות",
+            "עקב שחור לנשים",
+            "נעלי נשים שחורות עם עקב",
+            "נעלי עקב אלגנטיות שחורות",
+            "נעלי סטיל שחורות",
+            "נעלי עקב גבוהות שחורות",
+            "נעלי עבודה שחורות עקב",
+            "נעלי חתונה שחורות עקב",
+            "נעלי נוחות עקב שחור",
+            "נעלי אופנה שחורות עקב",
+            "נעלי בסיס שחורות עקב"
+          ]
+        }
+      },
+      "inputTokens": 446,
+      "outputTokens": 444
+    },
+    "Strappy Sandals Gold": {
+      "output": {
+        "facts": "נעליים, סנדלים עם רצועות מוזהבות.",
+        "look": "סנדלים מוזהבים עם רצועות, גזרה פתוחה.",
+        "read": "סנדלים אלגנטיים וקלילים שמתאימים לעונת הקיץ, לבילויים יומיומיים או לאירועים קלילים, מתאימים לנשים.",
+        "summary": "סנדלים מוזהבים עם רצועות לעונת הקיץ.",
+        "asks": {
+          "en": [
+            "gold strappy sandals",
+            "gold sandals",
+            "strappy shoes",
+            "gold summer sandals",
+            "womens gold sandals",
+            "flat gold strappy sandals",
+            "gold shoes for women",
+            "metallic gold sandals",
+            "cute gold sandals",
+            "party gold sandals",
+            "strappy gold shoes",
+            "gold beach sandals",
+            "casual gold sandals",
+            "shiny gold sandals"
+          ],
+          "he": [
+            "סנדלים מוזהבים",
+            "סנדלים עם רצועות",
+            "נעליים מוזהבות",
+            "סנדלי קיץ מוזהבים",
+            "סנדלים שטוחים מוזהבים",
+            "סנדלים צבע זהב",
+            "נעלי קיץ לנשים",
+            "סנדלים אלגנטיים מוזהבים",
+            "סנדלי רצועות לנשים",
+            "סנדלים יפים לקיץ",
+            "סנדלים מטאליים",
+            "נעלי ערב מוזהבות",
+            "סנדלים נוחים לקיץ",
+            "סנדלים עם רצועות זהב"
+          ]
+        }
+      },
+      "inputTokens": 444,
+      "outputTokens": 411
+    },
+    "Running Shoes Neon": {
+      "output": {
+        "facts": "נעלי ריצה בצבע ניאון. סוג פריט: נעליים.",
+        "look": "נעלי ריצה בצבע ניאון.",
+        "read": "נעלי ספורט מתאימות לריצה ופעילות גופנית.",
+        "summary": "נעלי ריצה בצבע ניאון לפעילות ספורטיבית.",
+        "asks": {
+          "en": [
+            "neon running shoes",
+            "running shoes neon",
+            "neon sneakers",
+            "sport running shoes",
+            "bright running shoes",
+            "neon trainers",
+            "running shoes for sport",
+            "neon athletic shoes",
+            "exercise shoes neon",
+            "fitness running shoes",
+            "neon workout shoes",
+            "neon shoes for running",
+            "running sneakers neon",
+            "neon sport shoes",
+            "bright sneakers for running"
+          ],
+          "he": [
+            "נעלי ריצה ניאון",
+            "נעלי ספורט ניאון",
+            "נעלי ריצה בצבע ניאון",
+            "סניקרס ניאון",
+            "נעלי ספורט זורח",
+            "נעלי ריצה זורחות",
+            "נעלי אימון ניאון",
+            "נעלי ריצה ספורטיביות",
+            "נעלי ריצה לכושר",
+            "נעלי ספורט לריצה",
+            "נעלי ניאון לספורט",
+            "נעלי ריצה בצבע בוהק",
+            "נעלי ספורט בצבע ניאון",
+            "נעלי ריצה מקצועיות",
+            "נעלי ריצה קלות"
+          ]
+        }
+      },
+      "inputTokens": 447,
+      "outputTokens": 403
+    },
+    "Leather Loafers Brown": {
+      "output": {
+        "facts": "נעליים. סוג פריט: נעלי לואפרס. נעלי לואפרס בגימור סליפ-און. צבע: חום. חומר: עור (מתוך הכותרת).",
+        "look": "נעלי לואפרס בצבע חום בעיצוב סליפ-און קלאסי.",
+        "read": "נעליים בסגנון קלאסי ויומיומי, מתאימות לעבודה, לאירועים קז'ואל ולשימוש יומיומי לכל מי שמעדיף הנעלה נוחה ואלגנטית.",
+        "summary": "נעלי לואפרס חומות מעור בעיצוב סליפ-און נוח וקל לנעילה.",
+        "asks": {
+          "en": [
+            "brown leather loafers",
+            "slip on shoes",
+            "mens brown loafers",
+            "leather slip ons",
+            "comfortable brown shoes",
+            "casual leather loafers",
+            "brown shoes for men",
+            "slip on leather shoes",
+            "classic brown loafers",
+            "everyday leather shoes",
+            "brown leather slip on loafers",
+            "mens casual slip ons",
+            "brown work shoes",
+            "stylish brown loafers",
+            "leather shoes brown"
+          ],
+          "he": [
+            "נעלי לואפרס מעור",
+            "נעלי לואפרס חומות",
+            "נעלי סליפ און חומות",
+            "נעלי עור חומות לגברים",
+            "נעליים נוחות ליום יום",
+            "לואפרס עור",
+            "נעלי סליפ און מעור",
+            "נעליים קלאסיות חומות",
+            "נעלי עור קזואל",
+            "נעלי לואפרס נוחות",
+            "נעליים חומות יפות",
+            "נעלי עור אלגנטיות",
+            "לואפרס חומות",
+            "נעלי סליפ און נוחות",
+            "נעלי עור ליום יום"
+          ]
+        }
+      },
+      "inputTokens": 452,
+      "outputTokens": 506
+    },
+    "Ballet Flats Nude": {
+      "output": {
+        "facts": "נעלי בלט שטוחות, בצבע ניוד.",
+        "look": "נעלי בלט שטוחות בצ색 ניוד, מראה בסיסי ונוח.",
+        "read": "נעליים נוחות ליום יום, מתאימות ללבוש יומיומי וקזואל לנשים.",
+        "summary": "נעלי בלט שטוחות ונוחות בצבע ניוד לשימוש יומיומי.",
+        "asks": {
+          "en": [
+            "ballet flats",
+            "nude ballet flats",
+            "comfy flats",
+            "flat shoes nude",
+            "womens nude flats",
+            "comfortable ballet shoes",
+            "nude slip on shoes",
+            "everyday flat shoes",
+            "simple nude flats",
+            "casual flat shoes for women",
+            "flat shoes",
+            "nude shoes",
+            "comfortable flats",
+            "womens flat shoes",
+            "basic ballet flats"
+          ],
+          "he": [
+            "נעלי בלט",
+            "נעלי בלט ניוד",
+            "נעלי בלט שטוחות",
+            "נעליים שטוחות נוחות",
+            "נעליים בצבע ניוד",
+            "נעליים שטוחות לנשים",
+            "נעלי בלט נוחות",
+            "נעלי יום יום שטוחות",
+            "נעליים שטוחות יומיומיות",
+            "נעלי ניוד שטוחות",
+            "נעלי בלט בצבע ניוד",
+            "נעליים נוחות לנשים",
+            "נעלי בלט פשוטות",
+            "נעליים שטוחות",
+            "נעלי בלט יפות"
+          ]
+        }
+      },
+      "inputTokens": 439,
+      "outputTokens": 405
+    },
+    "סנדלי קיץ לבנים": {
+      "output": {
+        "facts": "נעליים, סנדלים נוחים. צבע לבן.",
+        "look": "סנדלי קיץ בצבע לבן, נראים כמו סנדלי קיץ נוחים בעיצוב קז'ואל.",
+        "read": "סנדלי קיץ אלו מתאימים ללבוש יומיומי וקז'ואל, מושלמים לימים חמים ומיועדים לכל מי שמחפש נוחות בקיץ.",
+        "summary": "סנדלי קיץ לבנים ונוחים, אידיאליים לשימוש יומיומי בעונת הקיץ.",
+        "asks": {
+          "en": [
+            "white summer sandals",
+            "comfortable white sandals",
+            "casual summer shoes for men",
+            "white flat sandals",
+            "summer footwear white",
+            "comfortable sandals",
+            "white casual shoes",
+            "mens white summer sandals",
+            "lightweight summer sandals",
+            "everyday white sandals"
+          ],
+          "he": [
+            "סנדלי קיץ לבנים",
+            "סנדלים נוחים לבנים",
+            "נעלי קיץ לבנות",
+            "סנדלי קז'ואל לבנים",
+            "סנדלים נוחים לקיץ",
+            "נעלי נוחות לבנות",
+            "סנדלים לבנים שטוחים",
+            "סנדלי יום יומיים לבנים",
+            "סנדלים עדינים לקיץ",
+            "הנעלת קיץ לבנה"
+          ]
+        }
+      },
+      "inputTokens": 459,
+      "outputTokens": 370
+    },
+    "Ankle Boots Suede": {
+      "output": {
+        "facts": "Ankle boots suede.",
+        "look": "Ankle boots in suede.",
+        "read": "Casual ankle boots suitable for everyday wear and cooler weather.",
+        "summary": "Suede ankle boots for everyday wear.",
+        "asks": {
+          "en": [
+            "ankle boots",
+            "suede ankle boots",
+            "womens ankle boots",
+            "boots",
+            "suede boots",
+            "short boots",
+            "booties",
+            "suede booties",
+            "casual ankle boots",
+            "comfortable ankle boots",
+            "leather ankle boots",
+            "fashion ankle boots",
+            "winter ankle boots",
+            "fall ankle boots",
+            "flat ankle boots"
+          ],
+          "he": [
+            "מגפונים",
+            "מגפוני זמש",
+            "מגפיים קצרים",
+            "מגפונים לנשים",
+            "נעלי חורף",
+            "מגפי זמש",
+            "מגפונים יומיומיים",
+            "מגפונים שטוחים",
+            "מגפונים אופנתיים",
+            "מגפונים נוחים",
+            "מגפונים לעונה",
+            "מגפונים יפים",
+            "מגפיים לנשים",
+            "מגפונים בצבע זמש",
+            "הנעלת חורף לנשים"
+          ]
+        }
+      },
+      "inputTokens": 434,
+      "outputTokens": 342
+    },
+    "Silver Party Heels": {
+      "output": {
+        "facts": "נעלי ערב כסופות. טקסט המוכר מציין: עקבים מבריקים.",
+        "look": "נעלי עקב בצבע כסוף, נראות מבריקות.",
+        "read": "נעליים בסגנון מסיבה וערב, מתאימות לאירועים מיוחדים ולמי שמחפש מראה נוצץ.",
+        "summary": "נעלי ערב כסופות ומבריקות, מושלמות לאירועים ומסיבות.",
+        "asks": {
+          "en": [
+            "silver party heels",
+            "shiny silver heels",
+            "evening shoes for women",
+            "silver high heels",
+            "party shoes",
+            "shiny evening shoes",
+            "silver heels for parties",
+            "glamorous silver shoes",
+            "silver occasion shoes",
+            "sparkling heels"
+          ],
+          "he": [
+            "נעלי ערב כסופות",
+            "נעלי עקב כסופות",
+            "נעלי מסיבה מבריקות",
+            "עקבים כסופים לאירועים",
+            "נעלי ערב מבריקות",
+            "נעליים כסופות אלגנטיות",
+            "עקבים נוצצים",
+            "נעלי עקב ערב",
+            "נעליים למסיבה כסופות",
+            "נעלי עקב נשים כסוף"
+          ]
+        }
+      },
+      "inputTokens": 449,
+      "outputTokens": 351
+    },
+    "Silk Blouse Ivory": {
+      "output": {
+        "facts": "Silk Blouse Ivory. Category: top. Colors: ivory. Primary color: ivory. Style: silk.",
+        "look": "Ivory silk blouse, top.",
+        "read": "A classic silk blouse suitable for elegant occasions, work, or formal wear, worn by women.",
+        "summary": "An ivory silk blouse offering a classic and elegant look for various occasions.",
+        "asks": {
+          "en": [
+            "silk blouse",
+            "ivory silk blouse",
+            "ivory top",
+            "silk top",
+            "elegant silk blouse",
+            "ivory shirt",
+            "silk shirt",
+            "womens silk blouse",
+            "formal silk top",
+            "ivory silk shirt",
+            "designer silk blouse",
+            "luxurious silk top",
+            "white silk blouse",
+            "cream silk blouse",
+            "chic silk top"
+          ],
+          "he": [
+            "חולצת משי",
+            "חולצת משי בצבע שמנת",
+            "טופ משי",
+            "חולצת משי לבנה",
+            "חולצה אלגנטית משי",
+            "חולצת נשים משי",
+            "חולצת משי יוקרתית",
+            "טופ אלגנטי",
+            "חולצה בצבע שמנת",
+            "חולצת משי איוורי",
+            "בגדי משי לנשים",
+            "חולצת ערב משי",
+            "חולצת משי קלאסית",
+            "חולצת בייסיק משי",
+            "חולצת מעצבים משי"
+          ]
+        }
+      },
+      "inputTokens": 441,
+      "outputTokens": 391
+    },
+    "חולצת פשתן לבנה": {
+      "output": {
+        "facts": "חולצת פשתן. חומר: פשתן קליל. גזרה: משוחררת.",
+        "look": "חולצת פשתן בצבע לבן, בגזרה משוחררת.",
+        "read": "חולצה בסגנון קזואל קליל, מתאימה לעונת הקיץ והאביב, ליום יום ולבילויים נינוחים.",
+        "summary": "חולצת פשתן לבנה וקליחה בגזרה משוחררת, מושלמת לימי הקיץ החמים.",
+        "asks": {
+          "en": [
+            "white linen shirt",
+            "lightweight linen top",
+            "relaxed fit white shirt",
+            "casual linen blouse",
+            "summer linen shirt for women",
+            "white summer top",
+            "breathable linen shirt",
+            "simple white top",
+            "casual white shirt",
+            "linen top white",
+            "spring linen shirt",
+            "comfortable white shirt"
+          ],
+          "he": [
+            "חולצת פשתן לבנה",
+            "חולצת פשתן קלילה",
+            "חולצה לבנה משוחררת",
+            "חולצת פשתן לנשים",
+            "חולצה קזואל לבנה",
+            "חולצה לקיץ פשתן",
+            "טופ פשתן לבן",
+            "חולצת פשתן יומיומית",
+            "חולצה לבנה מבד נושם",
+            "חולצת קיץ לבנה",
+            "חולצה אלגנטית קלילה",
+            "חולצת פשתן אופנתית"
+          ]
+        }
+      },
+      "inputTokens": 470,
+      "outputTokens": 409
+    },
+    "Graphic Tee Black": {
+      "output": {
+        "facts": "Graphic Tee Black. Tops. Tag: tee. Category: top. Colors: black. Primary color: black. Style: graphic tee.",
+        "look": "Black graphic tee, short sleeves, crew neck, casual cut.",
+        "read": "A versatile casual graphic tee suitable for everyday wear, casual outings, and relaxed settings, designed for anyone looking for a basic black t-shirt.",
+        "summary": "A classic black graphic tee suitable for everyday casual wear.",
+        "asks": {
+          "en": [
+            "black graphic tee",
+            "black t-shirt",
+            "graphic top for women",
+            "black tee shirt",
+            "casual black tee",
+            "black printed shirt",
+            "everyday black top",
+            "graphic tee black",
+            "black t shirt with print",
+            "mens black graphic tee",
+            "unisex black tee",
+            "black cotton graphic shirt",
+            "cool black t-shirt",
+            "simple black tee",
+            "black shirt for casual wear"
+          ],
+          "he": [
+            "חולצת טי שחורה",
+            "טישרט שחורה עם הדפס",
+            "חולצה גרפית שחורה",
+            "חוליית טי קזואל שחורה",
+            "חולצה שחורה יום יומית",
+            "טי שירט שחור מודפס",
+            "חולצה שחורה עם גרפיקה",
+            "חולצת בסיס שחורה",
+            "טישרט שחור",
+            "חולצת טריקו שחורה",
+            "חולצה אופנתית שחורה",
+            "טפ שחור עם הדפס",
+            "חולצה שחורה קצרה",
+            "טישרט קזואל שחור",
+            "חולצת טי שחורה להיום"
+          ]
+        }
+      },
+      "inputTokens": 441,
+      "outputTokens": 448
+    },
+    "Cashmere Sweater Cream": {
+      "output": {
+        "facts": "Cashmere Sweater Cream. Softest cashmere. Material: cashmere. Looks like a cream-colored knit sweater with long sleeves and a crew neckline.",
+        "look": "A cream-colored cashmere sweater with a soft texture, long sleeves, and a classic knit design.",
+        "read": "A luxurious and cozy style suitable for cold weather, casual or semi-formal occasions, worn by anyone looking for comfort and warmth.",
+        "summary": "Soft cream cashmere sweater designed for warmth and comfort during colder seasons.",
+        "asks": {
+          "en": [
+            "cashmere sweater cream",
+            "cream cashmere jumper",
+            "soft cashmere top",
+            "winter cream sweater",
+            "warm cashmere knit",
+            "cream sweater for women",
+            "luxury cashmere pullover",
+            "cozy winter top",
+            "cream designer sweater",
+            "soft winter sweater",
+            "shetland style sweater",
+            "cream wool alternative",
+            "classic cream jumper",
+            "casual cashmere wear",
+            "elegant cream top"
+          ],
+          "he": [
+            "סוודר קשמיר שמנת",
+            "סוודר קשמיר רך",
+            "סוודר בצבע שמנת",
+            "חולצת קשמיר חורפית",
+            "סוודר נשים קשמיר",
+            "סוודר יוקרתי שמנת",
+            "קשמיר רך במיוחד",
+            "סוודר חם לחורף",
+            "סוודר קלאסי שמנת",
+            "אופנת קשמיר שמנת",
+            "סוודר אלגנטי שמנת",
+            "חולצת סריג קשמיר",
+            "סוודר שמנת נעים",
+            "סוודר איכותי קשמיר",
+            "סוודר בצבע קרם"
+          ]
+        }
+      },
+      "inputTokens": 453,
+      "outputTokens": 452
+    },
+    "סוודר צמר אדום": {
+      "output": {
+        "facts": "סוודר צמר אדום.",
+        "look": "סוודר בצבע אדום.",
+        "read": "מתאים לימים קר, לחורף, מתאים ללבוש יומיומי.",
+        "summary": "סוודר צמר אדום לחורף.",
+        "asks": {
+          "en": [
+            "red wool sweater",
+            "wool sweater for winter",
+            "red sweater",
+            "warm red top",
+            "womens red wool sweater",
+            "mens red wool sweater",
+            "cozy red sweater",
+            "winter wool top",
+            "red knit sweater",
+            "wool winter clothing"
+          ],
+          "he": [
+            "סוודר צמר אדום",
+            "סוודר אדום",
+            "חולצת צמר אדומה",
+            "סוודר לחורף",
+            "סוודר צמר חם",
+            "סוודר אדום לחורף",
+            "בגדי צמר לחורף",
+            "סוודר אדום צמר",
+            "סוודר נעים לחורף",
+            "סוודר אדום יפה"
+          ]
+        }
+      },
+      "inputTokens": 452,
+      "outputTokens": 305
+    },
+    "Denim Shirt": {
+      "output": {
+        "facts": "Classic denim shirt. Material: denim. Style: classic.",
+        "look": "Classic denim shirt with a standard cut and shape.",
+        "read": "A classic denim shirt suitable for casual everyday wear and versatile styling, perfect for anyone looking for a timeless wardrobe staple.",
+        "summary": "A classic denim shirt designed for versatile, everyday wear.",
+        "asks": {
+          "en": [
+            "denim shirt",
+            "classic denim shirt",
+            "blue denim top",
+            "casual denim shirt",
+            "womens denim shirt",
+            "mens denim shirt",
+            "button up denim shirt",
+            "long sleeve denim shirt",
+            "everyday denim top",
+            "simple denim shirt",
+            "stylish denim shirt",
+            "comfortable denim shirt"
+          ],
+          "he": [
+            "חולצת ג'ינס",
+            "חולצת ג'ינס קלאסית",
+            "חולצת ג'ינס כחולה",
+            "חולצת ג'ינס יום יומית",
+            "חולצת ג'ינס אופנתית",
+            "חולצת ג'ינס בסיסית",
+            "חולצת ג'ינס עם כפתורים",
+            "חולצת ג'ינס יפה",
+            "טופ ג'ינס",
+            "חולצת ג'ינס קזואל",
+            "חולצת ג'ינס נוחה",
+            "חולצת ג'ינס איכותית"
+          ]
+        }
+      },
+      "inputTokens": 432,
+      "outputTokens": 362
+    },
+    "Striped Sailor Top": {
+      "output": {
+        "facts": "Striped Sailor Top. Looks like top.",
+        "look": "Striped sailor top. Looks like striped and sailor style.",
+        "read": "A classic casual style suitable for everyday wear, casual outings, and warm weather, worn by anyone looking for a nautical-inspired look.",
+        "summary": "A classic striped sailor top with a casual nautical look.",
+        "asks": {
+          "en": [
+            "striped sailor top",
+            "sailor top",
+            "striped top",
+            "nautical striped top",
+            "striped shirt",
+            "sailor shirt",
+            "casual striped top",
+            "summer striped top",
+            "striped womens top",
+            "striped top for women",
+            "blue and white striped top",
+            "long sleeve striped top",
+            "short sleeve striped top",
+            "classic sailor top"
+          ],
+          "he": [
+            "חולצת פסים",
+            "חולצת מלחים",
+            "חולצת פסים מלחים",
+            "חולצה מפוספסת",
+            "חולצת קיץ פסים",
+            "חולצת נשים פסים",
+            "חולצה יומיומית פסים",
+            "חולצת מלחים לנשים",
+            "חולצת פסים קלאסית",
+            "טופ פסים",
+            "חולצה מלחים אופנתית",
+            "חולצת פסים יפה",
+            "חולצת טריקו פסים",
+            "חולצת פסים קזואל"
+          ]
+        }
+      },
+      "inputTokens": 432,
+      "outputTokens": 375
+    },
+    "חולצת אוברסייז אפורה": {
+      "output": {
+        "facts": "חולצה, צבע אפור, גזרה אוברסייז",
+        "look": "חולצה בצבע אפור בגזרה רחבה ואוברסייז",
+        "read": "חולצת בייסיק יום יומית נוחה המתאימה ללבוש יומיומי לכל אחד",
+        "summary": "חולצת אוברסייז אפורה ונוחה לשימוש יומיומי.",
+        "asks": {
+          "en": [
+            "gray oversized t-shirt",
+            "oversized grey shirt",
+            "loose gray top",
+            "comfortable grey t-shirt",
+            "casual gray oversized shirt",
+            "grey top for women",
+            "oversized basic shirt",
+            "grey cotton blend oversized top",
+            "simple grey shirt",
+            "relaxed fit grey t-shirt"
+          ],
+          "he": [
+            "חולצת אוברסייז אפורה",
+            "חולצה אפורה רחבה",
+            "טישרט אוברסייז אפור",
+            "חולצה אפורה אוברסייז",
+            "חולצה בייסיק אפורה רחבה",
+            "חולצה יומיומית אפורה",
+            "חולצה אפורה נוחה",
+            "טופ אפור רחב",
+            "חולצת בייסיק אוברסייז",
+            "חולצה אפורה גדולות"
+          ]
+        }
+      },
+      "inputTokens": 453,
+      "outputTokens": 363
+    },
+    "Satin Camisole Blush": {
+      "output": {
+        "facts": "גופיית סאטן עדינה בצבע סמוק. חומר: סאטן.",
+        "look": "גופיית סאטן עדינה בצבע סמוק, בגזרה קלאסית ונשית.",
+        "read": "גופייה אלגנטית ועדינה המתאימה למראה יומיומי שיקי או ללבוש ערב קליל.",
+        "summary": "גופיית סאטן עדינה וקסומה בגוון סמוק, מושלמת למראה נשי ואלגנטי.",
+        "asks": {
+          "en": [
+            "blush satin camisole",
+            "delicate satin top",
+            "pink camisole top",
+            "satin cami for women",
+            "blush pink top",
+            "elegant satin camisole",
+            "silk feel cami top",
+            "soft satin camisole",
+            "basic satin top",
+            "blush pink cami",
+            "womens satin camisole",
+            "party satin top",
+            "summer satin camisole",
+            "chic blush top",
+            "lightweight satin cami"
+          ],
+          "he": [
+            "גופיית סאטן סמוק",
+            "טופ סאטן עדין",
+            "גופייה ורודה אלגנטית",
+            "גופיית סאטן נשים",
+            "טופ סامي ורוד",
+            "גופייה עדינה לערב",
+            "גופיית סאטן בצבע ורוד עתיק",
+            "טופ אלגנטי מבריק",
+            "גופייה קייצית עדינה",
+            "חולצת סאטן בלי שרוולים",
+            "גופיית בסיס סאטן",
+            "טופ נשי עדין",
+            "גופיית ערב סאטן",
+            "טופ סאטן צבע סמוק",
+            "גופייה יפה מרוסקת"
+          ]
+        }
+      },
+      "inputTokens": 450,
+      "outputTokens": 483
+    },
+    "Turtleneck Basic Black": {
+      "output": {
+        "facts": "גולף בייסיק שחור. פריט מסוג טופ.",
+        "look": "גולף שחור בסיסי, גזרה צמודה, צבע שחור אחיד.",
+        "read": "חולצת בייסיק קלאסית המתאימה ללבוש יומיומי, לעבודה או כשכבת בסיס לימים קרים, מתאימה לנשים ולגברים כאחד.",
+        "summary": "חולצת גולף בייסיק שחורה קלאסית ושימושית לכל ארון.",
+        "asks": {
+          "en": [
+            "black turtleneck",
+            "basic black top",
+            "black basic turtleneck sweater",
+            "womens black turtleneck",
+            "black turtleneck shirt",
+            "plain black turtleneck",
+            "simple black top",
+            "black long sleeve turtleneck",
+            "basic black shirt",
+            "black fitted turtleneck",
+            "winter black turtleneck",
+            "black high neck top"
+          ],
+          "he": [
+            "חולצת גולף שחורה",
+            "גולף שחור בייסיק",
+            "חולצה שחורה עם צווארון גולף",
+            "טופ שחור בייסיק",
+            "גולף שחור פשוט",
+            "חולצת בייסיק שחורה לנשים",
+            "חולצת חורף שחורה גולף",
+            "גולף צמוד שחור",
+            "חולצה חמה שחורה גולף",
+            "בגדי בייסיק שחורים",
+            "גולף שחור חלק",
+            "חולצת צווארון גבוה שחורה"
+          ]
+        }
+      },
+      "inputTokens": 441,
+      "outputTokens": 425
+    },
+    "Tailored Trousers Black": {
+      "output": {
+        "facts": "Tailored Trousers Black. Pants. Sharp tailoring.",
+        "look": "Black tailored trousers, sharp tailoring.",
+        "read": "A sharp, tailored style suitable for work and professional occasions.",
+        "summary": "Sharp tailored black trousers designed for professional workwear.",
+        "asks": {
+          "en": [
+            "black tailored trousers",
+            "tailored pants black",
+            "black work pants",
+            "womens black trousers",
+            "sharp tailored trousers",
+            "black pants for work",
+            "tailored work trousers",
+            "black trousers sharp tailoring",
+            "office pants black",
+            "black dress pants"
+          ],
+          "he": [
+            "מכנסיים מחויטים שחורים",
+            "מכנסיים שחורים לעבודה",
+            "מכנסיים מחויטים",
+            "מכנסיים שחורים אלגנטיים",
+            "מכנסיים מחויטים לנשים שחור",
+            "מכנסיים למשרד שחורים",
+            "מכנסיים שחורים בגזרה מחויטת",
+            "מכנסי עבודה שחורים",
+            "מכנסיים קלאסיים שחורים",
+            "מכנסיים מחויטים שחורים לאירועים"
+          ]
+        }
+      },
+      "inputTokens": 457,
+      "outputTokens": 323
+    },
+    "ג'ינס סקיני כחול": {
+      "output": {
+        "facts": "מכנסי ג'ינס סקיני כחול. גזרה: סקיני. צבע: כחול.",
+        "look": "ג'ינס סקיני בצבע כחול.",
+        "read": "ג'ינס סקיני יום-יומי וקלאסי, מתאים ללבוש יומיומי, שילובים קז'ואל ובילויים קלילים לכל מי שלובש ג'ינס.",
+        "summary": "מכנסי ג'ינס סקיני בצבע כחול. פריט בסיסי ואופנתי שמתאים לכל ארון.",
+        "asks": {
+          "en": [
+            "blue skinny jeans",
+            "skinny jeans for women",
+            "blue denim pants",
+            "skinny blue denim",
+            "casual blue jeans",
+            "fitted blue jeans",
+            "stretch blue jeans",
+            "everyday blue jeans",
+            "blue pants skinny fit",
+            "stylish blue jeans",
+            "basic blue denim",
+            "classic blue skinny jeans"
+          ],
+          "he": [
+            "ג'ינס סקיני כחול",
+            "מכנסי ג'ינס כחולים",
+            "ג'ינס סקיני לנשים",
+            "מכנסי סקיני כחול",
+            "ג'ינס כחול צמוד",
+            "מכנסי ג'ינס יומיומיים",
+            "ג'ינס אופנתי כחול",
+            "מכנסי ג'ינס ארוכים כחולים",
+            "ג'ינס סקיני יפה",
+            "מכנסי דנים כחולים",
+            "ג'ינס בסיסי כחול",
+            "ג'ינס צמוד כחול"
+          ]
+        }
+      },
+      "inputTokens": 455,
+      "outputTokens": 448
+    },
+    "Pleated Midi Skirt": {
+      "output": {
+        "facts": "חצאית מידי плиссированная, מיועדת למשרד.",
+        "look": "חצאית מידי בצבע שאינו מצוין, בעלת קפלים (pleats), מתאימה למראה משרדי.",
+        "read": "חצאית בסגנון משרדי ואלגנטי, מתאימה לעבודה ולפגישות רשמיות, מיועדת לנשים.",
+        "summary": "חצאית מידי מплиссированная בסגנון משרדי ואלגנטי.",
+        "asks": {
+          "en": [
+            "pleated midi skirt",
+            "office ready skirt",
+            "work skirt for women",
+            "midi skirt with pleats",
+            "formal pleated skirt",
+            "business casual midi skirt",
+            "womens work midi skirt",
+            "pleated skirt for office",
+            "midi length pleated skirt",
+            "elegant office skirt",
+            "chic work skirt",
+            "solid pleated midi skirt"
+          ],
+          "he": [
+            "חצאית מידי פליסה",
+            "חצאית משרדית",
+            "חצאית קפלים אלגנטית",
+            "חצאית מידי לעבודה",
+            "חצאית פליסה לנשים",
+            "חצאית אלגנטיות למשרד",
+            "חצאית מידי קפלים",
+            "חצאית פליסה משרדי",
+            "חצאית ארוכה עם קפלים",
+            "חצאית לעבודה נשים",
+            "חצאית פליסה שחורה לעבודה",
+            "חצאית מידי אלגנטית"
+          ]
+        }
+      },
+      "inputTokens": 451,
+      "outputTokens": 404
+    },
+    "חצאית מיני שחורה": {
+      "output": {
+        "facts": "חצאית מיני שחורה",
+        "look": "חצאית מיני בצבע שחור",
+        "read": "חצאית מיני שחורה קלאסית המתאימה ללבוש יומיומי או ליציאות, מתאימה לנשים",
+        "summary": "חצאית מיני שחורה בעיצוב בסיסי וקלאסי.",
+        "asks": {
+          "en": [
+            "black mini skirt",
+            "short black skirt",
+            "black skirt mini",
+            "womens black mini skirt",
+            "basic black mini skirt",
+            "black mini",
+            "mini skirt black",
+            "casual black mini skirt",
+            "black short skirt",
+            "plain black mini skirt",
+            "black skirt for women",
+            "short skirt black"
+          ],
+          "he": [
+            "חצאית מיני שחורה",
+            "חצאית שחורה קצרה",
+            "חצאית מיני בצבע שחור",
+            "חצאית שחורה מיני",
+            "חצאית קצרה שחורה",
+            "מיני שחורה",
+            "חצאית לנשים שחורה מיני",
+            "חצאית מיני בסיסית שחורה",
+            "חצאית שחורה יומיומית",
+            "חצאית מיני יפה שחורה",
+            "חצאית שחורה קצרה לנשים",
+            "חצאית מיני שחורה מומלצת"
+          ]
+        }
+      },
+      "inputTokens": 447,
+      "outputTokens": 376
+    },
+    "Wide-Leg Linen Pants": {
+      "output": {
+        "facts": "מכנסיים עשויים פשתן אוורירי.",
+        "look": "מכנסיים רחבים, נראים עשויים פשתן אוורירי.",
+        "read": "מכנסיים קלילים ונוחים המתאימים לימי קיץ חמים, ללבוש יומיומי או לחופשה.",
+        "summary": "מכנסי פשתן רחבים ואווריריים ללבוש יומיומי קליל ונוח.",
+        "asks": {
+          "en": [
+            "wide-leg linen pants",
+            "airy linen pants",
+            "summer linen trousers",
+            "comfortable wide pants",
+            "lightweight linen pants",
+            "casual wide-leg trousers",
+            "linen pants for women",
+            "relaxed fit linen pants",
+            "breathable summer pants",
+            "loose linen trousers",
+            "beach linen pants",
+            "chic wide-leg pants",
+            "simple linen trousers",
+            "soft linen pants",
+            "stylish summer pants"
+          ],
+          "he": [
+            "מכנסי פשתן רחבים",
+            "מכנסי פשתן אווריריים",
+            "מכנסי קיץ רחבים",
+            "מכנסיים מבד פשתן",
+            "מכנסי פשתן קלים",
+            "מכנסיים נוחים לקיץ",
+            "מכנסי פשתן יומיומיים",
+            "מכנסיים רחבים מבד טבעי",
+            "מכנסי פשתן אופנתיים",
+            "מכנסי חוף פשתן",
+            "מכנסיים קלילים לקיץ",
+            "מכנסי פשתן נעימים",
+            "מכנסיים רחבים אלגנטיים",
+            "מכנסי פשתן לנשים",
+            "מכנסיים לקיץ החם"
+          ]
+        }
+      },
+      "inputTokens": 442,
+      "outputTokens": 488
+    },
+    "Cargo Pants Olive": {
+      "output": {
+        "facts": "Cargo Pants Olive. Category: pants. Colors: olive. Primary color: olive. Occasions: casual. Fit: relaxed. Style: cargo. Seasons: spring, fall. Looks like cotton fabric, looks like a straight-leg cut with side cargo pockets.",
+        "look": "Olive green cargo pants with a relaxed fit and a casual style, featuring visible side pockets typical of cargo trousers.",
+        "read": "Casual cargo pants suitable for everyday wear, outdoor activities, and relaxed weekend outings, designed for those who prefer comfortable and functional streetwear.",
+        "summary": "Relaxed fit olive cargo pants designed for casual wear during spring and fall seasons.",
+        "asks": {
+          "en": [
+            "olive cargo pants",
+            "green cargo trousers",
+            "relaxed fit cargo pants",
+            "casual cargo pants for men",
+            "casual cargo pants for women",
+            "spring cargo pants",
+            "fall cargo pants",
+            "olive green pants",
+            "streetwear cargo trousers",
+            "comfortable cargo pants",
+            "cargo pants in olive",
+            "relaxed fit olive trousers",
+            "mens olive cargo pants",
+            "womens olive cargo pants",
+            "casual green pants"
+          ],
+          "he": [
+            "מכנסי קרגו זית",
+            "מכנסי קרגו ירוקים",
+            "מכנסי קרגו בגזרה משוחררת",
+            "מכנסי קרגו ליומיום",
+            "מכנסיים ירוקים לגברים",
+            "מכנסיים ירוקים לנשים",
+            "מכנסי קרגו לעונת מעבר",
+            "מכנסיים נוחים קזואל",
+            "מכנסי קרגו בצבע זית",
+            "מכנסיים אופנתיים זית"
+          ]
+        }
+      },
+      "inputTokens": 457,
+      "outputTokens": 428
+    },
+    "חצאית מקסי פרחונית": {
+      "output": {
+        "facts": "חצאית, מקסי פרחונית.",
+        "look": "חצאית מקסי בעיצוב פרחוני.",
+        "read": "חצאית בסגנון נשי וקליל, מתאימה לימים חמים, ליום יום ולבילויים קז'ואליים לנשים.",
+        "summary": "חצאית מקסי פרחונית קלילה ומתאימה ליום יום.",
+        "asks": {
+          "en": [
+            "floral maxi skirt",
+            "long floral skirt",
+            "maxi skirt for women",
+            "summer floral skirt",
+            "casual maxi skirt",
+            "printed maxi skirt",
+            "flowy long skirt",
+            "women maxi skirt floral",
+            "long skirt with flowers",
+            "pretty maxi skirt",
+            "cute floral skirt",
+            "lightweight maxi skirt"
+          ],
+          "he": [
+            "חצאית מקסי פרחונית",
+            "חצאית ארוכה פרחונית",
+            "חצאית מקסי לנשים",
+            "חצאית פרחונית יפה",
+            "חצאית ארוכה לקיץ",
+            "חצאית פרחונית ליום יום",
+            "חצאית מקסי מודפסת",
+            "חצאית פרחים ארוכה",
+            "חצאית קלילה לאביב",
+            "חצאית מקסי פרחים",
+            "חצאית נשים ארוכה",
+            "חצאית פרחונית אופנתית"
+          ]
+        }
+      },
+      "inputTokens": 449,
+      "outputTokens": 381
+    },
+    "Yoga Leggings": {
+      "output": {
+        "facts": "Yoga Leggings. Stretch fit.",
+        "look": "Looks like stretch-fit yoga pants.",
+        "read": "A sporty style suitable for yoga, workouts, and casual athletic wear.",
+        "summary": "Comfortable stretch-fit yoga leggings designed for workouts and active lifestyles.",
+        "asks": {
+          "en": [
+            "yoga leggings",
+            "stretch yoga pants",
+            "workout leggings",
+            "sport pants for women",
+            "gym leggings",
+            "stretch fit pants",
+            "athletic leggings",
+            "comfortable yoga wear",
+            "fitness pants",
+            "running leggings",
+            "activewear pants",
+            "training leggings"
+          ],
+          "he": [
+            "טייץ יוגה",
+            "מכנסי יוגה נמתחים",
+            "טייץ ספורט",
+            "מכנסי ספורט",
+            "טייץ אימון",
+            "מכנסי כושר",
+            "טייץ נשים",
+            "בגדי ספורט",
+            "מכנסיים נמתחים",
+            "טייץ לחדר כושר",
+            "יוגה פאנטס",
+            "טייץ נוח לספורט"
+          ]
+        }
+      },
+      "inputTokens": 442,
+      "outputTokens": 308
+    },
+    "מכנסי פשתן בז'": {
+      "output": {
+        "facts": "מכנסיים. חומר: פשתן (looks like פשתן).",
+        "look": "מכנסיים בצבע בז'. בגזרה ובצורה של מכנסי פשתן.",
+        "read": "מכנסיים קלילים ויומיומיים המתאימים לעונת הקיץ, ללבוש יומיומי או לבילוי נינוח.",
+        "summary": "מכנסי פשתן בצבע בז' המתאימים למראה קיצי ויומיומי.",
+        "asks": {
+          "en": [
+            "beige linen pants",
+            "linen pants for women",
+            "lightweight summer pants",
+            "casual beige trousers",
+            "linen trousers",
+            "beige pants",
+            "summer linen pants",
+            "comfortable linen trousers",
+            "stylish beige pants",
+            "breathable summer pants",
+            "womens beige linen pants",
+            "casual linen trousers",
+            "beach linen pants",
+            "simple beige pants"
+          ],
+          "he": [
+            "מכנסי פשתן בז",
+            "מכנסי פשתן",
+            "מכנסיים בצבע בז",
+            "מכנסי קיץ קלילים",
+            "מכנסי פשתן לנשים",
+            "מכנסיים נוחים לקיץ",
+            "מכנסי פשתן ארוכים",
+            "מכנסיים יומיומיים בז",
+            "מכנסיים מבד פשתן",
+            "מכנסי קיץ מודרניים",
+            "מכנסי פשתן בז לנשים",
+            "מכנסיים אלגנטיים קלילים",
+            "מכנסיים מבד נושם",
+            "מכנסי פשתן יפים"
+          ]
+        }
+      },
+      "inputTokens": 447,
+      "outputTokens": 448
+    },
+    "Tote Bag Canvas": {
+      "output": {
+        "facts": "תיק בד קנבס. חומר: קנבס. גודל: מרווח.",
+        "look": "תיק קנבס רחב ומרווח, נראה בצבע טבעי או בסיסי.",
+        "read": "מתאים לשימוש יומיומי, קניות, לימודים או נשיאת חפצים אישיים. מתאים לכולם.",
+        "summary": "תיק קנבס מרווח ושימושי ליומיום.",
+        "asks": {
+          "en": [
+            "canvas tote bag",
+            "roomy canvas bag",
+            "large canvas tote",
+            "everyday canvas bag",
+            "shopping tote bag",
+            "casual canvas bag",
+            "cotton canvas tote",
+            "simple canvas bag",
+            "tote bag for shopping",
+            "large tote bag",
+            "bag for everyday use",
+            "canvas shoulder bag",
+            "practical canvas tote",
+            "basic canvas bag"
+          ],
+          "he": [
+            "תיק קנבס",
+            "תיק בד מרווח",
+            "תיק קנבס גדול",
+            "תיק שק קנבס",
+            "תיק יומיומי מבד",
+            "תיק קניות מבד",
+            "תיק צד קנבס",
+            "תיק בד גדול",
+            "תיק קנבס פשוט",
+            "תיק נשיאה מבד",
+            "תיק שימושי ליום יום",
+            "תיק קנבס איכותי",
+            "תיק בד יומיומי"
+          ]
+        }
+      },
+      "inputTokens": 435,
+      "outputTokens": 402
+    },
+    "תיק ערב מנצנץ": {
+      "output": {
+        "facts": "תיק ערב מנצנץ. סוג מוצר: תיק.",
+        "look": "תיק ערב מנצנץ.",
+        "read": "תיק ערב אלגנטי ומוצץ המתאים לאירועים מיוחדים ולשעות הערב.",
+        "summary": "תיק ערב מנצנץ לאירועים.",
+        "asks": {
+          "en": [
+            "sparkly evening bag",
+            "evening clutch",
+            "glitter bag for events",
+            "shimmering party bag",
+            "sparkle purse",
+            "evening bag",
+            "party clutch",
+            "shiny event bag",
+            "glitzy evening purse",
+            "stylish sparkly bag"
+          ],
+          "he": [
+            "תיק ערב מנצנץ",
+            "קלאץ ערב",
+            "תיק נוצץ לאירועים",
+            "תיק ערב נוצץ",
+            "תיק נשים לאירוע",
+            "קלאץ מנצנץ",
+            "תיק ערב אלגנטי",
+            "תיק מנצנץ למסיבה",
+            "תיק קטן לערב",
+            "תיק ערב יוקרתי"
+          ]
+        }
+      },
+      "inputTokens": 441,
+      "outputTokens": 314
+    },
+    "Crossbody Bag Tan": {
+      "output": {
+        "facts": "תיק צד קומפקטי. חומר: לא צוין במקור. צבע: חום שיזוף (tan). מידות וסגירה: לא צוינו.",
+        "look": "תיק צד (crossbody) קומפקטי בצבע חום שיזוף (tan).",
+        "read": "תיק יומיומי קומפקטי ופרקטי המתאים לנשיאת פריטים אישיים בסיסיים, מתאים ליום-יום ולסידורים.",
+        "summary": "תיק צד קומפקטי ושימושי בצבע חום שיזוף המתאים לשימוש יומיומי.",
+        "asks": {
+          "en": [
+            "tan crossbody bag",
+            "compact crossbody bag",
+            "small brown shoulder bag",
+            "tan bag for women",
+            "everyday crossbody bag",
+            "minimalist tan bag",
+            "small tan purse",
+            "light brown crossbody",
+            "compact bag tan",
+            "crossbody bag tan color",
+            "תיק צד קטן",
+            "תיק קרוסבאדי חום",
+            "תיק צד בצבע חום שיזוף"
+          ],
+          "he": [
+            "תיק צד חום",
+            "תיק קרוסבאדי קומפקטי",
+            "תיק צד קטן חום",
+            "תיק יומי בצבע חום שיזוף",
+            "תיק צד נשים",
+            "תיק קרוסבאדי יומיומי",
+            "תיק צד מיני",
+            "תיק כתף קטן חום",
+            "תיק קומפקטי לחפצים אישיים",
+            "תיק צד אופנתי",
+            "תיק בצבע טאן",
+            "תיק קרוסבאדי קטן",
+            "תיק צד נוח ליום יום"
+          ]
+        }
+      },
+      "inputTokens": 445,
+      "outputTokens": 467
+    },
+    "Silk Scarf Floral": {
+      "output": {
+        "facts": "מדובר בצעיף משי בעיצוב פרחוני. החומר הוא משי. אין פרטים נוספים בטקסט.",
+        "look": "צעיף בצבעוניות פרחונית, נראה עשוי משי רך וקל.",
+        "read": "צעיף אלגנטי שמתאים לעונות מעבר, ללבוש יומיומי וגם לאירועים מיוחדים, מתאים לנשים וגברים כאחד המחפשים נגיעת סטייל.",
+        "summary": "צעיף משי בעיצוב פרחוני קלאסי ואלגנטי, מושלם להוספת צבע וסטייל לכל הופעה.",
+        "asks": {
+          "en": [
+            "silk scarf floral",
+            "floral silk scarf",
+            "silk floral neck scarf",
+            "women silk scarf",
+            "floral print silk scarf",
+            "lightweight silk scarf",
+            "elegant floral scarf",
+            "silk accessories",
+            "flower pattern silk scarf",
+            "designer silk scarf",
+            "silk scarf for women",
+            "colorful floral scarf",
+            "soft silk scarf",
+            "fashion silk scarf",
+            "classy silk scarf"
+          ],
+          "he": [
+            "צעיף משי",
+            "צעיף פרחוני",
+            "צעיף משי פרחוני",
+            "צעיף משי אלגנטי",
+            "צעיף לאישה",
+            "צעיף פרחים",
+            "צעיף משי צבעוני",
+            "אביזרי אופנה משי",
+            "צעיף משי יוקרתי",
+            "צעיף פרחוני לאישה",
+            "צעיף קליל משי",
+            "צעיף עיצוב פרחים",
+            "צעיף משי לאירוע",
+            "צעיף אופנתי משי",
+            "צעיף משי רך"
+          ]
+        }
+      },
+      "inputTokens": 430,
+      "outputTokens": 480
+    },
+    "צעיף צמר אפור": {
+      "output": {
+        "facts": "צעיף, חומר: צמר, צבע: אפור, עונה: חורף.",
+        "look": "צעיף אפור חם.",
+        "read": "צעיף אפור מתאים לימי חורף קרים ולשימוש יומיומי לכל מי שמעוניין בחימום.",
+        "summary": "צעיף צמר אפור וחם לימי החורף.",
+        "asks": {
+          "en": [
+            "gray wool scarf",
+            "warm gray scarf",
+            "winter wool scarf for men",
+            "winter wool scarf for women",
+            "grey winter scarf",
+            "gray accessories",
+            "warm winter scarf",
+            "wool scarf gray",
+            "gray neck scarf",
+            "cozy winter scarf"
+          ],
+          "he": [
+            "צעיף אפור",
+            "צעיף צמר אפור",
+            "צעיף חם לחורף",
+            "צעיף צמר חם",
+            "אקססוריז לחורף",
+            "צעיף אפור חם",
+            "צעיף צמר",
+            "צעיף אפור לחימום",
+            "צעיף חורפי",
+            "צעיף אפור יפה"
+          ]
+        }
+      },
+      "inputTokens": 449,
+      "outputTokens": 316
+    },
+    "Straw Sun Hat": {
+      "output": {
+        "facts": "Straw Sun Hat",
+        "look": "Straw sun hat",
+        "read": "A sun hat suitable for summer and outdoor occasions.",
+        "summary": "A straw sun hat designed for summer wear.",
+        "asks": {
+          "en": [
+            "straw sun hat",
+            "summer hat",
+            "beach hat",
+            "straw hat for women",
+            "sun protection hat",
+            "woven sun hat",
+            "lightweight straw hat",
+            "wide brim straw hat",
+            "summer straw hat",
+            "vacation sun hat"
+          ],
+          "he": [
+            "כובע קש",
+            "כובע שמש",
+            "כובע קש קיצי",
+            "כובע לים",
+            "כובע שמש לנשים",
+            "כובע קש רחב שוליים",
+            "כובע קיץ",
+            "כובע קש אופנתי",
+            "כובע הגנה מהשמש",
+            "כובע קש לחוף"
+          ]
+        }
+      },
+      "inputTokens": 437,
+      "outputTokens": 263
+    },
+    "Leather Belt Brown": {
+      "output": {
+        "facts": "חגורת עור בצבע חום. עשויה מעור מלא (Full-grain leather).",
+        "look": "חגורת עור בצבע חום.",
+        "read": "חגורת עור קלאסית המתאימה לשימוש יומיומי, לעבודה או לאירועים רשמיים ויומיומיים כאחד, מתאימה לנשים ולגברים כאחד.",
+        "summary": "חגורת עור איכותית עשויה עור מלא בצבע חום בעיצוב קלאסי.",
+        "asks": {
+          "en": [
+            "brown leather belt",
+            "full grain leather belt",
+            "mens brown leather belt",
+            "womens brown belt",
+            "classic brown belt",
+            "leather belt brown",
+            "brown belt for men",
+            "brown belt for women",
+            "genuine leather belt brown",
+            "brown accessories",
+            "simple brown leather belt",
+            "casual brown belt",
+            "formal brown belt",
+            "brown leather strap belt"
+          ],
+          "he": [
+            "חגורת עור חومة",
+            "חגורת עור חומה",
+            "חגורה חومة מעור",
+            "חגורת עור מלא",
+            "חגורה חومة לגבר",
+            "חגורה חومة לאישה",
+            "חגורת עור איכותית חומה",
+            "חגורה קלאסית חומה",
+            "אקססוריז עור חום",
+            "חגורת עור יומיומית",
+            "חגורת עור חום",
+            "חגורה חומה פשוטה",
+            "חגורת עור אמיתי חومة"
+          ]
+        }
+      },
+      "inputTokens": 444,
+      "outputTokens": 434
+    },
+    "כובע צמר שחור": {
+      "output": {
+        "facts": "כובע צמר שחור. חומר: צמר. צבע: שחור.",
+        "look": "כובע צמר בצבע שחור, עיצוב בסיסי קלאסי.",
+        "read": "כובע צמר מתאים לימי חורף קרים, מתאים ליומיום ולפעילויות בחוץ, מתאים לנשים ולגברים.",
+        "summary": "כובע צמר שחור קלאסי לימי החורף הקרים.",
+        "asks": {
+          "en": [
+            "black wool hat",
+            "wool winter hat",
+            "black beanie",
+            "mens black wool hat",
+            "womens black winter hat",
+            "warm black hat",
+            "black knit hat",
+            "winter accessories black hat",
+            "plain black wool hat",
+            "cold weather black hat",
+            "black headwear",
+            "wool cap black",
+            "simple black wool hat",
+            "black winter cap",
+            "classic black wool hat"
+          ],
+          "he": [
+            "כובע צמר שחור",
+            "כובע חורף שחור",
+            "כובע צמר חם",
+            "כובע שחור לגברים",
+            "כובע שחור לנשים",
+            "כובע סרוג שחור",
+            "כובע צמר לחורף",
+            "כובע שחור ליומיום",
+            "כובע צמר שחור פשוט",
+            "אביזרי חורף כובע שחור",
+            "כובע צמר קלאסי שחור",
+            "כובע שחור קור",
+            "כובע ראש שחור",
+            "כובע צמר שחור יפה",
+            "כובע לחימום הראש שחור"
+          ]
+        }
+      },
+      "inputTokens": 450,
+      "outputTokens": 461
+    },
+    "Pearl Necklace": {
+      "output": {
+        "facts": "Freshwater pearls.",
+        "look": "Pearl necklace, looks like white freshwater pearls.",
+        "read": "A classic pearl necklace suitable for formal occasions, everyday wear, and gifting, worn by anyone who appreciates timeless jewelry.",
+        "summary": "A classic freshwater pearl necklace suitable for any occasion.",
+        "asks": {
+          "en": [
+            "pearl necklace",
+            "freshwater pearl necklace",
+            "real pearl necklace",
+            "white pearl necklace",
+            "classic pearl jewelry",
+            "pearl necklace for women",
+            "simple pearl strand",
+            "elegant pearl necklace",
+            "bridal pearl necklace",
+            "natural pearl necklace",
+            "שרשרת פנינים",
+            "שרשרת פנינים אמיתיות",
+            "פנינים מים מתוקים",
+            "שרשרת פנינים לבנות",
+            "תכשיטי פנינים",
+            "שרשרת אלגנטית",
+            "שרשרת פנינים לכלה",
+            "שרשרת פנינים קלאסית",
+            "שרשרת פנינים מתנה",
+            "פנינים אמיתיות"
+          ],
+          "he": [
+            "שרשרת פנינים",
+            "שרשרת פנינים אמיתיות",
+            "פנינים מים מתוקים",
+            "שרשרת פנינים לבנות",
+            "תכשיטי פנינים",
+            "שרשרת אלגנטית",
+            "שרשרת פנינים לכלה",
+            "שרשרת פנינים קלאסית",
+            "שרשרת פנינים מתנה",
+            "פנינים אמיתיות",
+            "pearl necklace",
+            "freshwater pearl necklace",
+            "real pearl necklace",
+            "white pearl necklace",
+            "classic pearl jewelry",
+            "pearl necklace for women",
+            "simple pearl strand",
+            "elegant pearl necklace",
+            "bridal pearl necklace",
+            "natural pearl necklace"
+          ]
+        }
+      },
+      "inputTokens": 432,
+      "outputTokens": 478
+    },
+    "משקפי שמש רטרו": {
+      "output": {
+        "facts": "משקפי שמש רטרו, אביזרים",
+        "look": "משקפי שמש בסגנון רטרו",
+        "read": "משקפי שמש בסגנון רטרו מתאימים ליום יום ולהשלמת מראה וינטג אופנתי, מתאימים לנשים ולגברים כאחד.",
+        "summary": "משקפי שמש בסגנון רטרו, מתאימים ליומיום ומשלימים מראה אופנתי.",
+        "asks": {
+          "en": [
+            "retro sunglasses",
+            "vintage style sunglasses",
+            "retro shades",
+            "classic retro sunglasses",
+            "fashion sunglasses",
+            "retro sun glasses",
+            "mens retro sunglasses",
+            "womens retro sunglasses",
+            "cool retro sunglasses",
+            "retro accessories",
+            "stylish retro sunnies",
+            "retro eyewear"
+          ],
+          "he": [
+            "משקפי שמש רטרו",
+            "משקפי שמש וינטג",
+            "משקפי שמש אופנתיים",
+            "משקפי שמש בסגנון רטרו",
+            "משקפי שמש ליום יום",
+            "משקפי שמש לגברים",
+            "משקפי שמש לנשים",
+            "משקפי שמש יפים",
+            "אביזרי אופנה משקפי שמש",
+            "משקפי שמש קלאסיים",
+            "משקפי שמש רטרו אופנתיים",
+            "משקפי שמש שחורים רטרו"
+          ]
+        }
+      },
+      "inputTokens": 435,
+      "outputTokens": 389
+    },
+    "Air Zoom 90 Sneakers": {
+      "output": {
+        "facts": "נעלי ספורט מסוג Air Zoom 90. נעלי ריצה יום-יומיות מרופדות.",
+        "look": "נעלי ספורט בצבע וגזרה סטנדרטיים.",
+        "read": "נעליים בסגנון ספורטיבי ויומיומי, מתאימות לפעילות ספורטיבית וליום-יום.",
+        "summary": "נעלי ספורט יום-יומיות מרופדות מדגם Air Zoom 90.",
+        "asks": {
+          "en": [
+            "Air Zoom 90 sneakers",
+            "cushioned running shoes",
+            "everyday sneakers",
+            "sport shoes for men",
+            "sport shoes for women",
+            "comfortable running sneakers",
+            "casual sport shoes",
+            "Air Zoom sneakers",
+            "cushioned everyday runners",
+            "running shoes",
+            "sport sneakers",
+            "walking shoes",
+            "gym shoes",
+            "athletic footwear",
+            "Air Zoom 90 shoes"
+          ],
+          "he": [
+            "נעלי ספורט Air Zoom 90",
+            "נעלי ריצה מרופדות",
+            "נעלי ספורט ליום יום",
+            "נעלי ריצה נוחות",
+            "נעלי ספורט גברים",
+            "נעלי ספורט נשים",
+            "נעלי התעמלות",
+            "נעלי ריצה מומלצות",
+            "נעלי ספורט יומיומיות",
+            "נעלי Air Zoom",
+            "נעלי ריצה ספורטיביות",
+            "נעלי הליכה נוחות",
+            "נעלי ספורט מרופדות",
+            "נעלי ריצה לאימון",
+            "נעלי ספורט קז'ואל"
+          ]
+        }
+      },
+      "inputTokens": 445,
+      "outputTokens": 444
+    },
+    "Mesh Over Dress in Pink": {
+      "output": {
+        "facts": "Sheer mesh overlay dress. Colors mentioned: pink, black, and navy. Style: mesh, sheer. Season: summer.",
+        "look": "Pink sheer mesh overlay dress, sleeveless or standard dress cut with a sheer overlay, lightweight appearance.",
+        "read": "A trendy summer dress featuring a sheer mesh overlay, suitable for casual summer outings, layering over swimwear or slips, worn by women.",
+        "summary": "Sheer mesh overlay dress in pink, perfect for summer layering and casual wear.",
+        "asks": {
+          "en": [
+            "pink mesh dress",
+            "sheer mesh overlay dress",
+            "summer pink dress",
+            "mesh overlay dress in pink",
+            "pink sheer summer dress",
+            "lightweight mesh dress",
+            "pink dress with mesh",
+            "sheer overlay dress",
+            "mesh beach dress",
+            "pink summer overlay dress",
+            "casual pink mesh dress",
+            "see through mesh dress pink",
+            "womens pink mesh dress",
+            "pink sheer dress",
+            "mesh dress for summer"
+          ],
+          "he": [
+            "שמלת רשת",
+            "שמלת רשת ורודה",
+            "שמלת מיש שקופה",
+            "שמלה שקופה לקיץ",
+            "שמלת קיץ ורודה",
+            "שמלת רשת קיצית",
+            "שמלה ורודה שקופה",
+            "שמלת שכבת רשת",
+            "שמלת רשת אופנתית",
+            "שמלה שקופה ורודה",
+            "שמלת חוף ורודה",
+            "שמלת רשת לנשים",
+            "שמלת מיש ורודה",
+            "שמלת קיץ שקופה",
+            "שמלת מעטפת רשת"
+          ]
+        }
+      },
+      "inputTokens": 466,
+      "outputTokens": 439
+    },
+    "Tie Waist Dress in Black": {
+      "output": {
+        "facts": "Black tie-waist summer dress.",
+        "look": "Black summer dress with a tie waist, sleeveless, knee-length, casual style.",
+        "read": "A casual summer dress suitable for warm weather, everyday wear, and casual outings, designed for women.",
+        "summary": "A black tie-waist summer dress designed for casual wear.",
+        "asks": {
+          "en": [
+            "black tie waist summer dress",
+            "casual black summer dress",
+            "summer dress in black",
+            "black dress with tie waist",
+            "women's black casual dress",
+            "black dress for summer",
+            "tie waist dress black",
+            "casual summer dress",
+            "black daytime dress",
+            "simple black summer dress",
+            "black dress",
+            "summer dress",
+            "tie waist dress",
+            "casual dress",
+            "black outfit for summer"
+          ],
+          "he": [
+            "שמלת קיץ שחורה",
+            "שמלה שחורה עם קשירה במותן",
+            "שמלת קיץ יום יומית שחורה",
+            "שמלה שחורה קז'ואל",
+            "שמלת קיץ קז'ואל",
+            "שמלה שחורה לעונת הקיץ",
+            "שמלת מעטפת שחורה",
+            "שמלה שחורה פשוטה לקיץ",
+            "שמלת קשירה שחורה",
+            "שמלת קיץ לנשים שחורה",
+            "שמלה שחורה",
+            "שמלת קיץ",
+            "שמלה יום יומית",
+            "שמלה אלגנטית קלילה",
+            "בגדי קיץ שמלות"
+          ]
+        }
+      },
+      "inputTokens": 470,
+      "outputTokens": 429
+    },
+    "Rib Knit Top in Pink": {
+      "output": {
+        "facts": "Ribbed knit top. Available colors: pink, navy, black. Material looks like knit fabric. Style looks like a rib knit top.",
+        "look": "A pink rib knit top. Looks like a sleeveless or short-sleeve fitted ribbed top based on the title and description.",
+        "read": "A casual everyday top suitable for casual occasions and everyday wear, worn by women.",
+        "summary": "A comfortable pink rib knit top that is also available in navy and black.",
+        "asks": {
+          "en": [
+            "pink rib knit top",
+            "ribbed knit top pink",
+            "pink top",
+            "rib knit top",
+            "black rib knit top",
+            "navy rib knit top",
+            "casual pink top",
+            "knit top for women",
+            "ribbed top pink",
+            "pink ribbed shirt",
+            "basic pink knit top",
+            "womens pink rib top"
+          ],
+          "he": [
+            "חולצת סרוג ריב ורודה",
+            "טופ סרוג ורוד",
+            "חולצה סרוגה ורודה",
+            "טופ ריב ורוד",
+            "חולצת ריב לנשים",
+            "טופ סרוג בצבע ורוד",
+            "חולצה ורודה בסיסית",
+            "טופ שחור סרוג",
+            "חולצת ריב כחול כהה",
+            "טופ סרוג יומיומי",
+            "חולצה סרוגה יפה",
+            "טופ אופנתי סרוג"
+          ]
+        }
+      },
+      "inputTokens": 460,
+      "outputTokens": 385
+    },
+    "Rib Knit Top in Navy": {
+      "output": {
+        "facts": "Ribbed knit top. Available in navy, pink, and black.",
+        "look": "A navy rib knit top with a ribbed texture, cut as a top.",
+        "read": "A versatile casual top suitable for everyday wear, layering, or casual outings, designed for women.",
+        "summary": "A ribbed knit top in navy, also available in pink and black.",
+        "asks": {
+          "en": [
+            "navy rib knit top",
+            "ribbed top in navy",
+            "blue knit top",
+            "ribbed knit shirt",
+            "navy top",
+            "casual knit top",
+            "ribbed shirt",
+            "womens navy top",
+            "knit top",
+            "ribbed knit wear",
+            "navy ribbed shirt",
+            "basic knit top"
+          ],
+          "he": [
+            "טופ סרוג בצבע כחול כהה",
+            "חולצת סריג ריב",
+            "טופ ריב כחול",
+            "חולצה סרוגה כחולה",
+            "טופ סרוג לנשים",
+            "חולצת ריב כחול כהה",
+            "סריג ריב דקיק",
+            "חולצה סרוגה ריב",
+            "טופ כחול כהה",
+            "חולצת בסיס סרוגה"
+          ]
+        }
+      },
+      "inputTokens": 460,
+      "outputTokens": 331
+    },
+    "Rib Knit Top in Black": {
+      "output": {
+        "facts": "Ribbed knit top. Colors mentioned: black, pink, and navy. Primary color is black. Material looks like rib knit.",
+        "look": "Rib knit top in black. Cut and shape are standard for a knit top.",
+        "read": "A casual rib knit top suitable for everyday wear, versatile for various casual occasions and suitable for anyone looking for a comfortable knit top.",
+        "summary": "A versatile ribbed knit top available in black, pink, and navy.",
+        "asks": {
+          "en": [
+            "black rib knit top",
+            "ribbed knit top",
+            "black top",
+            "knit top for women",
+            "casual black top",
+            "ribbed top in black",
+            "black knitted top",
+            "everyday black top",
+            "basic black rib top",
+            "simple black knit shirt",
+            "black top eval-fixture",
+            "rib knit shirt"
+          ],
+          "he": [
+            "טופ סרוג שחור",
+            "גופיית סריג שחורה",
+            "חולצת סריג שחורה",
+            "טופ ריב שחור",
+            "חולצה סרוגה יומיומית",
+            "סריג שחור בייסיק",
+            "טופ שחור לנשים",
+            "חולצת ריב שחורה",
+            "סריג קั้น שחור",
+            "טופ אופנתי שחור",
+            "חולצת בייסיק סרוגה",
+            "טופ סרוג יפה"
+          ]
+        }
+      },
+      "inputTokens": 459,
+      "outputTokens": 379
+    },
+    "Ivory Lace Wedding Dress": {
+      "output": {
+        "facts": "Floor-length bridal gown with a lace train. Material looks like lace and fabric. Floor-length fit.",
+        "look": "Ivory wedding dress, floor-length bridal gown with a lace train.",
+        "read": "A classic bridal style suited for weddings and formal ceremonies, worn by brides.",
+        "summary": "An ivory floor-length bridal gown featuring a lace train, perfect for a wedding.",
+        "asks": {
+          "en": [
+            "ivory lace wedding dress",
+            "floor length bridal gown",
+            "wedding dress with train",
+            "ivory bridal dress",
+            "lace wedding gown",
+            "long wedding dress",
+            "bridal gown with lace",
+            "ivory dress for wedding",
+            "formal ivory bridal wear",
+            "lace train wedding dress"
+          ],
+          "he": [
+            "שמלת כלה לבנה",
+            "שמלת כלה תחרה",
+            "שמלת כלה ארוכה",
+            "שמלת כלה עם שרשרת תחרה",
+            "שמלת חתונה שמנת",
+            "שמלת כלה קלאסית",
+            "שמלת כלה רצפה",
+            "שמלת כלה אבوری",
+            "בגדי כלה תחרה",
+            "שמלת כלה לאירוע"
+          ]
+        }
+      },
+      "inputTokens": 464,
+      "outputTokens": 329
+    },
+    "שמלת כלה שנהב": {
+      "output": {
+        "facts": "שמלת כלה קלאסית עם שובל.",
+        "look": "שמלת כלה בצבע שנהב בגזרה קלאסית הכוללת שוב.",
+        "read": "שמלת כלה בסגנון קלאסי המאימה לחתונות ואירועים רשמיים עבור כלות.",
+        "summary": "שמלת כלה קלאסית ואלגנטית בצבע שנהב המשלבת שובל מרשים.",
+        "asks": {
+          "en": [
+            "ivory wedding dress",
+            "classic bridal gown",
+            "wedding dress with train",
+            "ivory dress for bride",
+            "classic wedding dress",
+            "bridal gown ivory",
+            "long wedding dress",
+            "simple ivory bridal dress",
+            "wedding dress ivory color",
+            "elegant wedding gown"
+          ],
+          "he": [
+            "שמלת כלה שנהב",
+            "שמלת כלה קלאסית",
+            "שמלת כלה עם שובל",
+            "שמלת כלה בצבע שנהב",
+            "שמלה לכלות קלאסית",
+            "שמלת כלה ארוכה",
+            "שמלת כלה אלגנטית",
+            "שמלת כלה פשוטה",
+            "שמלת חתונה שנהב",
+            "שמלת כלה עם שובל ארוך"
+          ]
+        }
+      },
+      "inputTokens": 461,
+      "outputTokens": 350
+    },
+    "Sage Guest Midi Dress": {
+      "output": {
+        "facts": "מדובר בשמלת מידי בצבע מרווה (sage) המתאימה לאורחת בחתונה. הגזרה זורמת (flowy).",
+        "look": "שמלת מידי בצבע מרווה בגזרה זורמת.",
+        "read": "שמלה בסגנון אלגנטי-יומיומי המתאימה לאירועים כמו חתונות ולאורחות מחפשות מראה נינוח ושיקי.",
+        "summary": "שמלת מידי זורמת בצבע מרווה, מושלמת לאורחת בחתונה.",
+        "asks": {
+          "en": [
+            "sage midi dress",
+            "wedding guest dress",
+            "flowy sage dress",
+            "sage dress for wedding",
+            "midi dress for wedding guest",
+            "green guest midi dress",
+            "sage wedding guest outfit",
+            "flowy midi dress",
+            "sage dress",
+            "wedding guest attire midi"
+          ],
+          "he": [
+            "שמלת מידי מרווה",
+            "שמלה לאורחת בחתונה",
+            "שמלת מידי זורמת",
+            "שמלה ירוקה לחתונה",
+            "שמלת מרווה לאירוע",
+            "שמלה אלגנטית לאורחת",
+            "שמלת מידי לאירועים",
+            "שמלה זורמת לחתונה",
+            "שמלת מרווה זורמת",
+            "בגדים לאורחת לחתונה"
+          ]
+        }
+      },
+      "inputTokens": 462,
+      "outputTokens": 377
+    },
+    "שמלת מידי לאורחת": {
+      "output": {
+        "facts": "שמלת מידי אלגנטית לאורחת בחתונה.",
+        "look": "שמלת מידי אלגנטית בצבע וגזרת מידי",
+        "read": "שמלה אלגנטית המתאימה לאירועים כמו חתונות וערב",
+        "summary": "שמלת מידי אלגנטית ומרשימה המיועדת לאורחות בחתונה ולאירועי ערב.",
+        "asks": {
+          "en": [
+            "midi wedding guest dress",
+            "elegant midi dress",
+            "evening midi dress",
+            "wedding guest dress",
+            "formal midi dress for wedding",
+            "chic midi dress for evening",
+            "midi dress for special occasions",
+            "party midi dress",
+            "stylish wedding guest dress",
+            "sophisticated midi dress"
+          ],
+          "he": [
+            "שמלת מידי לאורחת בחתונה",
+            "שמלה אלגנטית לאירוע",
+            "שמלת מידי אלגנטית",
+            "שמלה לחתונה לאורחת",
+            "שמלת ערב מידי",
+            "שמלה לאירוע ערב",
+            "שמלת מידי לאירועים",
+            "שמלה יפה לחתונה",
+            "שמלת מידי לאורחת",
+            "שמלת ערב אלגנטית"
+          ]
+        }
+      },
+      "inputTokens": 459,
+      "outputTokens": 349
+    },
+    "Sleeveless Linen Tank Top": {
+      "output": {
+        "facts": "Sleeveless tank top. Material: linen. Fit: sleeveless. Description states it is a sleeveless tank in breezy linen.",
+        "look": "Sleeveless tank top, looks like a relaxed cut, breezy linen material.",
+        "read": "A casual summer style suitable for warm weather and everyday wear, ideal for women or anyone seeking a lightweight sleeveless top.",
+        "summary": "A breezy linen sleeveless tank top perfect for casual summer wear.",
+        "asks": {
+          "en": [
+            "sleeveless linen tank top",
+            "breezy linen tank",
+            "summer linen top",
+            "womens sleeveless top",
+            "casual linen tank",
+            "lightweight linen shirt",
+            "sleeveless summer shirt",
+            "linen top for women",
+            "tank top in linen",
+            "simple sleeveless linen top",
+            "breezy summer tank top",
+            "eval-fixture linen top"
+          ],
+          "he": [
+            "גופיית פשתן ללא שרוולים",
+            "גופיית פשתן קייצית",
+            "טופ פשתן לנשים",
+            "גופייה מבד פשתן",
+            "גופייה קלילה לפשתן",
+            "חולצת פשתן ללא שרוולים",
+            "גופיית קיץ מבד פשתן",
+            "טופ קיצי ללא שרוולים",
+            "גופיית פשתן אורירית",
+            "חולצה קייצית מודרנית",
+            "גופייה יוםיומית פשתן"
+          ]
+        }
+      },
+      "inputTokens": 449,
+      "outputTokens": 377
+    },
+    "Long-Sleeve Cotton Top": {
+      "output": {
+        "facts": "חולצה, חומר: כותנה רכה, שרוולים: ארוכים.",
+        "look": "חולצת שרוול ארוך בצבע בסיסי, גזרה סטנדרטית.",
+        "read": "חולצת בסיס נוחה ליום יום מתאימה לנשים וגברים כאחד ללבוש קזואל.",
+        "summary": "חולצת שרוול ארוך מכותנה רכה לנוחות יומיומית.",
+        "asks": {
+          "en": [
+            "long sleeve cotton top",
+            "soft cotton shirt",
+            "long sleeve top",
+            "casual cotton shirt",
+            "basic long sleeve top",
+            "cotton long sleeve",
+            "soft long sleeve shirt",
+            "comfortable cotton top",
+            "everyday long sleeve shirt",
+            "plain cotton top"
+          ],
+          "he": [
+            "חולצת שרוול ארוך מכותנה",
+            "חולצת כותנה רכה",
+            "חולצה ארוכה בסיסית",
+            "חולצת שרוול ארוך קזואל",
+            "חולצת כותנה יומיומית",
+            "טופ ארוך מכותנה",
+            "חולצה רכה שרוול ארוך",
+            "חולצת בסיס כותנה",
+            "חולצה ארוכה נעימה",
+            "חולצת טריקו ארוכה"
+          ]
+        }
+      },
+      "inputTokens": 439,
+      "outputTokens": 363
+    },
+    "גופייה ללא שרוולים": {
+      "output": {
+        "facts": "גופייה קלילה ללא שרוולים.",
+        "look": "גופייה בסיסית ללא שרוולים, עיצוב קליל ופשוט.",
+        "read": "מתאימה לימי קיץ חמים, ללבוש יומיומי וקז'ואל.",
+        "summary": "גופייה קלילה וקז'ואל ללא שרוולים, מושלמת לקיץ.",
+        "asks": {
+          "en": [
+            "sleeveless top",
+            "lightweight summer top",
+            "basic tank top",
+            "casual sleeveless shirt",
+            "summer sleeveless top",
+            "light top for women",
+            "simple tank top",
+            "casual summer wear",
+            "sleeveless basic shirt",
+            "lightweight tank",
+            "womens sleeveless top",
+            "summer basic top",
+            "casual top",
+            "light summer shirt"
+          ],
+          "he": [
+            "גופייה ללא שרוולים",
+            "גופייה קלילה לקיץ",
+            "גופייה בסיסית",
+            "חולצה ללא שרוולים",
+            "גופייה יומיומית",
+            "גופייה קזואל",
+            "גופייה לקיץ",
+            "חולצה קלילה לנשים",
+            "גופייה פשוטה",
+            "גופייה יפה לקיץ",
+            "בגדי קיץ לנשים",
+            "גופייה בלי שרוולים",
+            "חולצת בסיס לקיץ",
+            "גופייה קלילה"
+          ]
+        }
+      },
+      "inputTokens": 459,
+      "outputTokens": 398
+    },
+    "חולצה עם שרוולים ארוכים": {
+      "output": {
+        "facts": "חולצה, חולצת כותנה עם שרוולים ארוכים.",
+        "look": "חולצה עם שרוולים ארוכים. צבע, גזרה, צורה, דפוס והדפס אינם מפורטים מעבר לטקסט המוכר.",
+        "read": "חולצת בייסיק יומיומית המתאימה ללבוש יומיומי, מתאימה לנשים או גברים בהתאם לגזרה.",
+        "summary": "חולצת כותנה ארוכת שרוולים בסיסית ונוחה ליום יום.",
+        "asks": {
+          "en": [
+            "long sleeve cotton shirt",
+            "cotton top",
+            "long sleeve shirt",
+            "basic cotton shirt",
+            "mens long sleeve cotton top",
+            "womens long sleeve cotton shirt",
+            "casual long sleeve shirt",
+            "cotton long sleeve",
+            "simple long sleeve top",
+            "everyday cotton shirt"
+          ],
+          "he": [
+            "חולצה ארוכה",
+            "חולצת כותנה",
+            "חולצה עם שרוולים ארוכים",
+            "חולצת בייסיק כותנה",
+            "חולצה יומיומית ארוכה",
+            "חולצת כותנה ארוכה",
+            "חולצה ארוכה מכותנה",
+            "חולצת בייסיק ארוכה",
+            "חולצת טריקו ארוכה",
+            "חולצה יפה ארוכת שרוולים"
+          ]
+        }
+      },
+      "inputTokens": 444,
+      "outputTokens": 381
+    },
+    "Cotton Linen Blend Shirt": {
+      "output": {
+        "facts": "Cotton linen blend shirt. Cotton-linen blend, breathable.",
+        "look": "Shirt, looks like a breathable cotton-linen blend.",
+        "read": "A casual style suitable for warm weather and everyday wear, for anyone looking for comfort and breathability.",
+        "summary": "A breathable cotton-linen blend shirt designed for everyday casual wear.",
+        "asks": {
+          "en": [
+            "cotton linen shirt",
+            "breathable top",
+            "blend shirt for summer",
+            "casual cotton linen blend shirt",
+            "lightweight shirt",
+            "comfortable summer top",
+            "cotton and linen shirt",
+            "breathable casual shirt",
+            "mens cotton linen shirt",
+            "womens cotton linen shirt",
+            "simple cotton shirt",
+            "linen blend top",
+            "airy summer shirt",
+            "everyday cotton shirt",
+            "soft linen blend shirt"
+          ],
+          "he": [
+            "חולצת פשתן כותנה",
+            "חולצה נושמת",
+            "חולצת קיץ קלילה",
+            "חולצת כותנה ופשתן",
+            "חולצה יומיומית",
+            "חולצת פשתן מעורבת",
+            "חולצה מבד נושם",
+            "חולצת בייסיק כותנה",
+            "חולצת קיץ נוחה",
+            "חולצה אורירית",
+            "חולצת טריקו פשתן",
+            "חולצת כותנה נושמת",
+            "חולצה יפה לקיץ",
+            "חולצה קלילה ליום יום",
+            "חולצת פשתן יומיומית"
+          ]
+        }
+      },
+      "inputTokens": 441,
+      "outputTokens": 411
+    },
+    "Wool Cashmere Blend Coat": {
+      "output": {
+        "facts": "מעיל עשוי תערובת צמר וקשמיר. חם מאוד.",
+        "look": "מעיל עשוי תערובת צמר וקשמיר.",
+        "read": "מעיל חם ואלגנטי המתאים לימי חורף קרים וללבוש יומיומי או רשמי.",
+        "summary": "מעיל חם במיוחד עשוי תערובת איכותית של צמר וקשמיר.",
+        "asks": {
+          "en": [
+            "wool cashmere blend coat",
+            "warm winter coat",
+            "mens wool coat",
+            "womens wool coat",
+            "cashmere coat",
+            "heavy winter coat",
+            "stylish warm coat",
+            "wool blend jacket",
+            "cold weather coat",
+            "luxury wool coat",
+            "classic winter coat",
+            "warm coat for winter",
+            "soft cashmere coat",
+            "elegant wool coat",
+            "premium winter coat"
+          ],
+          "he": [
+            "מעיל צמר",
+            "מעיל קשמיר",
+            "מעיל צמר וקשמיר",
+            "מעיל חם לחורף",
+            "מעיל חורפי",
+            "מעיל עבה",
+            "מעיל אלגנטי",
+            "מעיל איכותי",
+            "מעיל צמר חם",
+            "מעיל קשמיר לחורף",
+            "מעיל יוקרתי",
+            "מעיל חורף לנשים",
+            "מעיל חורף לגברים",
+            "מעיל מרופד חם",
+            "מעיל צמר אופנתי"
+          ]
+        }
+      },
+      "inputTokens": 447,
+      "outputTokens": 411
+    },
+    "מעיל פוך ניילון": {
+      "output": {
+        "facts": "מעיל פוך ניילון. מעיל פוך קל מניילון, ללא צמר.",
+        "look": "מעיל פוך קל, נראה כמו ניילון, בגזרה של מעיל פוך חורפי.",
+        "read": "מעיל פוך קל ופרקטי המתאים לימי חורף קרים, מיועד ליום יום ולפעילות בחוץ.",
+        "summary": "מעיל פוך קל מניילון וללא צמר, מושלם לימי חורף קרים.",
+        "asks": {
+          "en": [
+            "puffer coat",
+            "lightweight puffer jacket",
+            "nylon puffer coat",
+            "winter coat",
+            "down coat without wool",
+            "light winter jacket",
+            "womens puffer coat",
+            "mens puffer coat",
+            "warm nylon coat",
+            "casual puffer jacket",
+            "packable puffer coat",
+            "black puffer jacket",
+            "short puffer coat",
+            "water resistant puffer",
+            "cold weather coat"
+          ],
+          "he": [
+            "מעיל פוך",
+            "מעיל פוך קל",
+            "מעיל ניילון",
+            "מעיל חורף",
+            "מעיל פוך ללא צמר",
+            "מעיל פוך חורפי",
+            "מעיל קל ליום יום",
+            "ג'קט פוך",
+            "מעיל מרופד",
+            "מעיל חורף קל",
+            "מעיל ניילון חורפי",
+            "מעיל פוך לנשים",
+            "מעיל פוך לגברים",
+            "מעיל חם לחורף",
+            "מעיל פוך ניילון"
+          ]
+        }
+      },
+      "inputTokens": 455,
+      "outputTokens": 440
+    },
+    "Vegan Leather Tote": {
+      "output": {
+        "facts": "תיק Tote. עשוי עור טבעוני, ללא עור בעלי חיים.",
+        "look": "תיק Tote בצבע שחור או חום, נראה עשוי עור טבעוני, בגזרה קלאסית ומרווחת.",
+        "read": "תיק יומיומי אופנתי ופרקטי, מתאים לעבודה, ללימודים ולסידורים, מתאים לנשים ולגברים כאחד.",
+        "summary": "תיק Tote עשוי עור טבעוני איכותי, מרווח ונוח לשימוש יומיומי.",
+        "asks": {
+          "en": [
+            "vegan leather tote",
+            "vegan bag",
+            "tote bag",
+            "cruelty free bag",
+            "faux leather tote",
+            "large vegan bag",
+            "black vegan tote",
+            "vegan leather handbag",
+            "everyday vegan bag",
+            "synthetic leather tote",
+            "tote bag for work",
+            "vegan shoulder bag",
+            "ethical leather bag",
+            "simple vegan tote"
+          ],
+          "he": [
+            "תיק טוט עור טבעוני",
+            "תיק טבעוני",
+            "תיק עור סינטטי",
+            "תיק גדולה ליום יום",
+            "תיק אלגנטי טבעוני",
+            "תיק עבודה טבעוני",
+            "תיק ללא עור",
+            "תיק כתף טבעוני",
+            "תיק נשים טבעוני",
+            "תיק יוניסקס טבעוני",
+            "תיק קניות טבעוני",
+            "תיק מרווח טבעוני",
+            "תיק אופנתי טבעוני"
+          ]
+        }
+      },
+      "inputTokens": 437,
+      "outputTokens": 429
+    },
+    "Golden Sequin Dress": {
+      "output": {
+        "facts": "שמet, עשויה פאייטים בכל מקום.",
+        "look": "שמלה בצבע זהב, מלאה בפאייטים.",
+        "read": "שמלה זו מתאימה לאירועים ולמסיבות ערב, ומומלצת למי שמחפשת מראה נוצץ ובולט.",
+        "summary": "שמלת פאייטים זהובה ונוצצת, מושלמת למסיבות ולאירועי ערב.",
+        "asks": {
+          "en": [
+            "golden sequin dress",
+            "gold party dress",
+            "evening sequin dress",
+            "sequin dress for women",
+            "sparkly gold dress",
+            "shiny party dress",
+            "gold dress with sequins",
+            "glamorous evening dress",
+            "gold dress for events",
+            "sequined dress"
+          ],
+          "he": [
+            "שמלת פאייטים זהובה",
+            "שמלה נוצצת למסיבה",
+            "שמלת ערב זהב",
+            "שמלה עם פאייטים",
+            "שמלת ערב נוצצת",
+            "שמלה מנצחת לאירוע",
+            "שמלת פאייטים לאירועים",
+            "שמלה זהובה למסיבות",
+            "שמלת מיני פאייטים",
+            "שמלת ערב מיוחדת"
+          ]
+        }
+      },
+      "inputTokens": 453,
+      "outputTokens": 355
+    },
+    "מגפי חורף שחורים": {
+      "output": {
+        "facts": "מגפי חורף שחורים",
+        "look": "מגפי חורף שחורים",
+        "read": "מגפי חורף מתאימים לעונת החורף לכל מי שמחפש הנעלה חמה ופרקטית.",
+        "summary": "מגפי חורף שחורים ופרקטיים לעונה הקרה.",
+        "asks": {
+          "en": [
+            "black winter boots",
+            "winter boots in black",
+            "black boots for winter",
+            "warm black boots",
+            "cold weather black boots",
+            "black snow boots",
+            "womens black winter boots",
+            "mens black winter boots",
+            "black boots",
+            "winter footwear black",
+            "black booties for winter",
+            "stylish black winter boots",
+            "comfortable black winter boots",
+            "waterproof black winter boots",
+            "classic black winter boots"
+          ],
+          "he": [
+            "מגפי חורף שחורים",
+            "מגפיים שחורים לחורף",
+            "מגפי חורף בצבע שחור",
+            "מגפים שחורים חמים",
+            "נעלי חורף שחורות",
+            "מגפיים עמידים לחורף שחורים",
+            "מגפי חורף שחורים נוחים",
+            "מגפי שלג שחורים",
+            "מגפיים שחורים עמוקים לחורף",
+            "מגפי חורף אופנתיים שחורים",
+            "מגפיים לחורף שחורים",
+            "מגף חורף שחור",
+            "הנעלת חורף שחורה",
+            "מגפיים גבוהים שחורים לחורף",
+            "מגפיים שחורים לימים הקרים"
+          ]
+        }
+      },
+      "inputTokens": 445,
+      "outputTokens": 454
+    },
+    "Leather Pants Black": {
+      "output": {
+        "facts": "Pants, black color, leather style.",
+        "look": "Black pants, looks like leather.",
+        "read": "A stylish pair of leather-style pants suitable for casual or edgy everyday looks.",
+        "summary": "Black leather-style pants for a bold and versatile wardrobe.",
+        "asks": {
+          "en": [
+            "black leather pants",
+            "leather pants",
+            "black pants for women",
+            "black pants for men",
+            "faux leather pants",
+            "black trousers",
+            "edgy black pants",
+            "leather look trousers",
+            "black leather style pants",
+            "cool black pants"
+          ],
+          "he": [
+            "מכנסי עור שחורים",
+            "מכנסי עור",
+            "מכנס שחור",
+            "מכנסיים שחורים",
+            "מכנסיים בסגנון עור",
+            "מכנסי עור לנשים",
+            "מכנסי עור לגברים",
+            "מכנסיים שחורים יפים",
+            "מכנסיים מגניבים",
+            "מכנסיים שחורים מיוחדים"
+          ]
+        }
+      },
+      "inputTokens": 440,
+      "outputTokens": 294
+    }
+  }
+}

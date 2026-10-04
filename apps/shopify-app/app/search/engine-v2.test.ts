@@ -22,7 +22,7 @@ import {
   createSearchOrchestrator,
   type SearchOrchestrator,
 } from "./orchestrator.server";
-import { serializeProxySearchResponse } from "./proxy.server";
+import { engineV2FromEnv, serializeProxySearchResponse } from "./proxy.server";
 
 // Engine v2's find step and server-side pages (YOY-145) on the embedded
 // PGlite database: the real card-index query and the real pg_trgm store,
@@ -329,6 +329,29 @@ describe("Engine v2 on the database", () => {
     expect(body.chips).toEqual([]);
     expect(body.intent).toBeNull();
     expect(body).not.toHaveProperty("closeMatches");
+  });
+
+  it("serves Engine v2 with ENGINE_V2 unset and the old engine only on ENGINE_V2=0 (YOY-153 AC-1)", async () => {
+    expect(engineV2FromEnv({})).toBe(true);
+    expect(engineV2FromEnv({ ENGINE_V2: "" })).toBe(true);
+    expect(engineV2FromEnv({ ENGINE_V2: "1" })).toBe(true);
+    expect(engineV2FromEnv({ ENGINE_V2: "0" })).toBe(false);
+    expect(engineV2FromEnv({ ENGINE_V2: " 0 " })).toBe(false);
+
+    await seed(db, [{ productId: "a", title: "Wool Coat", y: 0.1 }]);
+    const unset = orchestrator(fakeEmbeddings(), {
+      engineV2: engineV2FromEnv({}),
+      classifier: classicClassifier,
+    });
+    expect((await unset.runSearch({ query: "wool coat", shopDomain: SHOP })).engine).toBe("v2");
+    const off = orchestrator(fakeEmbeddings(), {
+      engineV2: engineV2FromEnv({ ENGINE_V2: "0" }),
+      classifier: classicClassifier,
+    });
+    expect((await off.runSearch({ query: "wool coat", shopDomain: SHOP })).engine).toBe("v1");
+    // The playground's per-request `engine=v1` still reaches the old engine.
+    const askedV1 = await unset.runSearch({ query: "wool coat", shopDomain: SHOP, engine: "v1" });
+    expect(askedV1.engine).toBe("v1");
   });
 
   it("lets a request's engine override the env switch, either way (AC-6)", async () => {

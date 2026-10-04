@@ -780,13 +780,14 @@ export function intentReuseWindowMsFromEnv(
 export const ENGINE_V2_ENV = "ENGINE_V2";
 
 /**
- * Whether Engine v2 is the default: `ENGINE_V2=1`. Anything else — unset,
- * empty, `0` — is the old engine (NG-3: off by default).
+ * Whether Engine v2 is the default: on unless `ENGINE_V2=0` (YOY-153 AC-1).
+ * Unset, empty or any other value serves Engine v2; `0` serves the old
+ * engine, which stays one env value away until it is deleted.
  */
 export function engineV2FromEnv(
   env: Record<string, string | undefined> = process.env,
 ): boolean {
-  return env[ENGINE_V2_ENV]?.trim() === "1";
+  return env[ENGINE_V2_ENV]?.trim() !== "0";
 }
 
 /**
@@ -871,8 +872,9 @@ export function createProxySearchOrchestrator(
       store: createPgVectorRetrievalStore(db),
     }),
     classicStore,
-    // Engine v2's find step (YOY-145), behind ENGINE_V2 (NG-3); the
-    // playground may still ask for either engine per request (AC-6).
+    // Engine v2's find step (YOY-145), the default since YOY-153 AC-1
+    // (`ENGINE_V2=0` serves the old engine); the playground may still ask
+    // for either engine per request (YOY-145 AC-6).
     find: createFindStep({
       db,
       embeddings,

@@ -2,6 +2,9 @@ import { createHash } from "node:crypto";
 
 import type {
   CostRecorder,
+  DecisionAnswer,
+  DecisionClient,
+  DecisionRequest,
   EmbeddingClient,
   InlineImage,
   LlmClient,
@@ -175,6 +178,73 @@ export function createReplayEmbeddingClient({
         searchId: request.searchId,
       });
       return vectors;
+    },
+  };
+}
+
+/** One recorded decision-model answer (YOY-153 AC-2): the typed answers per question key. */
+export interface RecordedDecision {
+  answers: Record<string, DecisionAnswer>;
+  inputTokens: number;
+  outputTokens: number;
+}
+
+/** A decision model's recorded answers (the Jev judge), keyed by `decisionRecordingKey`. */
+export interface DecisionRecording {
+  modelId: string;
+  /** The ledger provider the live adapter meters under ("openrouter"). */
+  provider: string;
+  entries: Record<string, RecordedDecision>;
+}
+
+/**
+ * The recording key for one decision request (YOY-153 AC-2): the search
+ * text, for a readable fixture, plus a digest of the whole request — the
+ * state (search, product row, any previous search) and the questions — so
+ * a changed product row or question set is a missing recording, never a
+ * stale answer. The recorder and the replay client both call this.
+ */
+export function decisionRecordingKey(request: Pick<DecisionRequest, "state" | "questions">): string {
+  const search =
+    typeof request.state === "string"
+      ? request.state
+      : typeof request.state.search === "string"
+        ? request.state.search
+        : "";
+  const digest = createHash("sha256")
+    .update(JSON.stringify({ state: request.state, questions: request.questions }))
+    .digest("hex")
+    .slice(0, 16);
+  return `${search}#${digest}`;
+}
+
+/** Replay DecisionClient over recorded answers, metered like the live adapter. */
+export function createReplayDecisionClient({
+  recording,
+  costRecorder,
+}: {
+  recording: DecisionRecording;
+  costRecorder: CostRecorder;
+}): DecisionClient {
+  return {
+    async decide(request) {
+      const key = decisionRecordingKey(request);
+      const entry = recording.entries[key];
+      if (entry === undefined) {
+        throw new Error(
+          `eval replay: no recorded ${request.operation} decision for key "${key}" — regenerate the eval fixtures`,
+        );
+      }
+      await costRecorder.record({
+        provider: recording.provider,
+        modelId: recording.modelId,
+        operation: request.operation,
+        inputTokens: entry.inputTokens,
+        outputTokens: entry.outputTokens,
+        storeId: request.storeId,
+        searchId: request.searchId,
+      });
+      return structuredClone(entry.answers);
     },
   };
 }
