@@ -1,6 +1,6 @@
 # M6 live-run runbook — Engine v2 measured on the deployment
 
-- **Date:** _not yet run_
+- **Date:** 2026-10-05 (Part 3's probe, agent) — the founder-lane parts not yet run
 - **Executed by:** founder (Parts 1, 2, 4's store half, 5's store half, 6) + agents (Parts 3, 4's playground half, 5's playground half, 7)
 - **Deployment URL:** `https://unfiltered-eu.onrender.com` (Frankfurt)
 - **Engine version:** `0.4.0` (expected at `/healthz`; the value
@@ -244,14 +244,14 @@ Fill one row per check. **YOY-154 closes only when every row has a result
 and a `searchId`** (or, for steps with no search, the command's output).
 Every FAIL row links the Linear issue filed for it (AC-7).
 
-- **Date:** _not yet run_
-- **Executed by:**
-- **Deployment URL / commit:**
+- **Date:** 2026-10-05 10:02–10:13 UTC (Part 3 step 6, two probe runs); the rest not yet run
+- **Executed by:** builder (rows 1's engine half, 14, 15); founder lane pending for the rest
+- **Deployment URL / commit:** `https://unfiltered-eu.onrender.com`; `/healthz` `200`, engine `0.4.0` at 10:02:33 UTC. The live commit is the founder's read off the Render dashboard (row 1); `main` was at the runbook merge at the time — a docs-and-scripts-only change, the engine identical either way.
 - **Seed catalog size (products):**
 
 | # | AC | Check | Query | searchId | Expected | Observed | Result |
 |---|---|---|---|---|---|---|---|
-| 1 | — | `/healthz`, deployed commit, Engine v2 | `dress` | | `200`, `0.4.0`, `engine: v2`, judge routeReason | | |
+| 1 | — | `/healthz`, deployed commit, Engine v2 | `dress` | | `200`, `0.4.0`, `engine: v2`, judge routeReason | **Engine half (agent, 10:02:33 UTC):** `/healthz` `200`, engine `0.4.0`; every probe search answered with a judge routeReason (`judged`, `judge-cached`, `judge-timeout`), which only Engine v2 serves — e.g. `47a137e3-bcdb-43a8-937b-4c2e5472dbb2` (`dress`, `judge-cached`). Deployed commit: founder, Render dashboard. | _pending founder half_ |
 | 2 | — | Keep-awake monitor | — | — | monitor up for the whole run | | |
 | 3 | — | Index counts | — | — | products = enriched = embedded | | |
 | 4 | AC-2 | Parity P1 (EN keyword) | `dress` | | widget first page ≥ stock; stock top 3 / widget top 3 named | | |
@@ -264,9 +264,9 @@ Every FAIL row links the Linear issue filed for it (AC-7).
 | 11 | AC-2 | Parity P8 (HE keyword) | `מגפיים` | | as row 4 | | |
 | 12 | AC-2 | Parity P9 (HE typo) | `סודר` | | as row 4 | | |
 | 13 | AC-2 | Parity P10 (HE brand or title) | | | as row 4 | | |
-| 14 | AC-3 | Speed probe `--runs 5` | probe set | first and last `searchId` of the run | per set: median, under-1-s share, no-extraction share | | |
-| 15 | AC-8 | Jev on the deployment | probe set | as row 14 | judge p50 < 700 ms (estimate); failures < 2 % (estimate); > 5 % FAIL | | |
-| 16 | AC-9 | Judge log rows | probe set | as row 14 | `uncached` > 0; Jev identity `typesafe/jev-1.13` in the ledger; row count recorded | | |
+| 14 | AC-3 | Speed probe `--runs 5` | probe set | `47a137e3-bcdb-43a8-937b-4c2e5472dbb2` … `876eea74-6378-4915-992a-88edfd93cd4d` (run 2; every sample's id is in the probe output) | per set: median, under-1-s share, no-extraction share | **Recorded run** 10:08:22–10:13:25 UTC, `--runs 5 --set all`, exit 0, `degraded=0 limited=0 reused=0` on every set, no failed request. **classic** median 273 ms, under-1 s 100 %, no-extraction 0 %; **ai-en** median 2276 ms, under-1 s 0 %, no-extraction 0 %; **ai-he** median 2164 ms, under-1 s 0 %, no-extraction 4 %; **ai-combined** median 2167 ms, under-1 s 0 %, no-extraction 2 %. Overall 25 of 75 under 1 s (33 %) — the PRD's "half under 1 s" gate is measured, then decided, so this row records it. A first run minutes earlier (10:02:33–10:07:38, without per-sample ids) read classic 248 ms / 92 %, ai-combined 1864 ms / 0 %, no-extraction 0 %. | **PASS** (recorded) |
+| 15 | AC-8 | Jev on the deployment | probe set | as row 14 | judge p50 < 700 ms (estimate); failures < 2 % (estimate); > 5 % FAIL | Run 2: judge stage **p50 941 ms, p95 1781 ms** (n=75, server-timed in Frankfurt); outcomes judged 36, judge-cached 25, **judge-timeout 14**, judge-error 0 → **18.7 % of all searches, 28 % of the 50 uncached ones** served unjudged in find order. Run 1: p50 778 / p95 1705 ms, judge-timeout 8 (10.7 %), judge-error 0. Every timeout is an AI-set search, EN and HE alike; e.g. `3a190302-61a5-456c-a555-f2e943b464a8` (`elegant evening dress under 400`), `0271ee00-b10e-4c7b-b9e4-f73224743cb6` (HE). The `partial` share is the founder lane's `evidence.mts judge 2026-10-05T10:02:33Z` (row 16) — the row fails on timeouts alone. | **FAIL — YOY-159** |
+| 16 | AC-9 | Judge log rows | probe set | as row 14 | `uncached` > 0; Jev identity `typesafe/jev-1.13` in the ledger; row count recorded | Pending the founder lane: `npx tsx scripts/evidence.mts judge 2026-10-05T10:02:33Z` covers both probe runs (the agent's database read was not permitted). | _pending_ |
 | 17 | AC-4 | Label `price-near` — playground EN / HE | | | label line filled, page language | | |
 | 18 | AC-4 | Label `price-far` — playground EN / HE | | | as row 17 | | |
 | 19 | AC-4 | Label `size-missing` — playground EN / HE | | | as row 17 | | |
