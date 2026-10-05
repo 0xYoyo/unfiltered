@@ -7,6 +7,7 @@ import {
   evaluateAssertions,
   exitCode,
   formatBreaches,
+  formatJudgeSummary,
   formatSummary,
   loadQueries,
   parseArgs,
@@ -14,6 +15,7 @@ import {
   percentile,
   ProbeUsageError,
   summarize,
+  summarizeJudge,
   UNDER_ONE_SECOND_MS,
   visibleQueryText,
   type ProbeSample,
@@ -146,6 +148,40 @@ describe("set summaries", () => {
 
   it("is null for an empty set rather than a fake zero", () => {
     expect(summarize("classic", [])).toBeNull();
+  });
+});
+
+describe("the judge stage over every set (YOY-154 AC-8)", () => {
+  it("reports the judge stage's p50/p95 and how each search's judge step ended", () => {
+    const judged = (judge: number, routeReason = "judged") =>
+      sample({ routeReason, stages: { find: 300, compose: 20, judge } });
+    const samples = [
+      judged(400),
+      judged(500),
+      judged(600, "judge-cached"),
+      judged(1500, "judge-timeout"),
+      judged(900, "judge-error"),
+      sample({ set: "classic", route: "classic", routeReason: "keyword", stages: { classic: 20 } }),
+    ];
+    const summary = summarizeJudge(samples)!;
+    expect(summary.n).toBe(5);
+    expect(summary.p50).toBe(600);
+    expect(summary.p95).toBe(1500);
+    expect(summary.outcomes).toEqual({
+      judged: 2,
+      "judge-cached": 1,
+      "judge-timeout": 1,
+      "judge-error": 1,
+    });
+    // The failure share is over every search of the run, judged or not.
+    expect(summary.errorShare).toBeCloseTo(1 / 6);
+    expect(formatJudgeSummary(summary)).toBe(
+      "[judge, all sets] n=5 p50=600 ms p95=1500 ms judge-error=16.7% outcomes: judged=2 judge-cached=1 judge-timeout=1 judge-error=1",
+    );
+  });
+
+  it("is null when no sample ran the judge — the old engine reports no judge line", () => {
+    expect(summarizeJudge([sample({})])).toBeNull();
   });
 });
 

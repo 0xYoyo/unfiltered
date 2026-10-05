@@ -27,7 +27,10 @@
  * default. Absent — the default (YOY-153 AC-5) — no parameter is sent and the
  * engine the deployment serves answers: Engine v2 unless its `ENGINE_V2=0`.
  * Every set reports its under-1-s share and, for v2 samples, the share
- * composed without the wish extraction (`no-extraction`).
+ * composed without the wish extraction (`no-extraction`). A last line
+ * gives the judge stage over every set (YOY-154 AC-8): its p50/p95 and how
+ * many searches ended `judged`, `judge-cached`, `judge-timeout` or
+ * `judge-error`.
  *
  * Exit 1 on any asserted breach or any failed request; exit 0 otherwise.
  */
@@ -317,6 +320,56 @@ function shareOf(
     : reported.filter((sample) => flag(sample) === true).length / reported.length;
 }
 
+/** The routeReasons the judge step ends a search with (judge-step.server.ts `JudgeOutcome`). */
+export const JUDGE_OUTCOMES = ["judged", "judge-cached", "judge-timeout", "judge-error"] as const;
+
+export interface JudgeSummary {
+  /** Samples whose response timed the judge stage. */
+  n: number;
+  /** Nearest-rank percentiles of the server's `judge` stage ms (YOY-154 AC-8). */
+  p50: number;
+  p95: number;
+  /** Samples per judge outcome, over every sample whatever its stages. */
+  outcomes: Record<(typeof JUDGE_OUTCOMES)[number], number>;
+  /** Share of all samples served `judge-error`, 0–1. */
+  errorShare: number;
+}
+
+/**
+ * The judge stage over every sample of the run (YOY-154 AC-8): its median
+ * and 95th percentile as the server timed them, and how the step ended.
+ * Null when no sample ran the judge — the old engine, a classic-only run.
+ */
+export function summarizeJudge(samples: readonly ProbeSample[]): JudgeSummary | null {
+  const timed = samples
+    .map((sample) => sample.stages.judge)
+    .filter((ms): ms is number => ms !== undefined);
+  if (timed.length === 0) {
+    return null;
+  }
+  const outcomes = Object.fromEntries(
+    JUDGE_OUTCOMES.map((outcome) => [
+      outcome,
+      samples.filter((sample) => sample.routeReason === outcome).length,
+    ]),
+  ) as JudgeSummary["outcomes"];
+  return {
+    n: timed.length,
+    p50: percentile(timed, 50),
+    p95: percentile(timed, 95),
+    outcomes,
+    errorShare: outcomes["judge-error"] / samples.length,
+  };
+}
+
+export function formatJudgeSummary(summary: JudgeSummary): string {
+  const outcomes = JUDGE_OUTCOMES.map((outcome) => `${outcome}=${summary.outcomes[outcome]}`).join(" ");
+  return (
+    `[judge, all sets] n=${summary.n} p50=${summary.p50} ms p95=${summary.p95} ms` +
+    ` judge-error=${Math.round(summary.errorShare * 1000) / 10}% outcomes: ${outcomes}`
+  );
+}
+
 export interface Breach {
   set: SetSummary["set"];
   metric: "p50" | "p95";
@@ -562,6 +615,10 @@ export async function main(argv: readonly string[]): Promise<0 | 1> {
   console.log(`latency probe — ${args.url}${args.catalog === null ? "" : ` catalog=${args.catalog}`}${args.engine === null ? "" : ` engine=${args.engine}`} runs=${args.runs}`);
   for (const summary of summaries) {
     console.log(formatSummary(summary));
+  }
+  const judge = summarizeJudge(samples);
+  if (judge !== null) {
+    console.log(formatJudgeSummary(judge));
   }
   if (failures > 0) {
     console.log(`failed requests: ${failures} (excluded from the percentiles)`);
