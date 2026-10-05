@@ -8,6 +8,7 @@ import {
   exitCode,
   formatBreaches,
   formatJudgeSummary,
+  formatSampleLine,
   formatSummary,
   loadQueries,
   parseArgs,
@@ -177,6 +178,16 @@ describe("the judge stage over every set (YOY-154 AC-8)", () => {
     expect(summary.errorShare).toBeCloseTo(1 / 6);
     expect(formatJudgeSummary(summary)).toBe(
       "[judge, all sets] n=5 p50=600 ms p95=1500 ms judge-error=16.7% outcomes: judged=2 judge-cached=1 judge-timeout=1 judge-error=1",
+    );
+  });
+
+  it("names the judge outcome and the searchId on every sample line", () => {
+    expect(
+      formatSampleLine(sample({ searchId: "abc-123", routeReason: "judge-timeout", latencyMs: 2100 }), 2, 5, "linen dress"),
+    ).toBe('ai-en run 2/5 2100 ms ai judge-timeout abc-123 "linen dress"');
+    // A route that never reached the judge prints no outcome, still the searchId.
+    expect(formatSampleLine(sample({ searchId: "s-9", routeReason: "intent-reuse" }), 1, 5, "q")).toBe(
+      'ai-en run 1/5 1000 ms ai REUSED s-9 "q"',
     );
   });
 

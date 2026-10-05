@@ -370,6 +370,27 @@ export function formatJudgeSummary(summary: JudgeSummary): string {
   );
 }
 
+/**
+ * One sample's progress line: the set, the run, the server latency and
+ * route, the judge's outcome where the judge ran (YOY-154 AC-8), and the
+ * `searchId`, so every measured search can be read back from the database.
+ */
+export function formatSampleLine(
+  sample: ProbeSample,
+  run: number,
+  runs: number,
+  query: string,
+): string {
+  const judged = (JUDGE_OUTCOMES as readonly string[]).includes(sample.routeReason);
+  return (
+    `${sample.set} run ${run}/${runs} ${sample.latencyMs} ms ${sample.route}` +
+    `${sample.degraded ? " degraded" : ""}${sample.limited !== null ? ` limited=${sample.limited}` : ""}` +
+    `${sample.routeReason === "intent-reuse" ? " REUSED" : ""}` +
+    `${judged ? ` ${sample.routeReason}` : ""}` +
+    ` ${sample.searchId} "${query}"`
+  );
+}
+
 export interface Breach {
   set: SetSummary["set"];
   metric: "p50" | "p95";
@@ -582,12 +603,7 @@ export async function main(argv: readonly string[]): Promise<0 | 1> {
             paced ? distinctQueryText(query, invocation, run) : query,
           );
           samples.push(sample);
-          console.log(
-            `${set} run ${run}/${args.runs} ${sample.latencyMs} ms ${sample.route}` +
-              `${sample.degraded ? " degraded" : ""}${sample.limited !== null ? ` limited=${sample.limited}` : ""}` +
-              `${sample.routeReason === "intent-reuse" ? " REUSED" : ""}` +
-              ` "${query}"`,
-          );
+          console.log(formatSampleLine(sample, run, args.runs, query));
         } catch (error) {
           failures += 1;
           console.error(`${set} run ${run}/${args.runs} FAILED: ${String(error)}`);
