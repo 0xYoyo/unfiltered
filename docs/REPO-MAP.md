@@ -630,6 +630,7 @@ docs/
   M3-LIVE-RUN.md
   M4-LIVE-RUN.md
   M5-LIVE-RUN.md
+  M6-LIVE-RUN.md
   PORTABILITY.md
   PRD.md
   RESET-2026-09-27.md

@@ -13,6 +13,7 @@
  *   npx tsx scripts/evidence.mts vision             # visionStatus coverage
  *   npx tsx scripts/evidence.mts attributes ID...   # enrichment of given products
  *   npx tsx scripts/evidence.mts variants ID        # one product's variants
+ *   npx tsx scripts/evidence.mts judge SINCE_ISO    # judge log since a time
  */
 
 import { dirname, resolve } from "node:path";
@@ -226,6 +227,64 @@ async function variants(productId: string): Promise<void> {
   );
 }
 
+/**
+ * The judge log since a time (YOY-154 AC-8, AC-9): how many `JudgeVerdict`
+ * rows the store's searches wrote, split by `cached`, and the judge
+ * calls the cost ledger metered for the same searches, by model — the
+ * judge's identity, which the verdict rows do not carry. A search whose
+ * uncached verdicts outnumber its metered judge calls was served a
+ * substituted (`partial`) verdict: a Jev call that failed before it was
+ * metered (timeout, rate limit, HTTP error). The count is a lower bound —
+ * a metered call whose answer was unusable is also substituted.
+ */
+async function judge(since: Date): Promise<void> {
+  const [verdicts, calls] = await Promise.all([
+    db.judgeVerdict.findMany({
+      where: { shopDomain: SHOP, createdAt: { gte: since } },
+      select: { searchId: true, cached: true },
+    }),
+    db.aiCall.findMany({
+      where: { shopDomain: SHOP, operation: "judge", createdAt: { gte: since } },
+      select: { searchId: true, modelId: true },
+    }),
+  ]);
+  const uncached = verdicts.filter((row) => !row.cached);
+  console.table([
+    {
+      shop: SHOP,
+      since: since.toISOString(),
+      verdictRows: verdicts.length,
+      uncached: uncached.length,
+      cached: verdicts.length - uncached.length,
+      searches: new Set(verdicts.map((row) => row.searchId)).size,
+    },
+  ]);
+  const byModel = new Map<string, number>();
+  for (const call of calls) {
+    byModel.set(call.modelId, (byModel.get(call.modelId) ?? 0) + 1);
+  }
+  console.table([...byModel].map(([modelId, count]) => ({ modelId, judgeCalls: count })));
+  const tally = (rows: Array<{ searchId: string | null }>) => {
+    const counts = new Map<string, number>();
+    for (const row of rows) {
+      if (row.searchId !== null) counts.set(row.searchId, (counts.get(row.searchId) ?? 0) + 1);
+    }
+    return counts;
+  };
+  const verdictsPerSearch = tally(uncached);
+  const callsPerSearch = tally(calls);
+  const partial = [...verdictsPerSearch].filter(
+    ([searchId, count]) => (callsPerSearch.get(searchId) ?? 0) < count,
+  );
+  console.log(
+    `searches with uncached verdicts: ${verdictsPerSearch.size}; ` +
+      `served partial (fewer metered judge calls than verdicts, a lower bound): ${partial.length}`,
+  );
+  for (const [searchId, count] of partial) {
+    console.log(`  ${searchId}: ${callsPerSearch.get(searchId) ?? 0} calls for ${count} verdicts`);
+  }
+}
+
 const [mode, argument, ...rest] = process.argv.slice(2);
 try {
   switch (mode) {
@@ -259,9 +318,17 @@ try {
       }
       await variants(argument);
       break;
+    case "judge": {
+      const since = new Date(argument ?? "");
+      if (Number.isNaN(since.getTime())) {
+        throw new Error("usage: evidence.mts judge SINCE_ISO");
+      }
+      await judge(since);
+      break;
+    }
     default:
       throw new Error(
-        "usage: evidence.mts counts | searches [limit] | costs SEARCH_ID | clicks [limit] | vision | attributes PRODUCT_ID... | variants PRODUCT_ID",
+        "usage: evidence.mts counts | searches [limit] | costs SEARCH_ID | clicks [limit] | vision | attributes PRODUCT_ID... | variants PRODUCT_ID | judge SINCE_ISO",
       );
   }
 } finally {
