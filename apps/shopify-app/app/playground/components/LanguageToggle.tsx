@@ -1,3 +1,4 @@
+import type { PlaygroundEngine } from "../search-client";
 import type { PlaygroundLocale, PlaygroundStrings } from "../strings";
 
 /**
@@ -16,12 +17,15 @@ export function LanguageToggle({
   pathname,
   query,
   detailsOpen,
+  engine,
 }: {
   locale: PlaygroundLocale;
   strings: PlaygroundStrings;
   pathname: string;
   query: string;
   detailsOpen: boolean;
+  /** The engine the page view asks for (YOY-165); kept across the switch. */
+  engine?: PlaygroundEngine;
 }) {
   const target: PlaygroundLocale = locale === "he" ? "en" : "he";
   const params = new URLSearchParams({ lang: target });
@@ -31,6 +35,9 @@ export function LanguageToggle({
   // Switching language must not close an opened details panel (AC-5).
   if (detailsOpen) {
     params.set("details", "1");
+  }
+  if (engine !== undefined) {
+    params.set("engine", engine);
   }
 
   return (

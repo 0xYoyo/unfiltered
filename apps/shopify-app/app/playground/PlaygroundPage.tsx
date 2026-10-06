@@ -21,6 +21,7 @@ import {
   fetchPlaygroundLabels,
   searchPlayground,
   sendPlaygroundClick,
+  type PlaygroundEngine,
   type RemovedChip,
 } from "./search-client";
 import {
@@ -83,11 +84,18 @@ export function PlaygroundPage({
   detailsOpen: initialDetailsOpen,
   catalog,
   store,
+  engine,
 }: {
   locale: PlaygroundLocale;
   pathname: string;
   initialQuery: string;
   detailsOpen: boolean;
+  /**
+   * The engine `/try?engine=` names (YOY-165 AC-1): every submitted
+   * search, chip removal and page request of this page view carries it.
+   * Absent means the server default.
+   */
+  engine?: PlaygroundEngine;
   /** Registry slug; every request on a preload page carries it (YOY-94). */
   catalog?: string;
   /** The preloaded store, when this is a `/s/<slug>` page. */
@@ -252,6 +260,8 @@ export function PlaygroundPage({
           // Every submit asks for page 1 (YOY-146 AC-1); a preview is
           // never paged.
           ...(preview ? {} : { paging: { page: 1, pageSize: PAGE_SIZE } }),
+          // A preview is classic-only and never names an engine (YOY-165).
+          ...(preview || engine === undefined ? {} : { engine }),
           signal: controller.signal,
         });
         if (controller.signal.aborted) {
@@ -318,7 +328,7 @@ export function PlaygroundPage({
         setPhase("settled");
       }
     },
-    [catalog, awaitLabels],
+    [catalog, engine, awaitLabels],
   );
 
   /**
@@ -357,6 +367,7 @@ export function PlaygroundPage({
           ? {}
           : { previousQuery: state.previousQuery }),
         paging: { page: state.nextPage, pageSize: PAGE_SIZE },
+        ...(engine === undefined ? {} : { engine }),
       });
       if (pagingRef.current !== state) {
         return;
@@ -378,7 +389,7 @@ export function PlaygroundPage({
         setLoadingMore(false);
       }
     }
-  }, [catalog, awaitLabels]);
+  }, [catalog, engine, awaitLabels]);
 
   // Stable, so the grid's last-card watch re-arms only when cards change.
   const appendNextPage = useCallback(() => {
@@ -570,9 +581,12 @@ export function PlaygroundPage({
     if (!detailsOpen) {
       params.set("details", "1");
     }
+    if (engine !== undefined) {
+      params.set("engine", engine);
+    }
     const search = params.toString();
     return search === "" ? pathname : `${pathname}?${search}`;
-  }, [detailsOpen, locale, pathname, query]);
+  }, [detailsOpen, engine, locale, pathname, query]);
 
   /**
    * Flip the panel and record it in the URL without navigating, so an
@@ -606,6 +620,7 @@ export function PlaygroundPage({
           pathname={pathname}
           query={query}
           detailsOpen={detailsOpen}
+          {...(engine === undefined ? {} : { engine })}
         />
       </header>
 
@@ -630,6 +645,14 @@ export function PlaygroundPage({
             the ivory page: the search is the page's subject, and the card
             is what says so (P-3). */}
         <section className="searchCard" data-testid="playground-search-card">
+          {engine === undefined ? null : (
+            // Which engine this page view asks for (YOY-165 AC-2): muted
+            // text, no colour of its own — a fact for the comparison, not
+            // a control.
+            <p className="engineBadge" data-testid="playground-engine-badge">
+              {strings.engineBadge.replace("{engine}", engine)}
+            </p>
+          )}
           <SearchBar
             strings={strings}
             value={query}
