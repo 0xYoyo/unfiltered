@@ -400,6 +400,29 @@
        * `pageSize` gets that page of the fixture's whole result order plus
        * `page` and `totalCount`, as the real endpoint answers.
        */
+      /**
+       * A judged Engine v2 page with matches (YOY-166): the page's last two
+       * products are close — labelled "close match" and served in
+       * `closeMatches` beside the matched ones, `closeMatchesRelaxed: []`.
+       * `?fixture=close-divider` selects it; every page splits the same way.
+       */
+      const closeDivider = (page) => {
+        if (page.results.length < 3) {
+          return page;
+        }
+        const split = page.results.length - 2;
+        return {
+          ...page,
+          route: "ai",
+          results: page.results.slice(0, split).map((result) => ({ ...result, label: null })),
+          closeMatches: page.results.slice(split).map((result) => ({
+            ...result,
+            label: { template: "close-match", values: [] },
+          })),
+          closeMatchesRelaxed: [],
+        };
+      };
+
       const paged = (body, request) => {
         if (request.page === undefined) {
           return body;
@@ -832,7 +855,7 @@
                 : AI_CHIPS,
               intent: AI_INTENT,
             };
-          } else if (fixture === "many") {
+          } else if (fixture === "many" || fixture === "close-divider") {
             // YOY-146: a plain 30-product order (`?results=<N>` sizes it),
             // served one page per request.
             body = {
@@ -858,7 +881,10 @@
           } else {
             body = RESULTS_RESPONSE;
           }
-          return settle(jsonResponse(paged(body, request)));
+          const page = paged(body, request);
+          return settle(
+            jsonResponse(fixture === "close-divider" ? closeDivider(page) : page),
+          );
         }
         if (url.startsWith("/apps/unfiltered/labels")) {
           // The late labels (YOY-151 AC-8): logged, then answered after a

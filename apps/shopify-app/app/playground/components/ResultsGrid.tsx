@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { Fragment, useEffect, useRef } from "react";
 
 import { Card, type PlaygroundCard } from "./Card";
 import type { PlaygroundStrings } from "../strings";
@@ -23,6 +23,8 @@ export function ResultsGrid({
   strings,
   skeleton = false,
   labelsPending,
+  closeStarts,
+  closeHeading,
   onOpen,
   onLastCardVisible,
 }: {
@@ -34,6 +36,14 @@ export function ResultsGrid({
    * reserves its label line so the labels land without moving anything.
    */
   labelsPending?: ReadonlySet<string>;
+  /**
+   * The cards each page's close products start at (YOY-166 AC-2, AC-3): a
+   * full-row "Close matches" divider goes before each, so every appended
+   * page repeats it under its own results.
+   */
+  closeStarts?: ReadonlySet<string>;
+  /** The divider's heading text; required with `closeStarts`. */
+  closeHeading?: string;
   onOpen: (card: PlaygroundCard, position: number) => void;
   /**
    * Called when the last card enters the viewport (YOY-146 AC-6): the page
@@ -88,14 +98,23 @@ export function ResultsGrid({
           data-testid="playground-grid"
         >
           {cards.map((card, index) => (
-            <Card
-              key={card.productId}
-              card={card}
-              position={index}
-              strings={strings}
-              labelPending={labelsPending?.has(card.productId) ?? false}
-              onOpen={onOpen}
-            />
+            <Fragment key={card.productId}>
+              {closeStarts?.has(card.productId) === true ? (
+                <li
+                  className="closeMatchesDivider"
+                  data-testid="playground-close-matches-divider"
+                >
+                  <h2 className="closeMatchesHeading">{closeHeading}</h2>
+                </li>
+              ) : null}
+              <Card
+                card={card}
+                position={index}
+                strings={strings}
+                labelPending={labelsPending?.has(card.productId) ?? false}
+                onOpen={onOpen}
+              />
+            </Fragment>
           ))}
         </ul>
       )}

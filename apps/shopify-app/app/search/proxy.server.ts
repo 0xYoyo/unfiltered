@@ -579,7 +579,10 @@ export interface ProxySearchResponse {
   chips: ProxyChip[];
   /** For the client to echo back as `previousIntent` on a follow-up. */
   intent: ProxyIntent | null;
-  /** Classic near-misses; present only on AI zero-hit responses. */
+  /**
+   * Classic near-misses on an AI zero-hit response; on an Engine v2 judged
+   * page with a match, the page's `close` products (YOY-166 AC-1).
+   */
   closeMatches?: ProxyResult[];
   /**
    * The constraints relaxed to fill `closeMatches` (YOY-111 AC-2), in
@@ -659,6 +662,32 @@ function serializeIntent(intent: Intent): ProxyIntent {
 }
 
 /**
+ * A judged page's close products, apart from its matches (YOY-166 AC-1):
+ * when the page holds at least one `exact` or `other-variant` product, its
+ * `close` products go under the "Close matches" divider, each group in the
+ * order it was served. Null — every card stays inline — on any other page:
+ * one with no match (the reject-all rule, YOY-147 AC-8), one with no close
+ * product, or one served without verdicts (find order, a judge timeout).
+ * A stand-in verdict (YOY-159) is no judgment and never moves a card.
+ */
+export function splitCloseVerdicts<
+  T extends { verdict?: string; standIn?: true },
+>(hits: readonly T[]): { matched: T[]; close: T[] } | null {
+  const judged = (hit: T) => hit.standIn !== true;
+  const isClose = (hit: T) => judged(hit) && hit.verdict === "close";
+  const hasMatch = hits.some(
+    (hit) => judged(hit) && (hit.verdict === "exact" || hit.verdict === "other-variant"),
+  );
+  if (!hasMatch || !hits.some(isClose)) {
+    return null;
+  }
+  return {
+    matched: hits.filter((hit) => !isClose(hit)),
+    close: hits.filter(isClose),
+  };
+}
+
+/**
  * Map an orchestrator response onto the wire contract. Explicit re-mapping
  * is the AC-5 guarantee: fields the contract does not name (routeReason and
  * anything added later) cannot reach a shopper.
@@ -681,6 +710,13 @@ export function serializeProxySearchResponse(
   if (response.closeMatches.length > 0) {
     body.closeMatches = response.closeMatches.map(serializeCard);
     body.closeMatchesRelaxed = [...response.closeMatchesRelaxed];
+  } else {
+    const split = splitCloseVerdicts(response.hits);
+    if (split !== null) {
+      body.results = split.matched.map(serializeCard);
+      body.closeMatches = split.close.map(serializeCard);
+      body.closeMatchesRelaxed = [];
+    }
   }
   // Only a paged response carries the page keys, so an unpaged one stays
   // byte-identical to the pre-paging contract (YOY-145 AC-5).

@@ -93,6 +93,17 @@
   margin-block: 16px 8px;
 }
 
+/* The "Close matches" divider inside a judged page's grid (YOY-166): one
+   full row of the theme's grid — CSS grid or flex-wrap — holding the same
+   plain heading, above the page's close products. */
+.unfiltered-native__close-matches-divider {
+  grid-column: 1 / -1;
+  flex: 0 0 100%;
+  width: 100%;
+  max-width: 100%;
+  list-style: none;
+}
+
 /* Color truthfulness (YOY-67 AC-5) carried onto native cards: the item is
    dimmed and labeled, so a color-unknown hit never poses as a confirmed
    match under a color chip. */

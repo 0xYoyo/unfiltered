@@ -12,7 +12,12 @@ import {
   parseHtml,
   sanitizeThemeMarkup,
 } from "./native-page";
-import { LABEL_TESTID, type Overlay, type ResponseHandlers } from "./overlay";
+import {
+  inlineCloseMatches,
+  LABEL_TESTID,
+  type Overlay,
+  type ResponseHandlers,
+} from "./overlay";
 import type {
   ProxyChip,
   ProxyLabel,
@@ -63,6 +68,9 @@ export const NATIVE_LOADING_TESTID = "unfiltered-native-loading";
 export const NATIVE_NO_RESULTS_TESTID = "unfiltered-native-no-results";
 export const NATIVE_ZERO_HIT_TESTID = "unfiltered-native-zero-hit";
 export const NATIVE_CLOSE_MATCHES_TESTID = "unfiltered-native-close-matches";
+/** The "Close matches" divider inside a judged page's grid (YOY-166 AC-2). */
+export const NATIVE_CLOSE_MATCHES_DIVIDER_TESTID =
+  "unfiltered-native-close-matches-divider";
 export const NATIVE_STYLE_ATTR = "data-unfiltered-native-style";
 
 /**
@@ -496,11 +504,19 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
     preview: boolean;
     total: number;
     pageSize: number;
-    pages: Map<number, Promise<ProxyResult[]>>;
+    pages: Map<number, Promise<HeldPage>>;
     /** Pages whose response had `labelsPending` (YOY-151 AC-8). */
     pendingLabels: Set<number>;
     /** Each pending page's labels, asked for once and held. */
     labelFetches: Map<number, Promise<Record<string, ProxyLabel | null>>>;
+  }
+  /**
+   * One page's cards: its results, and the close products that sit under
+   * the page's "Close matches" divider inside its grid (YOY-166).
+   */
+  interface HeldPage {
+    results: ProxyResult[];
+    closeMatches: ProxyResult[];
   }
   let current: HeldSearch | null = null;
   /** The 1-based page of that set currently on screen. */
@@ -517,20 +533,20 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
    * (AC-3), else requested once and held. A failed request is forgotten, so
    * selecting the page later asks again.
    */
-  function fetchPage(held: HeldSearch, page: number): Promise<ProxyResult[]> {
+  function fetchPage(held: HeldSearch, page: number): Promise<HeldPage> {
     const known = held.pages.get(page);
     if (known !== undefined) {
       return known;
     }
     const loader = held.handlers.pages;
     if (loader === undefined) {
-      return Promise.resolve([]);
+      return Promise.resolve({ results: [], closeMatches: [] });
     }
     const pending = loader.load(page).then((next) => {
       if (next.labelsPending === true) {
         held.pendingLabels.add(page);
       }
-      return next.results;
+      return { results: next.results, closeMatches: inlineCloseMatches(next) };
     });
     held.pages.set(page, pending);
     pending.catch(() => {
@@ -577,9 +593,9 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
         return;
       }
       fetchPage(held, next)
-        .then((results) =>
-          buildItems(
-            results,
+        .then((pageData) =>
+          buildPage(
+            pageData,
             held.handlers,
             (next - 1) * held.pageSize,
             labellingFor(held, next),
@@ -590,7 +606,7 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
             if (token !== renderToken || current !== held) {
               return;
             }
-            list.append(...built.items);
+            list.append(...built.elements);
             settleLabels(built.items);
             fillLateLabels(held, next, built.items, token);
             if (built.items.length > 0) {
@@ -789,6 +805,52 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
     return blocks[blocks.length - 1] ?? card.lastElementChild ?? card;
   }
 
+  /**
+   * One page's grid content (YOY-166 AC-2, AC-3): its results, then — when
+   * it carries close products — the "Close matches" divider and those
+   * products, inside the page's grid. The divider is a full-row list item,
+   * so the theme's own pagination and the appended pages each show it under
+   * their own results. `items` are the cards alone, in order.
+   */
+  async function buildPage(
+    pageData: HeldPage,
+    handlers: ResponseHandlers,
+    offset: number,
+    labelling: { pending: boolean } | null,
+  ): Promise<{
+    elements: HTMLLIElement[];
+    items: HTMLLIElement[];
+    native: number;
+    cached: number;
+  }> {
+    const [matched, close] = await Promise.all([
+      buildItems(pageData.results, handlers, offset, labelling),
+      buildItems(
+        pageData.closeMatches,
+        handlers,
+        offset + pageData.results.length,
+        labelling,
+      ),
+    ]);
+    const items = [...matched.items, ...close.items];
+    const totals = {
+      items,
+      native: matched.native + close.native,
+      cached: matched.cached + close.cached,
+    };
+    if (close.items.length === 0) {
+      return { elements: items, ...totals };
+    }
+    const divider = document.createElement("li");
+    divider.className = "unfiltered-native__close-matches-divider";
+    divider.setAttribute("data-testid", NATIVE_CLOSE_MATCHES_DIVIDER_TESTID);
+    const heading = document.createElement("h2");
+    heading.className = "unfiltered-native__close-matches-heading";
+    heading.textContent = strings.closeMatchesHeading;
+    divider.append(heading);
+    return { elements: [...matched.items, divider, ...close.items], ...totals };
+  }
+
   /** Build the grid items for a result list; resolves when every card is
    * ready so the grid swaps in one paint. */
   async function buildItems(
@@ -973,8 +1035,9 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
    * page links number 1 to ceil(totalCount / pageSize). A page not yet in
    * hand is requested from the server; one fetched before is shown again
    * without a request (AC-3). Only this page's cards are fetched or cloned
-   * (YOY-107 AC-4). Close matches belong to the zero-hit state, which by
-   * definition has a single page, so they are never paged (YOY-107 AC-5).
+   * (YOY-107 AC-4). A zero-hit state's close matches have a single page,
+   * so they are never paged (YOY-107 AC-5); a judged page's close products
+   * sit under its own divider inside its grid (YOY-166 AC-3).
    */
   async function renderPage(page: number): Promise<void> {
     if (current === null) {
@@ -1018,9 +1081,9 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
     // The page's results and the shell (first render only — cached
     // afterwards) are awaited together, then the cards, so the theme's page
     // and our grid appear in one paint.
-    let pageResults: ProxyResult[];
+    let pageData: HeldPage;
     try {
-      [pageResults] = await Promise.all([
+      [pageData] = await Promise.all([
         fetchPage(held, target),
         mirror.ready(),
       ]);
@@ -1036,8 +1099,8 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
       return; // Superseded while fetching.
     }
     const [built, builtMatches] = await Promise.all([
-      buildItems(
-        pageResults,
+      buildPage(
+        pageData,
         handlers,
         (target - 1) * pageSize,
         labellingFor(held, target),
@@ -1083,7 +1146,7 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
       ...chips.map((chip) => chipElement(chip, currency, handlers.onChipRemove)),
     );
     chipsRow.hidden = chips.length === 0 && reading === null;
-    list.replaceChildren(...built.items);
+    list.replaceChildren(...built.elements);
     // The heading names what was relaxed to find them (YOY-111 AC-4).
     closeMatchesHeading.textContent = closeMatchesHeadingText(
       strings,
@@ -1135,7 +1198,7 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
   ): void {
     ensureMounted();
     const pageSize = handlers.pages?.pageSize ?? config.page.pageSize;
-    const pages = new Map<number, Promise<ProxyResult[]>>();
+    const pages = new Map<number, Promise<HeldPage>>();
     let first = response.page ?? 1;
     const total = response.totalCount ?? response.results.length;
     if (response.totalCount === undefined) {
@@ -1144,13 +1207,20 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
       for (let page = 1; page <= count; page += 1) {
         pages.set(
           page,
-          Promise.resolve(
-            response.results.slice((page - 1) * pageSize, page * pageSize),
-          ),
+          Promise.resolve({
+            results: response.results.slice((page - 1) * pageSize, page * pageSize),
+            closeMatches: [],
+          }),
         );
       }
     } else {
-      pages.set(first, Promise.resolve(response.results));
+      pages.set(
+        first,
+        Promise.resolve({
+          results: response.results,
+          closeMatches: preview ? [] : inlineCloseMatches(response),
+        }),
+      );
     }
     const pendingLabels = new Set<number>(
       response.labelsPending === true ? [first] : [],

@@ -30,6 +30,9 @@ export const CHIPS_TESTID = "unfiltered-widget-chips";
 export const CHIP_TESTID = "unfiltered-widget-chip";
 export const ZERO_HIT_TESTID = "unfiltered-widget-zero-hit";
 export const CLOSE_MATCHES_TESTID = "unfiltered-widget-close-matches";
+/** The "Close matches" divider inside a judged page's grid (YOY-166 AC-2). */
+export const CLOSE_MATCHES_DIVIDER_TESTID =
+  "unfiltered-widget-close-matches-divider";
 export const NEW_SEARCH_TESTID = "unfiltered-widget-new-search";
 export const COLOR_NOTE_TESTID = "unfiltered-widget-color-note";
 export const PREVIEW_EMPTY_TESTID = "unfiltered-widget-preview-empty";
@@ -244,7 +247,8 @@ export function createOverlay(options: OverlayOptions): Overlay {
     if (pages === undefined || typeof IntersectionObserver === "undefined") {
       return;
     }
-    let shown = response.results.length;
+    let shown =
+      response.results.length + inlineCloseMatches(response).length;
     let nextPage = (response.page ?? 1) + 1;
     const watchLast = (): void => {
       const last = grid.lastElementChild;
@@ -267,19 +271,15 @@ export function createOverlay(options: OverlayOptions): Overlay {
             loadingMore.hidden = true;
             const offset = (page - 1) * pages.pageSize;
             const pending = waitsForLabels(next, handlers);
-            const appended = next.results.map((result, index) =>
-              card(result, offset + index, handlers.onCardClick, {
-                pending,
-              }),
-            );
-            grid.append(...appended);
-            settleLabels(appended);
+            const appended = pageCards(next, offset, handlers, pending);
+            grid.append(...appended.elements);
+            settleLabels(appended.cards);
             if (pending) {
-              fillLateLabels(appended, page, handlers, mine);
+              fillLateLabels(appended.cards, page, handlers, mine);
             }
-            shown += next.results.length;
+            shown += appended.cards.length;
             nextPage = page + 1;
-            if (next.results.length > 0) {
+            if (appended.cards.length > 0) {
               watchLast();
             }
           },
@@ -295,6 +295,37 @@ export function createOverlay(options: OverlayOptions): Overlay {
     };
     watchLast();
   };
+
+  /**
+   * One page's grid content (YOY-166 AC-2, AC-3): its results, then — when
+   * the page has matches and close products both — the "Close matches"
+   * divider and the close products, each still carrying its label. The
+   * divider spans the grid, so every appended page repeats it under its
+   * own results. Positions count on from the page's place in the order.
+   */
+  function pageCards(
+    page: ProxySearchResponse,
+    offset: number,
+    handlers: ResponseHandlers,
+    pending: boolean,
+  ): { elements: HTMLElement[]; cards: HTMLElement[] } {
+    const close = inlineCloseMatches(page);
+    const cards = [...page.results, ...close].map((result, index) =>
+      card(result, offset + index, handlers.onCardClick, { pending }),
+    );
+    if (close.length === 0) {
+      return { elements: cards, cards };
+    }
+    const divider = document.createElement("h2");
+    divider.className = "close-matches-heading grid-divider";
+    divider.setAttribute("data-testid", CLOSE_MATCHES_DIVIDER_TESTID);
+    divider.textContent = closeMatchesHeadingText(strings, page.closeMatchesRelaxed);
+    const split = page.results.length;
+    return {
+      elements: [...cards.slice(0, split), divider, ...cards.slice(split)],
+      cards,
+    };
+  }
 
   /** Whether this page's labels arrive later (YOY-151 AC-8). */
   function waitsForLabels(
@@ -629,10 +660,8 @@ export function createOverlay(options: OverlayOptions): Overlay {
       const offset =
         ((response.page ?? 1) - 1) * (handlers.pages?.pageSize ?? 0);
       const pending = waitsForLabels(response, handlers);
-      const cards = response.results.map((result, index) =>
-        card(result, offset + index, handlers.onCardClick, { pending }),
-      );
-      grid.replaceChildren(...cards);
+      const { elements, cards } = pageCards(response, offset, handlers, pending);
+      grid.replaceChildren(...elements);
       settleLabels(cards);
       appendPages(response, handlers);
       if (pending) {
@@ -690,4 +719,14 @@ export function createOverlay(options: OverlayOptions): Overlay {
       host.remove();
     },
   };
+}
+
+/**
+ * A page's close products that sit inside its grid under the divider
+ * (YOY-166): a judged page with matches carries them in `closeMatches`
+ * beside non-empty `results`. A zero-hit response's close matches (empty
+ * `results`) keep their own section below the grid.
+ */
+export function inlineCloseMatches(page: ProxySearchResponse): ProxyResult[] {
+  return page.results.length > 0 ? (page.closeMatches ?? []) : [];
 }

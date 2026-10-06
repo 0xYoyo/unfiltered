@@ -30,6 +30,22 @@ import {
   type PlaygroundLocale,
 } from "./strings";
 
+/** One shown page's cards: its results, then its close products (YOY-166). */
+interface ShownPage {
+  results: PlaygroundCard[];
+  close: PlaygroundCard[];
+}
+
+/**
+ * A page's close products that sit inside its grid under the divider
+ * (YOY-166): a judged page with matches carries them in `closeMatches`
+ * beside non-empty `results`. A zero-hit response's close matches (empty
+ * `results`) keep their own section below the grid.
+ */
+function inlineCloseMatches(page: PlaygroundSearchResponse): PlaygroundCard[] {
+  return page.results.length > 0 ? (page.closeMatches ?? []) : [];
+}
+
 /**
  * The playground page (YOY-92, extended by YOY-93 with the AI states).
  *
@@ -109,8 +125,9 @@ export function PlaygroundPage({
     null,
   );
   const [failed, setFailed] = useState(false);
-  // Cards appended from later pages (YOY-146 AC-6), below page 1's.
-  const [more, setMore] = useState<PlaygroundCard[]>([]);
+  // Pages appended below page 1's (YOY-146 AC-6), each with the close
+  // products under its own divider (YOY-166 AC-3).
+  const [more, setMore] = useState<ShownPage[]>([]);
   const [loadingMore, setLoadingMore] = useState(false);
   const pagingRef = useRef<PagingState | null>(null);
   // Late labels (YOY-151 AC-8): the cards whose page answered with
@@ -282,7 +299,7 @@ export function PlaygroundPage({
               ...(removedChips === undefined ? {} : { removedChips }),
               ...(previousQuery === null ? {} : { previousQuery }),
               nextPage: (next.page ?? 1) + 1,
-              shown: next.results.length,
+              shown: next.results.length + inlineCloseMatches(next).length,
               total: next.totalCount ?? next.results.length,
               loading: false,
               stopped: false,
@@ -373,11 +390,12 @@ export function PlaygroundPage({
         return;
       }
       state.nextPage += 1;
-      state.shown += next.results.length;
+      const close = inlineCloseMatches(next);
+      state.shown += next.results.length + close.length;
       if (next.results.length === 0) {
         state.stopped = true;
       }
-      setMore((shown) => [...shown, ...next.results]);
+      setMore((shown) => [...shown, { results: next.results, close }]);
       awaitLabels(next, false);
     } catch {
       if (pagingRef.current === state) {
@@ -537,18 +555,31 @@ export function PlaygroundPage({
   // untouched by any label (YOY-151 AC-9). Keystroke-preview cards — the
   // ones no click can be attributed to — carry no label at all (NG-2).
   const previewCards = attributableSearchId === null;
-  const cards = useMemo(
-    () =>
-      [...(response?.results ?? []), ...more].map((card) =>
-        previewCards
-          ? { ...card, label: null }
-          : card.productId in lateLabels
-            ? { ...card, label: lateLabels[card.productId] ?? null }
-            : card,
+  // A judged page's close products follow its results under a divider
+  // inside the grid (YOY-166 AC-2): `closeStarts` names each page's first.
+  const { cards, closeStarts } = useMemo(() => {
+    const pages: ShownPage[] =
+      response === null
+        ? []
+        : [{ results: response.results, close: inlineCloseMatches(response) }, ...more];
+    return {
+      cards: pages
+        .flatMap((page) => [...page.results, ...page.close])
+        .map((card) =>
+          previewCards
+            ? { ...card, label: null }
+            : card.productId in lateLabels
+              ? { ...card, label: lateLabels[card.productId] ?? null }
+              : card,
+        ),
+      closeStarts: new Set(
+        pages.flatMap((page) => (page.close.length === 0 ? [] : [page.close[0]!.productId])),
       ),
-    [response, more, lateLabels, previewCards],
-  );
-  const closeMatches = response?.closeMatches ?? [];
+    };
+  }, [response, more, lateLabels, previewCards]);
+  // A zero-hit response's close matches keep their own section (YOY-111).
+  const closeMatches =
+    response !== null && response.results.length === 0 ? (response.closeMatches ?? []) : [];
   const zeroHit =
     response !== null &&
     response.route === "ai" &&
@@ -708,6 +739,8 @@ export function PlaygroundPage({
           strings={strings}
           skeleton={phase === "loading" && cards.length === 0}
           labelsPending={labelsPending}
+          closeStarts={closeStarts}
+          closeHeading={closeMatchesHeadingText(strings, [])}
           onOpen={openCard}
           onLastCardVisible={appendNextPage}
         />

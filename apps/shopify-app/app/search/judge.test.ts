@@ -56,7 +56,12 @@ import {
   type SearchRequest,
 } from "./orchestrator.server";
 import { writeClickEvent, writeSearchEvent } from "./events.server";
-import { parseLabelsParams, serializeLabels, serializeProxySearchResponse } from "./proxy.server";
+import {
+  parseLabelsParams,
+  serializeLabels,
+  serializeProxySearchResponse,
+  splitCloseVerdicts,
+} from "./proxy.server";
 
 // The judge (YOY-147): the engine's prompt, schema and ordering as pure
 // units, then the whole v2 path on the embedded PGlite database — the real
@@ -1093,9 +1098,13 @@ describe("the judge on Engine v2 (on the database)", () => {
     expect(wire.results.map((result) => result.label)).toEqual([
       null,
       { template: "fact-differs", values: ["navy", "black"] },
-      { template: "close-match", values: [] },
     ]);
-    expect(wire.results).toHaveLength(3);
+    expect(wire.results).toHaveLength(2);
+    // The page has matches, so its close product sits under the divider (YOY-166 AC-1).
+    expect(wire.closeMatches?.map((result) => [result.productId, result.label])).toEqual([
+      ["p4", { template: "close-match", values: [] }],
+    ]);
+    expect(wire.closeMatchesRelaxed).toEqual([]);
     // The storefront wire carries no verdict (AC-12).
     expect(JSON.stringify(wire)).not.toContain("verdict");
     expect(JSON.stringify(wire)).not.toContain("not-relevant");
@@ -1230,6 +1239,101 @@ describe("the judge on Engine v2 (on the database)", () => {
     expect(serializeProxySearchResponse(response).results.map((result) => result.label)).toEqual(
       Array(4).fill({ template: "close-match", values: [] }),
     );
+  });
+
+  describe("close products under the divider (YOY-166 AC-1)", () => {
+    const wireShape = (response: Awaited<ReturnType<typeof search>>) => {
+      const wire = serializeProxySearchResponse(response);
+      return {
+        results: wire.results.map((result) => result.productId),
+        closeMatches: wire.closeMatches?.map((result) => [result.productId, result.label]),
+        closeMatchesRelaxed: wire.closeMatchesRelaxed,
+        page: wire.page,
+        totalCount: wire.totalCount,
+      };
+    };
+
+    it("mixed page: the close products leave `results` for `closeMatches`, each group in verdict order, page and total unchanged — judged and cached alike", async () => {
+      await seed(db, FOUR);
+      const llm = scriptedLlm([answer(["CDC", "C-C", "E-X", "VFF"], [{ n: 4, p: "navy", a: "black" }])]);
+      const engine = orchestrator(llm);
+      const paging = { paging: { page: 1, pageSize: 24 } };
+      const judged = await search(engine, paging);
+      const cached = await search(engine, paging);
+      expect(cached.routeReason).toBe("judge-cached");
+      for (const response of [judged, cached]) {
+        // Verdict order on the orchestrator is untouched (NG-1).
+        expect(response.hits.map((hit) => hit.productId)).toEqual(["p3", "p4", "p1", "p2"]);
+        expect(wireShape(response)).toEqual({
+          results: ["p3", "p4"],
+          closeMatches: [
+            ["p1", { template: "close-match", values: [] }],
+            ["p2", { template: "close-match", values: [] }],
+          ],
+          closeMatchesRelaxed: [],
+          page: 1,
+          totalCount: 4,
+        });
+      }
+    });
+
+    it("a stand-in verdict is no judgment: it never counts as a match and never moves", () => {
+      const hit = (productId: string, verdict: string, standIn?: true) => ({
+        productId,
+        verdict,
+        ...(standIn === true ? { standIn } : {}),
+      });
+      expect(splitCloseVerdicts([hit("a", "exact", true), hit("b", "close")])).toBeNull();
+      expect(
+        splitCloseVerdicts([hit("a", "other-variant"), hit("b", "close"), hit("c", "close", true)]),
+      ).toEqual({
+        matched: [hit("a", "other-variant"), hit("c", "close", true)],
+        close: [hit("b", "close")],
+      });
+      expect(splitCloseVerdicts([hit("a", "exact"), hit("b", "exact")])).toBeNull();
+    });
+
+    it("all-close page: no match on the page, so every card stays inline with its label", async () => {
+      await seed(db, FOUR);
+      const response = await search(orchestrator(scriptedLlm([answer(["C-C", "CDC", "C-C", "C-C"])])), {
+        paging: { page: 1, pageSize: 24 },
+      });
+      expect(response.routeReason).toBe("judged");
+      expect(wireShape(response)).toEqual({
+        results: ["p1", "p2", "p3", "p4"],
+        closeMatches: undefined,
+        closeMatchesRelaxed: undefined,
+        page: 1,
+        totalCount: 4,
+      });
+    });
+
+    it("reject-all page: every card inline with close-match, no divider (YOY-147 AC-8)", async () => {
+      await seed(db, FOUR);
+      const response = await search(orchestrator(scriptedLlm([answer(["N-X", "NDX", "N-X", "NBX"])])));
+      expect(wireShape(response).results).toEqual(["p1", "p2", "p3", "p4"]);
+      expect(wireShape(response).closeMatches).toBeUndefined();
+    });
+
+    it("judge-timeout page: find order, labels late, no divider", async () => {
+      await seed(db, FOUR);
+      const slow: LlmClient = {
+        completeStructured: () =>
+          new Promise((resolve) => setTimeout(() => resolve(answer(["C-C", "C-C", "E-X", "E-X"])), 200)),
+      };
+      const response = await search(orchestrator(slow, { deadlineMs: 20, giveUpMs: 400 }), {
+        paging: { page: 1, pageSize: 24 },
+      });
+      expect(response.routeReason).toBe("judge-timeout");
+      expect(wireShape(response)).toEqual({
+        results: ["p1", "p2", "p3", "p4"],
+        closeMatches: undefined,
+        closeMatchesRelaxed: undefined,
+        page: 1,
+        totalCount: 4,
+      });
+      await awaitPendingLabels(SHOP, response.searchId, 1);
+    });
   });
 
   it("makes no judge call under a throttle or a playground cap: find order, capped, classic route (AC-7, AC-11)", async () => {
