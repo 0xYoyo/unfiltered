@@ -438,6 +438,20 @@ test.describe("engine details (AC-5, verify 5)", () => {
     }
   });
 
+  test("an Engine v2 page lists the judge step's database work as judgeRows, before judge (YOY-159 AC-1)", async ({
+    page,
+  }) => {
+    await page.goto("/try?details=1");
+    await submit(page, "budget dress under 400 size m in stock not black");
+    const rows = page.getByTestId("playground-details-stages").locator("li");
+    await expect(rows).toHaveText([
+      "find · 71 ms",
+      "hydrate · 9 ms",
+      "judgeRows · 14 ms",
+      "judge · 688 ms",
+    ]);
+  });
+
   test("names the intent tier: lite on the AI fixture, none on a classic response (YOY-116 AC-3)", async ({
     page,
   }) => {

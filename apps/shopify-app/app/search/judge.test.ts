@@ -44,6 +44,7 @@ import {
   judgeRowCharsFromEnv,
   awaitPendingLabels,
   judgeCacheKey,
+  judgeCallTimes,
   judgeGiveUpMsFromEnv,
   loadJudgeCandidates,
   resetPendingLabels,
@@ -624,6 +625,58 @@ describe("the decision judge (YOY-152 AC-2, AC-3)", () => {
   });
 });
 
+describe("single call times (YOY-159 AC-1)", () => {
+  const DECIDED = {
+    verdict: { type: "choice", choice: "close" },
+    fact: { type: "yes-no", yes: 0.1 },
+    description: { type: "yes-no", yes: 0.7 },
+    excluded: { type: "yes-no", yes: 0.1 },
+  } as const;
+
+  it("the decision judge reports every product's call as it settles, answered or failed", async () => {
+    const page = [candidate("fast"), candidate("slow"), candidate("broken")];
+    const decisions: DecisionClient = {
+      async decide(request) {
+        const product = JSON.stringify(request.state);
+        await new Promise((resolve) => setTimeout(resolve, product.includes("slow") ? 40 : 5));
+        if (product.includes("broken")) {
+          throw new Error("upstream 503");
+        }
+        return DECIDED;
+      },
+    };
+    const times: number[] = [];
+    const answered = await createDecisionJudge({ decisions }).judge({
+      sentence: "dress",
+      candidates: page,
+      onCallSettled: (ms) => times.push(ms),
+    });
+    expect(answered.partial).toBe(true);
+    expect(times).toHaveLength(3);
+    // Settled in completion order: the slow one last.
+    expect(times[2]!).toBeGreaterThanOrEqual(35);
+    expect(Math.max(...times.slice(0, 2))).toBeLessThan(35);
+  });
+
+  it("the LLM judge reports its one call per attempt", async () => {
+    const times: number[] = [];
+    await createLlmJudge({ llm: scriptedLlm([answer(["E-X"])]) }).judge({
+      sentence: "dress",
+      candidates: [candidate("p1")],
+      onCallSettled: (ms) => times.push(ms),
+    });
+    expect(times).toHaveLength(1);
+  });
+
+  it("gives the slowest and the median, counting calls still running as the time they have run", () => {
+    expect(judgeCallTimes([30, 10, 20], 0, 999)).toEqual({ settled: 3, slowestMs: 30, medianMs: 20, open: false });
+    // Served on a deadline miss with two of four calls still running at 1,500 ms.
+    expect(judgeCallTimes([100.4, 200.6], 2, 1500)).toEqual({ settled: 2, slowestMs: 1500, medianMs: 1500, open: true });
+    expect(judgeCallTimes([100, 200, 300], 1, 1500)).toEqual({ settled: 3, slowestMs: 1500, medianMs: 300, open: true });
+    expect(judgeCallTimes([], 0, 0)).toBeNull();
+  });
+});
+
 describe("the one factory and its configuration (AC-1, AC-2, AC-6)", () => {
   it("selects the provider from JUDGE_PROVIDER, jev by default — the named winner (YOY-152 AC-9) — and builds only that client", async () => {
     expect(judgeProviderFromEnv({})).toBe("jev");
@@ -944,6 +997,8 @@ describe("the judge on Engine v2 (on the database)", () => {
         { productId: "p4", verdict: "close" },
         { productId: "p2", verdict: "not-relevant" },
       ],
+      // The LLM judge's one call for the page (YOY-159 AC-1).
+      calls: expect.objectContaining({ settled: 1, open: false }),
     });
     expect(Object.keys(playground.details.stages)).toContain("judge");
   });
@@ -1374,6 +1429,84 @@ describe("the judge on Engine v2 (on the database)", () => {
     expect(response.labelsPending).toBe(true);
     expect(await awaitPendingLabels(SHOP, response.searchId, 1)).toEqual({});
     expect(await db.judgeAnswer.count()).toBe(0);
+  });
+
+  describe("the judge stage split (YOY-159 AC-1)", () => {
+    /** A decision judge whose call for the product titled `slowTitle` takes `slowMs`. */
+    function decisionJudge(slowTitle: string, slowMs: number): Judge {
+      return createDecisionJudge({
+        identity: "jev:test",
+        decisions: {
+          async decide(request) {
+            const slow = JSON.stringify(request.state).includes(slowTitle);
+            await new Promise((resolve) => setTimeout(resolve, slow ? slowMs : 5));
+            return {
+              verdict: { type: "choice", choice: "exact" },
+              fact: { type: "yes-no", yes: 0.1 },
+              description: { type: "yes-no", yes: 0.1 },
+              excluded: { type: "yes-no", yes: 0.1 },
+            };
+          },
+        },
+      });
+    }
+
+    const playgroundOf = (response: Awaited<ReturnType<SearchOrchestrator["runSearch"]>>) =>
+      serializePlaygroundSearchResponse(response, {
+        routeReason: response.routeReason,
+        latencyMs: 1,
+        limited: null,
+        stages: response.stages,
+        intentTier: response.intentTier,
+        engine: response.engine,
+      });
+
+    it("judged: judgeRows beside judge, and the slowest and median call in the playground details only", async () => {
+      await seed(db, FOUR);
+      const response = await search(orchestrator(undefined, { judge: decisionJudge("Black Maxi", 60) }));
+      expect(response.routeReason).toBe("judged");
+      expect(Object.keys(response.stages)).toEqual(["find", "hydrate", "judgeRows", "judge"]);
+      expect(response.stages.judge!).toBeGreaterThanOrEqual(55);
+      const calls = playgroundOf(response).details.judge!.calls!;
+      expect(calls.settled).toBe(4);
+      expect(calls.open).toBe(false);
+      expect(calls.slowestMs).toBeGreaterThanOrEqual(55);
+      expect(calls.medianMs).toBeLessThan(55);
+      // No change to the storefront wire.
+      const wire = JSON.stringify(serializeProxySearchResponse(response));
+      expect(wire).not.toContain("judgeRows");
+      expect(wire).not.toContain("slowestMs");
+    });
+
+    it("judge-timeout: the calls still running count as the time they had run, marked open", async () => {
+      await seed(db, FOUR);
+      const response = await search(
+        orchestrator(undefined, { judge: decisionJudge("Black Maxi", 300), deadlineMs: 80, giveUpMs: 2_000 }),
+      );
+      expect(response.routeReason).toBe("judge-timeout");
+      expect(Object.keys(response.stages)).toEqual(["find", "hydrate", "judgeRows", "judge"]);
+      const calls = playgroundOf(response).details.judge!.calls!;
+      expect(calls).toMatchObject({ settled: 3, open: true });
+      expect(calls.slowestMs).toBeGreaterThanOrEqual(75);
+      expect(calls.slowestMs).toBeLessThan(300);
+      expect(calls.medianMs).toBeLessThan(75);
+    });
+
+    it("judge-cached: judgeRows and judge, no calls; find-only: neither", async () => {
+      await seed(db, FOUR);
+      const engine = orchestrator(undefined, { judge: decisionJudge("Black Maxi", 5) });
+      await search(engine);
+      const cached = await search(engine);
+      expect(cached.routeReason).toBe("judge-cached");
+      expect(Object.keys(cached.stages)).toEqual(["find", "hydrate", "judgeRows", "judge"]);
+      expect(cached).not.toHaveProperty("judgeCalls");
+      expect(playgroundOf(cached).details.judge!.calls).toBeNull();
+
+      const findOnly = await search(orchestrator(undefined));
+      expect(findOnly.routeReason).toBe("find-only");
+      expect(Object.keys(findOnly.stages)).toEqual(["find", "hydrate"]);
+      expect(playgroundOf(findOnly).details.judge!.calls).toBeNull();
+    });
   });
 
   it("leaves labelsPending off the wire when the judge answered in time", async () => {

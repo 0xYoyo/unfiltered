@@ -3,6 +3,7 @@ import type { PrismaClient } from "@prisma/client";
 import { PLAYGROUND_STORE_KEY_PREFIX } from "./ingest-public.server";
 import type { IntentTier, JudgeVerdictCode } from "@unfiltered/engine";
 
+import type { JudgeCallTimes } from "../search/judge-step.server";
 import {
   SEARCH_STAGES,
   type SearchEngine,
@@ -85,6 +86,12 @@ export interface PlaygroundSearchDetails {
 export interface PlaygroundJudgeDetails {
   outcome: V2RouteReason;
   verdicts: Array<{ productId: string; verdict: JudgeVerdictCode | null }>;
+  /**
+   * The judge call's single provider calls as the page was served (YOY-159
+   * AC-1): the slowest and the median, lower bounds when `open`. Null when
+   * no call started — a cached answer, find-only, capped.
+   */
+  calls: JudgeCallTimes | null;
 }
 
 /** The playground response: the proxy contract plus `details`, nothing else. */
@@ -146,6 +153,7 @@ function judgeDetails(response: SearchResponse): PlaygroundJudgeDetails | null {
       productId: hit.productId,
       verdict: hit.verdict ?? null,
     })),
+    calls: response.judgeCalls ?? null,
   };
 }
 

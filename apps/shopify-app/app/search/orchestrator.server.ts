@@ -29,6 +29,7 @@ import {
   DEFAULT_JUDGE_DEADLINE_MS,
   DEFAULT_JUDGE_GIVE_UP_MS,
   runJudgeStep,
+  type JudgeCallTimes,
 } from "./judge-step.server";
 import { SEARCH_STAGES, type SearchStage, type SearchStages } from "./stages";
 import {
@@ -507,6 +508,12 @@ export interface SearchResponse {
    * render it as one chip. Absent when there is none.
    */
   otherReading?: string;
+  /**
+   * The judge call's single provider calls as the page was served (YOY-159
+   * AC-1). Diagnostic — the playground shows it; never on the storefront
+   * contract. Absent when no judge call started.
+   */
+  judgeCalls?: JudgeCallTimes;
 }
 
 /** Refinements a carry keeps after the chain's first sentence (YOY-150 AC-3). */
@@ -808,6 +815,7 @@ export function createSearchOrchestrator(
     let routeReason: V2RouteReason;
     let judgeStarted = false;
     let labelsPending = false;
+    let judgeCalls: JudgeCallTimes | null = null;
     let otherReading: string | null = null;
     let hits = cards;
     if (request.forceClassic === true) {
@@ -815,8 +823,8 @@ export function createSearchOrchestrator(
     } else if (judge === undefined || judgedPart.length === 0) {
       routeReason = "find-only";
     } else {
-      const judged = await stages.time("judge", () =>
-        runJudgeStep({
+      const judgeStartedAt = performance.now();
+      const judged = await runJudgeStep({
           judge,
           db,
           shopDomain: request.shopDomain,
@@ -831,8 +839,11 @@ export function createSearchOrchestrator(
           // A removed `exclude` chip is not applied through the judge either (AC-15).
           applyExcluded: !removedChips.some((chip) => chip.field === "exclude"),
           codeLabels,
-        }),
-      );
+        });
+      // The step's database time apart from its call's (YOY-159 AC-1).
+      stages.add("judgeRows", judged.rowsMs);
+      stages.add("judge", Math.max(0, performance.now() - judgeStartedAt - judged.rowsMs));
+      judgeCalls = judged.calls;
       routeReason = judged.outcome;
       judgeStarted = judged.started;
       labelsPending = judged.labelsPending;
@@ -869,6 +880,7 @@ export function createSearchOrchestrator(
       extractionCached: settled?.cached === true,
       carry: nextCarry(request.query, previousQuery, extracted?.refines ?? null),
       ...(otherReading !== null ? { otherReading } : {}),
+      ...(judgeCalls !== null ? { judgeCalls } : {}),
     };
   }
 

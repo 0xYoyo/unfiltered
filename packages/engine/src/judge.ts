@@ -112,6 +112,12 @@ export interface JudgeRequest {
   searchId?: string;
   /** Aborts the call (the caller's deadline, AC-6). */
   signal?: AbortSignal;
+  /**
+   * Diagnostics (YOY-159 AC-1): told each single provider call's duration
+   * in ms as it settles, answered or failed. The decision judge makes one
+   * call per candidate; the LLM judge one per attempt for the page.
+   */
+  onCallSettled?: (ms: number) => void;
 }
 
 /** The judge's answer for one candidate. */
@@ -499,15 +505,18 @@ export function createLlmJudge(options: LlmJudgeOptions): Judge {
         request.previousSentence,
       );
       for (let attempt = 1; attempt <= 2; attempt += 1) {
-        const answer = await llm.completeStructured({
-          prompt,
-          schema: JUDGE_SCHEMA,
-          operation: "judge",
-          temperature: 0,
-          storeId: request.storeId,
-          searchId: request.searchId,
-          signal: request.signal,
-        });
+        const startedAt = performance.now();
+        const answer = await llm
+          .completeStructured({
+            prompt,
+            schema: JUDGE_SCHEMA,
+            operation: "judge",
+            temperature: 0,
+            storeId: request.storeId,
+            searchId: request.searchId,
+            signal: request.signal,
+          })
+          .finally(() => request.onCallSettled?.(performance.now() - startedAt));
         const parsed = parseJudgeAnswer(answer, request.candidates);
         if (parsed !== null) {
           return parsed;
@@ -652,8 +661,9 @@ export function createDecisionJudge(options: DecisionJudgeOptions): Judge {
         ]),
       );
       const settled = await Promise.allSettled(
-        request.candidates.map((candidate) =>
-          decisions.decide({
+        request.candidates.map((candidate) => {
+          const startedAt = performance.now();
+          return decisions.decide({
             state: {
               ...(previous !== undefined ? { previous_search: previous } : {}),
               search: oneLine(request.sentence),
@@ -664,8 +674,8 @@ export function createDecisionJudge(options: DecisionJudgeOptions): Judge {
             storeId: request.storeId,
             searchId: request.searchId,
             signal: request.signal,
-          }),
-        ),
+          }).finally(() => request.onCallSettled?.(performance.now() - startedAt));
+        }),
       );
       if (request.signal?.aborted) {
         throw request.signal.reason ?? new Error("judge aborted");

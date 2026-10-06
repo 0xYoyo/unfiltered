@@ -30,7 +30,10 @@
  * composed without the wish extraction (`no-extraction`). A last line
  * gives the judge stage over every set (YOY-154 AC-8): its p50/p95 and how
  * many searches ended `judged`, `judge-cached`, `judge-timeout` or
- * `judge-error`.
+ * `judge-error` — and the split (YOY-159 AC-1): the `judgeRows` stage (the
+ * step's database work) and each search's slowest and median single judge
+ * call, lower bounds on a search served before every call settled. Each
+ * sample line carries its own rows and call times.
  *
  * Exit 1 on any asserted breach or any failed request; exit 0 otherwise.
  */
@@ -236,6 +239,19 @@ export interface ProbeSample {
   extractionInTime: boolean | null;
   /** Whether the extraction cache answered (YOY-149 AC-18); null where `extractionInTime` is. */
   extractionCached: boolean | null;
+  /**
+   * The judge call's slowest and median single provider call as the page
+   * was served (YOY-159 AC-1); lower bounds when `open`. Null when no judge
+   * call started.
+   */
+  judgeCalls: ProbeJudgeCalls | null;
+}
+
+/** `details.judge.calls` of a playground response (YOY-159 AC-1). */
+export interface ProbeJudgeCalls {
+  slowestMs: number;
+  medianMs: number;
+  open: boolean;
 }
 
 export interface SetSummary {
@@ -333,6 +349,26 @@ export interface JudgeSummary {
   outcomes: Record<(typeof JUDGE_OUTCOMES)[number], number>;
   /** Share of all samples served `judge-error`, 0–1. */
   errorShare: number;
+  /** p50/p95 of the `judgeRows` stage — the step's database work (YOY-159 AC-1); null when none reported it. */
+  rows: Spread | null;
+  /** p50/p95 of each search's slowest and median single call (YOY-159 AC-1); null when no call started. */
+  slowestCall: Spread | null;
+  medianCall: Spread | null;
+  /** Samples served before every call settled: their call times are lower bounds. */
+  openCalls: number;
+}
+
+/** Nearest-rank p50/p95 of a measure over the samples that reported it. */
+export interface Spread {
+  p50: number;
+  p95: number;
+}
+
+function spread(values: readonly (number | undefined)[]): Spread | null {
+  const reported = values.filter((value): value is number => value !== undefined);
+  return reported.length === 0
+    ? null
+    : { p50: percentile(reported, 50), p95: percentile(reported, 95) };
 }
 
 /**
@@ -359,14 +395,26 @@ export function summarizeJudge(samples: readonly ProbeSample[]): JudgeSummary | 
     p95: percentile(timed, 95),
     outcomes,
     errorShare: outcomes["judge-error"] / samples.length,
+    rows: spread(samples.map((sample) => sample.stages.judgeRows)),
+    slowestCall: spread(samples.map((sample) => sample.judgeCalls?.slowestMs)),
+    medianCall: spread(samples.map((sample) => sample.judgeCalls?.medianMs)),
+    openCalls: samples.filter((sample) => sample.judgeCalls?.open === true).length,
   };
 }
 
 export function formatJudgeSummary(summary: JudgeSummary): string {
   const outcomes = JUDGE_OUTCOMES.map((outcome) => `${outcome}=${summary.outcomes[outcome]}`).join(" ");
+  const part = (name: string, value: Spread | null) =>
+    value === null ? "" : ` ${name} p50=${value.p50} ms p95=${value.p95} ms`;
   return (
     `[judge, all sets] n=${summary.n} p50=${summary.p50} ms p95=${summary.p95} ms` +
-    ` judge-error=${Math.round(summary.errorShare * 1000) / 10}% outcomes: ${outcomes}`
+    ` judge-error=${Math.round(summary.errorShare * 1000) / 10}% outcomes: ${outcomes}` +
+    // The split (YOY-159 AC-1): database work, then the call's slowest and
+    // median single provider call per search.
+    part("| judgeRows", summary.rows) +
+    part("| slowest call", summary.slowestCall) +
+    part("| median call", summary.medianCall) +
+    (summary.slowestCall === null ? "" : ` (served before every call settled: ${summary.openCalls})`)
   );
 }
 
@@ -382,11 +430,16 @@ export function formatSampleLine(
   query: string,
 ): string {
   const judged = (JUDGE_OUTCOMES as readonly string[]).includes(sample.routeReason);
+  const calls = sample.judgeCalls;
+  // A call still running when the page was served ran at least this long.
+  const atLeast = calls?.open === true ? "≥" : "";
   return (
     `${sample.set} run ${run}/${runs} ${sample.latencyMs} ms ${sample.route}` +
     `${sample.degraded ? " degraded" : ""}${sample.limited !== null ? ` limited=${sample.limited}` : ""}` +
     `${sample.routeReason === "intent-reuse" ? " REUSED" : ""}` +
     `${judged ? ` ${sample.routeReason}` : ""}` +
+    `${sample.stages.judgeRows !== undefined ? ` rows=${sample.stages.judgeRows} ms` : ""}` +
+    `${calls == null ? "" : ` calls slowest=${atLeast}${calls.slowestMs} ms median=${atLeast}${calls.medianMs} ms`}` +
     ` ${sample.searchId} "${query}"`
   );
 }
@@ -485,6 +538,7 @@ interface PlaygroundBody {
     stages: Record<string, number>;
     extractionInTime?: boolean | null;
     extractionCached?: boolean | null;
+    judge?: { calls?: ProbeJudgeCalls | null } | null;
   };
 }
 
@@ -530,6 +584,7 @@ async function probeOnce(
     stages: body.details.stages ?? {},
     extractionInTime: body.details.extractionInTime ?? null,
     extractionCached: body.details.extractionCached ?? null,
+    judgeCalls: body.details.judge?.calls ?? null,
   };
 }
 

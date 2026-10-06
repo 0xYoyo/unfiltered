@@ -64,7 +64,8 @@
     "stages": {
       "find": 71,
       "hydrate": 9,
-      "judge": 702
+      "judgeRows": 14,
+      "judge": 688
     },
     "intentTier": null,
     "engine": "v2",
