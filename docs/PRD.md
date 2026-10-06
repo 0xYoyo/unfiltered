@@ -1,5 +1,5 @@
 # Unfiltered — PRD
-Version: 3.3 · Date: 2026-10-04
+Version: 3.4 · Date: 2026-10-06
 Supersedes v2; decisions in docs/RESET-2026-09-27.md. Refinements of
 2026-09-30 in §3 Engine v2 (binding where they differ from the text above
 them). Amendments of 2026-10-01 (budget rules, hidden-set home, label values,
@@ -12,6 +12,7 @@ v3.2 (2026-10-03, YOY-149): the 2026-10-01 amendments are version-bound —
 6: on judge failure the page keeps the code-computed price, size and stock
 labels.
 v3.3 (2026-10-04, YOY-152): the judge comparison was measured and decided — Jev (TypeSafe, via OpenRouter) is the default judge and Gemini 3.5 Flash-Lite the selectable fallback; measured judge costs replace the estimates in §3 and §8; the merchant-fact label and the two-meanings chip are dormant under Jev (YOY-158).
+v3.4 (2026-10-06, M6 live run; YOY-163, YOY-166, YOY-168, YOY-156): §3 Refinement 4 — price labels carry no numbers and the size label is short; §3 Refinements 17–18 — a "not relevant" product is dropped from a page that has anything better, and "close" products sit under the "Close matches" heading when the page has real matches, with no label of their own; §8 and §10 — the tiers were re-validated after the judge comparison and stand unchanged.
 
 Product type: B2B web SaaS, delivered first as a native Shopify app
 (self-serve). The engine is catalog-agnostic by design: a universal script
@@ -219,8 +220,7 @@ actual facts. (docs/RESET-2026-09-27.md §2–§3.)
   value, or two for the merchant-fact label (the product's value and the asked
   value, each at most three words, in the language of the shopper's sentence;
   amended 2026-10-01). The label text a shopper sees comes from about five
-  templates ("in grey, not black"; "no M — S and L in stock"; "₪319, slightly
-  over 300"); size, stock and price labels are computed by code from the
+  templates ("in grey, not black"; "size M not in stock"; "slightly over budget" — price labels carry no numbers, v3.4); size, stock and price labels are computed by code from the
   variants table, not by the judge. Runs on the page being viewed, at the
   store's page size (24 candidates on page 1 by default); page 2 is judged
   when the shopper nears the end of page 1, never in the background. Judge
@@ -317,10 +317,7 @@ Agreed in the co-manager plan review of 29–30 Sep 2026. Numbers marked
    price labels are computed by code from the variants table, never by the
    judge. The judge judges the description side only. A stock or price
    change therefore does not invalidate a cached judge answer.
-4. **Label templates per kind of miss.** About five templates in total: a
-   number missed ("₪319, over your 300"; "no M — S and L in stock"), a
-   merchant fact missed ("in grey, not black"), a description missed (one
-   generic "close match" line). Exclusions are filtered out, never labelled.
+4. **Label templates per kind of miss.** About five templates in total: a number missed — a price label carries no numbers ("slightly over budget" within the near band, "over budget" beyond it; the shopper's cap is on the chip and the product's price is on the card), a size label is short ("size M not in stock") — a merchant fact missed ("in grey, not black"), a description missed (one generic "close match" line). A label is one line, always, and is hidden entirely when it does not fit (founder design call 2026-10-06, YOY-168). Exclusions are filtered out, never labelled.
    Templates are translated once per shipped language and are the one
    permitted per-language asset (amends "no per-language code"); a language
    without templates shows no label.
@@ -372,6 +369,8 @@ Agreed in the co-manager plan review of 29–30 Sep 2026. Numbers marked
 16. **Theme-native label placement** is a docs/DESIGN.md decision inside M6
     (a small muted line under the price, inheriting the theme; nothing when
     it does not fit).
+17. **Not relevant is dropped (2026-10-06, YOY-163).** A product the judge marks "not relevant" is dropped from a page that holds anything better, as an excluded product is; the page may come out short, and the count still counts the find order. Refinement 8 stands for the page where every candidate is "not relevant": all shown, in find order, with the generic label. A product whose judge call failed or timed out is never dropped: it stays on the page, last, with no label.
+18. **Close matches under a heading (founder decision 2026-10-06, YOY-166).** When a page holds at least one product the judge marks exact or the same item in another colour or size, the "close" products sit below the existing "Close matches" heading, not inline, in their verdict order, and carry no label of their own: the heading is the label (YOY-168). A page with no exact product is unchanged (every card inline, labelled).
 
 ### Quality gate (v3, 2026-09-28, binding)
 
@@ -555,13 +554,11 @@ Model spend: Gemini first; every spend ceiling is proposed with its expected cos
 
 Tiers: **$39** (10K AI searches, catalogs up to 1K products) / **$99**
 (50K, up to 5K products) / **$249** (200K, up to 20K products); larger
-catalogs are enterprise inquiries. Overage $2 per additional 1,000 AI
-searches — re-validated after the M6 judge comparison (RESET §4); hard cap + fallback beyond a store-configurable ceiling. 14-day trial, card required, 1,000 AI-search
+catalogs are enterprise inquiries. Overage $2 per additional 1,000 AI searches — re-validated on 2026-10-06 after the M6 judge comparison (RESET §4) and unchanged: the Jev judge measures ≈ $0.82 per 1,000 uncached searches (YOY-152), so the typical store (20,000 searches) clears the 60 % target before the answer cache, while a tier used to its full allowance does not — the cache hit rate, measured on the live tail, decides the tier limits (unit economics below); hard cap + fallback beyond a store-configurable ceiling. 14-day trial, card required, 1,000 AI-search
 trial cap. Anchors: Boost $29–299 (product-count based, free plan),
 Cartally $59/$209/$499 (+$1/1K overage), Searchanise from $19. Pricing is
 an experiment: v1 measures real cost-per-search, and tier limits/prices
-may be revised at version bumps. Tiers are re-validated after the M6
-judge comparison and scale with catalog size and search volume.
+may be revised at version bumps. Tiers were re-validated after the M6 judge comparison (2026-10-06, unchanged) and scale with catalog size and search volume.
 
 Unit economics (typical store: 10k products, 20k searches/month; to be
 validated by measurement):
@@ -572,7 +569,7 @@ validated by measurement):
 - Judge, uncached, measured 2026-10-04 (YOY-152) at the typical store's 20,000 searches a month: Jev ≈ $16, Flash-Lite ≈ $45 (judge only). The answer cache cuts both; the real cache hit rate is measured on the live tail.
 - Hosting share $5–10.
 - At $99/month for the typical store above (20k searches), before cache, estimates from the measured judge cost plus $5–10 hosting: Jev judge ≈ 74–79 % margin; Flash-Lite judge ≈ 44–49 %. At the tier's full allowance (50k searches) Jev ≈ 48–54 % and Flash-Lite falls below zero — which is why Jev is the default (YOY-152, 2026-10-04) and the cache hit rate decides the tier limits. 500-product store ≈ $3–10/month cost. 200k-product/500k-search store → enterprise tier. Pricing tiers by catalog size and search volume.
-- Gross margin target: ≥60% per tier — re-validated after the M6 judge comparison (RESET §4); measured, not assumed.
+- Gross margin target: ≥60% per tier — re-validated after the M6 judge comparison (2026-10-06, RESET §4): met on the measured Jev cost at the typical store (74–79 %), not at a tier's full allowance before the cache ($99 at 50k searches ≈ 48–54 %, $249 at 200k ≈ 30 %); the cache hit rate is measured on the live tail, not assumed.
 - Monthly profit scenarios at avg. $60/store revenue and 65% margin:
   pessimistic (30 stores): ~$1.2K; realistic (150 stores): ~$5.9K; good
   (500 stores): ~$19.5K — plus enterprise upsell path outside v1.
@@ -634,8 +631,7 @@ catalog-agnostic architecture and playground were kept for exactly this.
 1. ≥100 installs and ≥30 paying stores within 6 months of App Store
    listing going live.
 2. Trial→paid conversion ≥25%.
-3. Measured blended AI cost ≤ $2 per 1,000 AI searches — re-validated
-   after the M6 judge comparison (RESET §4); gross margin ≥60%.
+3. Measured blended AI cost ≤ $2 per 1,000 AI searches — re-validated after the M6 judge comparison (2026-10-06, RESET §4): the Jev judge measures ≈ $0.82 per 1,000 uncached searches, under the bar; gross margin ≥60%.
 4. Across active stores: judged-search click-through rate exceeds the
    store's previous search CTR on the same stores (the engine visibly
    outperforms).
