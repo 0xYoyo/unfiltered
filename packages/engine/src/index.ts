@@ -133,6 +133,7 @@ export {
   previousChainLine,
   sentenceHasNumber,
   sentenceHasText,
+  sentenceNegates,
   statedCurrency,
   wishesText,
   type ExcludedTerm,
