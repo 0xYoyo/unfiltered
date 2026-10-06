@@ -228,6 +228,8 @@ export interface JudgeStepItem<T> {
   /** Null when the judge did not answer for the page. */
   verdict: JudgeVerdictCode | null;
   label: JudgeLabel | null;
+  /** The verdict stands in for a call that never answered (YOY-159). */
+  standIn?: true;
 }
 
 export interface JudgeStepResult<T> {

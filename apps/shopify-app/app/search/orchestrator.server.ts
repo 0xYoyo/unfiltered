@@ -422,6 +422,11 @@ export interface ProductCard {
    * judge did not answer for the card.
    */
   verdict?: JudgeVerdictCode;
+  /**
+   * The verdict stands in for a call that never answered (YOY-159):
+   * diagnostic, for the playground's details only.
+   */
+  standIn?: true;
 }
 
 /** The single response shape every orchestrated search resolves to. */
@@ -850,10 +855,11 @@ export function createSearchOrchestrator(
       // The second reading is offered on page 1 only (AC-7).
       otherReading = page === 1 ? judged.otherReading : null;
       hits = [
-        ...judged.items.map(({ item, verdict, label }) => ({
+        ...judged.items.map(({ item, verdict, label, standIn }) => ({
           ...item,
           label,
           ...(verdict !== null ? { verdict } : {}),
+          ...(standIn === true ? { standIn } : {}),
         })),
         ...tail,
       ];

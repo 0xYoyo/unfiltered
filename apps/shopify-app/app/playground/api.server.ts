@@ -85,7 +85,8 @@ export interface PlaygroundSearchDetails {
 /** The judge's part of the playground details (YOY-147 AC-12). */
 export interface PlaygroundJudgeDetails {
   outcome: V2RouteReason;
-  verdicts: Array<{ productId: string; verdict: JudgeVerdictCode | null }>;
+  /** `standIn` marks a verdict that stands in for a call that never answered (YOY-159). */
+  verdicts: Array<{ productId: string; verdict: JudgeVerdictCode | null; standIn?: true }>;
   /**
    * The judge call's single provider calls as the page was served (YOY-159
    * AC-1): the slowest and the median, lower bounds when `open`. Null when
@@ -152,6 +153,7 @@ function judgeDetails(response: SearchResponse): PlaygroundJudgeDetails | null {
     verdicts: response.hits.map((hit) => ({
       productId: hit.productId,
       verdict: hit.verdict ?? null,
+      ...(hit.standIn === true ? { standIn: true as const } : {}),
     })),
     calls: response.judgeCalls ?? null,
   };

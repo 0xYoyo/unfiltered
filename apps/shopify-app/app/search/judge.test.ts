@@ -412,6 +412,33 @@ describe("verdict order (AC-5, AC-8)", () => {
     expect(ordered.every((entry) => entry.verdict === "exact" && entry.label === null)).toBe(true);
   });
 
+  it("keeps a stand-in verdict on the page, last and unlabelled, and drops only judged not-relevant products (YOY-159)", () => {
+    const standIn = (id: string) => ({ ...verdict(id, "not-relevant"), standIn: true as const });
+    const ordered = orderByVerdict(
+      ["a", "b", "c", "d"],
+      [standIn("a"), verdict("b", "not-relevant"), verdict("c", "exact"), verdict("d", "close")],
+    );
+    expect(ordered.map((entry) => [entry.item, entry.verdict, entry.label?.template ?? null, entry.standIn ?? false])).toEqual([
+      ["c", "exact", null, false],
+      ["d", "close", null, false],
+      ["a", "not-relevant", null, true],
+    ]);
+  });
+
+  it("serves a page of only stand-ins in find order with no labels, and never counts stand-ins toward reject-all (YOY-159)", () => {
+    const standIn = (id: string) => ({ ...verdict(id, "not-relevant"), standIn: true as const });
+    const allStandIns = orderByVerdict(["a", "b", "c"], [standIn("a"), standIn("b"), standIn("c")]);
+    expect(allStandIns.map((entry) => entry.item)).toEqual(["a", "b", "c"]);
+    expect(allStandIns.every((entry) => entry.label === null && entry.standIn === true)).toBe(true);
+    // Every real verdict not relevant: the reject-all page, the stand-in kept unlabelled.
+    const rejectAll = orderByVerdict(["a", "b", "c"], [verdict("a", "not-relevant"), standIn("b"), verdict("c", "not-relevant")]);
+    expect(rejectAll.map((entry) => [entry.item, entry.label?.template ?? null])).toEqual([
+      ["a", "close-match"],
+      ["b", null],
+      ["c", "close-match"],
+    ]);
+  });
+
   it("still serves all 24 with close-match when every product is not relevant (YOY-163 AC-4)", () => {
     const ids = Array.from({ length: 24 }, (_, index) => `p${index}`);
     const ordered = orderByVerdict(ids, ids.map((id) => verdict(id, "not-relevant")));
@@ -603,7 +630,8 @@ describe("the decision judge (YOY-152 AC-2, AC-3)", () => {
     });
     expect(whole).not.toHaveProperty("partial");
     // "d" answered an unknown choice: invalid, read as not relevant too.
-    expect(answered.verdicts[1]).toEqual({ id: "b", verdict: "not-relevant", missed: [], label: null, excluded: false });
+    // A stand-in for the failed call, never a judgment (YOY-159).
+    expect(answered.verdicts[1]).toEqual({ id: "b", verdict: "not-relevant", missed: [], label: null, excluded: false, standIn: true });
   });
 
   it("returns close-match where Flash-Lite writes fact-differs, which Jev cannot write (AC-3)", async () => {
@@ -1338,8 +1366,9 @@ describe("the judge on Engine v2 (on the database)", () => {
 
     const first = await search(engine);
     expect(first).toMatchObject({ route: "ai", routeReason: "judged" });
-    // The failed product reads not relevant, so it is dropped from the page (YOY-163).
-    expect(first.hits.find((hit) => hit.productId === "p2")).toBeUndefined();
+    // The failed product's stand-in verdict keeps it on the page, last and
+    // unlabelled (YOY-159); the products judged not relevant are dropped.
+    expect(first.hits.at(-1)).toMatchObject({ productId: "p2", verdict: "not-relevant", standIn: true, label: null });
     expect(first.hits[0]!.productId).toBe("p3");
     expect(await db.judgeAnswer.count()).toBe(0);
 
@@ -1631,9 +1660,13 @@ describe("the judge on Engine v2 (on the database)", () => {
       const response = await search(orchestrator(undefined, { judge, deadlineMs: 200, giveUpMs: 2_000 }));
       expect(response.routeReason).toBe("judged");
       expect(response).not.toHaveProperty("labelsPending");
-      // The straggler reads as not relevant: last on the page.
-      expect(response.hits.at(-1)!.productId).toBe("p4");
-      expect(response.hits.at(-1)!.verdict).toBe("not-relevant");
+      // The straggler's stand-in keeps it on the page, last and unlabelled
+      // (YOY-159): a slow call never removes a product.
+      expect(response.hits).toHaveLength(4);
+      expect(response.hits.at(-1)).toMatchObject({ productId: "p4", verdict: "not-relevant", standIn: true, label: null });
+      const details = playgroundOf(response).details.judge!.verdicts;
+      expect(details.at(-1)).toEqual({ productId: "p4", verdict: "not-relevant", standIn: true });
+      expect(JSON.stringify(serializeProxySearchResponse(response))).not.toContain("standIn");
       // A partial answer is served but never cached.
       expect(await db.judgeAnswer.count()).toBe(0);
     });
