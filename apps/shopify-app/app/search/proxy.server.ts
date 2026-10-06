@@ -24,10 +24,15 @@ import {
   createQueuedCostRecorder,
   type CostRecorder,
 } from "../ai/cost-recorder.server";
-import { createOpenRouterDecisionClient, openRouterModelsFromEnv } from "../ai/openrouter.server";
+import {
+  createOpenRouterDecisionClient,
+  openRouterModelsFromEnv,
+  sharedOpenRouterPool,
+} from "../ai/openrouter.server";
 import { createPgTrgmClassicStore } from "./classic-store.server";
 import { createFindStep, findSetSizeFromEnv } from "./find.server";
 import {
+  judgeCallTimeoutMsFromEnv,
   judgeDeadlineMsFromEnv,
   judgeGiveUpMsFromEnv,
   judgeRowCharsFromEnv,
@@ -897,16 +902,25 @@ export function createProxySearchOrchestrator(
             thinkingLevel: models.judgeThinkingLevel,
             ...(requestTimeoutMs !== undefined ? { requestTimeoutMs } : {}),
           }),
-        jev: () =>
-          createOpenRouterDecisionClient({
+        jev: () => {
+          // The page's 24 calls share one keep-alive pool (YOY-159 AC-3),
+          // warmed once the client exists — that is, once the key is set.
+          const pool = sharedOpenRouterPool();
+          const client = createOpenRouterDecisionClient({
             modelId: openRouterModels.judgeModel,
             costRecorder,
+            fetchImpl: pool.fetch,
             ...(requestTimeoutMs !== undefined ? { requestTimeoutMs } : {}),
-          }),
+          });
+          void pool.warm();
+          return client;
+        },
       },
       // The answer-cache key names the model (YOY-148 AC-1).
       modelIds: { gemini: models.judgeModel, jev: openRouterModels.judgeModel },
       maxRowChars: judgeRowCharsFromEnv(),
+      // A straggler is read as not relevant past this, under the deadline (YOY-159 AC-3).
+      callTimeoutMs: judgeCallTimeoutMsFromEnv(),
     }),
     judgeDeadlineMs: judgeDeadlineMsFromEnv(),
     judgeGiveUpMs: judgeGiveUpMsFromEnv(),

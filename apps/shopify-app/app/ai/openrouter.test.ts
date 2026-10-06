@@ -3,6 +3,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   createOpenRouterDecisionClient,
+  createOpenRouterPool,
+  OPENROUTER_POOL_CONNECTIONS,
+  OPENROUTER_WARM_CONNECTIONS,
   DEFAULT_OPENROUTER_JUDGE_MODEL,
   OpenRouterApiError,
   OpenRouterConfigError,
@@ -129,5 +132,33 @@ describe("the OpenRouter decisions adapter (YOY-152)", () => {
     expect(openRouterModelsFromEnv({ OPENROUTER_JUDGE_MODEL: "typesafe/jev-1.14" })).toEqual({
       judgeModel: "typesafe/jev-1.14",
     });
+  });
+});
+
+describe("the keep-alive pool (YOY-159 AC-3)", () => {
+  it("keeps connections for a whole page and warms one page's worth, once, never rejecting", async () => {
+    expect(OPENROUTER_POOL_CONNECTIONS).toBeGreaterThanOrEqual(24);
+    expect(OPENROUTER_WARM_CONNECTIONS).toBe(24);
+    const calls: Array<{ url: string; method: string | undefined }> = [];
+    let failNext = true;
+    const impl = (async (url: string, init?: RequestInit) => {
+      calls.push({ url, method: init?.method });
+      if (failNext) {
+        failNext = false;
+        throw new Error("network down");
+      }
+      return new Response(null, { status: 200 });
+    }) as unknown as typeof fetch;
+    const pool = createOpenRouterPool({ origin: "https://openrouter.test", fetchImpl: impl });
+    await expect(pool.warm(3)).resolves.toBeUndefined();
+    expect(calls).toEqual([
+      { url: "https://openrouter.test/", method: "HEAD" },
+      { url: "https://openrouter.test/", method: "HEAD" },
+      { url: "https://openrouter.test/", method: "HEAD" },
+    ]);
+    await pool.warm(3);
+    expect(calls).toHaveLength(3);
+    // The client's calls go through the pool's fetch.
+    expect(pool.fetch).toBe(impl);
   });
 });

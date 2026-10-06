@@ -13,6 +13,7 @@ import type {
   DecisionClient,
   DecisionRequest,
 } from "@unfiltered/engine";
+import { Agent, fetch as undiciFetch } from "undici";
 
 const PROVIDER = "openrouter";
 const DEFAULT_BASE_URL = "https://openrouter.ai/api/alpha";
@@ -54,6 +55,69 @@ export class OpenRouterTimeoutError extends Error {
   ) {
     super(message);
   }
+}
+
+/**
+ * Connections the OpenRouter pool keeps open (YOY-159 AC-3): one per
+ * product of a 24-product page, plus headroom for a second page at once.
+ */
+export const OPENROUTER_POOL_CONNECTIONS = 32;
+/** Connections opened when the pool is warmed: one page's parallel calls. */
+export const OPENROUTER_WARM_CONNECTIONS = 24;
+
+/** A fetch over one keep-alive connection pool, and a way to open its connections ahead of the first page. */
+export interface OpenRouterPool {
+  fetch: typeof fetch;
+  /** Opens `connections` connections in parallel, the first time it is called; never rejects. */
+  warm(connections?: number): Promise<void>;
+}
+
+/**
+ * The OpenRouter keep-alive pool (YOY-159 AC-3): the 24 parallel decision
+ * calls of a page share warm TLS connections instead of each paying a
+ * handshake, and an idle connection is kept for a minute. `warm` sends
+ * cheap HEAD requests in parallel so the connections exist before the
+ * first search; its failures are ignored — a cold pool only costs the
+ * handshakes it saved.
+ */
+export function createOpenRouterPool(
+  options: { origin?: string; connections?: number; fetchImpl?: typeof fetch } = {},
+): OpenRouterPool {
+  const origin = options.origin ?? new URL(DEFAULT_BASE_URL).origin;
+  const agent = new Agent({
+    connections: options.connections ?? OPENROUTER_POOL_CONNECTIONS,
+    keepAliveTimeout: 60_000,
+    keepAliveMaxTimeout: 600_000,
+  });
+  const pooled =
+    options.fetchImpl ??
+    ((input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) =>
+      undiciFetch(input as Parameters<typeof undiciFetch>[0], {
+        ...(init as Parameters<typeof undiciFetch>[1]),
+        dispatcher: agent,
+      }) as unknown as Promise<Response>);
+  let warmed: Promise<void> | undefined;
+  return {
+    fetch: pooled as typeof fetch,
+    warm(connections = OPENROUTER_WARM_CONNECTIONS) {
+      warmed ??= Promise.allSettled(
+        Array.from({ length: connections }, () =>
+          pooled(`${origin}/`, { method: "HEAD", signal: AbortSignal.timeout(5_000) }).then(
+            (response) => response.arrayBuffer(),
+          ),
+        ),
+      ).then(() => undefined);
+      return warmed;
+    },
+  };
+}
+
+let sharedPool: OpenRouterPool | undefined;
+
+/** The process's one OpenRouter pool (YOY-159 AC-3). */
+export function sharedOpenRouterPool(): OpenRouterPool {
+  sharedPool ??= createOpenRouterPool();
+  return sharedPool;
 }
 
 export interface OpenRouterModelConfig {

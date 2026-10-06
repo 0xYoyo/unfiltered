@@ -45,6 +45,14 @@ export const JUDGE_GIVE_UP_MS_ENV = "JUDGE_GIVE_UP_MS";
 export const DEFAULT_JUDGE_GIVE_UP_MS = 6_000;
 /** Env var naming the characters a candidate row is cut to (AC-2). */
 export const JUDGE_ROW_CHARS_ENV = "JUDGE_ROW_CHARS";
+/** Env var naming how long one product's decision call may run (YOY-159 AC-3). */
+export const JUDGE_CALL_TIMEOUT_MS_ENV = "JUDGE_CALL_TIMEOUT_MS";
+/**
+ * One product's decision call past this is aborted and read as not relevant,
+ * the answer `partial` (YOY-159 AC-3): under the deadline, so a straggler
+ * cannot turn the page into a deadline miss.
+ */
+export const DEFAULT_JUDGE_CALL_TIMEOUT_MS = 1_200;
 
 function positiveIntFromEnv(
   env: Record<string, string | undefined>,
@@ -67,6 +75,13 @@ export function judgeDeadlineMsFromEnv(
   env: Record<string, string | undefined> = process.env,
 ): number {
   return positiveIntFromEnv(env, JUDGE_DEADLINE_MS_ENV, DEFAULT_JUDGE_DEADLINE_MS);
+}
+
+/** The per-call limit from `JUDGE_CALL_TIMEOUT_MS`; unset means 1,200. A malformed value fails at construction. */
+export function judgeCallTimeoutMsFromEnv(
+  env: Record<string, string | undefined> = process.env,
+): number {
+  return positiveIntFromEnv(env, JUDGE_CALL_TIMEOUT_MS_ENV, DEFAULT_JUDGE_CALL_TIMEOUT_MS);
 }
 
 /** The give-up time from `JUDGE_GIVE_UP_MS`; unset means 6,000. A malformed value fails at construction. */

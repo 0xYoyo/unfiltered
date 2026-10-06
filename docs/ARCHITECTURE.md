@@ -1007,6 +1007,15 @@ runs one page.
   `route = "ai"`) count judged searches and nothing else. `routeReason` is
   one of `judged`, `judge-timeout`, `judge-error`, `judge-cached`, `capped`,
   `find-only`.
+- **Per-call limit and pool (YOY-159).** The Jev judge's 24 calls share one
+  keep-alive `undici` pool (`createOpenRouterPool`, 32 connections, idle
+  connections kept 60 s), warmed with 24 parallel HEAD requests when the
+  client is first built. Each product's call is aborted past
+  `JUDGE_CALL_TIMEOUT_MS` (default 1,200, under the 1,500 deadline): that
+  product reads as not relevant and the answer is `partial` — served, never
+  cached — so one straggler no longer turns the page into a deadline miss.
+  The probe that chose this (one slow call per page, median call fast,
+  database work under 340 ms at p95) is on the issue.
 - **Diagnostics.** The step is split in two stages (YOY-159): `judgeRows`
   is its database work — the page's rows, the card hashes and the cache
   key, the answer-cache read and write, the verdict log — and `judge` is the
