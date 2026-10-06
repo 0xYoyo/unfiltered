@@ -64,6 +64,13 @@ export interface NativeRenderHarvestConfig {
     priceCompare: string;
     /** The badge container (sold-out marker). */
     badge: string;
+    /**
+     * The card block the label line goes into, after the price (YOY-164
+     * AC-1): inside the theme's card, so the card grows to hold it. The
+     * block holding the price wins; a card with none takes the line on
+     * its last element.
+     */
+    label: string;
   };
 }
 
@@ -246,6 +253,7 @@ export const DAWN_NATIVE_RENDER: NativeRenderConfig = {
       price: ".price__regular .price-item--regular, .price__sale .price-item--sale",
       priceCompare: "s.price-item, .unit-price",
       badge: ".card__badge",
+      label: ".card__information",
     },
   },
   page: {

@@ -352,7 +352,7 @@ export function createOverlay(options: OverlayOptions): Overlay {
           if (slot === null || !(productId in labels)) {
             continue;
           }
-          const segments = labelSegments(strings, labels[productId]);
+          const segments = labelSegments(strings, labels[productId], options.locale);
           renderLabel(slot, segments ?? []);
           if (segments === null) {
             slot.removeAttribute("data-testid");
@@ -428,7 +428,7 @@ export function createOverlay(options: OverlayOptions): Overlay {
     // sentence in the chrome's language, so it takes the overlay's
     // direction; its values are isolated inside it (renderLabel).
     if (labelling !== null && labelsShown) {
-      const segments = labelSegments(strings, result.label);
+      const segments = labelSegments(strings, result.label, options.locale);
       if (segments !== null || labelling.pending) {
         const label = document.createElement("div");
         label.className = "card-label";

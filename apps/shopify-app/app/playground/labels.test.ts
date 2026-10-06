@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  formatLabelMoney,
   LABEL_MAX_CHARS,
   LABEL_TEMPLATES,
   labelLocale,
+  labelSegments,
   labelText,
 } from "../../widget/src/labels";
 import { STRING_CATALOG } from "../../widget/src/strings";
@@ -126,5 +128,49 @@ describe("label language (AC-7)", () => {
     expect(labelLocale("fr")).toBeNull();
     expect(labelLocale("pt-BR")).toBeNull();
     expect(labelLocale("")).toBeNull();
+  });
+});
+
+describe("price label amounts in the storefront's format (YOY-164 AC-2)", () => {
+  // Intl's own output for the expected strings, so the test reads the
+  // runtime's bidi marks the same way the label will.
+  const intl = (locale: string, currency: string, amount: number, fraction: number) =>
+    new Intl.NumberFormat(locale, {
+      style: "currency",
+      currency,
+      minimumFractionDigits: fraction,
+      maximumFractionDigits: 2,
+    }).format(amount);
+
+  it("formats a <number> <ISO code> value for the locale, whole amounts without decimals", () => {
+    expect(formatLabelMoney("411.6 USD", "en")).toBe("$411.60");
+    expect(formatLabelMoney("1188.6 USD", "en")).toBe("$1,188.60");
+    expect(formatLabelMoney("450 ILS", "he")).toBe(intl("he", "ILS", 450, 0));
+    expect(formatLabelMoney("450 ILS", "he")).toContain("450");
+    expect(formatLabelMoney("450 ILS", "he")).toContain("₪");
+    expect(formatLabelMoney("450 ILS", "he")).not.toContain(".");
+  });
+
+  it("leaves any other value as written", () => {
+    expect(formatLabelMoney("M", "en")).toBe("M");
+    expect(formatLabelMoney("linen", "he")).toBe("linen");
+    expect(formatLabelMoney("120", "en")).toBe("120");
+    expect(formatLabelMoney("12 XYZ1", "en")).toBe("12 XYZ1");
+  });
+
+  it("fills a price label with formatted amounts when a locale is given; other templates and no locale are unchanged", () => {
+    const priceNear = { template: "price-near", values: ["411.6 USD", "400 USD"] };
+    expect(labelText(STRING_CATALOG.en, priceNear)).toBe("411.6 USD, slightly over 400 USD");
+    expect(
+      labelSegments(STRING_CATALOG.en, priceNear, "en")!
+        .map((segment) => segment.text)
+        .join(""),
+    ).toBe("$411.60, slightly over $400");
+    const size = { template: "size-missing", values: ["M", "S", "L"] };
+    expect(
+      labelSegments(STRING_CATALOG.en, size, "en")!
+        .map((segment) => segment.text)
+        .join(""),
+    ).toBe("no M — S, L in stock");
   });
 });
