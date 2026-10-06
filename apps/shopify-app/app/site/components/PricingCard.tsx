@@ -1,3 +1,5 @@
+import { SITE_ROUTES, TRY_CTA_LABEL } from "../paths";
+
 import { Badge } from "./Badge";
 import { Button } from "./Button";
 
@@ -14,7 +16,7 @@ export function PricingCard({
   features,
   featured = false,
   badge,
-  ctaLabel = "Start 14-day trial",
+  ctaLabel = TRY_CTA_LABEL,
   footnote,
 }: {
   name: string;
@@ -64,7 +66,11 @@ export function PricingCard({
           </li>
         ))}
       </ul>
-      <Button variant={featured ? "primary" : "secondary"} block>
+      <Button
+        variant={featured ? "primary" : "secondary"}
+        block
+        href={SITE_ROUTES.demo}
+      >
         {ctaLabel}
       </Button>
       <span className="unf-pricing__foot">{footnote}</span>

@@ -796,9 +796,24 @@ body:has(.site-chrome) {
   display: flex;
 }
 
-.site-nav__logo,
-.site-footer__logo {
-  height: 23px;
+/* The wordmark as text in the display face (YOY-156 AC-2), sized to the
+   23 px the image stood at, the circled-x mark in the accent beside it. */
+.site-wordmark {
+  display: inline-flex;
+  align-items: center;
+  block-size: 23px;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--text-display);
+}
+
+.site-wordmark__mark {
+  flex: none;
+  color: var(--accent);
 }
 
 .site-nav__links,
@@ -814,7 +829,6 @@ body:has(.site-chrome) {
 
 .site-nav__install {
   display: inline-flex;
-  cursor: not-allowed;
 }
 
 /* On /try the site nav stands in for the playground's own top bar, so the

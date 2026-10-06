@@ -1,15 +1,13 @@
-import { SITE_ASSETS, SITE_ROUTES } from "../paths";
+import { SITE_ROUTES } from "../paths";
+
+import { Wordmark } from "./Wordmark";
 
 export function SiteFooter() {
   return (
     <footer className="site-footer site-chrome" dir="ltr" lang="en">
       <div className="site-footer__grid">
         <div>
-          <img
-            src={SITE_ASSETS.wordmark}
-            alt="Unfiltered"
-            className="site-footer__logo"
-          />
+          <Wordmark className="site-footer__logo" />
           <p className="site-footer__blurb">
             Search for fashion stores. Works natively with Shopify and on any
             online store. Built multilingual from day one.

@@ -15,9 +15,14 @@ export const SITE_ROUTES = {
   demo: "/try",
 } as const;
 
+/**
+ * The label every former trial and install button carries (YOY-156 AC-3):
+ * neither a trial nor an install can be started yet, and /try can.
+ */
+export const TRY_CTA_LABEL = "Try it on a real catalog";
+
 /** Exported from the design kit into `public/site/`. */
 export const SITE_ASSETS = {
-  wordmark: "/site/logo-wordmark.svg",
   placeholder: (n: 1 | 2 | 3 | 4 | 5 | 6) =>
     `/site/placeholder/garment-0${n}.svg`,
 } as const;

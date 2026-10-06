@@ -11,7 +11,7 @@ import {
 import { SearchBar } from "../components/SearchBar";
 import { SitePage } from "../components/SitePage";
 import { StatCard } from "../components/StatCard";
-import { SITE_ASSETS, SITE_ROUTES } from "../paths";
+import { SITE_ASSETS, SITE_ROUTES, TRY_CTA_LABEL } from "../paths";
 
 /**
  * "/" — the landing page. The hero card replays three scripted searches:
@@ -308,7 +308,9 @@ export function LandingPage() {
           whole sentences and shows you the orders it earned.
         </p>
         <div className="site-actions site-hero__actions">
-          <Button size="lg">Start 14-day trial</Button>
+          <Button size="lg" href={SITE_ROUTES.demo}>
+            {TRY_CTA_LABEL}
+          </Button>
           <Button size="lg" variant="secondary" href={SITE_ROUTES.demo}>
             See a demo store
           </Button>
@@ -465,7 +467,9 @@ export function LandingPage() {
           </h2>
           <div className="site-closer__side">
             <div className="site-actions">
-              <Button size="lg">Add to Shopify</Button>
+              <Button size="lg" href={SITE_ROUTES.demo}>
+                {TRY_CTA_LABEL}
+              </Button>
               <Button size="lg" variant="secondary" href={SITE_ROUTES.demo}>
                 Try the live demo
               </Button>

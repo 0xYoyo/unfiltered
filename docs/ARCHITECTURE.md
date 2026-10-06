@@ -1901,8 +1901,42 @@ misconfiguration stays visible.
 The Shopify app record is not re-pointed at this deployment; the embedded app
 and its storefront proxy keep their existing configuration.
 
+### The theme-native path
+
+On the theme-native path (`widget/src/native-render.ts`, `native-page.ts`)
+a submitted search lands on the theme's own search-results page holding
+our ranked results, whatever page it was submitted from.
+
+- **The page is mirrored.** The theme's search page is fetched once per
+  page view for a term that always renders its results state, parsed inert,
+  and its main content becomes the shell. Entering the results view hides
+  the origin page's main content in place (nodes are never moved, and they
+  are restored exactly on leave), appends the shell, and puts the widget's
+  results section where the theme's results list was. The theme's count
+  line is rewritten to our total and the shopper's query, and the theme's
+  own pagination is driven over our pages (or, when it has none, later
+  pages append as the last row comes into view). Navigation is a
+  `history.pushState` to the theme's search URL, so Back returns to the
+  page the shopper searched from. When the shell cannot be fetched, the
+  section shows bare in the same place.
+- **The cards are the theme's.** Each result is rendered as the theme's
+  own product card: Variant A fetches the product through an alternate
+  template that renders only the card snippet (`?view=…`); Variant B
+  clones the first card of a page that already renders theme cards and
+  refills it through configured selectors. A result whose card cannot be
+  produced falls back to a plain card of ours in the same grid slot.
+- **Owned elements.** Inside the theme's page the widget adds only the
+  removable chips row (and the second-reading chip), the status text
+  (loading, no results, the zero-hit message), the "Close matches" heading
+  — as a section below the grid on a zero-hit page, as a full-row divider
+  inside the page's grid on a judged page with matches — and the one label
+  line under a card's price (DESIGN W-11). Everything else is the theme's.
+- **No new-search control.** Unlike the overlay, the theme-native view has
+  no new-search/close control (DESIGN W-2): the browser's Back leaves the
+  view, and the theme's own search box starts the next search.
+
 ## Deferred components
 
-Real widget search behavior (calling the proxy endpoint, theme-search
-takeover, result rendering), merchant dashboard, and billing are future
-milestones and intentionally absent from the current codebase.
+The merchant dashboard (the embedded admin is still the app template's
+starter page) and billing are future milestones and intentionally absent
+from the current codebase.

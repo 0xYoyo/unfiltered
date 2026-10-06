@@ -72,7 +72,9 @@ Each is imperative, atomic, and checkable from a screenshot or the diff.
 - **W-2 Footprint ≤ chips-level.** Shopper-visible additions are limited
   to: the results overlay/grid, the removable filter chips, one
   new-search/close control, status text, and the one label line a card
-  may carry (W-11). No logo, badge, watermark,
+  may carry (W-11). The new-search/close control exists on the overlay
+  path only; the theme-native path has none — the browser's Back leaves
+  it, and the theme's own search box starts the next search. No logo, badge, watermark,
   "powered by", or branded color anywhere in the shopper path.
 - **W-3 No foreign hue.** The widget introduces no hue the host page does
   not already have. Fixed fallback values are achromatic (grays derived
