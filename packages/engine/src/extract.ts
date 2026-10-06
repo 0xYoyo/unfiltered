@@ -20,7 +20,7 @@ import type { JsonSchema, LlmClient } from "./index.js";
  * Bump it with every change to `buildExtractPrompt`, `EXTRACT_SCHEMA` or
  * `parseExtractAnswer`.
  */
-export const EXTRACT_PROMPT_VERSION = 3;
+export const EXTRACT_PROMPT_VERSION = 4;
 
 /** One term the shopper excluded, as typed and in English (AC-1). */
 export interface ExcludedTerm {
@@ -152,7 +152,9 @@ export function buildExtractPrompt(sentence: string, previousSentence?: string):
     "inStock: true only when the shopper asked for items in stock or available now; else null.",
     "excluded: every thing the shopper said they do NOT want: typed is the excluded word",
     "exactly as written, WITHOUT the negation (\"not black\" -> \"black\"; \"no wool\" -> \"wool\";",
-    "\"לא שחורה\" -> \"שחורה\"), english is that word in English. Empty when none.",
+    "\"לא שחורה\" -> \"שחורה\"), english is that word in English. An exclusion needs a negation",
+    "in the search (\"not\", \"no\", \"without\", \"non\", \"-free\", \"לא\", \"בלי\", \"ללא\", \"חוץ מ\"):",
+    "the thing the shopper asks for is never excluded (\"jacket under 30\" excludes nothing). Empty when none.",
     "priceFirm: true only when the price was stated as a hard limit (\"max\", \"no more than\",",
     "\"at most\", \"only\", \"must be\", \"לא יותר מ\", \"מקסימום\"); \"under\", \"up to\", \"below\",",
     "\"around\" and \"עד\" are NOT firm. Else null.",
@@ -218,11 +220,41 @@ function withoutNegation(term: string): string {
   return term.trim().replace(LEADING_NEGATION, "").trim();
 }
 
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** No letter or digit on this side of the term: the whole-word boundary of `holdsWholeWord`. */
+const NOT_BEFORE = "(?<![\\p{L}\\p{N}])";
+const NOT_AFTER = "(?![\\p{L}\\p{N}])";
+
+/**
+ * Whether the sentence negates the term (YOY-162 AC-1): the term appears as
+ * a whole token, ignoring case, immediately after a negation word in the
+ * same clause — EN "not", "no", "without", "non"; HE "לא", "בלי", "ללא",
+ * and "חוץ מ" (whose מ may be written onto the term) — or carries the
+ * "-free" suffix ("wool-free"). A product word the shopper asked for is
+ * never excluded.
+ */
+export function sentenceNegates(sentence: string, term: string): boolean {
+  const needle = term.trim();
+  if (needle === "") {
+    return false;
+  }
+  const word = escapeRegExp(needle);
+  return [
+    `${NOT_BEFORE}(?:not|no|without|non|לא|בלי|ללא)[\\s-]+${word}${NOT_AFTER}`,
+    `${NOT_BEFORE}חוץ\\s+מ[\\s-]?${word}${NOT_AFTER}`,
+    `${NOT_BEFORE}${word}-free${NOT_AFTER}`,
+  ].some((pattern) => new RegExp(pattern, "iu").test(sentence));
+}
+
 /**
  * Validate one answer against the sentence (AC-2): a price is kept only when
- * its digits appear in the sentence; a size or an excluded term only when it
- * appears verbatim, ignoring case. Anything else is discarded. Null when the
- * answer is not the schema's shape at all.
+ * its digits appear in the sentence; a size only when it appears verbatim,
+ * ignoring case; an excluded term only when the sentence negates it
+ * (YOY-162 AC-1). Anything else is discarded. Null when the answer is not
+ * the schema's shape at all.
  */
 export function parseExtractAnswer(
   answer: unknown,
@@ -258,7 +290,7 @@ export function parseExtractAnswer(
         continue;
       }
       const typed = withoutNegation(typedRaw);
-      if (typed === "" || !sentenceHasText(text, typed)) {
+      if (typed === "" || !sentenceNegates(text, typed)) {
         continue;
       }
       const english =

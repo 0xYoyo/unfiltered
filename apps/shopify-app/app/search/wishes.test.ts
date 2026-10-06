@@ -8,6 +8,7 @@ import {
   EXTRACT_SCHEMA,
   NO_WISHES,
   parseExtractAnswer,
+  sentenceNegates,
   statedCurrency,
   type EmbeddingClient,
   type ExtractedWishes,
@@ -138,6 +139,65 @@ describe("the extraction keeps only what the sentence states (AC-1, AC-2)", () =
     expect(parseExtractAnswer({ priceMax: 80, currency: "GBP" }, "שמלה עד 80")!.currency).toBe("GBP");
     expect(parseExtractAnswer({ currency: "ILS" }, "שמלה")!.currency).toBeNull();
     expect(statedCurrency('עד 300 ש"ח')).toBe("ILS");
+  });
+
+  it("drops an excluded term the sentence does not negate: the thing asked for is never excluded (YOY-162 AC-1, AC-3)", () => {
+    const jacket = parseExtractAnswer(
+      { priceMax: 30, excluded: [{ typed: "jacket", english: "jacket" }] },
+      "jacket under 30",
+    )!;
+    expect(jacket.excluded).toEqual([]);
+    expect(jacket.priceMax).toEqual({ amount: 30, raw: "30" });
+
+    const hebrewJacket = parseExtractAnswer(
+      { priceMax: 30, excluded: [{ typed: "ז'קט", english: "jacket" }] },
+      "ז'קט עד 30",
+    )!;
+    expect(hebrewJacket.excluded).toEqual([]);
+    expect(hebrewJacket.priceMax).toEqual({ amount: 30, raw: "30" });
+    expect(hebrewJacket.currency).toBe("ILS");
+
+    expect(
+      parseExtractAnswer({ excluded: [{ typed: "black", english: "black" }] }, "dress not black")!.excluded,
+    ).toEqual([{ typed: "black", english: "black" }]);
+    expect(
+      parseExtractAnswer({ excluded: [{ typed: "שחורה", english: "black" }] }, "שמלה לא שחורה")!.excluded,
+    ).toEqual([{ typed: "שחורה", english: "black" }]);
+    expect(
+      parseExtractAnswer({ excluded: [{ typed: "wool", english: "wool" }] }, "wool-free sweater")!.excluded,
+    ).toEqual([{ typed: "wool", english: "wool" }]);
+    expect(buildExtractPrompt("x")).toContain("An exclusion needs a negation");
+  });
+
+  it("reads a negation only right before the term, as a whole token, in every listed form (YOY-162 AC-1)", () => {
+    // Each negation word, immediately before the term.
+    for (const sentence of [
+      "dress not black",
+      "dress no black",
+      "dress without black",
+      "non-black dress",
+      "black-free dress",
+      "שמלה לא black",
+      "שמלה בלי black",
+      "שמלה ללא black",
+      "שמלה חוץ מ black",
+      "שמלה חוץ מblack",
+    ]) {
+      expect(sentenceNegates(sentence, "black"), sentence).toBe(true);
+    }
+    // Not negated: no negation, a negation elsewhere in the sentence, or the
+    // term inside a longer word.
+    for (const sentence of [
+      "black dress",
+      "not a dress, black",
+      "dress not blackish",
+      "dress not jet-black",
+      "notblack dress",
+    ]) {
+      expect(sentenceNegates(sentence, "black"), sentence).toBe(false);
+    }
+    expect(sentenceNegates("Dress NOT Black", "black")).toBe(true);
+    expect(sentenceNegates("dress not black", "")).toBe(false);
   });
 
   it("keeps a Hebrew excluded term with its English form", () => {
