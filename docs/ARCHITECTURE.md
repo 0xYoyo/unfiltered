@@ -995,7 +995,11 @@ runs one page.
   backfill; `totalCount` still counts the find order). Its verdict-log row
   is still written, at `position: -1`. When every product left is "not
   relevant" the page stays in find order and every card carries
-  `close-match`. A fact-differs value longer than three words, or a missing
+  `close-match`. A stand-in verdict (a call that failed, timed out or
+  answered invalidly; YOY-159) is never dropped: the product sorts where
+  "not relevant" does, with no label, and never counts toward the
+  all-not-relevant case — a page of only stand-ins is served in find order
+  without labels. Playground `details.judge.verdicts` mark it `standIn`. A fact-differs value longer than three words, or a missing
   value, drops that label. Every v2 result on the wire carries `label`
   (`{ template, values }` or null); the old engine's wire has no `label` key.
   The verdict never reaches the storefront.
@@ -1010,6 +1014,17 @@ runs one page.
   `route = "ai"`) count judged searches and nothing else. `routeReason` is
   one of `judged`, `judge-timeout`, `judge-error`, `judge-cached`, `capped`,
   `find-only`.
+- **Per-call limit and pool (YOY-159).** The Jev judge's 24 calls share one
+  keep-alive `undici` pool (`createOpenRouterPool`, 32 connections, idle
+  connections kept 60 s), warmed with 24 parallel HEAD requests when the
+  client is first built. Each product's call is aborted past
+  `JUDGE_CALL_TIMEOUT_MS` (default 1,200, under the 1,500 deadline): that
+  product gets a stand-in "not relevant" verdict (`standIn: true`) and the
+  answer is `partial` — served, never cached — so one straggler no longer
+  turns the page into a deadline miss. A stand-in is no judgment: the
+  product stays on the page, last and unlabelled (see Order and labels).
+  The probe that chose this (one slow call per page, median call fast,
+  database work under 340 ms at p95) is on the issue.
 - **Diagnostics.** The step is split in two stages (YOY-159): `judgeRows`
   is its database work — the page's rows, the card hashes and the cache
   key, the answer-cache read and write, the verdict log — and `judge` is the

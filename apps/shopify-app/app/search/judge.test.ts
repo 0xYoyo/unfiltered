@@ -44,6 +44,7 @@ import {
   judgeRowCharsFromEnv,
   awaitPendingLabels,
   judgeCacheKey,
+  judgeCallTimeoutMsFromEnv,
   judgeCallTimes,
   judgeGiveUpMsFromEnv,
   loadJudgeCandidates,
@@ -411,6 +412,33 @@ describe("verdict order (AC-5, AC-8)", () => {
     expect(ordered.every((entry) => entry.verdict === "exact" && entry.label === null)).toBe(true);
   });
 
+  it("keeps a stand-in verdict on the page, last and unlabelled, and drops only judged not-relevant products (YOY-159)", () => {
+    const standIn = (id: string) => ({ ...verdict(id, "not-relevant"), standIn: true as const });
+    const ordered = orderByVerdict(
+      ["a", "b", "c", "d"],
+      [standIn("a"), verdict("b", "not-relevant"), verdict("c", "exact"), verdict("d", "close")],
+    );
+    expect(ordered.map((entry) => [entry.item, entry.verdict, entry.label?.template ?? null, entry.standIn ?? false])).toEqual([
+      ["c", "exact", null, false],
+      ["d", "close", null, false],
+      ["a", "not-relevant", null, true],
+    ]);
+  });
+
+  it("serves a page of only stand-ins in find order with no labels, and never counts stand-ins toward reject-all (YOY-159)", () => {
+    const standIn = (id: string) => ({ ...verdict(id, "not-relevant"), standIn: true as const });
+    const allStandIns = orderByVerdict(["a", "b", "c"], [standIn("a"), standIn("b"), standIn("c")]);
+    expect(allStandIns.map((entry) => entry.item)).toEqual(["a", "b", "c"]);
+    expect(allStandIns.every((entry) => entry.label === null && entry.standIn === true)).toBe(true);
+    // Every real verdict not relevant: the reject-all page, the stand-in kept unlabelled.
+    const rejectAll = orderByVerdict(["a", "b", "c"], [verdict("a", "not-relevant"), standIn("b"), verdict("c", "not-relevant")]);
+    expect(rejectAll.map((entry) => [entry.item, entry.label?.template ?? null])).toEqual([
+      ["a", "close-match"],
+      ["b", null],
+      ["c", "close-match"],
+    ]);
+  });
+
   it("still serves all 24 with close-match when every product is not relevant (YOY-163 AC-4)", () => {
     const ids = Array.from({ length: 24 }, (_, index) => `p${index}`);
     const ordered = orderByVerdict(ids, ids.map((id) => verdict(id, "not-relevant")));
@@ -602,7 +630,8 @@ describe("the decision judge (YOY-152 AC-2, AC-3)", () => {
     });
     expect(whole).not.toHaveProperty("partial");
     // "d" answered an unknown choice: invalid, read as not relevant too.
-    expect(answered.verdicts[1]).toEqual({ id: "b", verdict: "not-relevant", missed: [], label: null, excluded: false });
+    // A stand-in for the failed call, never a judgment (YOY-159).
+    expect(answered.verdicts[1]).toEqual({ id: "b", verdict: "not-relevant", missed: [], label: null, excluded: false, standIn: true });
   });
 
   it("returns close-match where Flash-Lite writes fact-differs, which Jev cannot write (AC-3)", async () => {
@@ -688,6 +717,69 @@ describe("single call times (YOY-159 AC-1)", () => {
     expect(times).toHaveLength(1);
   });
 
+  it("aborts one product's call past the per-call limit: that product reads not relevant and the answer is partial (YOY-159 AC-3)", async () => {
+    const page = [candidate("p1"), candidate("stuck"), candidate("p3")];
+    const aborted: string[] = [];
+    const decisions: DecisionClient = {
+      decide(request) {
+        const stuck = JSON.stringify(request.state).includes("stuck");
+        return new Promise((resolve, reject) => {
+          let settled = false;
+          const timer = setTimeout(() => {
+            settled = true;
+            resolve({ ...DECIDED, verdict: { type: "choice", choice: "exact" } });
+          }, stuck ? 1_000 : 5);
+          // Like fetch, an abort after the answer arrived is a no-op.
+          request.signal?.addEventListener("abort", () => {
+            if (settled) {
+              return;
+            }
+            clearTimeout(timer);
+            aborted.push(stuck ? "stuck" : "other");
+            reject(new Error("aborted"));
+          });
+        });
+      },
+    };
+    const startedAt = performance.now();
+    const answered = await createDecisionJudge({ decisions, callTimeoutMs: 40 }).judge({
+      sentence: "dress",
+      candidates: page,
+    });
+    expect(performance.now() - startedAt).toBeLessThan(500);
+    expect(aborted).toEqual(["stuck"]);
+    expect(answered.partial).toBe(true);
+    expect(answered.verdicts.map((verdict) => [verdict.id, verdict.verdict])).toEqual([
+      ["p1", "exact"],
+      ["stuck", "not-relevant"],
+      ["p3", "exact"],
+    ]);
+    // Without a limit nothing is aborted.
+    const unlimited = await createDecisionJudge({ decisions: { decide: async () => DECIDED } }).judge({
+      sentence: "dress",
+      candidates: [candidate("p1")],
+    });
+    expect(unlimited.partial).toBeUndefined();
+  });
+
+  it("the factory hands the per-call limit to the decision judge", async () => {
+    const judge = createJudge({
+      provider: "jev",
+      clients: {
+        gemini: () => scriptedLlm([]),
+        jev: () => ({
+          decide: (request) =>
+            new Promise((_, reject) =>
+              request.signal?.addEventListener("abort", () => reject(new Error("aborted"))),
+            ),
+        }),
+      },
+      callTimeoutMs: 20,
+    });
+    // Every call times out, so the judge rejects like a failed call.
+    await expect(judge.judge({ sentence: "dress", candidates: [candidate("p1")] })).rejects.toThrow("aborted");
+  });
+
   it("gives the slowest and the median, counting calls still running as the time they have run", () => {
     expect(judgeCallTimes([30, 10, 20], 0, 999)).toEqual({ settled: 3, slowestMs: 30, medianMs: 20, open: false });
     // Served on a deadline miss with two of four calls still running at 1,500 ms.
@@ -768,6 +860,11 @@ describe("the one factory and its configuration (AC-1, AC-2, AC-6)", () => {
     expect(judgeGiveUpMsFromEnv({})).toBe(6_000);
     expect(judgeGiveUpMsFromEnv({ JUDGE_GIVE_UP_MS: "4000" })).toBe(4_000);
     expect(() => judgeGiveUpMsFromEnv({ JUDGE_GIVE_UP_MS: "-1" })).toThrow(/JUDGE_GIVE_UP_MS/);
+    // The per-call limit sits under the deadline (YOY-159 AC-3).
+    expect(judgeCallTimeoutMsFromEnv({})).toBe(1_200);
+    expect(judgeCallTimeoutMsFromEnv({})).toBeLessThan(DEFAULT_JUDGE_DEADLINE_MS);
+    expect(judgeCallTimeoutMsFromEnv({ JUDGE_CALL_TIMEOUT_MS: "900" })).toBe(900);
+    expect(() => judgeCallTimeoutMsFromEnv({ JUDGE_CALL_TIMEOUT_MS: "0" })).toThrow(/JUDGE_CALL_TIMEOUT_MS/);
   });
 
   it("names the provider and model the factory built, for the cache key (YOY-148 AC-1)", () => {
@@ -1269,8 +1366,9 @@ describe("the judge on Engine v2 (on the database)", () => {
 
     const first = await search(engine);
     expect(first).toMatchObject({ route: "ai", routeReason: "judged" });
-    // The failed product reads not relevant, so it is dropped from the page (YOY-163).
-    expect(first.hits.find((hit) => hit.productId === "p2")).toBeUndefined();
+    // The failed product's stand-in verdict keeps it on the page, last and
+    // unlabelled (YOY-159); the products judged not relevant are dropped.
+    expect(first.hits.at(-1)).toMatchObject({ productId: "p2", verdict: "not-relevant", standIn: true, label: null });
     expect(first.hits[0]!.productId).toBe("p3");
     expect(await db.judgeAnswer.count()).toBe(0);
 
@@ -1530,6 +1628,47 @@ describe("the judge on Engine v2 (on the database)", () => {
       expect(calls.slowestMs).toBeGreaterThanOrEqual(75);
       expect(calls.slowestMs).toBeLessThan(300);
       expect(calls.medianMs).toBeLessThan(75);
+    });
+
+    it("a straggler past the per-call limit no longer misses the deadline: the page is judged, partial, never cached (YOY-159 AC-3)", async () => {
+      await seed(db, FOUR);
+      const judge = createDecisionJudge({
+        identity: "jev:test",
+        callTimeoutMs: 60,
+        decisions: {
+          decide(request) {
+            const slow = JSON.stringify(request.state).includes("Black Maxi");
+            return new Promise((resolve, reject) => {
+              const timer = setTimeout(
+                () =>
+                  resolve({
+                    verdict: { type: "choice", choice: "exact" },
+                    fact: { type: "yes-no", yes: 0.1 },
+                    description: { type: "yes-no", yes: 0.1 },
+                    excluded: { type: "yes-no", yes: 0.1 },
+                  }),
+                slow ? 600 : 5,
+              );
+              request.signal?.addEventListener("abort", () => {
+                clearTimeout(timer);
+                reject(new Error("aborted"));
+              });
+            });
+          },
+        },
+      });
+      const response = await search(orchestrator(undefined, { judge, deadlineMs: 200, giveUpMs: 2_000 }));
+      expect(response.routeReason).toBe("judged");
+      expect(response).not.toHaveProperty("labelsPending");
+      // The straggler's stand-in keeps it on the page, last and unlabelled
+      // (YOY-159): a slow call never removes a product.
+      expect(response.hits).toHaveLength(4);
+      expect(response.hits.at(-1)).toMatchObject({ productId: "p4", verdict: "not-relevant", standIn: true, label: null });
+      const details = playgroundOf(response).details.judge!.verdicts;
+      expect(details.at(-1)).toEqual({ productId: "p4", verdict: "not-relevant", standIn: true });
+      expect(JSON.stringify(serializeProxySearchResponse(response))).not.toContain("standIn");
+      // A partial answer is served but never cached.
+      expect(await db.judgeAnswer.count()).toBe(0);
     });
 
     it("judge-cached: judgeRows and judge, no calls; find-only: neither", async () => {

@@ -132,6 +132,13 @@ export interface JudgeVerdict {
    * AC-11): it is dropped from the page and never labelled.
    */
   excluded: boolean;
+  /**
+   * The verdict is a stand-in for an answer that never came — a call that
+   * failed, ran past its limit, or answered invalidly (YOY-159): it reads
+   * "not relevant" but is never a judgment, so the product stays on the
+   * page, last and unlabelled. Absent on a real verdict.
+   */
+  standIn?: true;
 }
 
 /** The judge's answer for one page. */
@@ -622,7 +629,14 @@ function decisionVerdict(
 
 /** A failed or unanswerable question: the candidate is read as not relevant. */
 function notRelevant(candidate: JudgeCandidate): JudgeVerdict {
-  return { id: candidate.id, verdict: "not-relevant", missed: [], label: null, excluded: false };
+  return {
+    id: candidate.id,
+    verdict: "not-relevant",
+    missed: [],
+    label: null,
+    excluded: false,
+    standIn: true,
+  };
 }
 
 export interface DecisionJudgeOptions {
@@ -631,6 +645,12 @@ export interface DecisionJudgeOptions {
   identity?: string;
   /** Characters a candidate row is cut to (AC-2). */
   maxRowChars?: number;
+  /**
+   * How long one product's call may run (YOY-159 AC-3): past it the call is
+   * aborted and the product reads as not relevant, the answer `partial`, so
+   * one slow call cannot stall the page. Absent means no per-call limit.
+   */
+  callTimeoutMs?: number;
 }
 
 /**
@@ -663,6 +683,13 @@ export function createDecisionJudge(options: DecisionJudgeOptions): Judge {
       const settled = await Promise.allSettled(
         request.candidates.map((candidate) => {
           const startedAt = performance.now();
+          const signal =
+            options.callTimeoutMs === undefined
+              ? request.signal
+              : AbortSignal.any([
+                  ...(request.signal !== undefined ? [request.signal] : []),
+                  AbortSignal.timeout(options.callTimeoutMs),
+                ]);
           return decisions.decide({
             state: {
               ...(previous !== undefined ? { previous_search: previous } : {}),
@@ -673,7 +700,7 @@ export function createDecisionJudge(options: DecisionJudgeOptions): Judge {
             operation: "judge",
             storeId: request.storeId,
             searchId: request.searchId,
-            signal: request.signal,
+            ...(signal !== undefined ? { signal } : {}),
           }).finally(() => request.onCallSettled?.(performance.now() - startedAt));
         }),
       );
@@ -714,6 +741,8 @@ export interface JudgeFactoryOptions {
   /** The model each provider's client calls, for the answer-cache key (YOY-148 AC-1). */
   modelIds?: Partial<Record<JudgeProvider, string>>;
   maxRowChars?: number;
+  /** The decision judge's per-call limit (YOY-159 AC-3); the LLM judge makes one call and ignores it. */
+  callTimeoutMs?: number;
 }
 
 /** The one judge factory (AC-1): the selected provider's client behind the one judge. */
@@ -722,7 +751,12 @@ export function createJudge(options: JudgeFactoryOptions): Judge {
   const identity = `${options.provider}:${modelId}`;
   const rows = options.maxRowChars !== undefined ? { maxRowChars: options.maxRowChars } : {};
   return options.provider === "jev"
-    ? createDecisionJudge({ decisions: options.clients.jev(), identity, ...rows })
+    ? createDecisionJudge({
+        decisions: options.clients.jev(),
+        identity,
+        ...rows,
+        ...(options.callTimeoutMs !== undefined ? { callTimeoutMs: options.callTimeoutMs } : {}),
+      })
     : createLlmJudge({ llm: options.clients.gemini(), identity, ...rows });
 }
 
@@ -738,6 +772,8 @@ export interface JudgedItem<T> {
   item: T;
   verdict: JudgeVerdictCode;
   label: JudgeLabel | null;
+  /** The verdict is a stand-in for a call that never answered (YOY-159). */
+  standIn?: true;
 }
 
 /**
@@ -746,7 +782,11 @@ export interface JudgedItem<T> {
  * (YOY-163), as an excluded one is (YOY-149 AC-11): the page may come out
  * short. When every product left is "not relevant", the page stays in find
  * order and every item carries `close-match` — nothing exact, here is the
- * closest. `items` and `verdicts` are parallel, in find order.
+ * closest. A stand-in verdict (YOY-159: a call that never answered) is no
+ * judgment: the product stays, ranked where "not relevant" sorts, with no
+ * label, and never counts toward the all-not-relevant case; a page of only
+ * stand-ins is served in find order without labels. `items` and `verdicts`
+ * are parallel, in find order.
  */
 export function orderByVerdict<T>(
   items: readonly T[],
@@ -758,18 +798,29 @@ export function orderByVerdict<T>(
       verdict: verdicts[index]!.verdict,
       label: verdicts[index]!.label,
       excluded: verdicts[index]!.excluded,
+      standIn: verdicts[index]!.standIn === true,
       index,
     }))
     .filter((entry) => !entry.excluded);
-  if (judged.length > 0 && judged.every((entry) => entry.verdict === "not-relevant")) {
-    return judged.map(({ item, verdict }) => ({
-      item,
-      verdict,
-      label: { template: "close-match", values: [] },
-    }));
+  const out = ({ item, verdict, label, standIn }: (typeof judged)[number]): JudgedItem<T> => ({
+    item,
+    verdict,
+    label: standIn ? null : label,
+    ...(standIn ? { standIn: true as const } : {}),
+  });
+  // Stand-ins are no judgment (YOY-159): they never count toward reject-all,
+  // are never dropped, and carry no label.
+  const real = judged.filter((entry) => !entry.standIn);
+  if (real.length === 0) {
+    return judged.map(out);
+  }
+  if (real.every((entry) => entry.verdict === "not-relevant")) {
+    return judged.map((entry) =>
+      entry.standIn ? out(entry) : { ...out(entry), label: { template: "close-match", values: [] } },
+    );
   }
   return judged
-    .filter((entry) => entry.verdict !== "not-relevant")
+    .filter((entry) => entry.standIn || entry.verdict !== "not-relevant")
     .sort((a, b) => VERDICT_RANK[a.verdict] - VERDICT_RANK[b.verdict] || a.index - b.index)
-    .map(({ item, verdict, label }) => ({ item, verdict, label }));
+    .map(out);
 }
