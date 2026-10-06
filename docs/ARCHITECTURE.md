@@ -1041,8 +1041,12 @@ runs one page.
   and `GET /api/playground/labels` take `searchId` and `page`, hold until
   the judge answers or gives up, and answer `{ labels: { productId: label |
   null } }` — or `{ labels: {} }` when it gave up, failed, or nothing is held
-  for that shop's search and page. Never an order: positions already served
-  stand. The pending answers live in process memory
+  for that shop's search and page. The endpoint merges code labels first
+  (YOY-160): a product the page served with a code-computed label
+  (`price-near`, `price-far`, `size-missing`) keeps it, and the judge's
+  label answers for the rest — the first response's rule (YOY-149 AC-12),
+  so a late answer never turns "slightly over your price" into "close
+  match". Never an order: positions already served stand. The pending answers live in process memory
   (`app/search/judge-step.server.ts`), kept 60 s after they settle. No
   client calls the endpoint yet.
 - **Costs.** `/internal/costs` shows judge calls (ledger rows under

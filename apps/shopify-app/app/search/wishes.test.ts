@@ -25,11 +25,12 @@ import { createTestDb } from "../testing/helpers.server";
 import { createPgTrgmClassicStore } from "./classic-store.server";
 import { createFindStep } from "./find.server";
 import { extractionCacheKey, sentenceLanguage } from "./extraction-cache.server";
-import { resetPendingLabels } from "./judge-step.server";
+import { awaitPendingLabels, resetPendingLabels } from "./judge-step.server";
 import { createSearchOrchestrator, type SearchRequest } from "./orchestrator.server";
 import {
   parseProxySearchBody,
   parseProxySearchParams,
+  serializeLabels,
   serializeProxySearchResponse,
 } from "./proxy.server";
 import {
@@ -682,6 +683,53 @@ describe("wishes on Engine v2 (on the database)", () => {
     expect(capped.routeReason).toBe("capped");
     expect(capped.hits.find((hit) => hit.productId === "p2")?.label?.template).toBe("price-far");
     expect(capped.chips).toEqual([{ field: "priceMax", value: "100" }]);
+  });
+
+  it("keeps a code label in the late labels after a judge timeout, the judge's label on the rest (YOY-160 AC-1, AC-2)", async () => {
+    await seed(db, [
+      { productId: "in1", title: "First Dress", y: 0.1, price: 80, sizes: [["M", true]] },
+      { productId: "near", title: "Near Dress", y: 0.2, price: 105, sizes: [["M", true]] },
+      { productId: "in2", title: "Second Dress", y: 0.3, price: 90, sizes: [["M", true]] },
+    ]);
+    const stated = wishes({ priceMax: { amount: 100, raw: "100" } });
+    const response = await search(
+      orchestrator({
+        extractor: fixedExtractor(stated),
+        judge: judgeLlm(["CDC", "CDC", "CDC"], [], 80),
+        judgeDeadlineMs: 20,
+      }),
+    );
+    expect(response).toMatchObject({ routeReason: "judge-timeout", labelsPending: true });
+    expect(response.hits.find((hit) => hit.productId === "near")?.label?.template).toBe("price-near");
+
+    const labels = await awaitPendingLabels(SHOP, response.searchId, 1);
+    expect(labels).toEqual({
+      in1: { template: "close-match", values: [] },
+      near: { template: "price-near", values: ["105 USD", "100 USD"] },
+      in2: { template: "close-match", values: [] },
+    });
+    expect(serializeLabels(labels).labels.near).toEqual({
+      template: "price-near",
+      values: ["105 USD", "100 USD"],
+    });
+  });
+
+  it("answers the judge's late labels unchanged for a page with no code labels (YOY-160 AC-2)", async () => {
+    await seed(db, FOUR.slice(0, 3));
+    const response = await search(
+      orchestrator({
+        extractor: fixedExtractor(NO_WISHES),
+        judge: judgeLlm(["CDC", "E-X", "CDC"], [], 80),
+        judgeDeadlineMs: 20,
+      }),
+    );
+    expect(response).toMatchObject({ routeReason: "judge-timeout", labelsPending: true });
+    expect(response.hits.every((hit) => hit.label === null)).toBe(true);
+    expect(await awaitPendingLabels(SHOP, response.searchId, 1)).toEqual({
+      p1: { template: "close-match", values: [] },
+      p2: null,
+      p3: { template: "close-match", values: [] },
+    });
   });
 
   it("drops a product the judge flagged as excluded from the page, unlabelled (AC-11)", async () => {

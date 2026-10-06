@@ -20,6 +20,7 @@ import {
 } from "@unfiltered/engine";
 
 import { normalizeReuseQuery } from "./events.server";
+import type { CodeLabel } from "./wishes.server";
 
 /**
  * Engine v2's judge step (YOY-147): the page's products, read as compact
@@ -262,6 +263,12 @@ export interface JudgeStepRequest<T extends { productId: string }> {
    * cached — are ignored for the request.
    */
   applyExcluded?: boolean;
+  /**
+   * The page's code-computed labels by product id (YOY-149 AC-12). A late
+   * answer delivers them in place of the judge's on the same product
+   * (YOY-160), the rule the first response applies.
+   */
+  codeLabels?: ReadonlyMap<string, CodeLabel>;
 }
 
 /**
@@ -458,8 +465,11 @@ async function writeVerdictRows<T extends { productId: string }>(
   }
 }
 
-/** The labels a late answer delivers (AC-8): one per product id, null for none. */
-export type PendingLabels = Record<string, JudgeLabel | null>;
+/**
+ * The labels a late answer delivers (AC-8): one per product id, null for
+ * none — the code-computed label where the page had one (YOY-160).
+ */
+export type PendingLabels = Record<string, JudgeLabel | CodeLabel | null>;
 
 interface PendingEntry {
   shopDomain: string;
@@ -635,8 +645,13 @@ export async function runJudgeStep<T extends { productId: string }>(
         warnJudgeFailure(searchId, "judge-timeout", late.error);
         return {};
       }
+      // A code-computed label replaces the judge's on the same card
+      // (YOY-149 AC-12), late as on the first response (YOY-160).
       return Object.fromEntries(
-        order(late.answer.verdicts).map((entry) => [entry.item.productId, entry.label]),
+        order(late.answer.verdicts).map(({ item, label }) => [
+          item.productId,
+          request.codeLabels?.get(item.productId) ?? label,
+        ]),
       );
     });
     pendingLabels.set(key, { shopDomain, labels });
