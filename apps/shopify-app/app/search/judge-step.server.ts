@@ -501,23 +501,34 @@ async function writeVerdictRows<T extends { productId: string }>(
     positionOffset: number;
     served: ReadonlyArray<{ item: T; verdict: JudgeVerdictCode; label: JudgeLabel | null }>;
     verdicts: readonly JudgeVerdict[];
+    /** Products judged "not relevant" and dropped from the page (YOY-163). */
+    dropped: readonly JudgeVerdict[];
     cached: boolean;
   },
 ): Promise<void> {
   const missedOf = new Map(input.verdicts.map((entry) => [entry.id, entry.missed]));
+  const row = (productId: string, position: number, verdict: JudgeVerdictCode, label: JudgeLabel | null) => ({
+    searchId: input.searchId,
+    shopDomain: input.shopDomain,
+    productId,
+    page: input.page,
+    position,
+    verdict,
+    missed: [...(missedOf.get(productId) ?? [])],
+    labelTemplate: label?.template ?? null,
+    cached: input.cached,
+  });
   try {
     await db.judgeVerdict.createMany({
-      data: input.served.map((entry, index) => ({
-        searchId: input.searchId,
-        shopDomain: input.shopDomain,
-        productId: entry.item.productId,
-        page: input.page,
-        position: input.positionOffset + index,
-        verdict: entry.verdict,
-        missed: [...(missedOf.get(entry.item.productId) ?? [])],
-        labelTemplate: entry.label?.template ?? null,
-        cached: input.cached,
-      })),
+      data: [
+        ...input.served.map((entry, index) =>
+          row(entry.item.productId, input.positionOffset + index, entry.verdict, entry.label),
+        ),
+        // A dropped product still writes its row, at position -1 (YOY-163
+        // AC-2): the log keeps one row per judged product, which
+        // `evidence.mts judge` counts against metered calls.
+        ...input.dropped.map((entry) => row(entry.id, -1, entry.verdict, null)),
+      ],
     });
   } catch (error) {
     warnJudgeStore("verdict log write", error);
@@ -655,6 +666,13 @@ export async function runJudgeStep<T extends { productId: string }>(
   ): Promise<JudgeStepResult<T>> => {
     const { verdicts } = answer;
     const served = order(verdicts);
+    const servedIds = new Set(served.map((entry) => entry.item.productId));
+    const dropped = verdicts.filter(
+      (entry) =>
+        entry.verdict === "not-relevant" &&
+        !(applyExcluded && entry.excluded) &&
+        !servedIds.has(entry.id),
+    );
     await timeRows(() =>
       writeVerdictRows(db, {
         shopDomain,
@@ -663,6 +681,7 @@ export async function runJudgeStep<T extends { productId: string }>(
         positionOffset,
         served,
         verdicts,
+        dropped,
         cached: outcome === "judge-cached",
       }),
     );

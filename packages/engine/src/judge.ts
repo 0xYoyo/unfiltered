@@ -761,12 +761,12 @@ export interface JudgedItem<T> {
 }
 
 /**
- * Order a page by verdict (AC-5, AC-8): verdict rank, ties in find order,
- * "not relevant" last and never removed. When every candidate is "not
- * relevant", the page stays in find order and every item carries
- * `close-match`. A product the judge flagged as excluded is dropped from
- * the page (YOY-149 AC-11). `items` and `verdicts` are parallel, in find
- * order.
+ * Order a page by verdict (AC-5, AC-8): verdict rank, ties in find order.
+ * A "not relevant" product is dropped from a page that has anything better
+ * (YOY-163), as an excluded one is (YOY-149 AC-11): the page may come out
+ * short. When every product left is "not relevant", the page stays in find
+ * order and every item carries `close-match` — nothing exact, here is the
+ * closest. `items` and `verdicts` are parallel, in find order.
  */
 export function orderByVerdict<T>(
   items: readonly T[],
@@ -789,6 +789,7 @@ export function orderByVerdict<T>(
     }));
   }
   return judged
+    .filter((entry) => entry.verdict !== "not-relevant")
     .sort((a, b) => VERDICT_RANK[a.verdict] - VERDICT_RANK[b.verdict] || a.index - b.index)
     .map(({ item, verdict, label }) => ({ item, verdict, label }));
 }

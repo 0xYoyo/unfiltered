@@ -989,8 +989,11 @@ runs one page.
   not one known code per candidate, or whose side list names a candidate
   twice or out of range, is asked once more, then fails
   (`JudgeAnswerError`).
-- **Order and labels.** `orderByVerdict`: verdict rank, ties in find order,
-  "not relevant" last and never removed. When every candidate is "not
+- **Order and labels.** `orderByVerdict`: verdict rank, ties in find order.
+  A "not relevant" product is dropped from a page that has anything better
+  (YOY-163), as an excluded one is, so a page can come out short (no
+  backfill; `totalCount` still counts the find order). Its verdict-log row
+  is still written, at `position: -1`. When every product left is "not
   relevant" the page stays in find order and every card carries
   `close-match`. A fact-differs value longer than three words, or a missing
   value, drops that label. Every v2 result on the wire carries `label`
