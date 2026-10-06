@@ -548,6 +548,14 @@ html:has(.playground) {
   margin-block-start: var(--space-6);
 }
 
+/* The "Close matches" divider inside a judged page's grid (YOY-166): the
+   section's own heading, spanning every column, above the close products. */
+.closeMatchesDivider {
+  grid-column: 1 / -1;
+  margin-block-start: var(--space-4);
+  list-style: none;
+}
+
 .closeMatchesHeading {
   margin: 0;
   font-family: var(--font-display);

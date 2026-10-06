@@ -91,7 +91,10 @@ export interface ProxySearchResponse {
   results: ProxyResult[];
   chips: ProxyChip[];
   intent: ProxyIntent | null;
-  /** Classic near-misses; present only on AI zero-hit responses. */
+  /**
+   * Classic near-misses on an AI zero-hit response; on a judged page with
+   * matches (non-empty `results`), the page's close products (YOY-166).
+   */
   closeMatches?: ProxyResult[];
   /** Constraint names the server relaxed to find them (YOY-111). */
   closeMatchesRelaxed?: string[];

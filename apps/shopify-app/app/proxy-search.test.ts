@@ -1128,14 +1128,18 @@ describe("the judge on the storefront (YOY-147)", () => {
       await action(actionArgs(proxyRequest({ payload: { query, sessionId: "judge-1" } })))
     ).json();
     expect(judged.route).toBe("ai");
+    // The close wrap dress sits under the divider beside the exact shirt (YOY-166 AC-1).
     expect(judged.results.map((result: { productId: string }) => result.productId)).toEqual([
       "linen-shirt",
-      "wrap-dress",
     ]);
-    expect(judged.results.map((result: { label: unknown }) => result.label)).toEqual([
-      null,
-      { template: "fact-differs", values: ["linen", "silk"] },
-    ]);
+    expect(judged.results.map((result: { label: unknown }) => result.label)).toEqual([null]);
+    expect(
+      judged.closeMatches.map((result: { productId: string; label: unknown }) => [
+        result.productId,
+        result.label,
+      ]),
+    ).toEqual([["wrap-dress", { template: "fact-differs", values: ["linen", "silk"] }]]);
+    expect(judged.closeMatchesRelaxed).toEqual([]);
     // The storefront wire carries no verdict and no details (AC-12).
     expect(JSON.stringify(judged)).not.toMatch(/verdict|"exact"|"close"/);
     expect(judged).not.toHaveProperty("details");

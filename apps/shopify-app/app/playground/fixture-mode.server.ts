@@ -72,7 +72,10 @@ export type PlaygroundFixtureName =
   | "labels"
   | "label-too-long"
   | "label-overflow"
-  | "labels-pending";
+  | "labels-pending"
+  // YOY-166: a judged order whose pages each hold matches and close
+  // products, the close ones under the page's "Close matches" divider.
+  | "v2-close";
 
 /** How long the `delayed` fixture waits — long enough to observe loading. */
 export const FIXTURE_DELAY_MS = 700;
@@ -145,6 +148,10 @@ export function selectFixture(
             ? "label-overflow"
             : "labels";
     }
+    if (has("divider")) {
+      // Close products under the divider (YOY-166): "divider red gown".
+      return "v2-close";
+    }
     if (has("budget")) {
       // Engine v2 chips (YOY-149): "budget dress under 400".
       return "v2-budget";
@@ -195,6 +202,52 @@ function pagedOrder(): PlaygroundSearchResponse {
   };
 }
 
+/** Products in the `v2-close` fixture's whole order, and its page size (YOY-166). */
+export const CLOSE_DIVIDER_FIXTURE_SIZE = 30;
+const CLOSE_DIVIDER_PAGE_SIZE = 24;
+/** How many of each `v2-close` page's products are close: the page's last ones. */
+const CLOSE_DIVIDER_CLOSE_PER_PAGE: Record<number, number> = { 1: 4, 2: 2 };
+
+/**
+ * One page of the `v2-close` fixture (YOY-166 AC-1, AC-3), as a judged
+ * Engine v2 page with matches answers: its matched products in `results`,
+ * its close ones — each labelled "close match" — in `closeMatches` with
+ * `closeMatchesRelaxed: []`, `totalCount` counting both.
+ */
+function closeDividerPage(page: number): PlaygroundSearchResponse {
+  const base = asResponse(labelsFixture);
+  const template = { ...base.results[0]!, label: null };
+  const start = (page - 1) * CLOSE_DIVIDER_PAGE_SIZE;
+  const products = Array.from(
+    { length: Math.max(0, Math.min(CLOSE_DIVIDER_PAGE_SIZE, CLOSE_DIVIDER_FIXTURE_SIZE - start)) },
+    (_, index) => start + index,
+  );
+  const closeCount = CLOSE_DIVIDER_CLOSE_PER_PAGE[page] ?? 0;
+  const matched = products.slice(0, products.length - closeCount);
+  const close = products.slice(products.length - closeCount);
+  const card = (index: number, isClose: boolean) => ({
+    ...template,
+    productId: `divider-${index}`,
+    title: isClose
+      ? `Close dress ${String(index).padStart(2, "0")}`
+      : `Red gown ${String(index).padStart(2, "0")}`,
+    label: isClose ? { template: "close-match" as const, values: [] } : null,
+  });
+  return {
+    ...base,
+    searchId: "fixture-v2-close",
+    route: "ai",
+    intent: null,
+    chips: [],
+    results: matched.map((index) => card(index, false)),
+    ...(close.length === 0
+      ? {}
+      : { closeMatches: close.map((index) => card(index, true)), closeMatchesRelaxed: [] }),
+    page,
+    totalCount: CLOSE_DIVIDER_FIXTURE_SIZE,
+  };
+}
+
 /**
  * One page of a fixture's answer, as the endpoint serves it (YOY-145
  * AC-4): with page parameters the response holds that page plus `page` and
@@ -204,7 +257,8 @@ export function pageOfFixture(
   outcome: FixtureOutcome,
   paging: { page: number; pageSize: number } | undefined,
 ): FixtureOutcome {
-  if (paging === undefined || outcome.body === null) {
+  // A fixture that pages itself (`v2-close`) is already one page.
+  if (paging === undefined || outcome.body === null || outcome.body.page !== undefined) {
     return outcome;
   }
   const start = (paging.page - 1) * paging.pageSize;
@@ -296,6 +350,8 @@ export function fixtureOutcome(
       return { delayMs: 0, status: 200, body: asResponse(labelOverflowFixture) };
     case "labels-pending":
       return { delayMs: 0, status: 200, body: asResponse(labelsPendingFixture) };
+    case "v2-close":
+      return { delayMs: 0, status: 200, body: closeDividerPage(paging?.page ?? 1) };
     case "color-unknown":
       return {
         delayMs: 0,

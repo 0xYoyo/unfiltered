@@ -135,6 +135,13 @@
   font-weight: 600;
 }
 
+/* The "Close matches" divider inside a judged page's grid (YOY-166): the
+   same heading, spanning every column, above the page's close products. */
+.grid-divider {
+  grid-column: 1 / -1;
+  margin-block: 16px 0;
+}
+
 .status {
   padding: 12px 4px;
 }

@@ -214,10 +214,12 @@ apps/
         strings.ts
         test-ui/
           ai-states.spec.ts
+          close-divider.spec.ts
           design-invariants.spec.ts
           engine.spec.ts
           evidence-ai.spec.ts
           evidence-classic-stages.spec.ts
+          evidence-close-divider.spec.ts
           evidence-close-matches.spec.ts
           evidence-design.spec.ts
           evidence-engine.spec.ts
@@ -557,6 +559,8 @@ apps/
         widget.css
       test-ui/
         ai-results.spec.ts
+        close-divider.spec.ts
+        evidence-close-divider.spec.ts
         evidence-close-matches.spec.ts
         evidence-hardening.spec.ts
         evidence-labels.spec.ts
@@ -1085,6 +1089,55 @@ docs/
       playground-mobile-he-4-details-engine-row.png
       playground-mobile-he-5-empty.png
       playground-mobile-he-6-error.png
+    YOY-166/
+      playground-desktop-en-empty.png
+      playground-desktop-en-error.png
+      playground-desktop-en-loading.png
+      playground-desktop-en-mixed-page-divider.png
+      playground-desktop-en-mixed-page-two-pages.png
+      playground-desktop-he-empty.png
+      playground-desktop-he-error.png
+      playground-desktop-he-loading.png
+      playground-desktop-he-mixed-page-divider.png
+      playground-desktop-he-mixed-page-two-pages.png
+      playground-mobile-en-empty.png
+      playground-mobile-en-error.png
+      playground-mobile-en-loading.png
+      playground-mobile-en-mixed-page-divider.png
+      playground-mobile-en-mixed-page-two-pages.png
+      playground-mobile-he-empty.png
+      playground-mobile-he-error.png
+      playground-mobile-he-loading.png
+      playground-mobile-he-mixed-page-divider.png
+      playground-mobile-he-mixed-page-two-pages.png
+      widget-native-desktop-en-page-1-divider.png
+      widget-native-desktop-en-page-2-divider.png
+      widget-native-desktop-he-page-1-divider.png
+      widget-native-desktop-he-page-2-divider.png
+      widget-native-mobile-en-page-1-divider.png
+      widget-native-mobile-en-page-2-divider.png
+      widget-native-mobile-he-page-1-divider.png
+      widget-native-mobile-he-page-2-divider.png
+      widget-overlay-desktop-en-appended-page-divider.png
+      widget-overlay-desktop-en-empty.png
+      widget-overlay-desktop-en-error.png
+      widget-overlay-desktop-en-loading.png
+      widget-overlay-desktop-en-mixed-page-divider.png
+      widget-overlay-desktop-he-appended-page-divider.png
+      widget-overlay-desktop-he-empty.png
+      widget-overlay-desktop-he-error.png
+      widget-overlay-desktop-he-loading.png
+      widget-overlay-desktop-he-mixed-page-divider.png
+      widget-overlay-mobile-en-appended-page-divider.png
+      widget-overlay-mobile-en-empty.png
+      widget-overlay-mobile-en-error.png
+      widget-overlay-mobile-en-loading.png
+      widget-overlay-mobile-en-mixed-page-divider.png
+      widget-overlay-mobile-he-appended-page-divider.png
+      widget-overlay-mobile-he-empty.png
+      widget-overlay-mobile-he-error.png
+      widget-overlay-mobile-he-loading.png
+      widget-overlay-mobile-he-mixed-page-divider.png
     YOY-64/
       desktop-en-intent-reuse.png
       desktop-he-intent-reuse.png
@@ -1382,6 +1435,7 @@ vitest.setup.ts
 - apps/shopify-app/app/playground/shopify-public-source.test.ts → apps/shopify-app/app/playground/catalog-source.server.ts, apps/shopify-app/app/playground/fixtures/shopify-public-products.ts, apps/shopify-app/app/playground/polite-fetch.server.ts, apps/shopify-app/app/playground/shopify-public-source.server.ts, apps/shopify-app/app/testing/fake-store.server.ts
 - apps/shopify-app/app/playground/sitemap.server.ts → apps/shopify-app/app/playground/polite-fetch.server.ts
 - apps/shopify-app/app/playground/test-ui/ai-states.spec.ts → apps/shopify-app/app/playground/strings.ts
+- apps/shopify-app/app/playground/test-ui/close-divider.spec.ts → apps/shopify-app/app/playground/strings.ts
 - apps/shopify-app/app/playground/test-ui/engine.spec.ts → apps/shopify-app/app/playground/strings.ts
 - apps/shopify-app/app/playground/test-ui/labels.spec.ts → apps/shopify-app/app/playground/strings.ts
 - apps/shopify-app/app/playground/test-ui/paging.spec.ts → apps/shopify-app/app/playground/strings.ts
