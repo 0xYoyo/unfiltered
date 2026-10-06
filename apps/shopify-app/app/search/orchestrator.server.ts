@@ -830,6 +830,7 @@ export function createSearchOrchestrator(
           positionOffset: pageStart,
           // A removed `exclude` chip is not applied through the judge either (AC-15).
           applyExcluded: !removedChips.some((chip) => chip.field === "exclude"),
+          codeLabels,
         }),
       );
       routeReason = judged.outcome;
