@@ -2,12 +2,19 @@ import { useLayoutEffect, useRef, useState } from "react";
 
 import { formatPrice } from "../../../widget/src/format";
 import {
+  cardImageLoading,
+  cardImageSources,
+} from "../../../widget/src/image-url";
+import {
   labelOverflows,
   labelSegments,
   type LabelLike,
   type LabelSegment,
 } from "../../../widget/src/labels";
 import type { PlaygroundStrings } from "../strings";
+
+/** The card's rendered width (YOY-169): half the viewport on a phone, else ~240 px. */
+const CARD_IMAGE_SIZES = "(max-width: 640px) 50vw, 240px";
 
 /**
  * One result card (YOY-92 AC-6), with the widget's card anatomy so what the
@@ -119,11 +126,14 @@ export function Card({
           aria-hidden="true"
         />
       ) : (
+        // Sized by the CDN where it can (YOY-169): 360/540/720 wide for a
+        // card that is about 180–240 px, two columns on a phone.
         <img
           className="cardImage"
-          src={card.imageUrl}
+          {...cardImageSources(card.imageUrl)}
+          sizes={CARD_IMAGE_SIZES}
           alt=""
-          loading="lazy"
+          loading={cardImageLoading(position)}
           decoding="async"
         />
       )}

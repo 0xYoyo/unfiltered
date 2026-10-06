@@ -75,7 +75,10 @@ export type PlaygroundFixtureName =
   | "labels-pending"
   // YOY-166: a judged order whose pages each hold matches and close
   // products, the close ones under the page's "Close matches" divider.
-  | "v2-close";
+  | "v2-close"
+  // YOY-169: one Shopify-CDN image and one crawl-sourced image, so the
+  // sized `src`/`srcset` and the untouched plain `src` both render.
+  | "images";
 
 /** How long the `delayed` fixture waits — long enough to observe loading. */
 export const FIXTURE_DELAY_MS = 700;
@@ -148,6 +151,10 @@ export function selectFixture(
             ? "label-overflow"
             : "labels";
     }
+    if (has("images")) {
+      // Sized card images (YOY-169): "images dress".
+      return "images";
+    }
     if (has("divider")) {
       // Close products under the divider (YOY-166): "divider red gown".
       return "v2-close";
@@ -199,6 +206,26 @@ function pagedOrder(): PlaygroundSearchResponse {
       productId: `paged-${index}`,
       title: `Paged dress ${String(index).padStart(2, "0")}`,
     })),
+  };
+}
+
+/** The Shopify-CDN image the `images` fixture's first card carries (YOY-169). */
+export const IMAGES_FIXTURE_SHOPIFY_URL =
+  "https://cdn.shopify.com/s/files/1/0001/files/fixture-dress.jpg?v=1712345678";
+/** The crawl-sourced image (another host) its second card carries. */
+export const IMAGES_FIXTURE_CRAWL_URL = "https://images.example.test/products/fixture-shirt.jpg";
+
+/** The `images` fixture: the results fixture's first two cards, re-imaged. */
+function imagesFixture(): PlaygroundSearchResponse {
+  const base = asResponse(resultsFixture);
+  const [first, second] = base.results;
+  return {
+    ...base,
+    searchId: "fixture-images",
+    results: [
+      { ...first!, productId: "images-shopify", imageUrl: IMAGES_FIXTURE_SHOPIFY_URL },
+      { ...second!, productId: "images-crawl", imageUrl: IMAGES_FIXTURE_CRAWL_URL },
+    ],
   };
 }
 
@@ -356,6 +383,8 @@ export function fixtureOutcome(
       return { delayMs: 0, status: 200, body: asResponse(labelOverflowFixture) };
     case "labels-pending":
       return { delayMs: 0, status: 200, body: asResponse(labelsPendingFixture) };
+    case "images":
+      return { delayMs: 0, status: 200, body: imagesFixture() };
     case "v2-close":
       return { delayMs: 0, status: 200, body: closeDividerPage(paging?.page ?? 1) };
     case "color-unknown":
