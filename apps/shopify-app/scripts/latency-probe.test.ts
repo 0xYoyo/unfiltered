@@ -74,6 +74,7 @@ function sample(overrides: Partial<ProbeSample>): ProbeSample {
     stages: { classify: 40, intent: 600, embed: 100, retrieve: 200, hydrate: 10 },
     extractionInTime: null,
     extractionCached: null,
+    judgeCalls: null,
     ...overrides,
   };
 }
@@ -188,6 +189,34 @@ describe("the judge stage over every set (YOY-154 AC-8)", () => {
     // A route that never reached the judge prints no outcome, still the searchId.
     expect(formatSampleLine(sample({ searchId: "s-9", routeReason: "intent-reuse" }), 1, 5, "q")).toBe(
       'ai-en run 1/5 1000 ms ai REUSED s-9 "q"',
+    );
+  });
+
+  it("splits the judge stage: judgeRows, and each search's slowest and median single call (YOY-159 AC-1)", () => {
+    const split = (judgeRows: number, judge: number, slowestMs: number, medianMs: number, open = false, routeReason = "judged") =>
+      sample({ routeReason, stages: { find: 300, judgeRows, judge }, judgeCalls: { slowestMs, medianMs, open } });
+    const samples = [
+      split(20, 700, 690, 300),
+      split(30, 900, 880, 320),
+      split(25, 1500, 1500, 1500, true, "judge-timeout"),
+      sample({ routeReason: "judge-cached", stages: { find: 300, judgeRows: 15, judge: 0 } }),
+    ];
+    const summary = summarizeJudge(samples)!;
+    expect(summary.rows).toEqual({ p50: 20, p95: 30 });
+    expect(summary.slowestCall).toEqual({ p50: 880, p95: 1500 });
+    expect(summary.medianCall).toEqual({ p50: 320, p95: 1500 });
+    expect(summary.openCalls).toBe(1);
+    expect(formatJudgeSummary(summary)).toBe(
+      "[judge, all sets] n=4 p50=700 ms p95=1500 ms judge-error=0% outcomes: judged=2 judge-cached=1 judge-timeout=1 judge-error=0" +
+        " | judgeRows p50=20 ms p95=30 ms | slowest call p50=880 ms p95=1500 ms | median call p50=320 ms p95=1500 ms" +
+        " (served before every call settled: 1)",
+    );
+    expect(formatSampleLine(samples[0]!, 1, 5, "q")).toBe(
+      'ai-en run 1/5 1000 ms ai judged rows=20 ms calls slowest=690 ms median=300 ms s "q"',
+    );
+    // A search served on a deadline miss shows its call times as lower bounds.
+    expect(formatSampleLine(samples[2]!, 1, 5, "q")).toBe(
+      'ai-en run 1/5 1000 ms ai judge-timeout rows=25 ms calls slowest=≥1500 ms median=≥1500 ms s "q"',
     );
   });
 

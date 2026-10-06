@@ -1007,10 +1007,19 @@ runs one page.
   `route = "ai"`) count judged searches and nothing else. `routeReason` is
   one of `judged`, `judge-timeout`, `judge-error`, `judge-cached`, `capped`,
   `find-only`.
-- **Diagnostics.** The `judge` stage times the rows and the call. Playground
-  `details.judge` is `{ outcome, verdicts: [{ productId, verdict }] }` on a
-  find-path response (verdict null where the judge did not answer), null
-  otherwise. `scripts/latency-probe.mts --engine v1|v2` sends that `engine`
+- **Diagnostics.** The step is split in two stages (YOY-159): `judgeRows`
+  is its database work — the page's rows, the card hashes and the cache
+  key, the answer-cache read and write, the verdict log — and `judge` is the
+  rest, the call and its wait. Playground `details.judge` is `{ outcome,
+  verdicts: [{ productId, verdict }], calls }` on a find-path response
+  (verdict null where the judge did not answer), null otherwise. `calls` is
+  `{ settled, slowestMs, medianMs, open }`: the judge's single provider calls
+  (one per product for Jev) as the page was served, each timed by the
+  adapter through `JudgeRequest.onCallSettled`; on a deadline miss the calls
+  still running count as the time they had run and `open` is true. Null
+  when no call started (a cached answer). The probe's `[judge, all sets]`
+  line prints the p50/p95 of `judgeRows`, of the slowest call and of the
+  median call. None of it reaches the storefront wire. `scripts/latency-probe.mts --engine v1|v2` sends that `engine`
   to the playground API, so either engine can be timed whatever the
   deployment's default; without it the probe times the engine the
   deployment serves.

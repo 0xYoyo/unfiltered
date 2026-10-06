@@ -234,6 +234,50 @@ export interface JudgeStepResult<T> {
    * answered in time or from the cache; null otherwise.
    */
   otherReading: string | null;
+  /**
+   * Whole ms the step spent on the database before the page was served
+   * (YOY-159 AC-1): the page's rows, the card hashes and the cache key, the
+   * answer-cache read and write, and the verdict-log write. The rest of the
+   * step is the call and its wait.
+   */
+  rowsMs: number;
+  /** The single provider calls' times when a call started (YOY-159 AC-1); null otherwise. */
+  calls: JudgeCallTimes | null;
+}
+
+/**
+ * The judge call's single provider calls as the page was served (YOY-159
+ * AC-1) — one per product for the decision judge. A page served on a
+ * deadline miss leaves calls still running: each counts as the time it had
+ * run by then, so `slowestMs` and `medianMs` are lower bounds and `open` is
+ * true.
+ */
+export interface JudgeCallTimes {
+  /** Calls that settled before the page was served. */
+  settled: number;
+  slowestMs: number;
+  medianMs: number;
+  open: boolean;
+}
+
+/** Slowest and median (upper median) of call times, whole ms. */
+export function judgeCallTimes(
+  settledMs: readonly number[],
+  stillRunning: number,
+  runningMs: number,
+): JudgeCallTimes | null {
+  const times = [...settledMs, ...Array<number>(Math.max(0, stillRunning)).fill(runningMs)].sort(
+    (a, b) => a - b,
+  );
+  if (times.length === 0) {
+    return null;
+  }
+  return {
+    settled: settledMs.length,
+    slowestMs: Math.round(times[times.length - 1]!),
+    medianMs: Math.round(times[Math.floor(times.length / 2)]!),
+    open: stillRunning > 0,
+  };
 }
 
 export interface JudgeStepRequest<T extends { productId: string }> {
@@ -533,6 +577,19 @@ export async function runJudgeStep<T extends { productId: string }>(
       items,
       applyExcluded ? verdicts : verdicts.map((entry) => ({ ...entry, excluded: false })),
     );
+  // The step's database time (YOY-159 AC-1), apart from the call's.
+  let rowsMs = 0;
+  const timeRows = async <R>(run: () => Promise<R>): Promise<R> => {
+    const startedAt = performance.now();
+    try {
+      return await run();
+    } finally {
+      rowsMs += performance.now() - startedAt;
+    }
+  };
+  // Each single provider call's time as it settles; read when the page is served.
+  const callMs: number[] = [];
+  let calls: JudgeCallTimes | null = null;
   const findOrder = (
     outcome: JudgeOutcome,
     started = true,
@@ -543,15 +600,19 @@ export async function runJudgeStep<T extends { productId: string }>(
     labelsPending,
     items: items.map((item) => ({ item, verdict: null, label: null })),
     otherReading: null,
+    rowsMs: Math.round(rowsMs),
+    calls,
   });
   let candidates: JudgeCandidate[];
   let cacheKey: string;
   try {
     const productIds = items.map((item) => item.productId);
-    const [loaded, hashes] = await Promise.all([
-      loadJudgeCandidates(db, shopDomain, productIds),
-      cardTextHashes(db, shopDomain, productIds),
-    ]);
+    const [loaded, hashes] = await timeRows(() =>
+      Promise.all([
+        loadJudgeCandidates(db, shopDomain, productIds),
+        cardTextHashes(db, shopDomain, productIds),
+      ]),
+    );
     candidates = loaded;
     cacheKey = judgeCacheKey({
       sentence,
@@ -579,25 +640,29 @@ export async function runJudgeStep<T extends { productId: string }>(
   ): Promise<JudgeStepResult<T>> => {
     const { verdicts } = answer;
     const served = order(verdicts);
-    await writeVerdictRows(db, {
-      shopDomain,
-      searchId,
-      page,
-      positionOffset,
-      served,
-      verdicts,
-      cached: outcome === "judge-cached",
-    });
+    await timeRows(() =>
+      writeVerdictRows(db, {
+        shopDomain,
+        searchId,
+        page,
+        positionOffset,
+        served,
+        verdicts,
+        cached: outcome === "judge-cached",
+      }),
+    );
     return {
       outcome,
       started: outcome === "judged",
       labelsPending: false,
       items: served,
       otherReading: answer.otherReading,
+      rowsMs: Math.round(rowsMs),
+      calls,
     };
   };
 
-  const cached = await readCachedAnswer(db, shopDomain, cacheKey, candidates);
+  const cached = await timeRows(() => readCachedAnswer(db, shopDomain, cacheKey, candidates));
   if (cached !== null) {
     return serve(cached, "judge-cached");
   }
@@ -606,6 +671,7 @@ export async function runJudgeStep<T extends { productId: string }>(
   // this response waits for it (YOY-148 AC-6).
   const controller = new AbortController();
   const giveUp = setTimeout(() => controller.abort(), giveUpMs);
+  const callStartedAt = performance.now();
   // The call's failure is a value, so a rejection after the deadline won is
   // never unobserved.
   const call = judge
@@ -616,6 +682,9 @@ export async function runJudgeStep<T extends { productId: string }>(
       storeId: shopDomain,
       searchId,
       signal: controller.signal,
+      onCallSettled: (ms) => {
+        callMs.push(ms);
+      },
     })
     .then(
       (answer) => ({ kind: "answered" as const, answer }),
@@ -626,7 +695,7 @@ export async function runJudgeStep<T extends { productId: string }>(
       // A partial answer holds stand-in verdicts for failed questions
       // (YOY-152): served, never cached.
       if (settled.kind === "answered" && settled.answer.partial !== true) {
-        await storeAnswer(db, shopDomain, cacheKey, settled.answer);
+        await timeRows(() => storeAnswer(db, shopDomain, cacheKey, settled.answer));
       }
       return settled;
     });
@@ -636,6 +705,13 @@ export async function runJudgeStep<T extends { productId: string }>(
   });
   const settled = await Promise.race([call, deadline]);
   clearTimeout(timer);
+  // The calls as the page is served: on a deadline miss the ones still
+  // running count as the time they have run (YOY-159 AC-1).
+  calls = judgeCallTimes(
+    callMs,
+    settled.kind === "timeout" ? candidates.length - callMs.length : 0,
+    performance.now() - callStartedAt,
+  );
 
   if (settled.kind === "timeout") {
     warnJudgeFailure(searchId, "judge-timeout", new Error(`no answer within ${deadlineMs}ms`));
