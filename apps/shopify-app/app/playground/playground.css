@@ -241,6 +241,14 @@ html:has(.playground) {
   font-size: var(--size-body-sm);
 }
 
+/* The engine a `/try?engine=` page view asks for (YOY-165): the status
+   line's muted ink and size above the bar, no colour of its own. */
+.engineBadge {
+  margin: 0 0 var(--space-3);
+  color: var(--text-muted);
+  font-size: var(--size-body-sm);
+}
+
 /* An error is a plain sentence in the critical ink, never a red box (kit
    §4 States). */
 .statusLineFailed {

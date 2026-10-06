@@ -115,6 +115,13 @@ export interface PlaygroundStrings {
   detailsIntent: string;
   /** Heading of the per-stage timing rows (YOY-114). */
   detailsStages: string;
+  /** Which engine answered (YOY-165 AC-2). */
+  detailsEngine: string;
+  /**
+   * The badge near the search field when `/try?engine=` names an engine
+   * (YOY-165 AC-2); {engine} is `v1` or `v2`.
+   */
+  engineBadge: string;
   /** Value shown for a detail the response left null. */
   detailsNone: string;
   detailsYes: string;
@@ -191,6 +198,8 @@ export const PLAYGROUND_STRING_CATALOG: Record<
     detailsLimited: "Limited",
     detailsIntent: "Extracted intent",
     detailsStages: "Stages",
+    detailsEngine: "Engine",
+    engineBadge: "Engine {engine}",
     detailsNone: "none",
     detailsYes: "yes",
     detailsNo: "no",
@@ -253,6 +262,8 @@ export const PLAYGROUND_STRING_CATALOG: Record<
     detailsLimited: "הוגבל",
     detailsIntent: "כוונה שחולצה",
     detailsStages: "שלבים",
+    detailsEngine: "מנוע",
+    engineBadge: "מנוע {engine}",
     detailsNone: "אין",
     detailsYes: "כן",
     detailsNo: "לא",

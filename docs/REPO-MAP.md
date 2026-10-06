@@ -206,6 +206,7 @@ apps/
         playground.css
         polite-fetch.server.ts
         polite-fetch.test.ts
+        search-client.test.ts
         search-client.ts
         shopify-public-source.server.ts
         shopify-public-source.test.ts
@@ -214,10 +215,12 @@ apps/
         test-ui/
           ai-states.spec.ts
           design-invariants.spec.ts
+          engine.spec.ts
           evidence-ai.spec.ts
           evidence-classic-stages.spec.ts
           evidence-close-matches.spec.ts
           evidence-design.spec.ts
+          evidence-engine.spec.ts
           evidence-examples.spec.ts
           evidence-hardening.spec.ts
           evidence-intent-reuse.spec.ts
@@ -1002,6 +1005,31 @@ docs/
       widget-overlay-mobile-he-4-loading.png
       widget-overlay-mobile-he-5-empty.png
       widget-overlay-mobile-he-6-error.png
+    YOY-165/
+      playground-desktop-en-1-initial.png
+      playground-desktop-en-2-loading.png
+      playground-desktop-en-3-results.png
+      playground-desktop-en-4-details-engine-row.png
+      playground-desktop-en-5-empty.png
+      playground-desktop-en-6-error.png
+      playground-desktop-he-1-initial.png
+      playground-desktop-he-2-loading.png
+      playground-desktop-he-3-results.png
+      playground-desktop-he-4-details-engine-row.png
+      playground-desktop-he-5-empty.png
+      playground-desktop-he-6-error.png
+      playground-mobile-en-1-initial.png
+      playground-mobile-en-2-loading.png
+      playground-mobile-en-3-results.png
+      playground-mobile-en-4-details-engine-row.png
+      playground-mobile-en-5-empty.png
+      playground-mobile-en-6-error.png
+      playground-mobile-he-1-initial.png
+      playground-mobile-he-2-loading.png
+      playground-mobile-he-3-results.png
+      playground-mobile-he-4-details-engine-row.png
+      playground-mobile-he-5-empty.png
+      playground-mobile-he-6-error.png
     YOY-64/
       desktop-en-intent-reuse.png
       desktop-he-intent-reuse.png
@@ -1270,7 +1298,7 @@ vitest.setup.ts
 - apps/shopify-app/app/playground/components/ChipRow.tsx → apps/shopify-app/app/playground/strings.ts, apps/shopify-app/app/search/proxy.server.ts, apps/shopify-app/widget/src/format.ts
 - apps/shopify-app/app/playground/components/EngineDetails.tsx → apps/shopify-app/app/playground/api.server.ts, apps/shopify-app/app/playground/strings.ts, apps/shopify-app/app/search/stages.ts
 - apps/shopify-app/app/playground/components/ExampleQueries.tsx → apps/shopify-app/app/playground/strings.ts
-- apps/shopify-app/app/playground/components/LanguageToggle.tsx → apps/shopify-app/app/playground/strings.ts
+- apps/shopify-app/app/playground/components/LanguageToggle.tsx → apps/shopify-app/app/playground/search-client.ts, apps/shopify-app/app/playground/strings.ts
 - apps/shopify-app/app/playground/components/NewSearch.tsx → apps/shopify-app/app/playground/strings.ts
 - apps/shopify-app/app/playground/components/ResultsGrid.tsx → apps/shopify-app/app/playground/components/Card.tsx, apps/shopify-app/app/playground/strings.ts
 - apps/shopify-app/app/playground/components/SearchBar.tsx → apps/shopify-app/app/playground/strings.ts
@@ -1293,11 +1321,13 @@ vitest.setup.ts
 - apps/shopify-app/app/playground/playground-examples.test.ts → apps/shopify-app/app/playground/strings.ts, apps/shopify-app/widget/src/format.ts
 - apps/shopify-app/app/playground/playground-strings.test.ts → apps/shopify-app/app/playground/strings.ts
 - apps/shopify-app/app/playground/polite-fetch.test.ts → apps/shopify-app/app/playground/polite-fetch.server.ts, apps/shopify-app/app/testing/fake-store.server.ts
+- apps/shopify-app/app/playground/search-client.test.ts → apps/shopify-app/app/playground/search-client.ts, apps/shopify-app/app/search/proxy.server.ts
 - apps/shopify-app/app/playground/search-client.ts → apps/shopify-app/app/playground/api.server.ts, apps/shopify-app/app/search/proxy.server.ts
 - apps/shopify-app/app/playground/shopify-public-source.server.ts → apps/shopify-app/app/catalog/mapping.server.ts, apps/shopify-app/app/catalog/variants.server.ts, apps/shopify-app/app/playground/catalog-source.server.ts, apps/shopify-app/app/playground/polite-fetch.server.ts
 - apps/shopify-app/app/playground/shopify-public-source.test.ts → apps/shopify-app/app/playground/catalog-source.server.ts, apps/shopify-app/app/playground/fixtures/shopify-public-products.ts, apps/shopify-app/app/playground/polite-fetch.server.ts, apps/shopify-app/app/playground/shopify-public-source.server.ts, apps/shopify-app/app/testing/fake-store.server.ts
 - apps/shopify-app/app/playground/sitemap.server.ts → apps/shopify-app/app/playground/polite-fetch.server.ts
 - apps/shopify-app/app/playground/test-ui/ai-states.spec.ts → apps/shopify-app/app/playground/strings.ts
+- apps/shopify-app/app/playground/test-ui/engine.spec.ts → apps/shopify-app/app/playground/strings.ts
 - apps/shopify-app/app/playground/test-ui/labels.spec.ts → apps/shopify-app/app/playground/strings.ts
 - apps/shopify-app/app/playground/test-ui/paging.spec.ts → apps/shopify-app/app/playground/strings.ts
 - apps/shopify-app/app/playground/test-ui/playground.spec.ts → apps/shopify-app/app/playground/strings.ts
@@ -1329,7 +1359,7 @@ vitest.setup.ts
 - apps/shopify-app/app/routes/privacy.tsx → apps/shopify-app/app/playground/fonts.css (unresolved), apps/shopify-app/app/playground/tokens.css (unresolved), apps/shopify-app/app/site/pages/PrivacyPage.tsx, apps/shopify-app/app/site/site.css (unresolved)
 - apps/shopify-app/app/routes/s.$slug.tsx → apps/shopify-app/app/db.server.ts, apps/shopify-app/app/playground/PlaygroundPage.tsx, apps/shopify-app/app/playground/components/CatalogNotFound.tsx, apps/shopify-app/app/playground/components/LanguageToggle.tsx, apps/shopify-app/app/playground/fixture-mode.server.ts, apps/shopify-app/app/playground/fonts.css (unresolved), apps/shopify-app/app/playground/playground.css (unresolved), apps/shopify-app/app/playground/strings.ts, apps/shopify-app/app/playground/tokens.css (unresolved)
 - apps/shopify-app/app/routes/terms.tsx → apps/shopify-app/app/playground/fonts.css (unresolved), apps/shopify-app/app/playground/tokens.css (unresolved), apps/shopify-app/app/site/pages/TermsPage.tsx, apps/shopify-app/app/site/site.css (unresolved)
-- apps/shopify-app/app/routes/try.tsx → apps/shopify-app/app/playground/PlaygroundPage.tsx, apps/shopify-app/app/playground/fonts.css (unresolved), apps/shopify-app/app/playground/playground.css (unresolved), apps/shopify-app/app/playground/strings.ts, apps/shopify-app/app/playground/tokens.css (unresolved), apps/shopify-app/app/site/components/SiteFooter.tsx, apps/shopify-app/app/site/components/SiteNav.tsx, apps/shopify-app/app/site/site.css (unresolved)
+- apps/shopify-app/app/routes/try.tsx → apps/shopify-app/app/playground/PlaygroundPage.tsx, apps/shopify-app/app/playground/fonts.css (unresolved), apps/shopify-app/app/playground/playground.css (unresolved), apps/shopify-app/app/playground/search-client.ts, apps/shopify-app/app/playground/strings.ts, apps/shopify-app/app/playground/tokens.css (unresolved), apps/shopify-app/app/site/components/SiteFooter.tsx, apps/shopify-app/app/site/components/SiteNav.tsx, apps/shopify-app/app/site/site.css (unresolved)
 - apps/shopify-app/app/routes/webhooks.app.scopes_update.tsx → apps/shopify-app/app/db.server.ts, apps/shopify-app/app/shopify.server.ts
 - apps/shopify-app/app/routes/webhooks.app.uninstalled.tsx → apps/shopify-app/app/db.server.ts, apps/shopify-app/app/shopify.server.ts
 - apps/shopify-app/app/routes/webhooks.customers.data_request.tsx → apps/shopify-app/app/shopify.server.ts

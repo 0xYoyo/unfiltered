@@ -41,6 +41,8 @@ export function EngineDetails({
   onToggle: () => void;
 }) {
   const rows: { label: string; value: string }[] = [
+    // Which engine answered (YOY-165 AC-2).
+    { label: strings.detailsEngine, value: response.details.engine },
     { label: strings.detailsRoute, value: response.route },
     { label: strings.detailsRouteReason, value: response.details.routeReason },
     // Which tier answered the intent call (YOY-116): "lite", "accuracy", or
