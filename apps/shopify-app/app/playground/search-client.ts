@@ -22,6 +22,20 @@ import type { PlaygroundSearchResponse } from "./api.server";
 
 export const PREVIEW_DEBOUNCE_MS = 200;
 
+/** The engine a playground page view asks for (YOY-165): `/try?engine=`. */
+export type PlaygroundEngine = "v1" | "v2";
+
+/**
+ * The engine named by a page URL's `engine` parameter (YOY-165 AC-1):
+ * `v1` or `v2`; anything else, or nothing, is ignored and the server
+ * default answers.
+ */
+export function playgroundEngineParam(
+  value: string | null,
+): PlaygroundEngine | undefined {
+  return value === "v1" || value === "v2" ? value : undefined;
+}
+
 /**
  * One removed engine v2 chip as it rides `removedChips` (YOY-149): the
  * field and value identify it. Structural, so it does not depend on the
@@ -94,6 +108,11 @@ export interface PlaygroundSearchRequest {
    * one; a keystroke preview never does.
    */
   paging?: { page: number; pageSize: number };
+  /**
+   * The engine the page view asks for (YOY-165 AC-1); absent means the
+   * server default. Never on a preview.
+   */
+  engine?: PlaygroundEngine;
   signal?: AbortSignal;
 }
 
@@ -107,6 +126,7 @@ export function playgroundSearchUrl(request: {
   removedChips?: readonly RemovedChip[];
   previousQuery?: string;
   paging?: { page: number; pageSize: number };
+  engine?: PlaygroundEngine;
 }): string {
   const params = new URLSearchParams({
     query: request.query,
@@ -144,6 +164,11 @@ export function playgroundSearchUrl(request: {
     params.set("page", String(request.paging.page));
     params.set("pageSize", String(request.paging.pageSize));
   }
+  // A keystroke preview is classic-only, so it never names an engine
+  // (YOY-165 AC-1).
+  if (request.engine !== undefined && !request.preview) {
+    params.set("engine", request.engine);
+  }
   return `/api/playground/search?${params.toString()}`;
 }
 
@@ -169,6 +194,7 @@ export async function searchPlayground(
       ? {}
       : { previousQuery: request.previousQuery }),
     ...(request.paging === undefined ? {} : { paging: request.paging }),
+    ...(request.engine === undefined ? {} : { engine: request.engine }),
   });
   const response = await fetch(url, {
     ...(request.signal === undefined ? {} : { signal: request.signal }),
