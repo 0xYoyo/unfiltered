@@ -682,6 +682,9 @@ html:has(.playground) {
   block-size: calc(var(--size-caption) * var(--lh-tight));
   white-space: nowrap;
   overflow: hidden;
+  /* One line, always (YOY-168 AC-4): a label wider than its card is removed
+     whole (YOY-151 AC-6); the ellipsis only guards the frame before that. */
+  text-overflow: ellipsis;
 }
 
 .cardSoldOut {

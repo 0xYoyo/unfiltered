@@ -231,7 +231,13 @@ function closeDividerPage(page: number): PlaygroundSearchResponse {
     title: isClose
       ? `Close dress ${String(index).padStart(2, "0")}`
       : `Red gown ${String(index).padStart(2, "0")}`,
-    label: isClose ? { template: "close-match" as const, values: [] } : null,
+    // A matched card keeps its label (the page's first carries one); a close
+    // card's `close-match` label is dropped under the heading (YOY-168 AC-3).
+    label: isClose
+      ? { template: "close-match" as const, values: [] }
+      : index === start
+        ? { template: "price-near" as const, values: ["420 ILS", "400 ILS"] }
+        : null,
   });
   return {
     ...base,

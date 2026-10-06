@@ -7,6 +7,7 @@ import {
   labelLocale,
   labelSegments,
   labelText,
+  underCloseHeading,
 } from "../../widget/src/labels";
 import { STRING_CATALOG } from "../../widget/src/strings";
 import { PLAYGROUND_STRING_CATALOG } from "./strings";
@@ -20,16 +21,16 @@ import { PLAYGROUND_STRING_CATALOG } from "./strings";
 
 const TEMPLATES = {
   en: {
-    labelPriceNear: "{price}, slightly over {cap}",
-    labelPriceFar: "{price}, over your {cap}",
-    labelSizeMissing: "no {size} — {sizes} in stock",
+    labelPriceNear: "slightly over budget",
+    labelPriceFar: "over budget",
+    labelSizeMissing: "size {size} not in stock",
     labelFactDiffers: "in {have}, not {asked}",
     labelCloseMatch: "close match",
   },
   he: {
-    labelPriceNear: "{price}, מעט מעל {cap}",
-    labelPriceFar: "{price}, מעל ה-{cap} שביקשת",
-    labelSizeMissing: "אין {size} — יש {sizes} במלאי",
+    labelPriceNear: "מעט מעל התקציב",
+    labelPriceFar: "מעל התקציב",
+    labelSizeMissing: "מידה {size} לא במלאי",
     labelFactDiffers: "ב{have}, לא {asked}",
     labelCloseMatch: "התאמה קרובה",
   },
@@ -53,14 +54,16 @@ describe("label templates (AC-1)", () => {
 
   it("fills every template in English", () => {
     const strings = STRING_CATALOG.en;
+    // The price labels carry no numbers (YOY-168 AC-1); the wire's values stay.
     expect(labelText(strings, { template: "price-near", values: ["420 ILS", "400 ILS"] })).toBe(
-      "420 ILS, slightly over 400 ILS",
+      "slightly over budget",
     );
     expect(labelText(strings, { template: "price-far", values: ["640 ILS", "400 ILS"] })).toBe(
-      "640 ILS, over your 400 ILS",
+      "over budget",
     );
+    // The size label keeps its one value, the size asked for (YOY-168 AC-2).
     expect(labelText(strings, { template: "size-missing", values: ["M", "S", "L"] })).toBe(
-      "no M — S, L in stock",
+      "size M not in stock",
     );
     expect(labelText(strings, { template: "fact-differs", values: ["linen", "silk"] })).toBe(
       "in linen, not silk",
@@ -71,13 +74,13 @@ describe("label templates (AC-1)", () => {
   it("fills every template in Hebrew", () => {
     const strings = PLAYGROUND_STRING_CATALOG.he;
     expect(labelText(strings, { template: "price-near", values: ["420 ILS", "400 ILS"] })).toBe(
-      "420 ILS, מעט מעל 400 ILS",
+      "מעט מעל התקציב",
     );
     expect(labelText(strings, { template: "price-far", values: ["640 ILS", "400 ILS"] })).toBe(
-      "640 ILS, מעל ה-400 ILS שביקשת",
+      "מעל התקציב",
     );
     expect(labelText(strings, { template: "size-missing", values: ["M", "S"] })).toBe(
-      "אין M — יש S במלאי",
+      "מידה M לא במלאי",
     );
     expect(labelText(strings, { template: "fact-differs", values: ["פשתן", "משי"] })).toBe(
       "בפשתן, לא משי",
@@ -158,19 +161,36 @@ describe("price label amounts in the storefront's format (YOY-164 AC-2)", () => 
     expect(formatLabelMoney("12 XYZ1", "en")).toBe("12 XYZ1");
   });
 
-  it("fills a price label with formatted amounts when a locale is given; other templates and no locale are unchanged", () => {
+  it("a price label shows no amount with or without a locale (YOY-168 AC-1); the size label is unchanged by one", () => {
     const priceNear = { template: "price-near", values: ["411.6 USD", "400 USD"] };
-    expect(labelText(STRING_CATALOG.en, priceNear)).toBe("411.6 USD, slightly over 400 USD");
-    expect(
-      labelSegments(STRING_CATALOG.en, priceNear, "en")!
+    for (const locale of [undefined, "en"]) {
+      const text = labelSegments(STRING_CATALOG.en, priceNear, locale)!
         .map((segment) => segment.text)
-        .join(""),
-    ).toBe("$411.60, slightly over $400");
+        .join("");
+      expect(text).toBe("slightly over budget");
+      expect(text).not.toMatch(/\d/);
+    }
     const size = { template: "size-missing", values: ["M", "S", "L"] };
     expect(
       labelSegments(STRING_CATALOG.en, size, "en")!
         .map((segment) => segment.text)
         .join(""),
-    ).toBe("no M — S, L in stock");
+    ).toBe("size M not in stock");
+  });
+});
+
+describe("no close-match label under the heading (YOY-168 AC-3)", () => {
+  const card = (template: string | null) => ({
+    productId: "p",
+    label: template === null ? null : { template, values: [] as string[] },
+  });
+
+  it("drops a close-match label: the heading is the label", () => {
+    expect(underCloseHeading(card("close-match")).label).toBeNull();
+  });
+
+  it("keeps any other label, and a card with none", () => {
+    expect(underCloseHeading(card("price-far")).label).toEqual({ template: "price-far", values: [] });
+    expect(underCloseHeading(card(null)).label).toBeNull();
   });
 });

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { underCloseHeading } from "../../widget/src/labels";
 import type {
   ProxyChip,
   ProxyIntent,
@@ -43,7 +44,8 @@ interface ShownPage {
  * `results`) keep their own section below the grid.
  */
 function inlineCloseMatches(page: PlaygroundSearchResponse): PlaygroundCard[] {
-  return page.results.length > 0 ? (page.closeMatches ?? []) : [];
+  // Under the heading, the heading is the label (YOY-168 AC-3).
+  return page.results.length > 0 ? (page.closeMatches ?? []).map(underCloseHeading) : [];
 }
 
 /**
@@ -579,7 +581,9 @@ export function PlaygroundPage({
   }, [response, more, lateLabels, previewCards]);
   // A zero-hit response's close matches keep their own section (YOY-111).
   const closeMatches =
-    response !== null && response.results.length === 0 ? (response.closeMatches ?? []) : [];
+    response !== null && response.results.length === 0
+      ? (response.closeMatches ?? []).map(underCloseHeading)
+      : [];
   const zeroHit =
     response !== null &&
     response.route === "ai" &&

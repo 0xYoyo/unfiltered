@@ -60,6 +60,16 @@ export const LABEL_MAX_CHARS: Record<LabelTemplate, number> = {
 };
 
 /**
+ * A card that sits under a "Close matches" heading (YOY-168 AC-3): the
+ * heading is its label, so a `close-match` label is dropped; any other
+ * label stays. A page with no heading (the reject-all page) keeps its
+ * `close-match` labels — this is applied only under the heading.
+ */
+export function underCloseHeading<T extends { label?: LabelLike | null }>(card: T): T {
+  return card.label?.template === "close-match" ? { ...card, label: null } : card;
+}
+
+/**
  * The label language for a storefront locale (AC-7): English and Hebrew
  * have templates; any other locale — the widget's chrome falls back to
  * English there — shows no label at all, because an English sentence on a
