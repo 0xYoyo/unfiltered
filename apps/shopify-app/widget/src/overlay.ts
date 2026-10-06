@@ -1,4 +1,5 @@
 import { chipLabelParts, formatPrice, isNegationChip } from "./format";
+import { cardImageLoading, cardImageSources } from "./image-url";
 import {
   labelLocale,
   labelOverflows,
@@ -432,11 +433,19 @@ export function createOverlay(options: OverlayOptions): Overlay {
       placeholder.setAttribute("aria-hidden", "true");
       anchor.appendChild(placeholder);
     } else {
+      // Sized by the CDN where it can (YOY-169): the overlay card is ~200 px
+      // wide, the full panel on a phone.
       const image = document.createElement("img");
       image.className = "card-image";
-      image.src = result.imageUrl;
+      const sources = cardImageSources(result.imageUrl);
+      if (sources.srcset !== undefined) {
+        image.srcset = sources.srcset;
+        image.sizes = "(max-width: 440px) 100vw, 220px";
+      }
+      image.src = sources.src;
       image.alt = result.title;
-      image.loading = "lazy";
+      image.loading = cardImageLoading(position);
+      image.decoding = "async";
       anchor.appendChild(image);
     }
 

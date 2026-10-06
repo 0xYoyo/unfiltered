@@ -610,6 +610,19 @@
                 ),
               ),
             };
+          } else if (fixture === "images") {
+            // Sized card images (YOY-169): one Shopify-CDN image, one
+            // crawl-sourced image on another host.
+            body = {
+              ...RESULTS_RESPONSE,
+              results: RESULTS_RESPONSE.results.slice(0, 2).map((result, index) => ({
+                ...result,
+                imageUrl:
+                  index === 0
+                    ? "https://cdn.shopify.com/s/files/1/0001/files/fixture-dress.jpg?v=1712345678"
+                    : "https://images.example.test/products/fixture-shirt.jpg",
+              })),
+            };
           } else if (fixture === "null-url") {
             // A catalog whose adapter resolved no product links (YOY-87
             // AC-4): every card renders linkless.

@@ -189,6 +189,7 @@ apps/
           v2-refine.json
           v2-two-meanings.json
         fonts.css
+        image-url.test.ts
         ingest-public-cli.server.ts
         ingest-public-cli.test.ts
         ingest-public.server.ts
@@ -214,10 +215,12 @@ apps/
         strings.ts
         test-ui/
           ai-states.spec.ts
+          card-images.spec.ts
           close-divider.spec.ts
           design-invariants.spec.ts
           engine.spec.ts
           evidence-ai.spec.ts
+          evidence-card-images.spec.ts
           evidence-classic-stages.spec.ts
           evidence-close-divider.spec.ts
           evidence-close-matches.spec.ts
@@ -547,6 +550,7 @@ apps/
       src/
         env.d.ts
         format.ts
+        image-url.ts
         labels.ts
         main.ts
         native-page.ts
@@ -560,7 +564,9 @@ apps/
         widget.css
       test-ui/
         ai-results.spec.ts
+        card-images.spec.ts
         close-divider.spec.ts
+        evidence-card-images.spec.ts
         evidence-close-divider.spec.ts
         evidence-close-matches.spec.ts
         evidence-hardening.spec.ts
@@ -1189,6 +1195,47 @@ docs/
       widget-overlay-mobile-he-labels-narrowest.png
       widget-overlay-mobile-he-loading.png
       widget-overlay-mobile-he-no-label-under-divider.png
+    YOY-169/
+      playground-desktop-en-empty.png
+      playground-desktop-en-error.png
+      playground-desktop-en-loading.png
+      playground-desktop-en-results.png
+      playground-desktop-en-sized-images.png
+      playground-desktop-he-empty.png
+      playground-desktop-he-error.png
+      playground-desktop-he-loading.png
+      playground-desktop-he-results.png
+      playground-desktop-he-sized-images.png
+      playground-mobile-en-empty.png
+      playground-mobile-en-error.png
+      playground-mobile-en-loading.png
+      playground-mobile-en-results.png
+      playground-mobile-en-sized-images.png
+      playground-mobile-he-empty.png
+      playground-mobile-he-error.png
+      playground-mobile-he-loading.png
+      playground-mobile-he-results.png
+      playground-mobile-he-sized-images.png
+      widget-overlay-desktop-en-empty.png
+      widget-overlay-desktop-en-error.png
+      widget-overlay-desktop-en-loading.png
+      widget-overlay-desktop-en-results.png
+      widget-overlay-desktop-en-sized-images.png
+      widget-overlay-desktop-he-empty.png
+      widget-overlay-desktop-he-error.png
+      widget-overlay-desktop-he-loading.png
+      widget-overlay-desktop-he-results.png
+      widget-overlay-desktop-he-sized-images.png
+      widget-overlay-mobile-en-empty.png
+      widget-overlay-mobile-en-error.png
+      widget-overlay-mobile-en-loading.png
+      widget-overlay-mobile-en-results.png
+      widget-overlay-mobile-en-sized-images.png
+      widget-overlay-mobile-he-empty.png
+      widget-overlay-mobile-he-error.png
+      widget-overlay-mobile-he-loading.png
+      widget-overlay-mobile-he-results.png
+      widget-overlay-mobile-he-sized-images.png
     YOY-64/
       desktop-en-intent-reuse.png
       desktop-he-intent-reuse.png
@@ -1452,7 +1499,7 @@ vitest.setup.ts
 - apps/shopify-app/app/playground/PlaygroundPage.tsx → apps/shopify-app/app/playground/api.server.ts, apps/shopify-app/app/playground/components/Card.tsx, apps/shopify-app/app/playground/components/ChipRow.tsx, apps/shopify-app/app/playground/components/EngineDetails.tsx, apps/shopify-app/app/playground/components/ExampleQueries.tsx, apps/shopify-app/app/playground/components/LanguageToggle.tsx, apps/shopify-app/app/playground/components/NewSearch.tsx, apps/shopify-app/app/playground/components/ResultsGrid.tsx, apps/shopify-app/app/playground/components/SearchBar.tsx, apps/shopify-app/app/playground/components/StatusLine.tsx, apps/shopify-app/app/playground/components/StoreLine.tsx, apps/shopify-app/app/playground/search-client.ts, apps/shopify-app/app/playground/strings.ts, apps/shopify-app/app/search/proxy.server.ts, apps/shopify-app/widget/src/labels.ts
 - apps/shopify-app/app/playground/api.server.ts → apps/shopify-app/app/playground/ingest-public.server.ts, apps/shopify-app/app/search/judge-step.server.ts, apps/shopify-app/app/search/orchestrator.server.ts, apps/shopify-app/app/search/proxy.server.ts, apps/shopify-app/app/search/throttle.server.ts
 - apps/shopify-app/app/playground/catalog-source.server.ts → apps/shopify-app/app/catalog/variants.server.ts
-- apps/shopify-app/app/playground/components/Card.tsx → apps/shopify-app/app/playground/strings.ts, apps/shopify-app/widget/src/format.ts, apps/shopify-app/widget/src/labels.ts
+- apps/shopify-app/app/playground/components/Card.tsx → apps/shopify-app/app/playground/strings.ts, apps/shopify-app/widget/src/format.ts, apps/shopify-app/widget/src/image-url.ts, apps/shopify-app/widget/src/labels.ts
 - apps/shopify-app/app/playground/components/CatalogNotFound.tsx → apps/shopify-app/app/playground/strings.ts
 - apps/shopify-app/app/playground/components/ChipRow.tsx → apps/shopify-app/app/playground/strings.ts, apps/shopify-app/app/search/proxy.server.ts, apps/shopify-app/widget/src/format.ts
 - apps/shopify-app/app/playground/components/EngineDetails.tsx → apps/shopify-app/app/playground/api.server.ts, apps/shopify-app/app/playground/strings.ts, apps/shopify-app/app/search/stages.ts
@@ -1466,6 +1513,7 @@ vitest.setup.ts
 - apps/shopify-app/app/playground/fixture-mode.test.ts → apps/shopify-app/app/playground/fixture-mode.server.ts
 - apps/shopify-app/app/playground/fixtures/crawl/crawl-store.ts → apps/shopify-app/app/testing/fake-store.server.ts
 - apps/shopify-app/app/playground/fixtures/shopify-public-products.ts → apps/shopify-app/app/playground/shopify-public-source.server.ts
+- apps/shopify-app/app/playground/image-url.test.ts → apps/shopify-app/widget/src/image-url.ts
 - apps/shopify-app/app/playground/ingest-public-cli.server.ts → apps/shopify-app/app/catalog/card-embed.server.ts, apps/shopify-app/app/catalog/card.server.ts, apps/shopify-app/app/catalog/enrich.server.ts, apps/shopify-app/app/playground/catalog-source.server.ts, apps/shopify-app/app/playground/ingest-public.server.ts, apps/shopify-app/app/playground/jsonld-crawl-source.server.ts, apps/shopify-app/app/playground/polite-fetch.server.ts, apps/shopify-app/app/playground/shopify-public-source.server.ts
 - apps/shopify-app/app/playground/ingest-public-cli.test.ts → apps/shopify-app/app/catalog/card.server.ts, apps/shopify-app/app/playground/fixtures/shopify-public-products.ts, apps/shopify-app/app/playground/ingest-public-cli.server.ts, apps/shopify-app/app/playground/ingest-public.server.ts, apps/shopify-app/app/playground/jsonld-crawl-source.server.ts, apps/shopify-app/app/playground/polite-fetch.server.ts, apps/shopify-app/app/playground/shopify-public-source.server.ts, apps/shopify-app/app/testing/fake-store.server.ts, apps/shopify-app/app/testing/helpers.server.ts
 - apps/shopify-app/app/playground/ingest-public.server.ts → apps/shopify-app/app/catalog/card-embed.server.ts, apps/shopify-app/app/catalog/card.server.ts, apps/shopify-app/app/catalog/embed.server.ts, apps/shopify-app/app/catalog/enrich.server.ts, apps/shopify-app/app/catalog/images.server.ts, apps/shopify-app/app/catalog/mapping.server.ts, apps/shopify-app/app/catalog/variants.server.ts, apps/shopify-app/app/playground/catalog-source.server.ts
@@ -1595,7 +1643,7 @@ vitest.setup.ts
 - apps/shopify-app/widget/src/main.ts → apps/shopify-app/widget/src/native-page.ts, apps/shopify-app/widget/src/native-render.config.ts, apps/shopify-app/widget/src/native-render.ts, apps/shopify-app/widget/src/overlay.ts, apps/shopify-app/widget/src/search-client.ts, apps/shopify-app/widget/src/session.ts, apps/shopify-app/widget/src/strings.ts
 - apps/shopify-app/widget/src/native-page.ts → apps/shopify-app/widget/src/native-render.config.ts
 - apps/shopify-app/widget/src/native-render.ts → apps/shopify-app/widget/src/format.ts, apps/shopify-app/widget/src/labels.ts, apps/shopify-app/widget/src/native-page.ts, apps/shopify-app/widget/src/native-render.config.ts, apps/shopify-app/widget/src/native-render.css?inline (unresolved), apps/shopify-app/widget/src/overlay.ts, apps/shopify-app/widget/src/search-client.ts, apps/shopify-app/widget/src/strings.ts
-- apps/shopify-app/widget/src/overlay.ts → apps/shopify-app/widget/src/format.ts, apps/shopify-app/widget/src/labels.ts, apps/shopify-app/widget/src/search-client.ts, apps/shopify-app/widget/src/strings.ts, apps/shopify-app/widget/src/widget.css?inline (unresolved)
+- apps/shopify-app/widget/src/overlay.ts → apps/shopify-app/widget/src/format.ts, apps/shopify-app/widget/src/image-url.ts, apps/shopify-app/widget/src/labels.ts, apps/shopify-app/widget/src/search-client.ts, apps/shopify-app/widget/src/strings.ts, apps/shopify-app/widget/src/widget.css?inline (unresolved)
 - apps/shopify-app/widget/test-ui/labels.spec.ts → apps/shopify-app/widget/src/strings.ts
 - apps/shopify-app/widget/test-ui/localization.spec.ts → apps/shopify-app/widget/src/strings.ts
 - apps/shopify-app/widget/test-ui/refinement.spec.ts → apps/shopify-app/widget/src/strings.ts
