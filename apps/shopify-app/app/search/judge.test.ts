@@ -384,7 +384,7 @@ describe("verdict order (AC-5, AC-8)", () => {
     ).toEqual([{ item: "b", verdict: "not-relevant", label: { template: "close-match", values: [] } }]);
   });
 
-  it("ranks by verdict, ties in find order, not relevant last and never removed", () => {
+  it("ranks by verdict, ties in find order, and drops not relevant from a page with anything better (YOY-163)", () => {
     const ordered = orderByVerdict(
       ["a", "b", "c", "d", "e", "f"],
       [
@@ -396,7 +396,26 @@ describe("verdict order (AC-5, AC-8)", () => {
         verdict("f", "close"),
       ],
     );
-    expect(ordered.map((item) => item.item)).toEqual(["c", "e", "d", "b", "f", "a"]);
+    expect(ordered.map((item) => item.item)).toEqual(["c", "e", "d", "b", "f"]);
+  });
+
+  it("serves 10 exact of a 24-product page, in find order, no labels, and drops the 14 not relevant (YOY-163 AC-4)", () => {
+    const ids = Array.from({ length: 24 }, (_, index) => `p${index}`);
+    // Exact and not-relevant interleaved in find order.
+    const exactIds = new Set(["p0", "p2", "p3", "p5", "p8", "p9", "p11", "p15", "p20", "p23"]);
+    const ordered = orderByVerdict(
+      ids,
+      ids.map((id) => verdict(id, exactIds.has(id) ? "exact" : "not-relevant")),
+    );
+    expect(ordered.map((entry) => entry.item)).toEqual(ids.filter((id) => exactIds.has(id)));
+    expect(ordered.every((entry) => entry.verdict === "exact" && entry.label === null)).toBe(true);
+  });
+
+  it("still serves all 24 with close-match when every product is not relevant (YOY-163 AC-4)", () => {
+    const ids = Array.from({ length: 24 }, (_, index) => `p${index}`);
+    const ordered = orderByVerdict(ids, ids.map((id) => verdict(id, "not-relevant")));
+    expect(ordered.map((entry) => entry.item)).toEqual(ids);
+    expect(ordered.every((entry) => entry.label?.template === "close-match")).toBe(true);
   });
 
   it("serves find order with close-match on every card when every candidate is not relevant", () => {
@@ -493,7 +512,8 @@ describe.each(IMPLEMENTATIONS)("the shared judge suite: $name (YOY-152 AC-4)", (
       { id: "e", verdict: "close", missed: ["fact", "description"], label: { template: "close-match", values: [] }, excluded: false },
     ]);
     expect(answered.otherReading).toBeNull();
-    expect(orderByVerdict(page, answered.verdicts).map((entry) => entry.item.id)).toEqual(["c", "d", "b", "e", "a"]);
+    // The not-relevant product is dropped from a page with anything better (YOY-163).
+    expect(orderByVerdict(page, answered.verdicts).map((entry) => entry.item.id)).toEqual(["c", "d", "b", "e"]);
   });
 
   it("flags an excluded candidate and never labels it", async () => {
@@ -965,7 +985,9 @@ describe("the judge on Engine v2 (on the database)", () => {
     });
     const response = await search(orchestrator(llm));
 
-    expect(response.hits.map((hit) => hit.productId)).toEqual(["p3", "p1", "p4", "p2"]);
+    // The not-relevant p2 is dropped from the page (YOY-163): the wire answers
+    // only the kept products.
+    expect(response.hits.map((hit) => hit.productId)).toEqual(["p3", "p1", "p4"]);
     expect(response).toMatchObject({ route: "ai", routeReason: "judged", engine: "v2" });
     expect(response.stages.judge).toBeGreaterThanOrEqual(0);
     expect(costs.rows.map((row) => row.operation)).toEqual(["judge"]);
@@ -975,8 +997,8 @@ describe("the judge on Engine v2 (on the database)", () => {
       null,
       { template: "fact-differs", values: ["navy", "black"] },
       { template: "close-match", values: [] },
-      null,
     ]);
+    expect(wire.results).toHaveLength(3);
     // The storefront wire carries no verdict (AC-12).
     expect(JSON.stringify(wire)).not.toContain("verdict");
     expect(JSON.stringify(wire)).not.toContain("not-relevant");
@@ -995,7 +1017,6 @@ describe("the judge on Engine v2 (on the database)", () => {
         { productId: "p3", verdict: "exact" },
         { productId: "p1", verdict: "other-variant" },
         { productId: "p4", verdict: "close" },
-        { productId: "p2", verdict: "not-relevant" },
       ],
       // The LLM judge's one call for the page (YOY-159 AC-1).
       calls: expect.objectContaining({ settled: 1, open: false }),
@@ -1209,7 +1230,8 @@ describe("the judge on Engine v2 (on the database)", () => {
     expect(second).toMatchObject({ route: "classic", routeReason: "judge-cached" });
     expect(second.hits.map((hit) => hit.productId)).toEqual(first.hits.map((hit) => hit.productId));
     expect(second.hits.map((hit) => hit.label)).toEqual(first.hits.map((hit) => hit.label));
-    expect(second.hits.map((hit) => hit.verdict)).toEqual(["exact", "other-variant", "close", "not-relevant"]);
+    // The not-relevant product is dropped from the served page (YOY-163).
+    expect(second.hits.map((hit) => hit.verdict)).toEqual(["exact", "other-variant", "close"]);
     const playground = serializePlaygroundSearchResponse(second, {
       routeReason: second.routeReason,
       latencyMs: 1,
@@ -1247,7 +1269,8 @@ describe("the judge on Engine v2 (on the database)", () => {
 
     const first = await search(engine);
     expect(first).toMatchObject({ route: "ai", routeReason: "judged" });
-    expect(first.hits.find((hit) => hit.productId === "p2")?.verdict).toBe("not-relevant");
+    // The failed product reads not relevant, so it is dropped from the page (YOY-163).
+    expect(first.hits.find((hit) => hit.productId === "p2")).toBeUndefined();
     expect(first.hits[0]!.productId).toBe("p3");
     expect(await db.judgeAnswer.count()).toBe(0);
 
@@ -1330,16 +1353,17 @@ describe("the judge on Engine v2 (on the database)", () => {
           labelTemplate,
         })),
     ).toEqual([
+      // The dropped not-relevant product keeps its row, at position -1 (YOY-163 AC-2).
+      { searchId: judged.searchId, shopDomain: SHOP, productId: "p2", page: 1, position: -1, verdict: "not-relevant", missed: [], labelTemplate: null },
       { searchId: judged.searchId, shopDomain: SHOP, productId: "p3", page: 1, position: 0, verdict: "exact", missed: [], labelTemplate: null },
       { searchId: judged.searchId, shopDomain: SHOP, productId: "p1", page: 1, position: 1, verdict: "other-variant", missed: ["fact"], labelTemplate: "fact-differs" },
       { searchId: judged.searchId, shopDomain: SHOP, productId: "p4", page: 1, position: 2, verdict: "close", missed: ["description"], labelTemplate: "close-match" },
-      { searchId: judged.searchId, shopDomain: SHOP, productId: "p2", page: 1, position: 3, verdict: "not-relevant", missed: [], labelTemplate: null },
     ]);
     expect(rows.filter((row) => row.cached).map((row) => [row.searchId, row.productId])).toEqual([
+      [cached.searchId, "p2"],
       [cached.searchId, "p3"],
       [cached.searchId, "p1"],
       [cached.searchId, "p4"],
-      [cached.searchId, "p2"],
     ]);
     expect(rows.every((row) => row.clickedAt === null)).toBe(true);
 
@@ -1365,6 +1389,21 @@ describe("the judge on Engine v2 (on the database)", () => {
     ).toBe(true);
     const clicked = await db.judgeVerdict.findMany({ where: { clickedAt: { not: null } } });
     expect(clicked.map((row) => [row.searchId, row.productId])).toEqual([[judged.searchId, "p4"]]);
+  });
+
+  it("filters a later page the same way, and no kept card repeats one from an earlier page (YOY-163 AC-3)", async () => {
+    await seed(db, FOUR);
+    const llm = scriptedLlm([answer(["E-X", "N-X"]), answer(["N-X", "C-X"])]);
+    const engine = orchestrator(llm);
+    const first = await search(engine, { paging: { page: 1, pageSize: 2 } });
+    const second = await search(engine, { paging: { page: 2, pageSize: 2 } });
+    expect(first.hits.map((hit) => hit.productId)).toEqual(["p1"]);
+    expect(second.hits.map((hit) => hit.productId)).toEqual(["p4"]);
+    const seen = [...first.hits, ...second.hits].map((hit) => hit.productId);
+    expect(new Set(seen).size).toBe(seen.length);
+    // totalCount still counts the find order, unchanged by the filter (NG-2).
+    expect(second.totalCount).toBe(first.totalCount);
+    expect(first.totalCount).toBe(4);
   });
 
   it("writes page 2's rows at whole-order positions", async () => {
@@ -1402,9 +1441,10 @@ describe("the judge on Engine v2 (on the database)", () => {
     // Another shop's request for the same search gets nothing.
     expect(await awaitPendingLabels("other-shop.myshopify.com", response.searchId, 1)).toEqual({});
     const labels = await awaitPendingLabels(SHOP, response.searchId, 1);
+    // Labels only (NG-4): a product the late answer reads as not relevant
+    // gets no entry, so the card keeps the label it was served with.
     expect(labels).toEqual({
       p1: { template: "fact-differs", values: ["navy", "black"] },
-      p2: null,
       p3: null,
       p4: { template: "close-match", values: [] },
     });
