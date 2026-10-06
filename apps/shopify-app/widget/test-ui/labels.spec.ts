@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
+import { formatLabelMoney } from "../src/labels";
 import { STRING_CATALOG } from "../src/strings";
 
 /**
@@ -65,17 +66,22 @@ const nativeItem = (page: Page, index: number): Locator =>
     `[data-testid="unfiltered-native-item"][data-product-id="gid://shopify/Product/label-${index}"]`,
   );
 
+// Price amounts read the storefront's way on both widget paths (YOY-164
+// AC-2): "420 ILS" is "₪420" in English and "‏420 ‏₪" in Hebrew.
+const en = (value: string) => formatLabelMoney(value, "en");
+const he = (value: string) => formatLabelMoney(value, "he");
+
 const EXPECTED = {
   en: [
-    "420 ILS, slightly over 400 ILS",
-    "640 ILS, over your 400 ILS",
+    `${en("420 ILS")}, slightly over ${en("400 ILS")}`,
+    `${en("640 ILS")}, over your ${en("400 ILS")}`,
     "no M — S, L in stock",
     "in linen, not silk",
     "close match",
   ],
   he: [
-    "420 ILS, מעט מעל 400 ILS",
-    "640 ILS, מעל ה-400 ILS שביקשת",
+    `${he("420 ILS")}, מעט מעל ${he("400 ILS")}`,
+    `${he("640 ILS")}, מעל ה-${he("400 ILS")} שביקשת`,
     "אין M — יש S, L במלאי",
     "בlinen, לא silk",
     STRING_CATALOG.he.labelCloseMatch,
@@ -192,7 +198,7 @@ test.describe("overlay path", () => {
       { searchId: "harness-labels-pending-1", page: 1 },
     ]);
     await expect(overlayCard(page, 2).getByTestId("unfiltered-widget-label")).toHaveText(
-      "640 ILS, over your 400 ILS",
+      EXPECTED.en[1],
     );
   });
 
@@ -237,28 +243,93 @@ test.describe("theme-native path", () => {
     await submitQuery(page, "dress under 400 size m");
   }
 
-  test("verify 4: each labelled item has exactly one added element, after the theme card", async ({
+  test("verify 4: each labelled item has exactly one added element, inside the theme card's information block after the price (YOY-164 AC-1)", async ({
     page,
   }) => {
     await openNative(page, "labels");
     await expect(nativeItems(page)).toHaveCount(6);
     for (const [index, text] of EXPECTED.en.entries()) {
       const item = nativeItem(page, index + 1);
-      const shape = await item.evaluate((element) => ({
-        count: element.children.length,
-        first: element.children[0]?.getAttribute("data-testid") ?? element.children[0]?.className,
-        last: element.lastElementChild?.getAttribute("data-testid"),
-        fallback: element.getAttribute("data-fallback"),
-      }));
-      // The theme's own card, then the label — nothing else of ours.
+      const shape = await item.evaluate((element) => {
+        const label = element.querySelector('[data-testid="unfiltered-widget-label"]');
+        const block = label?.parentElement;
+        const price = block?.querySelector(".price");
+        return {
+          count: element.children.length,
+          fallback: element.getAttribute("data-fallback"),
+          labels: element.querySelectorAll(".unfiltered-native__label").length,
+          inBlock: block?.classList.contains("card__information") ?? false,
+          afterPrice:
+            price !== null && price !== undefined && label !== null && label !== undefined
+              ? (price.compareDocumentPosition(label) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
+              : false,
+          last: block?.lastElementChild === label,
+        };
+      });
+      // Only the theme's own card on the grid item; the label is inside it,
+      // in the block that holds the price, after the price.
       expect(shape.fallback).toBeNull();
-      expect(shape.count).toBe(2);
-      expect(shape.last).toBe("unfiltered-widget-label");
+      expect(shape.count).toBe(1);
+      expect(shape.labels).toBe(1);
+      expect(shape.inBlock).toBe(true);
+      expect(shape.afterPrice).toBe(true);
+      expect(shape.last).toBe(true);
       await expect(item.getByTestId("unfiltered-widget-label")).toHaveText(text);
     }
     // A product that misses nothing gets nothing added.
     expect(await nativeItem(page, 6).evaluate((element) => element.children.length)).toBe(1);
   });
+
+  for (const [device, width] of [
+    ["phone", 390],
+    ["desktop", 1280],
+  ] as const) {
+    test(`YOY-164 AC-1: at ${device} width every label is fully inside its card and no other card covers it`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await openNative(page, "labels");
+      await expect(nativeItems(page)).toHaveCount(6);
+      const boxes = await page.evaluate(() => {
+        const rect = (element: Element) => {
+          const box = element.getBoundingClientRect();
+          return { top: box.top, bottom: box.bottom, left: box.left, right: box.right };
+        };
+        return [...document.querySelectorAll('[data-testid="unfiltered-native-item"]')].map(
+          (item) => {
+            const label = item.querySelector('[data-testid="unfiltered-widget-label"]');
+            return {
+              item: rect(item),
+              card: rect(item.firstElementChild!),
+              label: label === null ? null : rect(label),
+            };
+          },
+        );
+      });
+      // A label wider than a narrow card is still removed whole (YOY-151
+      // AC-6); every label that is shown must be fully visible.
+      const labelled = boxes.filter((entry) => entry.label !== null);
+      expect(labelled.length).toBeGreaterThan(0);
+      for (const { card, label } of labelled) {
+        // Inside the theme's card: the card grew to hold the line.
+        expect(label!.top).toBeGreaterThanOrEqual(card.top - 0.5);
+        expect(label!.bottom).toBeLessThanOrEqual(card.bottom + 0.5);
+      }
+      // No card of another item overlaps any label line.
+      for (const [index, { label }] of boxes.entries()) {
+        if (label === null) continue;
+        for (const [other, { item }] of boxes.entries()) {
+          if (other === index) continue;
+          const overlaps =
+            item.left < label.right &&
+            item.right > label.left &&
+            item.top < label.bottom &&
+            item.bottom > label.top;
+          expect(overlaps, `item ${other} overlaps the label of item ${index}`).toBe(false);
+        }
+      }
+    });
+  }
 
   test("AC-5: the label is styled as on the overlay — inherited colour, quieter, no border or fill", async ({
     page,

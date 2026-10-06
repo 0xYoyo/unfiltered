@@ -711,7 +711,7 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
   function settleLabels(items: readonly HTMLElement[]): void {
     for (const item of items) {
       const label = item.querySelector<HTMLElement>(
-        ":scope > .unfiltered-native__label",
+        ".unfiltered-native__label",
       );
       if (label === null || label.textContent === "" || !labelOverflows(label)) {
         continue;
@@ -753,12 +753,12 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
         for (const item of items) {
           const productId = item.getAttribute("data-product-id") ?? "";
           const slot = item.querySelector<HTMLElement>(
-            ":scope > [data-label-slot]",
+            "[data-label-slot]",
           );
           if (slot === null || !(productId in labels)) {
             continue;
           }
-          const segments = labelSegments(strings, labels[productId]);
+          const segments = labelSegments(strings, labels[productId], options.locale);
           renderLabel(slot, segments ?? []);
           if (segments === null) {
             slot.removeAttribute("data-testid");
@@ -772,6 +772,21 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
         // The reserved lines stay empty; no error reaches the shopper.
       },
     );
+  }
+
+  /**
+   * Where a card's label line goes (YOY-164 AC-1): the configured block
+   * that holds the card's price, else the last such block, else the card's
+   * last element — always inside the card, never after it on the grid item.
+   */
+  function labelHost(card: Element): Element {
+    const { label: blockSelector, price } = config.harvest.fill;
+    const priced = card.querySelector(price)?.closest(blockSelector);
+    if (priced !== null && priced !== undefined && card.contains(priced)) {
+      return priced;
+    }
+    const blocks = card.querySelectorAll(blockSelector);
+    return blocks[blocks.length - 1] ?? card.lastElementChild ?? card;
   }
 
   /** Build the grid items for a result list; resolves when every card is
@@ -811,11 +826,12 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
       } else {
         item.appendChild(produced.element);
       }
-      // The label line (YOY-151 AC-5, W-11): appended after the theme's own
-      // card markup — the only element this adds to a theme card, styled
-      // as the overlay's (one quiet line, inherited colour, no hue).
+      // The label line (YOY-151 AC-5, W-11): the only element this adds to a
+      // theme card, styled as the overlay's (one quiet line, inherited
+      // colour, no hue) — inside the card's own information block after the
+      // price, so the theme's card grows to hold it (YOY-164 AC-1).
       if (labelling !== null && labelsShown) {
-        const segments = labelSegments(strings, result.label);
+        const segments = labelSegments(strings, result.label, options.locale);
         if (segments !== null || labelling.pending) {
           const label = document.createElement("div");
           label.className = "unfiltered-native__label";
@@ -826,7 +842,7 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
             label.setAttribute("data-testid", LABEL_TESTID);
             renderLabel(label, segments);
           }
-          item.appendChild(label);
+          labelHost(item.firstElementChild ?? item).appendChild(label);
         }
       }
       if (result.colorUnknown === true) {

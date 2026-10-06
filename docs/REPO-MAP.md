@@ -1023,6 +1023,43 @@ docs/
       playground-mobile-he-2-loading.png
       playground-mobile-he-3-empty.png
       playground-mobile-he-4-error.png
+    YOY-164/
+      widget-native-desktop-en-1-labels.png
+      widget-native-desktop-en-2-labels-pending.png
+      widget-native-desktop-en-3-labels-arrived.png
+      widget-native-desktop-he-1-labels.png
+      widget-native-desktop-he-2-labels-pending.png
+      widget-native-desktop-he-3-labels-arrived.png
+      widget-native-mobile-en-1-labels.png
+      widget-native-mobile-en-2-labels-pending.png
+      widget-native-mobile-en-3-labels-arrived.png
+      widget-native-mobile-he-1-labels.png
+      widget-native-mobile-he-2-labels-pending.png
+      widget-native-mobile-he-3-labels-arrived.png
+      widget-overlay-desktop-en-1-labels.png
+      widget-overlay-desktop-en-2-labels-pending.png
+      widget-overlay-desktop-en-3-labels-arrived.png
+      widget-overlay-desktop-en-4-loading.png
+      widget-overlay-desktop-en-5-empty.png
+      widget-overlay-desktop-en-6-error.png
+      widget-overlay-desktop-he-1-labels.png
+      widget-overlay-desktop-he-2-labels-pending.png
+      widget-overlay-desktop-he-3-labels-arrived.png
+      widget-overlay-desktop-he-4-loading.png
+      widget-overlay-desktop-he-5-empty.png
+      widget-overlay-desktop-he-6-error.png
+      widget-overlay-mobile-en-1-labels.png
+      widget-overlay-mobile-en-2-labels-pending.png
+      widget-overlay-mobile-en-3-labels-arrived.png
+      widget-overlay-mobile-en-4-loading.png
+      widget-overlay-mobile-en-5-empty.png
+      widget-overlay-mobile-en-6-error.png
+      widget-overlay-mobile-he-1-labels.png
+      widget-overlay-mobile-he-2-labels-pending.png
+      widget-overlay-mobile-he-3-labels-arrived.png
+      widget-overlay-mobile-he-4-loading.png
+      widget-overlay-mobile-he-5-empty.png
+      widget-overlay-mobile-he-6-error.png
     YOY-165/
       playground-desktop-en-1-initial.png
       playground-desktop-en-2-loading.png
@@ -1454,7 +1491,7 @@ vitest.setup.ts
 - apps/shopify-app/widget/src/native-page.ts → apps/shopify-app/widget/src/native-render.config.ts
 - apps/shopify-app/widget/src/native-render.ts → apps/shopify-app/widget/src/format.ts, apps/shopify-app/widget/src/labels.ts, apps/shopify-app/widget/src/native-page.ts, apps/shopify-app/widget/src/native-render.config.ts, apps/shopify-app/widget/src/native-render.css?inline (unresolved), apps/shopify-app/widget/src/overlay.ts, apps/shopify-app/widget/src/search-client.ts, apps/shopify-app/widget/src/strings.ts
 - apps/shopify-app/widget/src/overlay.ts → apps/shopify-app/widget/src/format.ts, apps/shopify-app/widget/src/labels.ts, apps/shopify-app/widget/src/search-client.ts, apps/shopify-app/widget/src/strings.ts, apps/shopify-app/widget/src/widget.css?inline (unresolved)
-- apps/shopify-app/widget/test-ui/labels.spec.ts → apps/shopify-app/widget/src/strings.ts
+- apps/shopify-app/widget/test-ui/labels.spec.ts → apps/shopify-app/widget/src/labels.ts, apps/shopify-app/widget/src/strings.ts
 - apps/shopify-app/widget/test-ui/localization.spec.ts → apps/shopify-app/widget/src/strings.ts
 - apps/shopify-app/widget/test-ui/refinement.spec.ts → apps/shopify-app/widget/src/strings.ts
 - apps/shopify-app/widget/test-ui/v2-chips.spec.ts → apps/shopify-app/widget/src/strings.ts

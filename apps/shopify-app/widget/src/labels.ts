@@ -91,20 +91,54 @@ export interface LabelSegment {
   value: boolean;
 }
 
+/** A wire money value: a number, a space, an ISO 4217 code (`411.6 USD`). */
+const WIRE_MONEY = /^(\d+(?:\.\d+)?) ([A-Z]{3})$/;
+
+/**
+ * A price label's money value shown the storefront's way (YOY-164 AC-2):
+ * `411.6 USD` on `en` reads `$411.60`, `450 ILS` on `he` reads `‏450 ₪` —
+ * whole amounts without decimals, as the chip shows them. Any other value,
+ * or a currency the runtime does not know, is left as written.
+ */
+export function formatLabelMoney(value: string, locale: string): string {
+  const match = WIRE_MONEY.exec(value.trim());
+  if (match === null) {
+    return value;
+  }
+  const amount = Number(match[1]);
+  try {
+    return new Intl.NumberFormat(locale, {
+      style: "currency",
+      currency: match[2]!,
+      minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
+  } catch {
+    return value;
+  }
+}
+
 /**
  * Fill a label's template (AC-1) into segments, or null when it must not be
  * shown: an unknown template (a newer server), or a filled text over the
  * template's maximum (AC-2). `size-missing` carries the asked size then
- * every in-stock size, which read as one comma-joined list.
+ * every in-stock size, which read as one comma-joined list. With a
+ * `locale`, a price label's amounts are formatted for it (YOY-164 AC-2);
+ * the widget's two card paths pass one, so both read the same.
  */
 export function labelSegments(
   strings: LabelStrings,
   label: LabelLike | null | undefined,
+  locale?: string,
 ): LabelSegment[] | null {
   if (label === null || label === undefined || !isTemplate(label.template)) {
     return null;
   }
-  const [first = "", second = "", ...rest] = label.values;
+  const money =
+    locale !== undefined && (label.template === "price-near" || label.template === "price-far");
+  const [first = "", second = "", ...rest] = money
+    ? label.values.map((value) => formatLabelMoney(value, locale))
+    : label.values;
   const values: Record<string, string> = {
     price: first,
     cap: second,

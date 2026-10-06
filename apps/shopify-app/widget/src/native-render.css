@@ -107,7 +107,8 @@
 }
 
 /* The label line (YOY-151 AC-5, W-11): the only element added to a theme
-   card, appended after its markup and styled as the overlay's — one line,
+   card, placed inside its information block after the price so the card
+   grows to hold it (YOY-164 AC-1), and styled as the overlay's — one line,
    no wrap, smaller and quieter than the price, in the theme's inherited
    colour, with no border, fill, icon or hue. A label wider than the card
    is removed whole (AC-6); the fixed block size makes a line reserved for
