@@ -1,5 +1,11 @@
 import { chipLabelParts, formatPrice, isNegationChip } from "./format";
-import { labelLocale, labelOverflows, labelSegments, renderLabel } from "./labels";
+import {
+  labelLocale,
+  labelOverflows,
+  labelSegments,
+  renderLabel,
+  underCloseHeading,
+} from "./labels";
 import {
   type NativeRenderConfig,
   type NativeRenderOverrides,
@@ -546,7 +552,10 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
       if (next.labelsPending === true) {
         held.pendingLabels.add(page);
       }
-      return { results: next.results, closeMatches: inlineCloseMatches(next) };
+      return {
+        results: next.results,
+        closeMatches: inlineCloseMatches(next).map(underCloseHeading),
+      };
     });
     held.pages.set(page, pending);
     pending.catch(() => {
@@ -1076,7 +1085,10 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
         : undefined;
     const empty = total === 0;
     const aiZeroHit = !preview && empty && response.route === "ai";
-    const matches = aiZeroHit ? (response.closeMatches ?? []) : [];
+    // Under the heading, the heading is the label (YOY-168 AC-3).
+    const matches = aiZeroHit
+      ? (response.closeMatches ?? []).map(underCloseHeading)
+      : [];
 
     // The page's results and the shell (first render only — cached
     // afterwards) are awaited together, then the cards, so the theme's page
@@ -1218,7 +1230,7 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
         first,
         Promise.resolve({
           results: response.results,
-          closeMatches: preview ? [] : inlineCloseMatches(response),
+          closeMatches: preview ? [] : inlineCloseMatches(response).map(underCloseHeading),
         }),
       );
     }

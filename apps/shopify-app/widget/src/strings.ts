@@ -68,9 +68,9 @@ export interface WidgetStrings {
   chipNegator: string;
   /**
    * The label line's five templates (YOY-151 AC-1), filled by `labelText`
-   * in labels.ts: {price} and {cap} are formatted amounts, {size} the size
-   * asked for, {sizes} the in-stock sizes comma-joined, {have} the
-   * product's value and {asked} the shopper's.
+   * in labels.ts: {size} the size asked for, {have} the product's value
+   * and {asked} the shopper's. The price labels carry no numbers (YOY-168
+   * AC-1): the cap is on the chip and the price is on the card.
    */
   labelPriceNear: string;
   labelPriceFar: string;
@@ -107,9 +107,9 @@ export const STRING_CATALOG: Record<WidgetLocale, WidgetStrings> = {
     chipSize: "Size {value}",
     chipInStock: "In stock",
     chipNegator: "Not",
-    labelPriceNear: "{price}, slightly over {cap}",
-    labelPriceFar: "{price}, over your {cap}",
-    labelSizeMissing: "no {size} — {sizes} in stock",
+    labelPriceNear: "slightly over budget",
+    labelPriceFar: "over budget",
+    labelSizeMissing: "size {size} not in stock",
     labelFactDiffers: "in {have}, not {asked}",
     labelCloseMatch: "close match",
   },
@@ -140,9 +140,9 @@ export const STRING_CATALOG: Record<WidgetLocale, WidgetStrings> = {
     chipSize: "מידה {value}",
     chipInStock: "במלאי",
     chipNegator: "לא",
-    labelPriceNear: "{price}, מעט מעל {cap}",
-    labelPriceFar: "{price}, מעל ה-{cap} שביקשת",
-    labelSizeMissing: "אין {size} — יש {sizes} במלאי",
+    labelPriceNear: "מעט מעל התקציב",
+    labelPriceFar: "מעל התקציב",
+    labelSizeMissing: "מידה {size} לא במלאי",
     labelFactDiffers: "ב{have}, לא {asked}",
     labelCloseMatch: "התאמה קרובה",
   },

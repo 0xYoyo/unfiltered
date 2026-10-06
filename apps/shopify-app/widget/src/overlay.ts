@@ -1,5 +1,11 @@
 import { chipLabelParts, formatPrice, isNegationChip } from "./format";
-import { labelLocale, labelOverflows, labelSegments, renderLabel } from "./labels";
+import {
+  labelLocale,
+  labelOverflows,
+  labelSegments,
+  renderLabel,
+  underCloseHeading,
+} from "./labels";
 import type {
   ProxyChip,
   ProxyLabel,
@@ -309,7 +315,8 @@ export function createOverlay(options: OverlayOptions): Overlay {
     handlers: ResponseHandlers,
     pending: boolean,
   ): { elements: HTMLElement[]; cards: HTMLElement[] } {
-    const close = inlineCloseMatches(page);
+    // Under the heading, the heading is the label (YOY-168 AC-3).
+    const close = inlineCloseMatches(page).map(underCloseHeading);
     const cards = [...page.results, ...close].map((result, index) =>
       card(result, offset + index, handlers.onCardClick, { pending }),
     );
@@ -676,7 +683,9 @@ export function createOverlay(options: OverlayOptions): Overlay {
       zeroHit.hidden = !aiZeroHit;
       noResults.hidden = !(empty && response.route === "classic");
 
-      const matches = aiZeroHit ? (response.closeMatches ?? []) : [];
+      const matches = aiZeroHit
+        ? (response.closeMatches ?? []).map(underCloseHeading)
+        : [];
       // The heading names what was relaxed to find them (YOY-111 AC-4).
       closeMatchesHeading.textContent = closeMatchesHeadingText(
         strings,

@@ -92,10 +92,10 @@ export interface PlaygroundStrings {
   colorNotConfirmed: string;
   /**
    * The card's label line (YOY-151 AC-1), the widget's five templates
-   * verbatim, filled by `labelText` in widget/src/labels.ts: {price} and
-   * {cap} are formatted amounts, {size} the size asked for, {sizes} the
-   * in-stock sizes comma-joined, {have} the product's value and {asked}
-   * the visitor's.
+   * verbatim, filled by `labelText` in widget/src/labels.ts: {size} the
+   * size asked for, {have} the product's value and {asked} the visitor's.
+   * The price labels carry no numbers (YOY-168 AC-1): the cap is on the
+   * chip and the price is on the card.
    */
   labelPriceNear: string;
   labelPriceFar: string;
@@ -184,9 +184,9 @@ export const PLAYGROUND_STRING_CATALOG: Record<
     relaxedCategory: "other categories",
     newSearch: "New search",
     colorNotConfirmed: "Color not confirmed",
-    labelPriceNear: "{price}, slightly over {cap}",
-    labelPriceFar: "{price}, over your {cap}",
-    labelSizeMissing: "no {size} — {sizes} in stock",
+    labelPriceNear: "slightly over budget",
+    labelPriceFar: "over budget",
+    labelSizeMissing: "size {size} not in stock",
     labelFactDiffers: "in {have}, not {asked}",
     labelCloseMatch: "close match",
     engineDetailsToggle: "How it understood you",
@@ -248,9 +248,9 @@ export const PLAYGROUND_STRING_CATALOG: Record<
     relaxedCategory: "קטגוריות אחרות",
     newSearch: "חיפוש חדש",
     colorNotConfirmed: "הצבע לא אומת",
-    labelPriceNear: "{price}, מעט מעל {cap}",
-    labelPriceFar: "{price}, מעל ה-{cap} שביקשת",
-    labelSizeMissing: "אין {size} — יש {sizes} במלאי",
+    labelPriceNear: "מעט מעל התקציב",
+    labelPriceFar: "מעל התקציב",
+    labelSizeMissing: "מידה {size} לא במלאי",
     labelFactDiffers: "ב{have}, לא {asked}",
     labelCloseMatch: "התאמה קרובה",
     engineDetailsToggle: "איך זה הבין אתכם",

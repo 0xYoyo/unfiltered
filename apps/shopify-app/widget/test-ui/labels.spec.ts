@@ -1,6 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
-import { formatLabelMoney } from "../src/labels";
 import { STRING_CATALOG } from "../src/strings";
 
 /**
@@ -66,23 +65,20 @@ const nativeItem = (page: Page, index: number): Locator =>
     `[data-testid="unfiltered-native-item"][data-product-id="gid://shopify/Product/label-${index}"]`,
   );
 
-// Price amounts read the storefront's way on both widget paths (YOY-164
-// AC-2): "420 ILS" is "₪420" in English and "‏420 ‏₪" in Hebrew.
-const en = (value: string) => formatLabelMoney(value, "en");
-const he = (value: string) => formatLabelMoney(value, "he");
-
+// The price labels carry no numbers and the size label names only the size
+// asked for (YOY-168 AC-1, AC-2): the cap is on the chip, the price on the card.
 const EXPECTED = {
   en: [
-    `${en("420 ILS")}, slightly over ${en("400 ILS")}`,
-    `${en("640 ILS")}, over your ${en("400 ILS")}`,
-    "no M — S, L in stock",
+    "slightly over budget",
+    "over budget",
+    "size M not in stock",
     "in linen, not silk",
     "close match",
   ],
   he: [
-    `${he("420 ILS")}, מעט מעל ${he("400 ILS")}`,
-    `${he("640 ILS")}, מעל ה-${he("400 ILS")} שביקשת`,
-    "אין M — יש S, L במלאי",
+    "מעט מעל התקציב",
+    "מעל התקציב",
+    "מידה M לא במלאי",
     "בlinen, לא silk",
     STRING_CATALOG.he.labelCloseMatch,
   ],

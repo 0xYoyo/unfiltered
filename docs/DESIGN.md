@@ -115,7 +115,7 @@ Each is imperative, atomic, and checkable from a screenshot or the diff.
 - **W-10 Removal leaves no trace.** After self-removal or uninstall, the
   page is visually identical to never having installed the widget
   (placeholder restored, no orphaned host node or style).
-- **W-11 One honest label line.** A result that misses a stated wish may carry one line of text directly under the card's price: one line, no wrap, smaller and quieter than the price, in the inherited colour — no hue, border, fill, icon or badge of ours. It is omitted entirely when its text does not fit the card's inline size or the storefront's language has no templates. On the theme-native path it is the only element added to a theme card.
+- **W-11 One honest label line.** A result that misses a stated wish may carry one line of text directly under the card's price: one line, no wrap, smaller and quieter than the price, in the inherited colour — no hue, border, fill, icon or badge of ours. It is omitted entirely when its text does not fit the card's inline size or the storefront's language has no templates. It says only what the card does not already show: a price label carries no numbers ("slightly over budget" / "over budget" — the cap is on the chip, the price on the card), a size label names the size asked for ("size M not in stock"). A card under a "Close matches" heading carries no `close-match` label — the heading is the label; on a page with no heading every such card keeps it. On the theme-native path it is the only element added to a theme card.
 
 **Theme-native path (Mirror Bar, PRD amendment 2026-08-16; YOY-100).**
 When the widget renders results through the theme's own surfaces — the
@@ -364,7 +364,8 @@ face per role serves both scripts and there is no separate Hebrew stack.
   "New search" is a ghost pill of the same shape with no fill.
 - **Cards:** image at 3/4 cover, title at `--size-body` medium, price in
   `--font-mono` muted, the label line (W-11) directly under the price in
-  `--text-muted` at `--size-caption`, availability pill when sold out. Hover lifts with
+  `--text-muted` at `--size-caption` — one line, no numbers, none under a
+  "Close matches" heading — availability pill when sold out. Hover lifts with
   `--shadow-2` and changes nothing else.
 - **Engine panel (P-4):** `--surface-inverse` with `--text-inverse`,
   `--font-mono` at `--size-caption`; collapses out of the DOM when off.

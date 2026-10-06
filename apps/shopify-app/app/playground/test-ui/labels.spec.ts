@@ -40,16 +40,16 @@ const card = (page: Page, title: string): Locator =>
 
 const EXPECTED = {
   en: [
-    ["Satin Slip Dress", "420 ILS, slightly over 400 ILS"],
-    ["Silk Evening Dress", "640 ILS, over your 400 ILS"],
-    ["Jersey Midi Dress", "no M — S, L in stock"],
+    ["Satin Slip Dress", "slightly over budget"],
+    ["Silk Evening Dress", "over budget"],
+    ["Jersey Midi Dress", "size M not in stock"],
     ["Linen Wrap Dress", "in linen, not silk"],
     ["Cotton Shirt Dress", "close match"],
   ],
   he: [
-    ["Satin Slip Dress", "420 ILS, מעט מעל 400 ILS"],
-    ["Silk Evening Dress", "640 ILS, מעל ה-400 ILS שביקשת"],
-    ["Jersey Midi Dress", "אין M — יש S, L במלאי"],
+    ["Satin Slip Dress", "מעט מעל התקציב"],
+    ["Silk Evening Dress", "מעל התקציב"],
+    ["Jersey Midi Dress", "מידה M לא במלאי"],
     ["Linen Wrap Dress", "בlinen, לא silk"],
     ["Cotton Shirt Dress", PLAYGROUND_STRING_CATALOG.he.labelCloseMatch],
   ],
@@ -198,7 +198,7 @@ test("verify 6: late labels fill reserved lines — one request, no card moves, 
   expect(requests[0]!.searchParams.get("searchId")).toBe("fixture-labels-pending");
   expect(requests[0]!.searchParams.get("page")).toBe("1");
   await expect(card(page, "Satin Slip Dress").getByTestId("playground-card-label")).toHaveText(
-    "420 ILS, slightly over 400 ILS",
+    "slightly over budget",
   );
 });
 

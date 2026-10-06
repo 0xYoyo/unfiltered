@@ -3,7 +3,8 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 /**
  * Close products under the divider (YOY-166 AC-2 to AC-4): a judged page
  * with matches shows its close products after its results under the
- * "Close matches" heading, each still labelled "close match". On the
+ * "Close matches" heading with no label line — the heading is the label
+ * (YOY-168 AC-3) — while a labelled match above it keeps its line. On the
  * overlay every appended page repeats the heading under its own results;
  * on the theme-native path the divider sits inside the page's grid, on
  * every page the theme's pagination shows. The `close-divider` harness
@@ -23,7 +24,7 @@ const nativeDividers = (page: Page) =>
 const themePages = (page: Page) => page.locator('[data-testid="theme-pagination"] a');
 
 const HEADINGS = { en: "Close matches", he: "התאמות קרובות" } as const;
-const CLOSE_LABELS = { en: "close match", he: "התאמה קרובה" } as const;
+const PRICE_NEAR = { en: "slightly over budget", he: "מעט מעל התקציב" } as const;
 
 async function submitQuery(page: Page, query: string): Promise<void> {
   await themeInput(page).fill(query);
@@ -58,10 +59,11 @@ for (const locale of ["en", "he"] as const) {
       card,
       card,
     ]);
+    await expect(
+      overlayCards(page).first().getByTestId("unfiltered-widget-label"),
+    ).toHaveText(PRICE_NEAR[locale]);
     for (const index of [22, 23]) {
-      await expect(
-        overlayCards(page).nth(index).getByTestId("unfiltered-widget-label"),
-      ).toHaveText(CLOSE_LABELS[locale]);
+      await expect(overlayCards(page).nth(index).locator(".card-label")).toHaveCount(0);
     }
     // The zero-hit section stays hidden on a page with matches.
     await expect(page.getByTestId("unfiltered-widget-close-matches")).toBeHidden();
@@ -101,10 +103,13 @@ for (const locale of ["en", "he"] as const) {
     const pageShape = [...Array(10).fill(item), divider, item, item];
     expect(await childIds(nativeList(page))).toEqual(pageShape);
     await expect(nativeDividers(page)).toHaveText(HEADINGS[locale]);
+    await expect(
+      nativeItems(page).first().getByTestId("unfiltered-widget-label"),
+    ).toHaveText(PRICE_NEAR[locale]);
     for (const index of [10, 11]) {
       await expect(
-        nativeItems(page).nth(index).getByTestId("unfiltered-widget-label"),
-      ).toHaveText(CLOSE_LABELS[locale]);
+        nativeItems(page).nth(index).locator(".unfiltered-native__label"),
+      ).toHaveCount(0);
     }
     await expect(page.getByTestId("unfiltered-native-close-matches")).toBeHidden();
     const [dividerBox, listBox] = await Promise.all([

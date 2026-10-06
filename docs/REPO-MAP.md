@@ -228,6 +228,7 @@ apps/
           evidence-intent-reuse.spec.ts
           evidence-intent-tier.spec.ts
           evidence-judge-split.spec.ts
+          evidence-label-line.spec.ts
           evidence-labels.spec.ts
           evidence-latency.spec.ts
           evidence-negation.spec.ts
@@ -563,6 +564,7 @@ apps/
         evidence-close-divider.spec.ts
         evidence-close-matches.spec.ts
         evidence-hardening.spec.ts
+        evidence-label-line.spec.ts
         evidence-labels.spec.ts
         evidence-negation-chips.spec.ts
         evidence-refinement.spec.ts
@@ -1138,6 +1140,55 @@ docs/
       widget-overlay-mobile-he-error.png
       widget-overlay-mobile-he-loading.png
       widget-overlay-mobile-he-mixed-page-divider.png
+    YOY-168/
+      playground-desktop-en-empty.png
+      playground-desktop-en-error.png
+      playground-desktop-en-labels-narrowest.png
+      playground-desktop-en-loading.png
+      playground-desktop-en-no-label-under-divider.png
+      playground-desktop-he-empty.png
+      playground-desktop-he-error.png
+      playground-desktop-he-labels-narrowest.png
+      playground-desktop-he-loading.png
+      playground-desktop-he-no-label-under-divider.png
+      playground-mobile-en-empty.png
+      playground-mobile-en-error.png
+      playground-mobile-en-labels-narrowest.png
+      playground-mobile-en-loading.png
+      playground-mobile-en-no-label-under-divider.png
+      playground-mobile-he-empty.png
+      playground-mobile-he-error.png
+      playground-mobile-he-labels-narrowest.png
+      playground-mobile-he-loading.png
+      playground-mobile-he-no-label-under-divider.png
+      widget-native-desktop-en-labels.png
+      widget-native-desktop-en-no-label-under-divider.png
+      widget-native-desktop-he-labels.png
+      widget-native-desktop-he-no-label-under-divider.png
+      widget-native-mobile-en-labels.png
+      widget-native-mobile-en-no-label-under-divider.png
+      widget-native-mobile-he-labels.png
+      widget-native-mobile-he-no-label-under-divider.png
+      widget-overlay-desktop-en-empty.png
+      widget-overlay-desktop-en-error.png
+      widget-overlay-desktop-en-labels-narrowest.png
+      widget-overlay-desktop-en-loading.png
+      widget-overlay-desktop-en-no-label-under-divider.png
+      widget-overlay-desktop-he-empty.png
+      widget-overlay-desktop-he-error.png
+      widget-overlay-desktop-he-labels-narrowest.png
+      widget-overlay-desktop-he-loading.png
+      widget-overlay-desktop-he-no-label-under-divider.png
+      widget-overlay-mobile-en-empty.png
+      widget-overlay-mobile-en-error.png
+      widget-overlay-mobile-en-labels-narrowest.png
+      widget-overlay-mobile-en-loading.png
+      widget-overlay-mobile-en-no-label-under-divider.png
+      widget-overlay-mobile-he-empty.png
+      widget-overlay-mobile-he-error.png
+      widget-overlay-mobile-he-labels-narrowest.png
+      widget-overlay-mobile-he-loading.png
+      widget-overlay-mobile-he-no-label-under-divider.png
     YOY-64/
       desktop-en-intent-reuse.png
       desktop-he-intent-reuse.png
@@ -1398,7 +1449,7 @@ vitest.setup.ts
 - apps/shopify-app/app/intent-live.test.ts → apps/shopify-app/app/ai/cost-recorder.server.ts, apps/shopify-app/app/testing/helpers.server.ts
 - apps/shopify-app/app/pgvector.test.ts → apps/shopify-app/app/testing/helpers.server.ts
 - apps/shopify-app/app/playground-api.test.ts → apps/shopify-app/app/db.server.ts, apps/shopify-app/app/playground/api.server.ts, apps/shopify-app/app/routes/api.playground.click.tsx, apps/shopify-app/app/routes/api.playground.search.tsx, apps/shopify-app/app/search/proxy.server.ts, apps/shopify-app/app/testing/helpers.server.ts
-- apps/shopify-app/app/playground/PlaygroundPage.tsx → apps/shopify-app/app/playground/api.server.ts, apps/shopify-app/app/playground/components/Card.tsx, apps/shopify-app/app/playground/components/ChipRow.tsx, apps/shopify-app/app/playground/components/EngineDetails.tsx, apps/shopify-app/app/playground/components/ExampleQueries.tsx, apps/shopify-app/app/playground/components/LanguageToggle.tsx, apps/shopify-app/app/playground/components/NewSearch.tsx, apps/shopify-app/app/playground/components/ResultsGrid.tsx, apps/shopify-app/app/playground/components/SearchBar.tsx, apps/shopify-app/app/playground/components/StatusLine.tsx, apps/shopify-app/app/playground/components/StoreLine.tsx, apps/shopify-app/app/playground/search-client.ts, apps/shopify-app/app/playground/strings.ts, apps/shopify-app/app/search/proxy.server.ts
+- apps/shopify-app/app/playground/PlaygroundPage.tsx → apps/shopify-app/app/playground/api.server.ts, apps/shopify-app/app/playground/components/Card.tsx, apps/shopify-app/app/playground/components/ChipRow.tsx, apps/shopify-app/app/playground/components/EngineDetails.tsx, apps/shopify-app/app/playground/components/ExampleQueries.tsx, apps/shopify-app/app/playground/components/LanguageToggle.tsx, apps/shopify-app/app/playground/components/NewSearch.tsx, apps/shopify-app/app/playground/components/ResultsGrid.tsx, apps/shopify-app/app/playground/components/SearchBar.tsx, apps/shopify-app/app/playground/components/StatusLine.tsx, apps/shopify-app/app/playground/components/StoreLine.tsx, apps/shopify-app/app/playground/search-client.ts, apps/shopify-app/app/playground/strings.ts, apps/shopify-app/app/search/proxy.server.ts, apps/shopify-app/widget/src/labels.ts
 - apps/shopify-app/app/playground/api.server.ts → apps/shopify-app/app/playground/ingest-public.server.ts, apps/shopify-app/app/search/judge-step.server.ts, apps/shopify-app/app/search/orchestrator.server.ts, apps/shopify-app/app/search/proxy.server.ts, apps/shopify-app/app/search/throttle.server.ts
 - apps/shopify-app/app/playground/catalog-source.server.ts → apps/shopify-app/app/catalog/variants.server.ts
 - apps/shopify-app/app/playground/components/Card.tsx → apps/shopify-app/app/playground/strings.ts, apps/shopify-app/widget/src/format.ts, apps/shopify-app/widget/src/labels.ts
@@ -1545,7 +1596,7 @@ vitest.setup.ts
 - apps/shopify-app/widget/src/native-page.ts → apps/shopify-app/widget/src/native-render.config.ts
 - apps/shopify-app/widget/src/native-render.ts → apps/shopify-app/widget/src/format.ts, apps/shopify-app/widget/src/labels.ts, apps/shopify-app/widget/src/native-page.ts, apps/shopify-app/widget/src/native-render.config.ts, apps/shopify-app/widget/src/native-render.css?inline (unresolved), apps/shopify-app/widget/src/overlay.ts, apps/shopify-app/widget/src/search-client.ts, apps/shopify-app/widget/src/strings.ts
 - apps/shopify-app/widget/src/overlay.ts → apps/shopify-app/widget/src/format.ts, apps/shopify-app/widget/src/labels.ts, apps/shopify-app/widget/src/search-client.ts, apps/shopify-app/widget/src/strings.ts, apps/shopify-app/widget/src/widget.css?inline (unresolved)
-- apps/shopify-app/widget/test-ui/labels.spec.ts → apps/shopify-app/widget/src/labels.ts, apps/shopify-app/widget/src/strings.ts
+- apps/shopify-app/widget/test-ui/labels.spec.ts → apps/shopify-app/widget/src/strings.ts
 - apps/shopify-app/widget/test-ui/localization.spec.ts → apps/shopify-app/widget/src/strings.ts
 - apps/shopify-app/widget/test-ui/refinement.spec.ts → apps/shopify-app/widget/src/strings.ts
 - apps/shopify-app/widget/test-ui/v2-chips.spec.ts → apps/shopify-app/widget/src/strings.ts

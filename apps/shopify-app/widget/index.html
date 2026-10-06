@@ -347,7 +347,11 @@
         return {
           ...page,
           route: "ai",
-          results: page.results.slice(0, split).map((result) => ({ ...result, label: null })),
+          results: page.results.slice(0, split).map((result, index) => ({
+            ...result,
+            label:
+              index === 0 ? { template: "price-near", values: ["420 ILS", "400 ILS"] } : null,
+          })),
           closeMatches: page.results.slice(split).map((result) => ({
             ...result,
             label: { template: "close-match", values: [] },
