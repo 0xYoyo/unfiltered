@@ -42,7 +42,7 @@ Do not chase breadth. Algolia, Klevu, and Searchspring own feature breadth and w
 
 ## Positioning notes (binding)
 
-- Hebrew: local-sales convenience for Israeli leads, NEVER a headline or moat claim. Multilingual is a later chapter after the core loop is proven.
+- Hebrew: local-sales convenience for Israeli leads, NEVER a headline or moat claim. All languages ship from day one: the engine reads the shopper's sentence in whatever language it is written, and Hebrew is simply one of them.
 - Pricing posture: sensible-best, never the cheap option; premium is the eventual position. Search-count metering stays (validated by Cartally; every alternative meter — GMV, sessions, requests — has documented bill-shock complaints we cite in positioning).
 - Rendering claim when spike proves out: "native when possible, functional always" — theme-native results with automatic own-widget fallback. No SMB competitor markets this.
 - Quality bar additions from incumbent complaints: survive theme updates/swaps without breakage; no metering surprises; card-level customization never a ceiling.

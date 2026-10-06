@@ -87,3 +87,64 @@ test("/try renders the playground search bar inside the site chrome", async ({
   await page.waitForLoadState("networkidle");
   expect(errors).toEqual([]);
 });
+
+/**
+ * The site copy pass (YOY-156; verify 1 – 4): the wordmark is text in the
+ * display face, every former "Start 14-day trial" / "Add to Shopify" button
+ * is a link to /try reading "Try it on a real catalog", nothing is
+ * disabled, and the pricing cards state PRD §8's tiers.
+ */
+const TRY_LABEL = "Try it on a real catalog";
+
+/** PRD §8: price, AI searches a month, catalog size, per tier. */
+const PRD_TIERS = [
+  ["$39", "10,000 AI searches / month", "Catalogs up to 1,000 products"],
+  ["$99", "50,000 AI searches / month", "Catalogs up to 5,000 products"],
+  ["$249", "200,000 AI searches / month", "Catalogs up to 20,000 products"],
+] as const;
+
+for (const path of ["/", "/pricing"]) {
+  test(`${path}: a text wordmark, every call to action links to /try, nothing disabled (verify 1, 2, 4)`, async ({
+    page,
+  }) => {
+    await page.goto(path);
+    for (const scope of [".site-nav", ".site-footer"]) {
+      const wordmark = page.locator(`${scope} .site-wordmark__name`);
+      await expect(wordmark).toHaveText("Unfiltered");
+      expect(
+        await wordmark.evaluate((element) =>
+          [...element.childNodes].every((node) => node.nodeType === Node.TEXT_NODE),
+        ),
+      ).toBe(true);
+      expect(
+        await wordmark.evaluate((element) => getComputedStyle(element).fontFamily),
+      ).toContain("Frank Ruhl Libre");
+      await expect(page.locator(`${scope} img`)).toHaveCount(0);
+    }
+    await expect(page.locator('img[src*="logo-wordmark"]')).toHaveCount(0);
+
+    await expect(page.getByText("Start 14-day trial")).toHaveCount(0);
+    await expect(page.getByText("Add to Shopify", { exact: true })).toHaveCount(0);
+    const ctas = page.locator(".unf-btn", { hasText: TRY_LABEL });
+    expect(await ctas.count()).toBeGreaterThan(0);
+    for (const cta of await ctas.all()) {
+      expect(await cta.evaluate((element) => element.tagName)).toBe("A");
+      await expect(cta).toHaveAttribute("href", "/try");
+    }
+    await expect(page.locator("[disabled]")).toHaveCount(0);
+  });
+}
+
+test("/pricing: each card states the PRD §8 price, searches and catalog size (verify 3)", async ({
+  page,
+}) => {
+  await page.goto("/pricing");
+  const cards = page.locator(".unf-pricing");
+  await expect(cards).toHaveCount(3);
+  for (const [index, [price, searches, catalog]] of PRD_TIERS.entries()) {
+    const card = cards.nth(index);
+    await expect(card.locator(".unf-pricing__amount")).toHaveText(price);
+    await expect(card).toContainText(searches);
+    await expect(card).toContainText(catalog);
+  }
+});

@@ -237,6 +237,7 @@ apps/
           evidence-negation.spec.ts
           evidence-paging.spec.ts
           evidence-refinement.spec.ts
+          evidence-site-copy.spec.ts
           evidence-store.spec.ts
           evidence-v2-chips.spec.ts
           evidence.spec.ts
@@ -417,6 +418,7 @@ apps/
           SiteNav.tsx
           SitePage.tsx
           StatCard.tsx
+          Wordmark.tsx
         pages/
           AboutPage.tsx
           FaqPage.tsx
@@ -1018,6 +1020,31 @@ docs/
       widget-overlay-mobile-he-4-loading.png
       widget-overlay-mobile-he-5-empty.png
       widget-overlay-mobile-he-6-error.png
+    YOY-156/
+      site-desktop-landing.png
+      site-desktop-pricing.png
+      site-mobile-landing.png
+      site-mobile-pricing.png
+      try-desktop-en-empty.png
+      try-desktop-en-error.png
+      try-desktop-en-initial.png
+      try-desktop-en-loading.png
+      try-desktop-en-results.png
+      try-desktop-he-empty.png
+      try-desktop-he-error.png
+      try-desktop-he-initial.png
+      try-desktop-he-loading.png
+      try-desktop-he-results.png
+      try-mobile-en-empty.png
+      try-mobile-en-error.png
+      try-mobile-en-initial.png
+      try-mobile-en-loading.png
+      try-mobile-en-results.png
+      try-mobile-he-empty.png
+      try-mobile-he-error.png
+      try-mobile-he-initial.png
+      try-mobile-he-loading.png
+      try-mobile-he-results.png
     YOY-159/
       playground-desktop-en-1-details-judge-split.png
       playground-desktop-en-2-loading.png
@@ -1611,10 +1638,10 @@ vitest.setup.ts
 - apps/shopify-app/app/session-storage.test.ts → apps/shopify-app/app/testing/helpers.server.ts
 - apps/shopify-app/app/shopify.server.ts → apps/shopify-app/app/db.server.ts, apps/shopify-app/app/playground/fixture-mode.server.ts, apps/shopify-app/app/playground/fixture-session-storage.server.ts
 - apps/shopify-app/app/site/components/LegalDocument.tsx → apps/shopify-app/app/site/components/Badge.tsx, apps/shopify-app/app/site/components/SitePage.tsx
-- apps/shopify-app/app/site/components/PricingCard.tsx → apps/shopify-app/app/site/components/Badge.tsx, apps/shopify-app/app/site/components/Button.tsx
+- apps/shopify-app/app/site/components/PricingCard.tsx → apps/shopify-app/app/site/components/Badge.tsx, apps/shopify-app/app/site/components/Button.tsx, apps/shopify-app/app/site/paths.ts
 - apps/shopify-app/app/site/components/QueryBreakdown.tsx → apps/shopify-app/app/site/components/FilterChip.tsx
-- apps/shopify-app/app/site/components/SiteFooter.tsx → apps/shopify-app/app/site/paths.ts
-- apps/shopify-app/app/site/components/SiteNav.tsx → apps/shopify-app/app/site/components/Button.tsx, apps/shopify-app/app/site/paths.ts
+- apps/shopify-app/app/site/components/SiteFooter.tsx → apps/shopify-app/app/site/components/Wordmark.tsx, apps/shopify-app/app/site/paths.ts
+- apps/shopify-app/app/site/components/SiteNav.tsx → apps/shopify-app/app/site/components/Button.tsx, apps/shopify-app/app/site/components/Wordmark.tsx, apps/shopify-app/app/site/paths.ts
 - apps/shopify-app/app/site/components/SitePage.tsx → apps/shopify-app/app/site/components/SiteFooter.tsx, apps/shopify-app/app/site/components/SiteNav.tsx
 - apps/shopify-app/app/site/pages/AboutPage.tsx → apps/shopify-app/app/site/components/SitePage.tsx
 - apps/shopify-app/app/site/pages/FaqPage.tsx → apps/shopify-app/app/site/components/Button.tsx, apps/shopify-app/app/site/components/SitePage.tsx, apps/shopify-app/app/site/paths.ts
