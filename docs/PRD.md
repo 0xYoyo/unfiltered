@@ -554,7 +554,7 @@ Model spend: Gemini first; every spend ceiling is proposed with its expected cos
 
 Tiers: **$39** (10K AI searches, catalogs up to 1K products) / **$99**
 (50K, up to 5K products) / **$249** (200K, up to 20K products); larger
-catalogs are enterprise inquiries. Overage $2 per additional 1,000 AI searches — re-validated on 2026-10-06 after the M6 judge comparison (RESET §4) and unchanged: the Jev judge measures ≈ $0.82 per 1,000 uncached searches (YOY-152), so every tier's margin in the unit economics below clears the 60 % target before the answer cache; hard cap + fallback beyond a store-configurable ceiling. 14-day trial, card required, 1,000 AI-search
+catalogs are enterprise inquiries. Overage $2 per additional 1,000 AI searches — re-validated on 2026-10-06 after the M6 judge comparison (RESET §4) and unchanged: the Jev judge measures ≈ $0.82 per 1,000 uncached searches (YOY-152), so the typical store (20,000 searches) clears the 60 % target before the answer cache, while a tier used to its full allowance does not — the cache hit rate, measured on the live tail, decides the tier limits (unit economics below); hard cap + fallback beyond a store-configurable ceiling. 14-day trial, card required, 1,000 AI-search
 trial cap. Anchors: Boost $29–299 (product-count based, free plan),
 Cartally $59/$209/$499 (+$1/1K overage), Searchanise from $19. Pricing is
 an experiment: v1 measures real cost-per-search, and tier limits/prices
@@ -569,7 +569,7 @@ validated by measurement):
 - Judge, uncached, measured 2026-10-04 (YOY-152) at the typical store's 20,000 searches a month: Jev ≈ $16, Flash-Lite ≈ $45 (judge only). The answer cache cuts both; the real cache hit rate is measured on the live tail.
 - Hosting share $5–10.
 - At $99/month for the typical store above (20k searches), before cache, estimates from the measured judge cost plus $5–10 hosting: Jev judge ≈ 74–79 % margin; Flash-Lite judge ≈ 44–49 %. At the tier's full allowance (50k searches) Jev ≈ 48–54 % and Flash-Lite falls below zero — which is why Jev is the default (YOY-152, 2026-10-04) and the cache hit rate decides the tier limits. 500-product store ≈ $3–10/month cost. 200k-product/500k-search store → enterprise tier. Pricing tiers by catalog size and search volume.
-- Gross margin target: ≥60% per tier — re-validated after the M6 judge comparison (2026-10-06, RESET §4): met on the measured Jev cost at the typical store and at the $99 tier's full allowance; measured on the live tail, not assumed.
+- Gross margin target: ≥60% per tier — re-validated after the M6 judge comparison (2026-10-06, RESET §4): met on the measured Jev cost at the typical store (74–79 %), not at a tier's full allowance before the cache ($99 at 50k searches ≈ 48–54 %, $249 at 200k ≈ 30 %); the cache hit rate is measured on the live tail, not assumed.
 - Monthly profit scenarios at avg. $60/store revenue and 65% margin:
   pessimistic (30 stores): ~$1.2K; realistic (150 stores): ~$5.9K; good
   (500 stores): ~$19.5K — plus enterprise upsell path outside v1.
