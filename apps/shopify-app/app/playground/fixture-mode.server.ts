@@ -31,7 +31,7 @@ import v2BudgetFixture from "./fixtures/v2-budget.json";
 import v2RefineFixture from "./fixtures/v2-refine.json";
 import v2TwoMeaningsFixture from "./fixtures/v2-two-meanings.json";
 
-import type { ProxyLabel } from "../search/proxy.server";
+import { splitCloseVerdicts, type ProxyLabel } from "../search/proxy.server";
 import type { PlaygroundSearchResponse } from "./api.server";
 
 export const PLAYGROUND_FIXTURES_ENV = "PLAYGROUND_FIXTURES";
@@ -76,6 +76,9 @@ export type PlaygroundFixtureName =
   // YOY-166: a judged order whose pages each hold matches and close
   // products, the close ones under the page's "Close matches" divider.
   | "v2-close"
+  // YOY-157 AC-27: a judged page as the Jev judge answers it, split by the
+  // server's own rule — its other-variant products under the divider too.
+  | "v2-close-jev"
   // YOY-169: one Shopify-CDN image and one crawl-sourced image, so the
   // sized `src`/`srcset` and the untouched plain `src` both render.
   | "images";
@@ -156,8 +159,9 @@ export function selectFixture(
       return "images";
     }
     if (has("divider")) {
-      // Close products under the divider (YOY-166): "divider red gown".
-      return "v2-close";
+      // Close products under the divider (YOY-166): "divider red gown";
+      // the Jev-judged page (YOY-157 AC-27): "divider jev red evening gown".
+      return has("jev") ? "v2-close-jev" : "v2-close";
     }
     if (has("budget")) {
       // Engine v2 chips (YOY-149): "budget dress under 400".
@@ -282,6 +286,52 @@ function closeDividerPage(page: number): PlaygroundSearchResponse {
 }
 
 /**
+ * The `v2-close-jev` fixture (YOY-157 AC-27): one judged page as the Jev
+ * judge answers it — one `exact` product, three `other-variant` ones and
+ * one `close` one, each non-exact card labelled "close match" because Jev
+ * writes no merchant-fact label — split by the server's own rule. Only the
+ * exact card stays in the grid; the other four sit under the heading.
+ */
+function closeDividerJevPage(): PlaygroundSearchResponse {
+  const base = asResponse(labelsFixture);
+  const template = { ...base.results[0]!, label: null };
+  const hits = (
+    [
+      ["jev-exact", "Red Evening Gown", "exact"],
+      ["jev-robe", "Robe Dress", "other-variant"],
+      ["jev-chiffon", "Chiffon Draped Dress", "other-variant"],
+      ["jev-edna", "Edna Dress", "other-variant"],
+      ["jev-lace", "Lace Dress", "close"],
+    ] as const
+  ).map(([productId, title, verdict]) => ({
+    ...template,
+    productId,
+    title,
+    verdict,
+    label: verdict === "exact" ? null : { template: "close-match" as const, values: [] },
+  }));
+  const split = splitCloseVerdicts(hits, "jev")!;
+  // The wire carries no verdict (YOY-147 AC-12).
+  const card = (hit: (typeof hits)[number]) => {
+    const result: Partial<(typeof hits)[number]> = { ...hit };
+    delete result.verdict;
+    return result as Omit<(typeof hits)[number], "verdict">;
+  };
+  return {
+    ...base,
+    searchId: "fixture-v2-close-jev",
+    route: "ai",
+    intent: null,
+    chips: [],
+    results: split.matched.map(card),
+    closeMatches: split.close.map(card),
+    closeMatchesRelaxed: [],
+    page: 1,
+    totalCount: hits.length,
+  };
+}
+
+/**
  * One page of a fixture's answer, as the endpoint serves it (YOY-145
  * AC-4): with page parameters the response holds that page plus `page` and
  * `totalCount`; without them it is unchanged.
@@ -387,6 +437,8 @@ export function fixtureOutcome(
       return { delayMs: 0, status: 200, body: imagesFixture() };
     case "v2-close":
       return { delayMs: 0, status: 200, body: closeDividerPage(paging?.page ?? 1) };
+    case "v2-close-jev":
+      return { delayMs: 0, status: 200, body: closeDividerJevPage() };
     case "color-unknown":
       return {
         delayMs: 0,

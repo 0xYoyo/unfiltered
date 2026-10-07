@@ -80,3 +80,36 @@ for (const locale of ["en", "he"] as const) {
     await expect(page.locator(".closeMatches")).toHaveCount(0);
   });
 }
+
+for (const locale of ["en", "he"] as const) {
+  const strings = PLAYGROUND_STRING_CATALOG[locale];
+  const path = locale === "he" ? "/try?lang=he" : "/try";
+
+  test(`a Jev-judged page puts its other-variant products under the divider with the close one, none labelled (YOY-157 AC-27, ${locale})`, async ({
+    page,
+  }) => {
+    await page.goto(path);
+    await page.getByTestId("playground-input").fill("divider jev red evening gown");
+    await page.getByTestId("playground-input").press("Enter");
+    await expect(cards(page)).toHaveCount(5);
+
+    // Only the exact product stays above the heading; the three
+    // other-variant products and the close one sit under it, unlabelled.
+    const items = grid(page).locator(":scope > *");
+    await expect(dividers(page)).toHaveCount(1);
+    await expect(dividers(page)).toHaveText(strings.closeMatchesHeading);
+    await expect(items.nth(1)).toHaveAttribute("data-testid", "playground-close-matches-divider");
+    await expect(cards(page).nth(0)).toContainText("Red Evening Gown");
+    for (const [index, title] of [
+      [1, "Robe Dress"],
+      [2, "Chiffon Draped Dress"],
+      [3, "Edna Dress"],
+      [4, "Lace Dress"],
+    ] as const) {
+      await expect(cards(page).nth(index)).toContainText(title);
+      await expect(cards(page).nth(index).locator(".cardLabel")).toHaveCount(0);
+    }
+    // No card anywhere on the page says "close match".
+    await expect(grid(page).getByText(strings.labelCloseMatch, { exact: true })).toHaveCount(0);
+  });
+}

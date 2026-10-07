@@ -224,6 +224,7 @@ apps/
           evidence-card-images.spec.ts
           evidence-card-srcset.spec.ts
           evidence-classic-stages.spec.ts
+          evidence-close-divider-jev.spec.ts
           evidence-close-divider.spec.ts
           evidence-close-matches.spec.ts
           evidence-design.spec.ts
@@ -576,6 +577,7 @@ apps/
         card-images.spec.ts
         close-divider.spec.ts
         evidence-card-images.spec.ts
+        evidence-close-divider-jev.spec.ts
         evidence-close-divider.spec.ts
         evidence-close-matches.spec.ts
         evidence-hardening.spec.ts
@@ -1081,6 +1083,27 @@ docs/
         landing-mobile-closer.png
         landing-mobile-full.png
         landing-mobile-hero.png
+      AC-27/
+        playground-desktop-en-empty.png
+        playground-desktop-en-error.png
+        playground-desktop-en-jev-page-divider.png
+        playground-desktop-en-loading.png
+        playground-desktop-he-empty.png
+        playground-desktop-he-error.png
+        playground-desktop-he-jev-page-divider.png
+        playground-desktop-he-loading.png
+        playground-mobile-en-empty.png
+        playground-mobile-en-error.png
+        playground-mobile-en-jev-page-divider.png
+        playground-mobile-en-loading.png
+        playground-mobile-he-empty.png
+        playground-mobile-he-error.png
+        playground-mobile-he-jev-page-divider.png
+        playground-mobile-he-loading.png
+        widget-overlay-desktop-en-jev-page-divider.png
+        widget-overlay-desktop-he-jev-page-divider.png
+        widget-overlay-mobile-en-jev-page-divider.png
+        widget-overlay-mobile-he-jev-page-divider.png
     YOY-159/
       playground-desktop-en-1-details-judge-split.png
       playground-desktop-en-2-loading.png

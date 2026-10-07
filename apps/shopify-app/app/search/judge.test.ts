@@ -30,7 +30,7 @@ import {
   type Retriever,
   type StructuredCompletionRequest,
 } from "@unfiltered/engine";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { aggregateCosts } from "../ai/cost-aggregates.server";
 import { createOpenRouterDecisionClient, DEFAULT_OPENROUTER_JUDGE_MODEL } from "../ai/openrouter.server";
@@ -59,6 +59,7 @@ import {
 } from "./orchestrator.server";
 import { writeClickEvent, writeSearchEvent } from "./events.server";
 import {
+  judgeWritesFactLabel,
   parseLabelsParams,
   serializeLabels,
   serializeProxySearchResponse,
@@ -1144,7 +1145,8 @@ describe("the judge on Engine v2 (on the database)", () => {
     expect(response.stages.judge).toBeGreaterThanOrEqual(0);
     expect(costs.rows.map((row) => row.operation)).toEqual(["judge"]);
 
-    const wire = serializeProxySearchResponse(response);
+    // This LLM judge is the Flash-Lite one: it writes the fact label.
+    const wire = serializeProxySearchResponse(response, "gemini");
     expect(wire.results.map((result) => result.label)).toEqual([
       null,
       { template: "fact-differs", values: ["navy", "black"] },
@@ -1292,8 +1294,9 @@ describe("the judge on Engine v2 (on the database)", () => {
   });
 
   describe("close products under the divider (YOY-166 AC-1)", () => {
+    // These pages are answered by the Flash-Lite judge, which writes the fact label.
     const wireShape = (response: Awaited<ReturnType<typeof search>>) => {
-      const wire = serializeProxySearchResponse(response);
+      const wire = serializeProxySearchResponse(response, "gemini");
       return {
         results: wire.results.map((result) => result.productId),
         closeMatches: wire.closeMatches?.map((result) => [result.productId, result.label]),
@@ -1333,14 +1336,84 @@ describe("the judge on Engine v2 (on the database)", () => {
         verdict,
         ...(standIn === true ? { standIn } : {}),
       });
-      expect(splitCloseVerdicts([hit("a", "exact", true), hit("b", "close")])).toBeNull();
+      expect(splitCloseVerdicts([hit("a", "exact", true), hit("b", "close")], "gemini")).toBeNull();
       expect(
-        splitCloseVerdicts([hit("a", "other-variant"), hit("b", "close"), hit("c", "close", true)]),
+        splitCloseVerdicts(
+          [hit("a", "other-variant"), hit("b", "close"), hit("c", "close", true)],
+          "gemini",
+        ),
       ).toEqual({
         matched: [hit("a", "other-variant"), hit("c", "close", true)],
         close: [hit("b", "close")],
       });
-      expect(splitCloseVerdicts([hit("a", "exact"), hit("b", "exact")])).toBeNull();
+      expect(splitCloseVerdicts([hit("a", "exact"), hit("b", "exact")], "gemini")).toBeNull();
+      // Under Jev a stand-in other-variant is still no judgment: it stays inline.
+      expect(
+        splitCloseVerdicts([hit("a", "exact"), hit("b", "other-variant", true), hit("c", "close")], "jev"),
+      ).toEqual({
+        matched: [hit("a", "exact"), hit("b", "other-variant", true)],
+        close: [hit("c", "close")],
+      });
+    });
+
+    it("under Jev, other-variant cards go under the heading with the close ones; under Flash-Lite they stay matches (YOY-157 AC-27)", () => {
+      const hit = (productId: string, verdict: string) => ({ productId, verdict });
+      const page = [
+        hit("a", "exact"),
+        hit("b", "other-variant"),
+        hit("c", "other-variant"),
+        hit("d", "close"),
+      ];
+      const ids = (split: { matched: { productId: string }[]; close: { productId: string }[] } | null) =>
+        split === null
+          ? null
+          : [split.matched.map((h) => h.productId), split.close.map((h) => h.productId)];
+      // Jev writes no fact label: only `exact` keeps a card in the main grid.
+      expect(ids(splitCloseVerdicts(page, "jev"))).toEqual([["a"], ["b", "c", "d"]]);
+      // Flash-Lite writes it: the split stays as shipped.
+      expect(ids(splitCloseVerdicts(page, "gemini"))).toEqual([["a", "b", "c"], ["d"]]);
+      // A Jev page whose only matches are other-variant has no match: reject-all, inline.
+      expect(splitCloseVerdicts([hit("b", "other-variant"), hit("d", "close")], "jev")).toBeNull();
+      expect(judgeWritesFactLabel("jev")).toBe(false);
+      expect(judgeWritesFactLabel("gemini")).toBe(true);
+    });
+
+    it("the wire splits by the provider JUDGE_PROVIDER names, jev by default (YOY-157 AC-27)", () => {
+      const card = (productId: string, verdict: string) => ({
+        productId,
+        title: productId,
+        url: `https://example.test/${productId}`,
+        imageUrl: null,
+        priceMin: 10,
+        priceMax: 10,
+        currencyCode: "USD",
+        available: true,
+        colorUnknown: false,
+        verdict,
+        label: verdict === "exact" ? null : { template: "close-match" as const, values: [] },
+      });
+      const response = {
+        searchId: "s",
+        route: "ai",
+        degraded: false,
+        hits: [card("a", "exact"), card("b", "other-variant"), card("c", "other-variant"), card("d", "close")],
+        chips: [],
+        intent: null,
+        closeMatches: [],
+        closeMatchesRelaxed: [],
+      } as unknown as Parameters<typeof serializeProxySearchResponse>[0];
+      const shape = (wire: ReturnType<typeof serializeProxySearchResponse>) => [
+        wire.results.map((result) => result.productId),
+        wire.closeMatches?.map((result) => result.productId),
+      ];
+      vi.stubEnv("JUDGE_PROVIDER", undefined);
+      try {
+        expect(shape(serializeProxySearchResponse(response))).toEqual([["a"], ["b", "c", "d"]]);
+        vi.stubEnv("JUDGE_PROVIDER", "gemini");
+        expect(shape(serializeProxySearchResponse(response))).toEqual([["a", "b", "c"], ["d"]]);
+      } finally {
+        vi.unstubAllEnvs();
+      }
     });
 
     it("all-close page: no match on the page, so every card stays inline with its label", async () => {
