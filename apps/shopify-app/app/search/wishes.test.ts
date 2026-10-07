@@ -215,7 +215,7 @@ describe("the extraction keeps only what the sentence states (AC-1, AC-2)", () =
     expect(
       parseExtractAnswer({ excluded: [{ typed: "wool", english: "wool" }] }, "sweater no wool")!.excluded,
     ).toEqual([{ typed: "wool", english: "wool" }]);
-    expect(EXTRACT_PROMPT_VERSION).toBe(5);
+    expect(EXTRACT_PROMPT_VERSION).toBe(6);
   });
 
   it("drops a negated currency from the excluded terms and keeps the price (YOY-157 AC-16)", () => {
@@ -232,6 +232,8 @@ describe("the extraction keeps only what the sentence states (AC-1, AC-2)", () =
       ["USD", "USD", "shirt under 80 euro not USD"],
       ["$", "$", "shirt under 80 euro not $"],
       ["שקל", "shekel", "חולצה עד 80 דולר לא שקל"],
+      ["shekels", "shekel", "dress under 80 dollars not shekels"],
+      ["shekel", "shekel", "dress under 80 dollars not shekel"],
     ] as const) {
       expect(parseExtractAnswer({ excluded: [{ typed, english }] }, text)!.excluded, text).toEqual([]);
     }
