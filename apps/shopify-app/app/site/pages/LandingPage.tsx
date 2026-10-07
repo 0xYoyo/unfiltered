@@ -311,8 +311,10 @@ export function LandingPage() {
           <Button size="lg" href={SITE_ROUTES.demo}>
             {TRY_CTA_LABEL}
           </Button>
-          <Button size="lg" variant="secondary" href={SITE_ROUTES.demo}>
-            See a demo store
+          {/* One call to action to /try per pair (YOY-157 AC-26): the
+              secondary names a different destination. */}
+          <Button size="lg" variant="secondary" href={SITE_ROUTES.howItWorks}>
+            See how it works
           </Button>
         </div>
         <HeroDemo />
@@ -470,8 +472,8 @@ export function LandingPage() {
               <Button size="lg" href={SITE_ROUTES.demo}>
                 {TRY_CTA_LABEL}
               </Button>
-              <Button size="lg" variant="secondary" href={SITE_ROUTES.demo}>
-                Try the live demo
+              <Button size="lg" variant="secondary" href={SITE_ROUTES.pricing}>
+                See pricing
               </Button>
             </div>
             <p className="site-closer__note">

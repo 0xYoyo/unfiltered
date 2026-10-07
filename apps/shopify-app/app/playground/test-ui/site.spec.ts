@@ -135,6 +135,28 @@ for (const path of ["/", "/pricing"]) {
   });
 }
 
+test("/: the hero's and the closer's button pairs each lead to two different places (YOY-157 AC-26)", async ({
+  page,
+}) => {
+  await page.goto("/");
+  for (const scope of [".site-hero__actions", ".site-closer .site-actions"]) {
+    const hrefs = await page
+      .locator(`${scope} a[href]`)
+      .evaluateAll((links) => links.map((link) => link.getAttribute("href")));
+    expect(hrefs.length, scope).toBe(2);
+    expect(new Set(hrefs).size, scope).toBe(hrefs.length);
+    expect(hrefs.filter((href) => href === "/try"), scope).toHaveLength(1);
+  }
+  await expect(page.locator(".site-hero__actions a", { hasText: "See how it works" })).toHaveAttribute(
+    "href",
+    "/how-it-works",
+  );
+  await expect(page.locator(".site-closer .site-actions a", { hasText: "See pricing" })).toHaveAttribute(
+    "href",
+    "/pricing",
+  );
+});
+
 test("/pricing: each card states the PRD §8 price, searches and catalog size (verify 3)", async ({
   page,
 }) => {

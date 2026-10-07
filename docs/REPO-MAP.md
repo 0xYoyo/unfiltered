@@ -235,6 +235,7 @@ apps/
           evidence-judge-split.spec.ts
           evidence-label-line.spec.ts
           evidence-labels.spec.ts
+          evidence-landing-ctas.spec.ts
           evidence-latency.spec.ts
           evidence-negation.spec.ts
           evidence-paging.spec.ts
@@ -1073,6 +1074,13 @@ docs/
         playground-mobile-he-loading.png
         playground-mobile-he-results.png
         playground-mobile-he-sized-images.png
+      AC-26/
+        landing-desktop-closer.png
+        landing-desktop-full.png
+        landing-desktop-hero.png
+        landing-mobile-closer.png
+        landing-mobile-full.png
+        landing-mobile-hero.png
     YOY-159/
       playground-desktop-en-1-details-judge-split.png
       playground-desktop-en-2-loading.png
