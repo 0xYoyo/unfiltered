@@ -169,6 +169,12 @@ export interface Judge {
    */
   readonly identity?: string;
   /**
+   * Characters a candidate row is cut to (AC-2, AC-17): part of the
+   * answer-cache key (YOY-157 AC-13), since a different cap sends the judge
+   * different rows.
+   */
+  readonly maxRowChars?: number;
+  /**
    * One verdict per candidate, in candidate order, and the second reading
    * when there is one. Rejects with `JudgeAnswerError` when the answer is
    * invalid twice (AC-4), and with the port's own error when the call fails.
@@ -302,6 +308,24 @@ export function judgeRow(candidate: JudgeCandidate, maxChars = DEFAULT_JUDGE_ROW
     .filter((part) => part !== "")
     .join(" | ");
   return row.slice(0, maxChars);
+}
+
+/**
+ * Everything a candidate's row says except its price (YOY-157 AC-13): the
+ * title, the facts or the no-card description slice, the vision attributes
+ * and the option names and values, in `judgeRow`'s order. The answer cache
+ * keys on it, so a retitled or re-enriched product misses while a price or
+ * stock change still hits (YOY-148 AC-3).
+ */
+export function judgeRowInputs(candidate: JudgeCandidate): string {
+  return JSON.stringify([
+    candidate.title,
+    candidate.facts !== null ? candidate.facts : candidate.description.slice(0, JUDGE_DESCRIPTION_CHARS),
+    candidate.attributes.map((attribute) => [attribute.name, attribute.value]),
+    candidate.options
+      .filter((option) => option.values.length > 0)
+      .map((option) => [option.name, option.values]),
+  ]);
 }
 
 /**
@@ -504,6 +528,7 @@ export function createLlmJudge(options: LlmJudgeOptions): Judge {
   const maxRowChars = options.maxRowChars ?? DEFAULT_JUDGE_ROW_CHARS;
   return {
     ...(options.identity !== undefined ? { identity: options.identity } : {}),
+    maxRowChars,
     async judge(request) {
       const prompt = buildJudgePrompt(
         request.sentence,
@@ -667,6 +692,7 @@ export function createDecisionJudge(options: DecisionJudgeOptions): Judge {
   const maxRowChars = options.maxRowChars ?? DEFAULT_JUDGE_ROW_CHARS;
   return {
     ...(options.identity !== undefined ? { identity: options.identity } : {}),
+    maxRowChars,
     async judge(request) {
       const previous =
         request.previousSentence === undefined || request.previousSentence.trim() === ""
