@@ -88,17 +88,22 @@ A judge input that is not on the default branch's workflow yet is dispatched
 with `--ref <branch>`, so the branch's own workflow file runs.
 
 The workflow runs on `workflow_dispatch` only — never on push or pull
-request, never inside `ci.yml`. It checks out `ref`, writes the secret to
-the runner's temp directory, runs `score-run.mts --hidden-set` with
-`GEMINI_API_KEY`, and captures every byte the runner writes. Before the
-run it prints the names — never the values — of the `GEMINI_*` and
-`INTENT_*` variables it has. `score-leak-check.mts` — run from a second
-checkout of the workflow's own commit (`github.sha`) in `guard/`, never from
-the scored ref (YOY-157 AC-2) — then fails the job if
+request, never inside `ci.yml`. It has two jobs on separate machines, so the
+scored ref's code and the leak guard never share a filesystem (YOY-157
+AC-31). The `run` job checks out `ref`, writes the secret to the runner's
+temp directory, runs `score-run.mts --hidden-set` with `GEMINI_API_KEY`, and
+captures every byte the runner writes. Before the run it prints the names —
+never the values — of the `GEMINI_*` and `INTENT_*` variables it has. It
+prints none of the output and writes no job summary: it uploads the output
+as a one-day artifact, encrypted with the hidden-set secret, because until
+the check has run the output may hold hidden query text. The `check` job
+then checks out the workflow's own commit (`github.sha`) only, never the
+scored ref (YOY-157 AC-2), decrypts the artifact, and runs
+`score-leak-check.mts`, which fails the job if
 any hidden query appears in that output as whole words (the score table,
 the cost line and the failure lines excepted: each is matched by its exact
 shape and holds only language codes, numbers, a stage or a class name),
-printing a count and never the query.
+printing a count and never the query. It exits with the run's own status.
 
 A run with more than 2 failed searches of 72 is not a baseline: its cause
 is fixed first and the run is dispatched again. Only a
