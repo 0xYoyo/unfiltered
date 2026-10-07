@@ -300,15 +300,24 @@ interface SizeStanding {
   offered: boolean;
   /** Some available variant carries it. */
   inStock: boolean;
+  /** The product has sizes at all: a size-named option, or the asked value (YOY-157 AC-17). */
+  sized: boolean;
 }
+
+/** An option name that means size, as a whole word, in the languages the engine serves. */
+const SIZE_OPTION_NAME = /(?<![\p{L}\p{N}])(?:size|sizes|מידה|מידות|taille|talla|größe|grösse|размер|مقاس)(?![\p{L}\p{N}])/iu;
 
 function sizeStanding(product: WishProduct, size: string): SizeStanding {
   const wanted = size.trim().toLowerCase();
   const carries = (variant: WishVariant) =>
     variant.options.some((option) => option.value.trim().toLowerCase() === wanted);
+  const offered = product.variants.some(carries);
   return {
-    offered: product.variants.some(carries),
+    offered,
     inStock: product.variants.some((variant) => variant.available && carries(variant)),
+    sized:
+      offered ||
+      product.variants.some((variant) => variant.options.some((option) => SIZE_OPTION_NAME.test(option.name))),
   };
 }
 
@@ -395,7 +404,9 @@ function standingOf(
     removed = true;
   }
   const size = wishes.size === null ? null : sizeStanding(product, wishes.size);
-  if (wishes.sizeFirm && size !== null && !size.inStock) {
+  // A product with no size option at all (a scarf, a bag) meets a firm size
+  // (YOY-157 AC-17); one that offers sizes, but not this one in stock, does not.
+  if (wishes.sizeFirm && size !== null && size.sized && !size.inStock) {
     removed = true;
   }
   if (isExcluded(product, wishes)) {

@@ -20,7 +20,7 @@ import type { JsonSchema, LlmClient } from "./index.js";
  * Bump it with every change to `buildExtractPrompt`, `EXTRACT_SCHEMA` or
  * `parseExtractAnswer`.
  */
-export const EXTRACT_PROMPT_VERSION = 4;
+export const EXTRACT_PROMPT_VERSION = 5;
 
 /** One term the shopper excluded, as typed and in English (AC-1). */
 export interface ExcludedTerm {
@@ -154,7 +154,8 @@ export function buildExtractPrompt(sentence: string, previousSentence?: string):
     "exactly as written, WITHOUT the negation (\"not black\" -> \"black\"; \"no wool\" -> \"wool\";",
     "\"לא שחורה\" -> \"שחורה\"), english is that word in English. An exclusion needs a negation",
     "in the search (\"not\", \"no\", \"without\", \"non\", \"-free\", \"לא\", \"בלי\", \"ללא\", \"חוץ מ\"):",
-    "the thing the shopper asks for is never excluded (\"jacket under 30\" excludes nothing). Empty when none.",
+    "the thing the shopper asks for is never excluded (\"jacket under 30\" excludes nothing). A negated",
+    "currency is not an exclusion (\"400 שקל לא דולר\" excludes nothing). Empty when none.",
     "priceFirm: true only when the price was stated as a hard limit (\"max\", \"no more than\",",
     "\"at most\", \"only\", \"must be\", \"לא יותר מ\", \"מקסימום\"); \"under\", \"up to\", \"below\",",
     "\"around\" and \"עד\" are NOT firm. Else null.",
@@ -186,6 +187,19 @@ export function sentenceHasText(sentence: string, text: string): boolean {
   return needle !== "" && sentence.toLowerCase().includes(needle);
 }
 
+/**
+ * Whether the sentence carries the text as a whole token, ignoring case
+ * (YOY-157 AC-15): no letter or digit on either side, the boundary rule of
+ * `holdsWholeWord`. "dress size M" carries "M"; "midi dress" does not.
+ */
+export function sentenceHasToken(sentence: string, text: string): boolean {
+  const needle = text.trim();
+  if (needle === "") {
+    return false;
+  }
+  return new RegExp(`${NOT_BEFORE}${escapeRegExp(needle)}${NOT_AFTER}`, "iu").test(sentence);
+}
+
 const CURRENCY_CODE = /^[A-Z]{3}$/;
 
 /**
@@ -214,6 +228,17 @@ export function statedCurrency(sentence: string): string | null {
     }
   }
   return /\p{Script=Hebrew}/u.test(sentence) ? "ILS" : null;
+}
+
+/**
+ * A currency word or sign as a whole excluded term (YOY-157 AC-16): "not
+ * dollars" negates a currency, never a product term.
+ */
+const CURRENCY_TERM =
+  /^(?:₪|ש["״]?ח|שקל|nis|ils|\$|usd|dollars?|דולר|€|eur|euros?|£|gbp|pounds?)$/iu;
+
+function isCurrencyTerm(term: string): boolean {
+  return CURRENCY_TERM.test(term.trim());
 }
 
 function withoutNegation(term: string): string {
@@ -251,9 +276,10 @@ export function sentenceNegates(sentence: string, term: string): boolean {
 
 /**
  * Validate one answer against the sentence (AC-2): a price is kept only when
- * its digits appear in the sentence; a size only when it appears verbatim,
- * ignoring case; an excluded term only when the sentence negates it
- * (YOY-162 AC-1). Anything else is discarded. Null when the answer is not
+ * its digits appear in the sentence; a size only when it appears as a whole
+ * token, ignoring case (YOY-157 AC-15); an excluded term only when the
+ * sentence negates it (YOY-162 AC-1) and it is not a currency (YOY-157
+ * AC-16). Anything else is discarded. Null when the answer is not
  * the schema's shape at all.
  */
 export function parseExtractAnswer(
@@ -298,12 +324,15 @@ export function parseExtractAnswer(
           ? withoutNegation(englishRaw)
           : typed;
       const term = { typed, english };
+      if (isCurrencyTerm(term.typed) || isCurrencyTerm(term.english)) {
+        continue;
+      }
       if (!excluded.some((kept) => kept.typed.toLowerCase() === term.typed.toLowerCase())) {
         excluded.push(term);
       }
     }
   }
-  const size = sizeRaw !== "" && sentenceHasText(text, sizeRaw) ? sizeRaw : null;
+  const size = sizeRaw !== "" && sentenceHasToken(text, sizeRaw) ? sizeRaw : null;
   return {
     priceMax,
     priceMin,

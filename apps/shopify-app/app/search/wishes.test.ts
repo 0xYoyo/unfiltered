@@ -5,6 +5,7 @@ import {
   buildExtractPrompt,
   createLlmJudge,
   createWishExtractor,
+  EXTRACT_PROMPT_VERSION,
   EXTRACT_SCHEMA,
   NO_WISHES,
   parseExtractAnswer,
@@ -198,6 +199,47 @@ describe("the extraction keeps only what the sentence states (AC-1, AC-2)", () =
     }
     expect(sentenceNegates("Dress NOT Black", "black")).toBe(true);
     expect(sentenceNegates("dress not black", "")).toBe(false);
+  });
+
+  it("keeps a size only as a whole token of the sentence, and an excluded term only as a negated whole word (YOY-157 AC-15)", () => {
+    expect(parseExtractAnswer({ size: "M", sizeFirm: true }, "midi dress")!.size).toBeNull();
+    expect(parseExtractAnswer({ size: "M", sizeFirm: true }, "midi dress")!.sizeFirm).toBe(false);
+    expect(parseExtractAnswer({ size: "S" }, "silk scarf")!.size).toBeNull();
+    expect(parseExtractAnswer({ size: "M" }, "dress size M")!.size).toBe("M");
+    expect(parseExtractAnswer({ size: "38" }, "shoes 38")!.size).toBe("38");
+    expect(parseExtractAnswer({ size: "XL" }, "XL shirt")!.size).toBe("XL");
+    expect(parseExtractAnswer({ size: "38" }, "shoes 385")!.size).toBeNull();
+    expect(
+      parseExtractAnswer({ excluded: [{ typed: "wool", english: "wool" }] }, "woolen-free sweater")!.excluded,
+    ).toEqual([]);
+    expect(
+      parseExtractAnswer({ excluded: [{ typed: "wool", english: "wool" }] }, "sweater no wool")!.excluded,
+    ).toEqual([{ typed: "wool", english: "wool" }]);
+    expect(EXTRACT_PROMPT_VERSION).toBe(5);
+  });
+
+  it("drops a negated currency from the excluded terms and keeps the price (YOY-157 AC-16)", () => {
+    const sentence = "שמלה לחתונה עד 400 שקל שקל לא דולר";
+    const parsed = parseExtractAnswer(
+      { priceMax: 400, currency: "ILS", excluded: [{ typed: "דולר", english: "dollar" }] },
+      sentence,
+    )!;
+    expect(parsed.excluded).toEqual([]);
+    expect(parsed.priceMax).toEqual({ amount: 400, raw: "400" });
+    expect(parsed.currency).toBe("ILS");
+    for (const [typed, english, text] of [
+      ["dollars", "dollars", "shirt under 80 euro not dollars"],
+      ["USD", "USD", "shirt under 80 euro not USD"],
+      ["$", "$", "shirt under 80 euro not $"],
+      ["שקל", "shekel", "חולצה עד 80 דולר לא שקל"],
+    ] as const) {
+      expect(parseExtractAnswer({ excluded: [{ typed, english }] }, text)!.excluded, text).toEqual([]);
+    }
+    expect(
+      parseExtractAnswer({ excluded: [{ typed: "black", english: "black" }] }, "dress not black")!.excluded,
+    ).toEqual([{ typed: "black", english: "black" }]);
+    expect(buildExtractPrompt("x")).toContain("A negated");
+    expect(buildExtractPrompt("x")).toContain("currency is not an exclusion");
   });
 
   it("keeps a Hebrew excluded term with its English form", () => {
@@ -427,7 +469,24 @@ describe("composing the wishes (AC-5 – AC-10, AC-12)", () => {
     ).toEqual(["cheap", "m-sold-out", "no-sizes"]);
     expect(
       composeWishes(ids, 4, products, wishes({ size: "m", sizeFirm: true }), { rates }).productIds,
-    ).toEqual(["cheap", "dear"]);
+    ).toEqual(["cheap", "dear", "no-sizes"]);
+  });
+
+  it("keeps a product with no size option under a firm size, and walls one that offers other sizes only (YOY-157 AC-17)", () => {
+    const products = new Map(
+      [
+        product("scarf", 50, { variants: sized([["Red", true], ["Blue", true]], "Color") }),
+        product("bag", 50),
+        product("s-and-l", 50, { variants: sized([["S", true], ["L", true]]) }),
+        product("he-sized", 50, { variants: sized([["S", true], ["L", true]], "מידה") }),
+        product("m", 50, { variants: sized([["M", true]], "Shoe size") }),
+      ].map((entry) => [entry.productId, entry]),
+    );
+    expect(
+      composeWishes(["scarf", "bag", "s-and-l", "he-sized", "m"], 5, products, wishes({ size: "M", sizeFirm: true }), {
+        rates,
+      }).productIds,
+    ).toEqual(["scarf", "bag", "m"]);
   });
 
   it("matches a size by value, ignoring case: in stock is met, sold out a miss, absent met", () => {
