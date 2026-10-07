@@ -20,7 +20,7 @@ import type { JsonSchema, LlmClient } from "./index.js";
  * Bump it with every change to `buildExtractPrompt`, `EXTRACT_SCHEMA` or
  * `parseExtractAnswer`.
  */
-export const EXTRACT_PROMPT_VERSION = 6;
+export const EXTRACT_PROMPT_VERSION = 7;
 
 /** One term the shopper excluded, as typed and in English (AC-1). */
 export interface ExcludedTerm {
@@ -231,11 +231,11 @@ export function statedCurrency(sentence: string): string | null {
 }
 
 /**
- * A currency word or sign as a whole excluded term (YOY-157 AC-16): "not
- * dollars" negates a currency, never a product term.
+ * A currency word or sign as a whole excluded term (YOY-157 AC-16, AC-28,
+ * Hebrew plurals): "not dollars" negates a currency, never a product term.
  */
 const CURRENCY_TERM =
-  /^(?:₪|ש["״]?ח|שקל|shekels?|nis|ils|\$|usd|dollars?|דולר|€|eur|euros?|£|gbp|pounds?)$/iu;
+  /^(?:₪|ש["״]?ח|שקלים|שקל|shekels?|nis|ils|\$|usd|dollars?|דולרים|דולר|€|eur|euros?|יורו|אירו|£|gbp|pounds?)$/iu;
 
 function isCurrencyTerm(term: string): boolean {
   return CURRENCY_TERM.test(term.trim());
