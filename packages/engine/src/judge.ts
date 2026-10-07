@@ -490,7 +490,7 @@ export interface LlmJudgeOptions {
   llm: LlmClient;
   /** Provider and model, for the answer-cache key (YOY-148 AC-1). */
   identity?: string;
-  /** Characters a candidate row is cut to; 320 by default (AC-2). */
+  /** Characters a candidate row is cut to; `DEFAULT_JUDGE_ROW_CHARS` by default (AC-2, AC-17). */
   maxRowChars?: number;
 }
 
