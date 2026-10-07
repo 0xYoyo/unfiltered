@@ -176,7 +176,10 @@ export const loader = async ({
           // degraded fallback still spent the intent call, like "model".
           response.routeReason === "purpose-phrase" ||
           response.routeReason === "classic-zero-hit"));
-    if (guarded && limited === null && aiDecided) {
+    // Only page 1 of a submitted search spends budget (YOY-157 AC-29); the
+    // daily ceilings count page-1 rows only (`countAiSearchesToday`).
+    const firstPage = (response.page ?? 1) === 1;
+    if (guarded && limited === null && aiDecided && firstPage) {
       throttle.recordAiSearch(ip);
     }
 

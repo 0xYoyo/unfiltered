@@ -200,7 +200,11 @@ async function handleSearch(
           // degraded fallback still spent the intent call, like "model".
           response.routeReason === "purpose-phrase" ||
           response.routeReason === "classic-zero-hit"));
-    if (!preview && resolvedIntent === undefined && !throttled && aiDecided) {
+    // Only page 1 of a submitted search spends budget (YOY-157 AC-29): a
+    // later page is the same search scrolled, and on Engine v2 it answers
+    // `route: "ai"` (AC-23) even when it made no model call.
+    const firstPage = (response.page ?? 1) === 1;
+    if (!preview && resolvedIntent === undefined && !throttled && aiDecided && firstPage) {
       throttle.recordAiSearch(body.sessionId);
     }
 
