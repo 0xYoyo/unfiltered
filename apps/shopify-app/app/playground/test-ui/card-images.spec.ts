@@ -30,6 +30,9 @@ for (const viewport of [
     page,
   }) => {
     await page.setViewportSize(viewport);
+    // React's development build warns once per misspelled DOM prop (YOY-157 AC-25).
+    const consoleMessages: string[] = [];
+    page.on("console", (message) => consoleMessages.push(message.text()));
     const requested = await stubImages(page);
     await page.goto("/try");
     await page.getByTestId("playground-input").fill("images dress");
@@ -62,6 +65,7 @@ for (const viewport of [
     for (const url of requested.filter((entry) => entry.includes("cdn.shopify.com"))) {
       expect(new URL(url).searchParams.get("width")).toMatch(/^(360|540|720)$/);
     }
+    expect(consoleMessages.filter((text) => text.includes("Invalid DOM property"))).toEqual([]);
   });
 }
 

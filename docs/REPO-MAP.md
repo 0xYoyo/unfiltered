@@ -142,6 +142,7 @@ apps/
         api.server.ts
         catalog-source.server.ts
         components/
+          Card.test.tsx
           Card.tsx
           CatalogNotFound.tsx
           ChipRow.tsx
@@ -221,6 +222,7 @@ apps/
           engine.spec.ts
           evidence-ai.spec.ts
           evidence-card-images.spec.ts
+          evidence-card-srcset.spec.ts
           evidence-classic-stages.spec.ts
           evidence-close-divider.spec.ts
           evidence-close-matches.spec.ts
@@ -1046,6 +1048,28 @@ docs/
       try-mobile-he-initial.png
       try-mobile-he-loading.png
       try-mobile-he-results.png
+    YOY-157/
+      AC-25/
+        playground-desktop-en-empty.png
+        playground-desktop-en-error.png
+        playground-desktop-en-loading.png
+        playground-desktop-en-results.png
+        playground-desktop-en-sized-images.png
+        playground-desktop-he-empty.png
+        playground-desktop-he-error.png
+        playground-desktop-he-loading.png
+        playground-desktop-he-results.png
+        playground-desktop-he-sized-images.png
+        playground-mobile-en-empty.png
+        playground-mobile-en-error.png
+        playground-mobile-en-loading.png
+        playground-mobile-en-results.png
+        playground-mobile-en-sized-images.png
+        playground-mobile-he-empty.png
+        playground-mobile-he-error.png
+        playground-mobile-he-loading.png
+        playground-mobile-he-results.png
+        playground-mobile-he-sized-images.png
     YOY-159/
       playground-desktop-en-1-details-judge-split.png
       playground-desktop-en-2-loading.png
@@ -1527,6 +1551,7 @@ vitest.setup.ts
 - apps/shopify-app/app/playground/PlaygroundPage.tsx → apps/shopify-app/app/playground/api.server.ts, apps/shopify-app/app/playground/components/Card.tsx, apps/shopify-app/app/playground/components/ChipRow.tsx, apps/shopify-app/app/playground/components/EngineDetails.tsx, apps/shopify-app/app/playground/components/ExampleQueries.tsx, apps/shopify-app/app/playground/components/LanguageToggle.tsx, apps/shopify-app/app/playground/components/NewSearch.tsx, apps/shopify-app/app/playground/components/ResultsGrid.tsx, apps/shopify-app/app/playground/components/SearchBar.tsx, apps/shopify-app/app/playground/components/StatusLine.tsx, apps/shopify-app/app/playground/components/StoreLine.tsx, apps/shopify-app/app/playground/search-client.ts, apps/shopify-app/app/playground/strings.ts, apps/shopify-app/app/search/proxy.server.ts, apps/shopify-app/widget/src/labels.ts
 - apps/shopify-app/app/playground/api.server.ts → apps/shopify-app/app/playground/ingest-public.server.ts, apps/shopify-app/app/search/judge-step.server.ts, apps/shopify-app/app/search/orchestrator.server.ts, apps/shopify-app/app/search/proxy.server.ts, apps/shopify-app/app/search/throttle.server.ts
 - apps/shopify-app/app/playground/catalog-source.server.ts → apps/shopify-app/app/catalog/variants.server.ts
+- apps/shopify-app/app/playground/components/Card.test.tsx → apps/shopify-app/app/playground/components/Card.tsx, apps/shopify-app/app/playground/strings.ts
 - apps/shopify-app/app/playground/components/Card.tsx → apps/shopify-app/app/playground/strings.ts, apps/shopify-app/widget/src/format.ts, apps/shopify-app/widget/src/image-url.ts, apps/shopify-app/widget/src/labels.ts
 - apps/shopify-app/app/playground/components/CatalogNotFound.tsx → apps/shopify-app/app/playground/strings.ts
 - apps/shopify-app/app/playground/components/ChipRow.tsx → apps/shopify-app/app/playground/strings.ts, apps/shopify-app/app/search/proxy.server.ts, apps/shopify-app/widget/src/format.ts
