@@ -112,6 +112,49 @@ describe("the OpenRouter decisions adapter (YOY-152)", () => {
     expect(costs.rows).toHaveLength(1);
   });
 
+  it("waits for the ledger only until the call's signal fires; an earlier ledger failure still throws (YOY-157 AC-24)", async () => {
+    const rows: AiCallUsage[] = [];
+    let release = () => {};
+    const slow: CostRecorder = {
+      record: (usage) =>
+        new Promise<void>((resolve) => {
+          release = () => {
+            rows.push(usage);
+            resolve();
+          };
+        }),
+    };
+    const controller = new AbortController();
+    const pending = createOpenRouterDecisionClient({
+      modelId: "typesafe/jev-1.13",
+      costRecorder: slow,
+      apiKey: "key-1",
+      fetchImpl: fakeFetch(200, ANSWER).impl,
+    }).decide({ ...REQUEST, signal: controller.signal });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    controller.abort();
+    // The answer in hand is returned; the write finishes behind it.
+    expect((await pending).verdict).toEqual({ type: "choice", choice: "close" });
+    expect(rows).toHaveLength(0);
+    release();
+    await Promise.resolve();
+    expect(rows).toHaveLength(1);
+
+    const failing: CostRecorder = {
+      record: async () => {
+        throw new Error("unknown model");
+      },
+    };
+    await expect(
+      createOpenRouterDecisionClient({
+        modelId: "typesafe/jev-1.13",
+        costRecorder: failing,
+        apiKey: "key-1",
+        fetchImpl: fakeFetch(200, ANSWER).impl,
+      }).decide(REQUEST),
+    ).rejects.toThrow("unknown model");
+  });
+
   it("fails with the status on a non-OK answer, and without a key at construction", async () => {
     const client = createOpenRouterDecisionClient({
       modelId: "typesafe/jev-1.13",

@@ -33,6 +33,7 @@ import {
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { aggregateCosts } from "../ai/cost-aggregates.server";
+import { createOpenRouterDecisionClient, DEFAULT_OPENROUTER_JUDGE_MODEL } from "../ai/openrouter.server";
 import { createReplayLlmClient, type LlmRecording } from "../eval/replay.server";
 import { serializePlaygroundSearchResponse } from "../playground/api.server";
 import { createTestDb } from "../testing/helpers.server";
@@ -766,6 +767,54 @@ describe("single call times (YOY-159 AC-1)", () => {
       candidates: [candidate("p1")],
     });
     expect(unlimited.partial).toBeUndefined();
+  });
+
+  it("settles a call within its limit when the answer lands late and the ledger is slow, and still writes the row (YOY-157 AC-24)", async () => {
+    // The answer arrives at 1,100 ms; the ledger write takes 500 ms more.
+    const fetchImpl = (async (_url: string, init: RequestInit) => {
+      await new Promise((resolve) => setTimeout(resolve, 1_100));
+      init.signal?.throwIfAborted();
+      return new Response(
+        JSON.stringify({
+          answers: {
+            verdict: { type: "choice", choice: "exact" },
+            fact: { type: "noul", noul: 0.1 },
+            description: { type: "noul", noul: 0.1 },
+            excluded: { type: "noul", noul: 0.1 },
+          },
+          usage: { input_tokens: 100, output_tokens: 5 },
+        }),
+        { status: 200 },
+      );
+    }) as unknown as typeof fetch;
+    const rows: AiCallUsage[] = [];
+    const costRecorder: CostRecorder = {
+      record: async (usage) => {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        rows.push(usage);
+      },
+    };
+    const decisions = createOpenRouterDecisionClient({
+      modelId: DEFAULT_OPENROUTER_JUDGE_MODEL,
+      costRecorder,
+      apiKey: "test-key",
+      fetchImpl,
+    });
+    const settledMs: number[] = [];
+    const answer = await createDecisionJudge({ decisions, callTimeoutMs: 1_200 }).judge({
+      sentence: "dress",
+      candidates: [candidate("p1")],
+      onCallSettled: (ms) => settledMs.push(ms),
+    });
+    expect(settledMs).toHaveLength(1);
+    expect(settledMs[0]!).toBeLessThan(1_300);
+    // The answer in hand is served, not a stand-in.
+    expect(answer.verdicts.map((verdict) => verdict.verdict)).toEqual(["exact"]);
+    expect(answer.partial).toBeUndefined();
+    // The paid call is still metered once the write finishes behind it.
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ operation: "judge", inputTokens: 100, outputTokens: 5 });
   });
 
   it("the factory hands the per-call limit to the decision judge", async () => {

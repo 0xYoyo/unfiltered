@@ -175,6 +175,38 @@ function portAnswer(answer: WireAnswer): DecisionAnswer | null {
   return null;
 }
 
+/**
+ * Wait for a ledger write unless the call's signal fires first (YOY-157
+ * AC-24). A write that fails before the signal stays a loud failure; once
+ * the signal has fired the write is left to finish, and a late failure is
+ * logged, never thrown into a call that has already answered.
+ */
+async function untilRecordedOrAborted(
+  write: Promise<void>,
+  signal: AbortSignal,
+  modelId: string,
+): Promise<void> {
+  const logLate = (error: unknown) =>
+    console.error(`[ai-cost] late ledger write failed for a judge call on ${modelId}`, error);
+  if (signal.aborted) {
+    write.catch(logLate);
+    return;
+  }
+  let onAbort = () => {};
+  const aborted = new Promise<"aborted">((resolve) => {
+    onAbort = () => resolve("aborted");
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
+  try {
+    const first = await Promise.race([write.then(() => "recorded" as const), aborted]);
+    if (first === "aborted") {
+      write.catch(logLate);
+    }
+  } finally {
+    signal.removeEventListener("abort", onAbort);
+  }
+}
+
 export function createOpenRouterDecisionClient(
   options: OpenRouterDecisionClientOptions,
 ): DecisionClient {
@@ -229,17 +261,26 @@ export function createOpenRouterDecisionClient(
         throw new OpenRouterResponseError("OpenRouter decisions answered a body that is not JSON");
       }
       // Metered before the answers are read (AC-5): a paid call is recorded
-      // even when its answers turn out unusable.
+      // even when its answers turn out unusable. The wait for the ledger is
+      // bounded by the call's own signal (YOY-157 AC-24): once the caller's
+      // per-call limit passes, the answer in hand is returned and the write
+      // finishes behind it, so a slow ledger never holds the call open.
       const usage = payload.usage ?? {};
-      await options.costRecorder.record({
-        provider: PROVIDER,
-        modelId: options.modelId,
-        operation: request.operation,
-        inputTokens: typeof usage.input_tokens === "number" ? usage.input_tokens : 0,
-        outputTokens: typeof usage.output_tokens === "number" ? usage.output_tokens : 0,
-        ...(request.storeId !== undefined ? { storeId: request.storeId } : {}),
-        ...(request.searchId !== undefined ? { searchId: request.searchId } : {}),
-      });
+      await untilRecordedOrAborted(
+        Promise.resolve().then(() =>
+          options.costRecorder.record({
+            provider: PROVIDER,
+            modelId: options.modelId,
+            operation: request.operation,
+            inputTokens: typeof usage.input_tokens === "number" ? usage.input_tokens : 0,
+            outputTokens: typeof usage.output_tokens === "number" ? usage.output_tokens : 0,
+            ...(request.storeId !== undefined ? { storeId: request.storeId } : {}),
+            ...(request.searchId !== undefined ? { searchId: request.searchId } : {}),
+          }),
+        ),
+        signal,
+        options.modelId,
+      );
       const answers: Record<string, DecisionAnswer> = {};
       for (const key of Object.keys(request.questions)) {
         const raw = payload.answers?.[key];
