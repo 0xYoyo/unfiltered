@@ -311,10 +311,10 @@ describe("Engine v2 on the database", () => {
     await seed(db, [{ productId: "a", title: "Linen Shirt", y: 0.1 }]);
     const engine = orchestrator(fakeEmbeddings());
     const response = await engine.runSearch({ query: "long sleeve linen", shopDomain: SHOP });
-    // No judge wired here: the page is served in find order, and no paid
-    // judge call started, so the route is classic (YOY-147 AC-11).
+    // No judge wired here: the page is served in find order. It still went
+    // through find, so the route is ai (YOY-157 AC-23).
     expect(response).toMatchObject({
-      route: "classic",
+      route: "ai",
       routeReason: "find-only",
       engine: "v2",
       chips: [],

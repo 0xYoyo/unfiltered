@@ -1009,9 +1009,13 @@ runs one page.
   requests that force classic — serve find order with no call (`capped`).
   The client-timeout rescue stays the keyword path. No error reaches the
   shopper.
-- **Route and caps.** `route` is `ai` exactly when a paid judge call started,
-  so the session throttle and the playground's daily caps (both counted from
-  `route = "ai"`) count judged searches and nothing else. `routeReason` is
+- **Route and caps.** `route` names the path that answered (YOY-157 AC-23):
+  `ai` for every page that went through find — judged, served from the
+  answer cache, timed out, failed or find-only — and `classic` only for a
+  capped or forced-classic page, a preview or the client-timeout rescue.
+  The session throttle and the playground's daily caps (both counted from
+  `route = "ai"`) therefore count every Engine v2 search, cached ones
+  included. `routeReason` is
   one of `judged`, `judge-timeout`, `judge-error`, `judge-cached`, `capped`,
   `find-only`.
 - **Per-call limit and pool (YOY-159).** The Jev judge's 24 calls share one

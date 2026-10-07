@@ -757,7 +757,11 @@ export function createSearchOrchestrator(
    * AC-10): a page beyond it is served in keyword order with no call, and
    * a page straddling the boundary keeps its keyword tail after the judged
    * part. A forced-classic request (throttle or cap) is never judged
-   * (AC-7). The route is "ai" exactly when a judge call started (AC-11).
+   * (AC-7). The route names the path that answered (YOY-157 AC-23): "ai"
+   * for every page that went through find — judged, served from the answer
+   * cache, timed out, failed or find-only — and "classic" only for a capped
+   * or forced-classic page. Previews and the client-timeout rescue never
+   * reach this path and stay "classic".
    */
   async function findPath(
     findStep: FindStep,
@@ -818,7 +822,6 @@ export function createSearchOrchestrator(
     const tail = cards.filter((card) => !inFindSet.has(card.productId));
 
     let routeReason: V2RouteReason;
-    let judgeStarted = false;
     let labelsPending = false;
     let judgeCalls: JudgeCallTimes | null = null;
     let otherReading: string | null = null;
@@ -850,7 +853,6 @@ export function createSearchOrchestrator(
       stages.add("judge", Math.max(0, performance.now() - judgeStartedAt - judged.rowsMs));
       judgeCalls = judged.calls;
       routeReason = judged.outcome;
-      judgeStarted = judged.started;
       labelsPending = judged.labelsPending;
       // The second reading is offered on page 1 only (AC-7).
       otherReading = page === 1 ? judged.otherReading : null;
@@ -871,7 +873,7 @@ export function createSearchOrchestrator(
     });
     return {
       searchId,
-      route: judgeStarted ? "ai" : "classic",
+      route: request.forceClassic === true ? "classic" : "ai",
       routeReason,
       intent: null,
       hits,
