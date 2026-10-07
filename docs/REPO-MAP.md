@@ -436,6 +436,7 @@ apps/
       testing/
         fake-store.server.ts
         helpers.server.ts
+      theme-extension.test.ts
       workspace-resolution.test.ts
     env.d.ts
     extensions/
@@ -445,7 +446,9 @@ apps/
           unfiltered-search.liquid
         locales/
           en.default.json
+          en.default.schema.json
           he.json
+          he.schema.json
         shopify.extension.toml
     package.json
     prisma/
