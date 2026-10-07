@@ -39,29 +39,24 @@ permissions:
   contents: read
 
 jobs:
-  hidden:
+  # Two jobs that never share a filesystem (YOY-157 AC-31): `run` executes the
+  # scored ref's code, `check` runs the leak guard from the workflow's own
+  # commit on a fresh machine. The scored ref's code therefore cannot rewrite
+  # the guard, its node_modules or its node install before the guard runs.
+  run:
     runs-on: ubuntu-latest
     # A hidden run is 72 searches plus 72 grades: minutes, not hours.
     timeout-minutes: 30
+    outputs:
+      run-status: ${{ steps.score.outputs.run-status }}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.ref }}
-      # The leak guard comes from the workflow's own commit, never from the
-      # scored ref (YOY-157 AC-2): a ref whose runner prints query text could
-      # otherwise ship a relaxed guard beside it. Checked out into `guard/`
-      # with its own install; the scored ref still supplies the runner.
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.sha }}
-          path: guard
       - uses: actions/setup-node@v4
         with:
           node-version: 22
       - run: npm ci
-      - name: Install the guard
-        working-directory: guard
-        run: npm ci
       # The secret holds the hidden half exactly as score-build-set.mts wrote
       # it (base64); the runner decodes it. It goes to the runner's temp dir,
       # never into the checkout.
@@ -71,17 +66,16 @@ jobs:
         run: |
           test -n "$HIDDEN_SET_B64" || { echo "HIDDEN_SET_B64 is not set"; exit 1; }
           printf '%s' "$HIDDEN_SET_B64" > "$RUNNER_TEMP/hidden.b64"
-      # Every byte the runner writes is captured, checked for hidden query
-      # text (AC-3), and only then printed — a leak fails the job before it
-      # can reach the log, and the check prints a count, never a query.
+      # Every byte the runner writes is captured to a file and never printed
+      # here: this job writes no step summary and echoes none of the output.
+      # The `check` job prints it only after the leak check passes.
       - name: Score the hidden half
+        id: score
         working-directory: apps/shopify-app
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           # The jev judge's key (YOY-152); unused when the judge is gemini.
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          # Through env, never interpolated into the script: a ref is input.
-          SCORE_REF: ${{ inputs.ref }}
           ENGINE_V2: ${{ inputs.engine == 'v2' && '1' || '0' }}
           JUDGE_PROVIDER: ${{ inputs.judge }}
           # A score run measures the judge's judgment, not its speed
@@ -101,9 +95,63 @@ jobs:
             > "$RUNNER_TEMP/score-output.txt" 2>&1
           run_status=$?
           set -e
-          (cd "$GITHUB_WORKSPACE/guard/apps/shopify-app" && npx tsx scripts/score-leak-check.mts \
+          # The job itself succeeds so `check` still runs and shows a failed
+          # run's output; `check` exits with this status at the end.
+          echo "run-status=$run_status" >> "$GITHUB_OUTPUT"
+      # The artifact is readable by anyone who can read the repository, and
+      # until `check` has run it may hold hidden query text: it is uploaded
+      # encrypted with the hidden-set secret, which only the two jobs have.
+      - name: Encrypt the output
+        env:
+          HIDDEN_SET_B64: ${{ secrets.HIDDEN_SET_B64 }}
+        run: |
+          openssl enc -aes-256-cbc -pbkdf2 -salt -pass env:HIDDEN_SET_B64 \
+            -in "$RUNNER_TEMP/score-output.txt" -out "$RUNNER_TEMP/score-output.enc"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: score-output
+          path: ${{ runner.temp }}/score-output.enc
+          retention-days: 1
+          if-no-files-found: error
+      - name: Remove the hidden set
+        if: always()
+        run: rm -f "$RUNNER_TEMP/hidden.b64" "$RUNNER_TEMP/score-output.txt" "$RUNNER_TEMP/score-output.enc"
+
+  # The leak guard comes from the workflow's own commit, never from the scored
+  # ref (YOY-157 AC-2), and runs on a machine the scored ref's code never
+  # touched (AC-31). A leak fails this job before the output can reach the
+  # log, and the check prints a count, never a query (YOY-141 AC-3).
+  check:
+    needs: run
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          name: score-output
+          path: ${{ runner.temp }}
+      - name: Check for leaks, then print
+        working-directory: apps/shopify-app
+        env:
+          HIDDEN_SET_B64: ${{ secrets.HIDDEN_SET_B64 }}
+          # Through env, never interpolated into the script: a ref is input.
+          SCORE_REF: ${{ inputs.ref }}
+          RUN_STATUS: ${{ needs.run.outputs.run-status }}
+        run: |
+          test -n "$HIDDEN_SET_B64" || { echo "HIDDEN_SET_B64 is not set"; exit 1; }
+          printf '%s' "$HIDDEN_SET_B64" > "$RUNNER_TEMP/hidden.b64"
+          openssl enc -d -aes-256-cbc -pbkdf2 -pass env:HIDDEN_SET_B64 \
+            -in "$RUNNER_TEMP/score-output.enc" -out "$RUNNER_TEMP/score-output.txt"
+          npx tsx scripts/score-leak-check.mts \
             --hidden-set "$RUNNER_TEMP/hidden.b64" \
-            --output "$RUNNER_TEMP/score-output.txt")
+            --output "$RUNNER_TEMP/score-output.txt"
           cat "$RUNNER_TEMP/score-output.txt"
           {
             echo "### Hidden score — \`$SCORE_REF\`"
@@ -112,7 +160,7 @@ jobs:
             cat "$RUNNER_TEMP/score-output.txt"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
-          exit "$run_status"
+          exit "${RUN_STATUS:-1}"
       - name: Remove the hidden set
         if: always()
-        run: rm -f "$RUNNER_TEMP/hidden.b64" "$RUNNER_TEMP/score-output.txt"
+        run: rm -f "$RUNNER_TEMP/hidden.b64" "$RUNNER_TEMP/score-output.txt" "$RUNNER_TEMP/score-output.enc"

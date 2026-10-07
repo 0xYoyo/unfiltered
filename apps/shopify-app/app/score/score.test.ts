@@ -1116,18 +1116,49 @@ describe("the score workflow (YOY-141 AC-1, AC-2)", () => {
     expect(workflow).toContain("GITHUB_STEP_SUMMARY");
   });
 
-  it("runs the leak check from a guard checkout of the workflow's own commit, never the scored ref (YOY-157 AC-2)", () => {
-    // The guard is a second checkout pinned to github.sha, in guard/, with its own install.
-    expect(workflow).toMatch(
-      /- uses: actions\/checkout@v4\n\s+with:\n\s+ref: \$\{\{ github\.sha \}\}\n\s+path: guard\n/,
-    );
-    expect(workflow).toMatch(/name: Install the guard\n\s+working-directory: guard\n\s+run: npm ci/);
-    // The leak check runs inside guard/; the runner runs from the scored ref's checkout.
-    const check = workflow.indexOf("scripts/score-leak-check.mts");
-    const line = workflow.slice(workflow.lastIndexOf("\n", check), check);
-    expect(line).toContain('cd "$GITHUB_WORKSPACE/guard/apps/shopify-app"');
+  // The two jobs, by their text: `run` up to `check:`, `check` to the end.
+  const runJob = workflow.slice(workflow.indexOf("\n  run:\n"), workflow.indexOf("\n  check:\n"));
+  const checkJob = workflow.slice(workflow.indexOf("\n  check:\n"));
+  const checkouts = (job: string) => job.match(/actions\/checkout@v4\n\s+with:\n\s+ref: (.*)\n/g) ?? [];
+
+  it("splits the run and the leak check into two jobs that never share a filesystem (YOY-157 AC-2, AC-31)", () => {
+    expect(workflow.match(/^ {2}[a-z-]+:\n {4}(?:needs|runs-on):/gm)).toHaveLength(2);
+    expect(runJob.length).toBeGreaterThan(0);
+    expect(checkJob.length).toBeGreaterThan(0);
+
+    // The scored ref's job: checks out inputs.ref only and never runs the
+    // guard, prints the output or writes the job summary.
+    expect(checkouts(runJob)).toEqual([expect.stringContaining("ref: ${{ inputs.ref }}")]);
+    expect(runJob).toContain("scripts/score-run.mts --hidden-set");
+    expect(runJob).not.toContain("score-leak-check.mts");
+    expect(runJob).not.toMatch(/\bcat\b/);
+    expect(runJob).not.toContain("GITHUB_STEP_SUMMARY");
+    expect(runJob).toContain("actions/upload-artifact@v4");
+
+    // The guard's job: checks out the workflow's own commit only, depends on
+    // the run, and runs the check before it prints.
+    expect(checkJob).toMatch(/^ {4}needs: run$/m);
+    expect(checkouts(checkJob)).toEqual([expect.stringContaining("ref: ${{ github.sha }}")]);
+    expect(checkJob).not.toContain("score-run.mts");
+    expect(checkJob).toContain("actions/download-artifact@v4");
+    const check = checkJob.indexOf("scripts/score-leak-check.mts");
+    expect(check).toBeGreaterThan(-1);
+    expect(checkJob.indexOf('cat "$RUNNER_TEMP/score-output.txt"')).toBeGreaterThan(check);
+    expect(checkJob.indexOf("GITHUB_STEP_SUMMARY")).toBeGreaterThan(check);
     expect(workflow.match(/score-leak-check\.mts/g)).toHaveLength(1);
-    expect(workflow).toMatch(/ref: \$\{\{ inputs\.ref \}\}/);
+
+    // Both jobs get the hidden set from the secret.
+    expect(runJob).toContain("HIDDEN_SET_B64: ${{ secrets.HIDDEN_SET_B64 }}");
+    expect(checkJob).toContain("HIDDEN_SET_B64: ${{ secrets.HIDDEN_SET_B64 }}");
+  });
+
+  it("uploads the output encrypted with the hidden-set secret, kept one day, and exits with the run's status", () => {
+    expect(runJob).toContain("openssl enc -aes-256-cbc -pbkdf2 -salt -pass env:HIDDEN_SET_B64");
+    expect(runJob).toMatch(/path: \$\{\{ runner\.temp \}\}\/score-output\.enc\n\s+retention-days: 1/);
+    expect(checkJob).toContain("openssl enc -d -aes-256-cbc -pbkdf2 -pass env:HIDDEN_SET_B64");
+    expect(runJob).toContain('echo "run-status=$run_status" >> "$GITHUB_OUTPUT"');
+    expect(checkJob).toContain("RUN_STATUS: ${{ needs.run.outputs.run-status }}");
+    expect(checkJob).toContain('exit "${RUN_STATUS:-1}"');
   });
 
   it("prints the GEMINI_ and INTENT_ env names before the run, never their values (YOY-141 AC-13)", () => {
