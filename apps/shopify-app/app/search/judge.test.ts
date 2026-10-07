@@ -1429,7 +1429,7 @@ describe("the judge on Engine v2 (on the database)", () => {
     expect(llm.requests).toHaveLength(1);
 
     const page2 = await search(engine, { query, paging: { page: 2, pageSize: 2 } });
-    expect(page2).toMatchObject({ route: "classic", routeReason: "find-only", totalCount: 4 });
+    expect(page2).toMatchObject({ route: "ai", routeReason: "find-only", totalCount: 4 });
     expect(page2.hits.every((hit) => hit.label === null)).toBe(true);
     expect(llm.requests).toHaveLength(1);
   });
@@ -1446,10 +1446,29 @@ describe("the judge on Engine v2 (on the database)", () => {
     expect(llm.requests[0]!.prompt).not.toContain("Clutch");
   });
 
-  it("answers find-only, classic route, when no judge is wired", async () => {
+  it("names the path that answered: judged, cached and timed-out pages are ai, a preview and a capped page classic (YOY-157 AC-23)", async () => {
+    await seed(db, FOUR);
+    const llm = scriptedLlm([answer(["E-X", "E-X", "E-X", "E-X"])]);
+    const engine = orchestrator(llm);
+    expect(await search(engine)).toMatchObject({ route: "ai", routeReason: "judged" });
+    expect(await search(engine)).toMatchObject({ route: "ai", routeReason: "judge-cached" });
+    const slow: LlmClient = {
+      completeStructured: () =>
+        new Promise((resolve) => setTimeout(() => resolve(answer(["E-X", "E-X", "E-X", "E-X"])), 200)),
+    };
+    const timedOut = await search(orchestrator(slow, { deadlineMs: 20, giveUpMs: 50 }), {
+      query: "another dress",
+    });
+    expect(timedOut).toMatchObject({ route: "ai", routeReason: "judge-timeout" });
+    await awaitPendingLabels(SHOP, timedOut.searchId, 1);
+    expect(await search(engine, { preview: true })).toMatchObject({ route: "classic" });
+    expect(await search(engine, { forceClassic: true })).toMatchObject({ route: "classic", routeReason: "capped" });
+  });
+
+  it("answers find-only, ai route, when no judge is wired (YOY-157 AC-23)", async () => {
     await seed(db, FOUR);
     const response = await search(orchestrator(undefined));
-    expect(response).toMatchObject({ route: "classic", routeReason: "find-only" });
+    expect(response).toMatchObject({ route: "ai", routeReason: "find-only" });
     expect(response.hits.map((hit) => hit.label)).toEqual([null, null, null, null]);
   });
 
@@ -1470,7 +1489,7 @@ describe("the judge on Engine v2 (on the database)", () => {
   });
   // YOY-148: the answer cache, the verdict log and late labels.
 
-  it("serves a repeat of the same page from the cache: no call, judge-cached, classic route, same order (YOY-148 AC-1, AC-2)", async () => {
+  it("serves a repeat of the same page from the cache: no call, judge-cached, ai route, same order (YOY-148 AC-1, AC-2; YOY-157 AC-23)", async () => {
     await seed(db, FOUR);
     const llm = scriptedLlm([answer(["VFF", "N-X", "E-X", "CDC"], [{ n: 1, p: "navy", a: "black" }])]);
     const engine = orchestrator(llm);
@@ -1478,7 +1497,7 @@ describe("the judge on Engine v2 (on the database)", () => {
     const second = await search(engine, { query: "  An Outfit   for tonight " });
     expect(llm.requests).toHaveLength(1);
     expect(first).toMatchObject({ route: "ai", routeReason: "judged" });
-    expect(second).toMatchObject({ route: "classic", routeReason: "judge-cached" });
+    expect(second).toMatchObject({ route: "ai", routeReason: "judge-cached" });
     expect(second.hits.map((hit) => hit.productId)).toEqual(first.hits.map((hit) => hit.productId));
     expect(second.hits.map((hit) => hit.label)).toEqual(first.hits.map((hit) => hit.label));
     // The not-relevant product is dropped from the served page (YOY-163).
@@ -1771,7 +1790,7 @@ describe("the judge on Engine v2 (on the database)", () => {
     expect(JSON.stringify(serializeLabels(labels))).not.toMatch(/position|order|verdict/);
 
     const again = await search(engine);
-    expect(again).toMatchObject({ routeReason: "judge-cached", route: "classic" });
+    expect(again).toMatchObject({ routeReason: "judge-cached", route: "ai" });
     expect(again).not.toHaveProperty("labelsPending");
     expect(calls).toBe(1);
   });
