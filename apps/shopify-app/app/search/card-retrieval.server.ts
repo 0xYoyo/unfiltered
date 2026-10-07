@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 
+import { cardLanguagesFromEnv } from "../catalog/card.server";
 import { withTenantVectorScan } from "../catalog/hnsw.server";
 import { FAMILY_OVERSCAN } from "./retrieval-store.server";
 
@@ -10,9 +11,20 @@ import { FAMILY_OVERSCAN } from "./retrieval-store.server";
  * them can sit near one query. The card scan therefore reads `limit *
  * FAMILY_OVERSCAN * CARD_SECTION_OVERSCAN` rows, so collapsing first by
  * product and then by family still leaves `limit` families, while the bound
- * keeps the scan index-driven (the YOY-125 AC-10 rule).
+ * keeps the scan index-driven (the YOY-125 AC-10 rule). This is the floor:
+ * with more ask languages the bound follows the sections a product stores
+ * (`cardSectionsPerProduct`, YOY-157 AC-9).
  */
 export const CARD_SECTION_OVERSCAN = 3;
+
+/**
+ * Card vectors one product stores: its prose vector plus one per ask
+ * language the card writer uses (`CARD_ASK_LANGUAGES`), never fewer than
+ * CARD_SECTION_OVERSCAN (YOY-157 AC-9).
+ */
+export function cardSectionsPerProduct(askLanguages: readonly string[]): number {
+  return Math.max(CARD_SECTION_OVERSCAN, 1 + askLanguages.length);
+}
 
 /** One hit of the card index: a product and its best distance (lower is nearer). */
 export interface CardIndexHit {
@@ -50,11 +62,14 @@ export async function queryCardIndex({
   shopDomain,
   vector,
   limit = 10,
+  askLanguages = cardLanguagesFromEnv(),
 }: {
   db: PrismaClient;
   shopDomain: string;
   vector: number[];
   limit?: number;
+  /** The card writer's ask languages; `CARD_ASK_LANGUAGES` by default (YOY-157 AC-9). */
+  askLanguages?: readonly string[];
 }): Promise<CardIndexHit[]> {
   const dimension = vector.length;
   if (!Number.isInteger(dimension) || dimension <= 0) {
@@ -64,7 +79,7 @@ export async function queryCardIndex({
     throw new RangeError(`limit must be a positive integer, got ${limit}`);
   }
   const productScan = limit * FAMILY_OVERSCAN;
-  const cardScan = productScan * CARD_SECTION_OVERSCAN;
+  const cardScan = productScan * cardSectionsPerProduct(askLanguages);
   const distance = (alias: string): string =>
     `((${alias}."embedding")::vector(${dimension}) <=> $2::vector(${dimension}))::float8`;
   const productFilters = `p."status" = 'ACTIVE'

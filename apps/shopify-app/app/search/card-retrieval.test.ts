@@ -4,7 +4,8 @@ import type { PrismaClient } from "@prisma/client";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { createTestDb } from "../testing/helpers.server";
-import { queryCardIndex } from "./card-retrieval.server";
+import { CARD_SECTION_OVERSCAN, cardSectionsPerProduct, queryCardIndex } from "./card-retrieval.server";
+import { FAMILY_OVERSCAN } from "./retrieval-store.server";
 
 // The card index query (YOY-144 AC-3 to AC-7) on the embedded PGlite DB.
 // Vectors are written directly, so every distance is known: the cosine
@@ -150,6 +151,30 @@ describe("the card index query", () => {
       }
     }
     expect((await query(3)).map((hit) => hit.productId)).toEqual(["f0-c0", "f1-c0", "f2-c0"]);
+  });
+
+  it("sizes the card scan to the sections a product stores, so five ask languages still fill the limit (YOY-157 AC-9)", async () => {
+    const languages = ["en", "he", "ar", "ru", "fr"];
+    const sections = ["prose", ...languages.map((language) => `asks:${language}`)];
+    expect(cardSectionsPerProduct(languages)).toBe(6);
+    expect(cardSectionsPerProduct(["en"])).toBe(CARD_SECTION_OVERSCAN);
+    // Three families of FAMILY_OVERSCAN colourways each, every section near
+    // the query: family 0's vectors alone are limit * FAMILY_OVERSCAN * 3
+    // rows, the old fixed window, so the old bound saw one family only.
+    const limit = 2;
+    for (let family = 0; family < 3; family += 1) {
+      for (let colourway = 0; colourway < FAMILY_OVERSCAN; colourway += 1) {
+        const id = `f${family}-c${colourway}`;
+        await seedProduct(db, id, { familyKey: `family-${family}` });
+        for (const [index, section] of sections.entries()) {
+          await cardVector(db, id, section, family * 0.1 + colourway * 0.001 + index * 0.0001);
+        }
+      }
+    }
+    const hits = await queryCardIndex({ db, shopDomain: SHOP, vector: QUERY, limit, askLanguages: languages });
+    expect(hits.map((hit) => hit.productId)).toEqual(["f0-c0", "f1-c0"]);
+    const oldBound = await queryCardIndex({ db, shopDomain: SHOP, vector: QUERY, limit, askLanguages: ["en", "he"] });
+    expect(oldBound.map((hit) => hit.productId)).toEqual(["f0-c0"]);
   });
 
   it("filters only on store, ACTIVE and published — never on stock, price or anything else (AC-7)", async () => {
