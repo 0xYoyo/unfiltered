@@ -616,6 +616,25 @@ describe("per-IP AI throttle (AC-4)", () => {
     expect(other.details.limited).toBeNull();
   });
 
+  it("spends one unit per submitted search: later pages leave the IP throttle unchanged (YOY-157 AC-29)", async () => {
+    process.env.PLAYGROUND_AI_THROTTLE_PER_MINUTE = "2";
+    const headers = { "x-forwarded-for": "4.4.4.4" };
+    const limitedOf = async (query: Record<string, string>) =>
+      (
+        (await (await searchLoader(loaderArgs(searchRequest(query, headers)))).json()) as {
+          details: { limited: unknown };
+        }
+      ).details.limited;
+
+    // One search scrolled through four pages spends one unit.
+    for (const page of ["1", "2", "3", "4"]) {
+      expect(await limitedOf({ engine: "v2", page, pageSize: "24" })).toBeNull();
+    }
+    // So a second search still fits the budget of two, and only a third is limited.
+    expect(await limitedOf({ engine: "v2", page: "1", pageSize: "24", query: "linen shirt" })).toBeNull();
+    expect(await limitedOf({ engine: "v2", page: "1", pageSize: "24", query: "wool coat" })).toBe("ip");
+  });
+
   it("keys the throttle by the last trusted X-Forwarded-For hop, then the connection address, then unknown (YOY-96 AC-11)", () => {
     // The first entry is whatever the client sent; the edge appended the last.
     const spoofed = new Request("https://p.example.com/", {
@@ -949,6 +968,31 @@ describe("daily AI ceilings ignore exact-query reuse rows (YOY-64 AC-4)", () => 
         { ...base, searchId: "a2", route: "ai", routeReason: null },
         { ...base, searchId: "a3", route: "ai", routeReason: "intent-reuse" },
         { ...base, searchId: "c1", route: "classic", routeReason: "short-query" },
+      ],
+    });
+    expect(await countAiSearchesToday(db, [SEED_KEY], now)).toBe(2);
+  });
+
+  it("counts page-1 rows only: a later page of the same search is not another search (YOY-157 AC-29)", async () => {
+    const { countAiSearchesToday } = await import("./playground/api.server");
+    const now = new Date("2026-10-07T12:00:00Z");
+    const base = {
+      shopDomain: SEED_KEY,
+      sessionId: "s",
+      query: "q",
+      degraded: false,
+      latencyMs: 10,
+      resultCount: 24,
+      createdAt: now,
+      route: "ai",
+      routeReason: "find-only",
+    };
+    await db.searchEvent.createMany({
+      data: [
+        { ...base, searchId: "x", page: 1, routeReason: "judged" },
+        { ...base, searchId: "x", page: 2 },
+        { ...base, searchId: "x", page: 3 },
+        { ...base, searchId: "y", page: 1, routeReason: "judge-cached" },
       ],
     });
     expect(await countAiSearchesToday(db, [SEED_KEY], now)).toBe(2);

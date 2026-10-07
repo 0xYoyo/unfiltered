@@ -337,7 +337,9 @@ export function startOfUtcDay(now: Date): Date {
  * than from memory: the ceilings are a spend guard, and a guard that resets
  * when the process restarts is not one. Only `route = "ai"` rows count — a
  * search served classic (throttled, capped, or simply keyword-routed) spent
- * no LLM budget, so it must not consume the AI ceiling it was denied.
+ * no LLM budget, so it must not consume the AI ceiling it was denied. Only
+ * page-1 rows count (YOY-157 AC-29): every page request writes its own row
+ * (YOY-145 AC-10), but a later page is the same search scrolled.
  */
 export async function countAiSearchesToday(
   db: PrismaClient,
@@ -351,6 +353,7 @@ export async function countAiSearchesToday(
     where: {
       shopDomain: { in: storeKeys },
       route: "ai",
+      page: 1,
       // An exact-query reuse row (YOY-64 AC-4) is an AI-routed search that
       // spent no LLM budget, so it must not consume the ceiling either.
       OR: [{ routeReason: null }, { routeReason: { not: "intent-reuse" } }],

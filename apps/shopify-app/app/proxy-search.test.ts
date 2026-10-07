@@ -1163,6 +1163,58 @@ describe("the judge on the storefront (YOY-147)", () => {
   });
 });
 
+describe("Engine v2 pages and the session throttle (YOY-157 AC-29)", () => {
+  it("answers route ai on a later page but records the session's budget once per submitted search", async () => {
+    await seed([
+      { productId: "a", title: "Wrap Dress" },
+      { productId: "b", title: "Linen Dress" },
+      { productId: "c", title: "Silk Dress" },
+    ]);
+    for (const [index, productId] of ["a", "b", "c"].entries()) {
+      await db.$executeRawUnsafe(
+        `INSERT INTO "CardEmbedding" ("id", "shopDomain", "productId", "section", "textHash", "embedding", "updatedAt")
+         VALUES ($1, $2, $3, 'prose', 'h', $4::vector(3), CURRENT_TIMESTAMP)`,
+        randomUUID(),
+        SHOP,
+        productId,
+        `[1,${(index + 1) / 10},0]`,
+      );
+    }
+    const recorded: string[] = [];
+    const inner = createSessionThrottle({ limit: 5, now: () => 0 });
+    throttleSeam.instance = {
+      shouldThrottle: (sessionId) => inner.shouldThrottle(sessionId),
+      recordAiSearch: (sessionId) => {
+        recorded.push(sessionId);
+        inner.recordAiSearch(sessionId);
+      },
+      sessionCount: () => inner.sessionCount(),
+    };
+    // No judge wired: every page is find-only, which answers route ai (AC-23).
+    installOrchestrator({ llm: fakeLlm({}), engineV2: true });
+    const page = async (number: number) =>
+      (
+        await action(
+          actionArgs(
+            proxyRequest({
+              payload: { query: "a dress for dinner", sessionId: "scroll-1", page: number, pageSize: 1 },
+            }),
+          ),
+        )
+      ).json();
+
+    const first = await page(1);
+    expect(first).toMatchObject({ route: "ai", page: 1 });
+    expect(recorded).toEqual(["scroll-1"]);
+    const second = await page(2);
+    expect(second).toMatchObject({ route: "ai", page: 2 });
+    const third = await page(3);
+    expect(third).toMatchObject({ route: "ai", page: 3 });
+    // Pages 2 and 3 are the same search scrolled: no further budget spent.
+    expect(recorded).toEqual(["scroll-1"]);
+  });
+});
+
 describe("per-session AI throttle (YOY-47 AC-4, AC-5)", () => {
   /** Fake LLM that counts invocations, answering the AI route + intent. */
   function countingAiLlm() {
