@@ -101,6 +101,7 @@ export {
   JudgeAnswerError,
   judgeProviderFromEnv,
   judgeRow,
+  judgeRowInputs,
   JUDGE_PROMPT_VERSION,
   JUDGE_READING_MAX_WORDS,
   orderByVerdict,

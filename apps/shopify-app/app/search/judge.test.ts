@@ -47,6 +47,7 @@ import {
   judgeCallTimeoutMsFromEnv,
   judgeCallTimes,
   judgeGiveUpMsFromEnv,
+  judgeRowHash,
   loadJudgeCandidates,
   resetPendingLabels,
 } from "./judge-step.server";
@@ -1508,6 +1509,72 @@ describe("the judge on Engine v2 (on the database)", () => {
     ).not.toBe(key);
     expect(judgeCacheKey({ ...base, identity: "gemini:other" })).not.toBe(key);
     expect(judgeCacheKey({ ...base, promptVersion: 2 })).not.toBe(key);
+  });
+
+  it("keys each candidate on its row inputs other than price, and the key on the row cap (YOY-157 AC-13)", () => {
+    const candidate: JudgeCandidate = {
+      id: "a",
+      title: "Black Dress",
+      priceMin: 100,
+      priceMax: 100,
+      currencyCode: "USD",
+      options: [{ name: "Size", values: ["S", "M"] }],
+      facts: null,
+      attributes: [{ name: "sleeve length", value: "long" }],
+      description: "A black dress.",
+    };
+    const rowHash = judgeRowHash(candidate);
+    const base = {
+      sentence: "black dress",
+      candidates: [{ id: "a", cardTextHash: "", rowHash }],
+      identity: "jev:m",
+    };
+    const key = judgeCacheKey(base);
+    const keyFor = (changed: JudgeCandidate) =>
+      judgeCacheKey({ ...base, candidates: [{ id: "a", cardTextHash: "", rowHash: judgeRowHash(changed) }] });
+    // Price is not a row input: same hash, same key (YOY-148 AC-3).
+    expect(keyFor({ ...candidate, priceMin: 5, priceMax: 9 })).toBe(key);
+    // Every other row input moves the key.
+    expect(keyFor({ ...candidate, title: "Black Gown" })).not.toBe(key);
+    expect(keyFor({ ...candidate, attributes: [{ name: "sleeve length", value: "short" }] })).not.toBe(key);
+    expect(keyFor({ ...candidate, options: [{ name: "Size", values: ["S"] }] })).not.toBe(key);
+    expect(keyFor({ ...candidate, description: "A black silk dress." })).not.toBe(key);
+    expect(keyFor({ ...candidate, facts: "Black, long sleeves." })).not.toBe(key);
+    // A card-less product past the 200-character slice: the tail is not a row input.
+    const long = { ...candidate, description: "x".repeat(200) };
+    expect(keyFor({ ...long, description: `${"x".repeat(200)} more` })).toBe(keyFor(long));
+    // The row cap is part of the key; unset means the default.
+    expect(judgeCacheKey({ ...base, rowChars: 300 })).not.toBe(key);
+    expect(judgeCacheKey({ ...base, rowChars: 480 })).toBe(key);
+  });
+
+  it("misses after a vision attribute or row cap change, while a price change still hits (YOY-157 AC-13)", async () => {
+    await seed(
+      db,
+      FOUR.map((product) => ({ ...product, sleeveLength: "long" })),
+    );
+    const llm = scriptedLlm([answer(["E-X", "E-X", "E-X", "E-X"])]);
+    await search(orchestrator(llm));
+    expect(llm.requests).toHaveLength(1);
+
+    await db.catalogProduct.updateMany({
+      where: { shopDomain: SHOP, productId: "p2" },
+      data: { priceMin: 5, priceMax: 9 },
+    });
+    expect(await search(orchestrator(llm))).toMatchObject({ routeReason: "judge-cached" });
+    expect(llm.requests).toHaveLength(1);
+
+    await db.productEnrichment.updateMany({
+      where: { shopDomain: SHOP, productId: "p2" },
+      data: { sleeveLength: "short" },
+    });
+    expect(await search(orchestrator(llm))).toMatchObject({ routeReason: "judged" });
+    expect(llm.requests).toHaveLength(2);
+
+    const capped = orchestrator(llm, { judge: createLlmJudge({ llm, maxRowChars: 300 }) });
+    expect(await search(capped)).toMatchObject({ routeReason: "judged" });
+    expect(llm.requests).toHaveLength(3);
+    expect(await search(capped)).toMatchObject({ routeReason: "judge-cached" });
   });
 
   it("still hits after a price or stock change, and misses after a card text change (YOY-148 AC-3)", async () => {

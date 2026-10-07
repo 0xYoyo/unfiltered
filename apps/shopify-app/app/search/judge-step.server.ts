@@ -7,6 +7,7 @@ import {
   JUDGE_MISSED_WISHES,
   JUDGE_PROMPT_VERSION,
   JUDGE_VERDICTS,
+  judgeRowInputs,
   orderByVerdict,
   VISION_NOT_APPLICABLE,
   type Judge,
@@ -336,16 +337,20 @@ export interface JudgeStepRequest<T extends { productId: string }> {
  * The answer-cache key (YOY-148 AC-1): the SHA-256 of the normalized search
  * text, the candidate ids in order, each candidate's card text hash (empty
  * for a product with no written card), the judge's provider and model, and
- * the prompt version. Price and stock are not in it (AC-3). A refinement's
- * previous chain (YOY-150 AC-2) is part of it: the same words after another
- * search are another question.
+ * the prompt version. Each candidate also carries a hash of its row inputs
+ * other than price (`judgeRowInputs`), and the key carries the row cap
+ * (YOY-157 AC-13), so a retitled or re-enriched product, an edited no-card
+ * description or a new `JUDGE_ROW_CHARS` misses. Price and stock are not in
+ * it (AC-3). A refinement's previous chain (YOY-150 AC-2) is part of it: the
+ * same words after another search are another question.
  */
 export function judgeCacheKey(input: {
   sentence: string;
   previousSentence?: string;
-  candidates: ReadonlyArray<{ id: string; cardTextHash: string }>;
+  candidates: ReadonlyArray<{ id: string; cardTextHash: string; rowHash?: string }>;
   identity: string;
   promptVersion?: number;
+  rowChars?: number;
 }): string {
   return createHash("sha256")
     .update(
@@ -354,12 +359,22 @@ export function judgeCacheKey(input: {
         ...(input.previousSentence !== undefined && input.previousSentence.trim() !== ""
           ? [input.previousSentence.split("\n").map(normalizeReuseQuery)]
           : []),
-        input.candidates.map((candidate) => [candidate.id, candidate.cardTextHash]),
+        input.candidates.map((candidate) => [
+          candidate.id,
+          candidate.cardTextHash,
+          candidate.rowHash ?? "",
+        ]),
         input.identity,
         input.promptVersion ?? JUDGE_PROMPT_VERSION,
+        input.rowChars ?? DEFAULT_JUDGE_ROW_CHARS,
       ]),
     )
     .digest("hex");
+}
+
+/** The hash of a candidate's row inputs other than price, for the cache key (YOY-157 AC-13). */
+export function judgeRowHash(candidate: JudgeCandidate): string {
+  return createHash("sha256").update(judgeRowInputs(candidate)).digest("hex");
 }
 
 /** The written cards' text hashes for the page's products; "" where there is none. */
@@ -648,8 +663,10 @@ export async function runJudgeStep<T extends { productId: string }>(
       candidates: candidates.map((candidate) => ({
         id: candidate.id,
         cardTextHash: hashes.get(candidate.id) ?? "",
+        rowHash: judgeRowHash(candidate),
       })),
       identity: judge.identity ?? "unknown",
+      rowChars: judge.maxRowChars ?? DEFAULT_JUDGE_ROW_CHARS,
     });
   } catch (error) {
     warnJudgeFailure(searchId, "judge-error", error);
