@@ -125,3 +125,27 @@ for (const locale of ["en", "he"] as const) {
     await expect(nativeItems(page).nth(10)).toHaveAttribute("data-position", "22");
   });
 }
+
+for (const locale of ["en", "he"] as const) {
+  const suffix = locale === "he" ? "&locale=he" : "";
+
+  test(`overlay: a Jev-judged page puts its other-variant products under the divider with the close one, none labelled (YOY-157 AC-27, ${locale})`, async ({
+    page,
+  }) => {
+    await page.goto(`/?fixture=close-divider-jev&results=5&debounce=30000${suffix}`);
+    await submitQuery(page, "red evening gown");
+    await expect(overlayCards(page)).toHaveCount(5);
+
+    // Only the exact product sits above the heading; the four below carry no label.
+    const card = "unfiltered-widget-card";
+    expect(await childIds(overlayGrid(page))).toEqual([
+      card,
+      "unfiltered-widget-close-matches-divider",
+      ...Array(4).fill(card),
+    ]);
+    await expect(overlayDividers(page)).toHaveText(HEADINGS[locale]);
+    for (let index = 0; index < 5; index += 1) {
+      await expect(overlayCards(page).nth(index).locator(".card-label")).toHaveCount(0);
+    }
+  });
+}

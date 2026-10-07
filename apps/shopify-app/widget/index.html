@@ -360,6 +360,25 @@
         };
       };
 
+      /**
+       * A page as the Jev judge answers it (YOY-157 AC-27): Jev writes no
+       * merchant-fact label, so the server groups its other-variant
+       * products with its close one. Only the exact product stays in
+       * `results`; three other-variant products and one close product,
+       * each labelled "close match", are served in `closeMatches`.
+       * `?fixture=close-divider-jev` selects it.
+       */
+      const closeDividerJev = (page) => ({
+        ...page,
+        route: "ai",
+        results: page.results.slice(0, 1).map((result) => ({ ...result, label: null })),
+        closeMatches: page.results.slice(1, 5).map((result) => ({
+          ...result,
+          label: { template: "close-match", values: [] },
+        })),
+        closeMatchesRelaxed: [],
+      });
+
       const paged = (body, request) => {
         if (request.page === undefined) {
           return body;
@@ -599,7 +618,11 @@
             body = DEGRADED_RESPONSE;
           } else if (fixture === "empty") {
             body = { ...RESULTS_RESPONSE, results: [] };
-          } else if (fixture === "many" || fixture === "close-divider") {
+          } else if (
+            fixture === "many" ||
+            fixture === "close-divider" ||
+            fixture === "close-divider-jev"
+          ) {
             body = {
               ...RESULTS_RESPONSE,
               searchId: "harness-many-1",
@@ -639,6 +662,8 @@
           body = paged(body, request);
           if (fixture === "close-divider") {
             body = closeDivider(body);
+          } else if (fixture === "close-divider-jev") {
+            body = closeDividerJev(body);
           }
           if (fixture === "delayed" || fixture === "ai-delayed") {
             return new Promise((resolve) =>

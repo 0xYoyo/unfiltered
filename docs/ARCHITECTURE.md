@@ -1003,6 +1003,12 @@ runs one page.
   value, drops that label. Every v2 result on the wire carries `label`
   (`{ template, values }` or null); the old engine's wire has no `label` key.
   The verdict never reaches the storefront.
+  On the wire a judged page with a match serves its close products in
+  `closeMatches`, under the "Close matches" divider (`splitCloseVerdicts`,
+  YOY-166). A match is `exact`, and `other-variant` too only under a judge that writes the
+  merchant-fact label (Flash-Lite): under Jev an `other-variant` card carries
+  the generic `close-match` and goes under the divider with the close ones
+  (YOY-157 AC-27).
 - **Fallbacks.** The deadline serves find order (`judge-timeout`) without
   aborting the call (YOY-148, below); a failed call or an answer invalid twice serves find
   order (`judge-error`); a throttled session or a playground cap — the

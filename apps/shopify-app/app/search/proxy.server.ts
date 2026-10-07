@@ -12,6 +12,7 @@ import {
   parseIntent,
   type AppliedConstraint,
   type Intent,
+  type JudgeProvider,
 } from "@unfiltered/engine";
 import {
   createGeminiEmbeddingClient,
@@ -662,23 +663,37 @@ function serializeIntent(intent: Intent): ProxyIntent {
 }
 
 /**
+ * Whether a judge provider writes the merchant-fact label ("in grey, not
+ * black") on an `other-variant` product (YOY-157 AC-27). The Flash-Lite
+ * judge does. The Jev decision judge writes no text, so its `other-variant`
+ * card carries the generic `close-match` label (PRD v3.4 §3) and reads to a
+ * shopper exactly like a `close` one.
+ */
+export function judgeWritesFactLabel(provider: JudgeProvider): boolean {
+  return provider === "gemini";
+}
+
+/**
  * A judged page's close products, apart from its matches (YOY-166 AC-1):
- * when the page holds at least one `exact` or `other-variant` product, its
- * `close` products go under the "Close matches" divider, each group in the
- * order it was served. Null — every card stays inline — on any other page:
+ * when the page holds at least one match, its close products go under the
+ * "Close matches" divider, each group in the order it was served. A match
+ * is `exact`, and `other-variant` too when the judge writes its fact label;
+ * under a judge that writes none (Jev), an `other-variant` card is a close
+ * one (YOY-157 AC-27). Null — every card stays inline — on any other page:
  * one with no match (the reject-all rule, YOY-147 AC-8), one with no close
  * product, or one served without verdicts (find order, a judge timeout).
  * A stand-in verdict (YOY-159) is no judgment and never moves a card.
  */
 export function splitCloseVerdicts<
   T extends { verdict?: string; standIn?: true },
->(hits: readonly T[]): { matched: T[]; close: T[] } | null {
+>(hits: readonly T[], provider: JudgeProvider): { matched: T[]; close: T[] } | null {
+  const variantMatches = judgeWritesFactLabel(provider);
   const judged = (hit: T) => hit.standIn !== true;
-  const isClose = (hit: T) => judged(hit) && hit.verdict === "close";
-  const hasMatch = hits.some(
-    (hit) => judged(hit) && (hit.verdict === "exact" || hit.verdict === "other-variant"),
-  );
-  if (!hasMatch || !hits.some(isClose)) {
+  const isMatch = (hit: T) =>
+    judged(hit) && (hit.verdict === "exact" || (variantMatches && hit.verdict === "other-variant"));
+  const isClose = (hit: T) =>
+    judged(hit) && (hit.verdict === "close" || (!variantMatches && hit.verdict === "other-variant"));
+  if (!hits.some(isMatch) || !hits.some(isClose)) {
     return null;
   }
   return {
@@ -694,6 +709,9 @@ export function splitCloseVerdicts<
  */
 export function serializeProxySearchResponse(
   response: SearchResponse,
+  // The provider that judged the page: the one the orchestrator was built
+  // with, unless a caller names it (YOY-157 AC-27).
+  judgeProvider: JudgeProvider = judgeProviderFromEnv(process.env),
 ): ProxySearchResponse {
   const body: ProxySearchResponse = {
     searchId: response.searchId,
@@ -711,7 +729,7 @@ export function serializeProxySearchResponse(
     body.closeMatches = response.closeMatches.map(serializeCard);
     body.closeMatchesRelaxed = [...response.closeMatchesRelaxed];
   } else {
-    const split = splitCloseVerdicts(response.hits);
+    const split = splitCloseVerdicts(response.hits, judgeProvider);
     if (split !== null) {
       body.results = split.matched.map(serializeCard);
       body.closeMatches = split.close.map(serializeCard);
