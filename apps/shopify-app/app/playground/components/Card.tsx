@@ -115,9 +115,10 @@ export function Card({
   onOpen: (card: PlaygroundCard, position: number) => void;
 }) {
   const label = labelSegments(strings, card.label);
+  const image = card.imageUrl === null ? null : cardImageSources(card.imageUrl);
   const body = (
     <>
-      {card.imageUrl === null ? (
+      {image === null ? (
         // A neutral block, not a broken image and not an icon: the grid keeps
         // its rhythm and nothing decorative enters the page (X-6).
         <div
@@ -130,7 +131,10 @@ export function Card({
         // card that is about 180–240 px, two columns on a phone.
         <img
           className="cardImage"
-          {...cardImageSources(card.imageUrl)}
+          // React's spelling, passed explicitly: the helper's DOM-spelled
+          // `srcset` key, spread, logs "Invalid DOM property" (YOY-157 AC-25).
+          src={image.src}
+          srcSet={image.srcset}
           sizes={CARD_IMAGE_SIZES}
           alt=""
           loading={cardImageLoading(position)}
