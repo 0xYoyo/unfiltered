@@ -923,6 +923,26 @@
         return realFetch(input, requestInit);
       };
 
+      // Search responses the widget has read (YOY-157 AC-30): a body counts
+      // once its json() resolves. The widget applies the response (carry,
+      // chips) in the same microtask chain, so a test that waits for this
+      // count waits on the response being applied, never on timing.
+      window.__searchResponsesRead = 0;
+      const stubFetch = window.fetch;
+      window.fetch = (input, requestInit) =>
+        Promise.resolve(stubFetch(input, requestInit)).then((response) => {
+          const url = typeof input === "string" ? input : input.url;
+          if (url.startsWith("/apps/unfiltered/search") && response instanceof Response) {
+            const read = response.json.bind(response);
+            response.json = () =>
+              read().then((body) => {
+                window.__searchResponsesRead += 1;
+                return body;
+              });
+          }
+          return response;
+        });
+
       // `?native=A|B` opts in through init config (what an embed setting
       // would pass); absent, only the dev URL flag can turn it on.
       const native = params.get("native");

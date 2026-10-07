@@ -42,6 +42,33 @@ async function submittedCount(page: Page): Promise<number> {
   return (await submitted(page)).length;
 }
 
+/**
+ * Wait until the widget has read and applied every search response so far
+ * (YOY-157 AC-30). The carry a submit sends is the last response's, so the
+ * next submit must not go out before that response is applied — waiting on
+ * the request count alone raced it.
+ */
+async function settled(page: Page): Promise<void> {
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const harness = window as unknown as {
+          __searchRequests: unknown[];
+          __searchResponsesRead: number;
+        };
+        return harness.__searchResponsesRead === harness.__searchRequests.length;
+      }),
+    )
+    .toBe(true);
+}
+
+/** Submit, then wait for that search's response to be applied. */
+async function submitAndSettle(page: Page, query: string, expectedSubmitted: number): Promise<void> {
+  await submitQuery(page, query);
+  await expect.poll(() => submittedCount(page)).toBe(expectedSubmitted);
+  await settled(page);
+}
+
 const PATHS = [
   {
     name: "overlay",
@@ -63,13 +90,10 @@ for (const path of PATHS) {
   test.describe(`${path.name} path`, () => {
     test("every submitted search sends the held carry as previousQuery (AC-4)", async ({ page }) => {
       await page.goto(path.url("refine"));
-      await submitQuery(page, "black dress");
-      await expect.poll(() => submittedCount(page)).toBe(1);
+      await submitAndSettle(page, "black dress", 1);
       await expect(page.getByTestId(path.chips)).toBeVisible();
-      await submitQuery(page, "same but cheaper");
-      await expect.poll(() => submittedCount(page)).toBe(2);
-      await submitQuery(page, "in navy");
-      await expect.poll(() => submittedCount(page)).toBe(3);
+      await submitAndSettle(page, "same but cheaper", 2);
+      await submitAndSettle(page, "in navy", 3);
       const requests = await submitted(page);
       expect(requests[0]!.previousQuery).toBeUndefined();
       expect(requests[1]!.previousQuery).toBe("black dress");
@@ -83,9 +107,9 @@ for (const path of PATHS) {
       await page.locator("[data-field='size']").click();
       await expect(page.locator("[data-field='size']")).toHaveCount(0);
       await expect.poll(() => submittedCount(page)).toBe(2);
+      await settled(page);
 
-      await submitQuery(page, "same but cheaper");
-      await expect.poll(() => submittedCount(page)).toBe(3);
+      await submitAndSettle(page, "same but cheaper", 3);
       const requests = await submitted(page);
       // The removal re-asked the search on screen, with no chain of its own.
       expect(requests[1]!.previousQuery).toBeUndefined();
@@ -114,6 +138,7 @@ for (const path of PATHS) {
 
         await reading.click();
         await expect.poll(() => submittedCount(page)).toBe(2);
+        await settled(page);
         const requests = await submitted(page);
         expect(requests[0]!.previousQuery).toBeUndefined();
         expect(requests[1]!.query).toBe(phrase);
@@ -122,8 +147,7 @@ for (const path of PATHS) {
         await expect(page.getByRole("alertdialog")).toHaveCount(0);
 
         // The reading started a new chain: the next search refines IT.
-        await submitQuery(page, "in ivory");
-        await expect.poll(() => submittedCount(page)).toBe(3);
+        await submitAndSettle(page, "in ivory", 3);
         expect((await submitted(page))[2]!.previousQuery).toBe(phrase);
       });
     }
@@ -146,8 +170,8 @@ for (const path of PATHS) {
 
 test("overlay: New search clears the held carry (AC-5)", async ({ page }) => {
   await page.goto(PATHS[0].url("refine"));
-  await submitQuery(page, "black dress");
-  await expect.poll(() => submittedCount(page)).toBe(1);
+  // The response is applied before New search, so New search is what clears the carry.
+  await submitAndSettle(page, "black dress", 1);
   await page.getByTestId("unfiltered-widget-new-search").click();
   await submitQuery(page, "same but cheaper");
   await expect.poll(() => submittedCount(page)).toBe(2);
@@ -156,9 +180,8 @@ test("overlay: New search clears the held carry (AC-5)", async ({ page }) => {
 
 test("theme-native: no New search control exists, and none is added (AC-4, NG-2)", async ({ page }) => {
   await page.goto(PATHS[1].url("refine"));
-  await submitQuery(page, "black dress");
-  await submitQuery(page, "same but cheaper");
-  await expect.poll(() => submittedCount(page)).toBe(2);
+  await submitAndSettle(page, "black dress", 1);
+  await submitAndSettle(page, "same but cheaper", 2);
   expect((await submitted(page))[1]!.previousQuery).toBe("black dress");
   await expect(page.getByTestId("unfiltered-native-results")).toBeVisible();
   await expect(page.getByTestId("unfiltered-widget-new-search")).not.toBeVisible();
