@@ -545,6 +545,51 @@ describe("JSON-LD crawler (AC-5)", () => {
     ]);
   });
 
+  it("keys every offer by position when the offers share one url and carry no sku (YOY-157 AC-4)", () => {
+    const html = page({
+      "@context": "https://schema.org",
+      "@type": "Product",
+      name: "Linen Shirt",
+      offers: ["S", "M", "L"].map((size, index) => ({
+        "@type": "Offer",
+        url: "https://shop.example/p/linen-shirt",
+        name: size,
+        price: String(40 + index),
+        priceCurrency: "USD",
+        availability: "https://schema.org/InStock",
+      })),
+    });
+    const [product] = extractProductsFromPage(html, "https://shop.example/p/linen-shirt").products;
+    const ids = product!.variants.map((variant) => variant.variantId);
+    expect(ids).toHaveLength(3);
+    expect(new Set(ids).size).toBe(3);
+    expect(ids).toEqual([1, 2, 3].map((position) => `${product!.sourceId}#${position}`));
+    expect(product!.variants.map((variant) => variant.price)).toEqual([40, 41, 42]);
+  });
+
+  it("keys every hasVariant row by position when their ids repeat (YOY-157 AC-4)", () => {
+    const html = page({
+      "@context": "https://schema.org",
+      "@type": "ProductGroup",
+      name: "Scarf",
+      hasVariant: ["Red", "Blue"].map((color) => ({
+        "@type": "Product",
+        "@id": "https://shop.example/p/scarf",
+        color,
+        offers: { "@type": "Offer", price: "15", priceCurrency: "USD", availability: "https://schema.org/InStock" },
+      })),
+    });
+    const [product] = extractProductsFromPage(html, "https://shop.example/p/scarf").products;
+    expect(product!.variants.map((variant) => variant.variantId)).toEqual([
+      `${product!.sourceId}#1`,
+      `${product!.sourceId}#2`,
+    ]);
+    expect(product!.variants.map((variant) => variant.options)).toEqual([
+      [{ name: "color", value: "Red" }],
+      [{ name: "color", value: "Blue" }],
+    ]);
+  });
+
   it("yields zero variant rows, and no error, for a page with no per-variant data", async () => {
     const html = page({
       "@context": "https://schema.org",

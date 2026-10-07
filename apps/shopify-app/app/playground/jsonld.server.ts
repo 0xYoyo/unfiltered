@@ -275,6 +275,12 @@ const optionValue = (value: unknown): string | null => {
  * storefront form — yields one row per offer, with no option pairs (the
  * Offer vocabulary carries none). A page with one offer, or none, provides
  * no per-variant data: zero rows.
+ *
+ * Storefronts often give every Offer the product page's own `url` and no
+ * `sku`, so the chosen ids repeat; the variant sync keeps only the first row
+ * per id. When any id repeats among a product's rows, every row of that
+ * product falls back to `${sourceId}#${position}` (YOY-157 AC-4), so the row
+ * count equals the offer count.
  */
 export function readVariants(
   node: JsonNode,
@@ -290,7 +296,7 @@ export function readVariants(
       .filter((entry): entry is string => typeof entry === "string" && entry !== "")
       .map(variesByProperty);
     const properties = variesBy.length > 0 ? variesBy : DEFAULT_VARIANT_PROPERTIES;
-    return variants.map((variant, index) => {
+    return distinctVariantIds(sourceId, variants.map((variant, index) => {
       const offers = readOffers(variant["offers"]);
       const options: VariantOption[] = properties.flatMap((name) => {
         const value = optionValue(variant[name]);
@@ -310,7 +316,7 @@ export function readVariants(
         quantity: null,
         sourceUpdatedAt: null,
       };
-    });
+    }));
   }
   const offers = (Array.isArray(node["offers"]) ? node["offers"] : []).filter(
     (offer): offer is JsonNode =>
@@ -319,7 +325,7 @@ export function readVariants(
   if (offers.length < 2) {
     return [];
   }
-  return offers.map((offer, index) => {
+  return distinctVariantIds(sourceId, offers.map((offer, index) => {
     const read = readOffers(offer);
     return {
       variantId:
@@ -334,7 +340,14 @@ export function readVariants(
       quantity: null,
       sourceUpdatedAt: null,
     };
-  });
+  }));
+}
+
+/** Every row keyed by position once any id repeats among a product's rows (AC-4). */
+function distinctVariantIds(sourceId: string, rows: VariantRecord[]): VariantRecord[] {
+  const ids = new Set(rows.map((row) => row.variantId));
+  if (ids.size === rows.length) return rows;
+  return rows.map((row) => ({ ...row, variantId: `${sourceId}#${row.position}` }));
 }
 
 /** Product nodes on the page: `Product` (any subtype) or `ProductGroup`. */
