@@ -197,8 +197,12 @@ the eval catalog is indexed from the same recordings as above, then its
 cards are written and embedded, and every golden is searched through the
 v2 path (find, wish extraction, the default `jev` judge) and scored on
 page 1 (24 results). It asserts the v2 output three ways — a negation
-golden's excluded products never appear on page 1, no over-budget product
-precedes an in-budget one on a price-cap golden, and a guest-dress query
+golden's excluded products never appear on page 1; on a price-cap golden
+the page leads in budget and, within each judge verdict, every in-budget
+product comes before every over-budget one (the engine orders by verdict
+first, `composeWishes`, so an `exact` over-budget product may precede a
+`close` in-budget one; "over budget" is the code's `price-near` /
+`price-far` label); and a guest-dress query
 (`co01`, `co03`) never leads with a bridal gown — and holds the per-group
 v2 floor: the `v2` object of `fixtures/constructor-floor.json`, hit rate
 and top-10 `mustNot` leak per group, beside the old engine's fields, which

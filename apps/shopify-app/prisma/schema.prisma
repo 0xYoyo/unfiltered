@@ -301,9 +301,6 @@ model CardEmbedding {
   @@index([shopDomain])
 }
 
-// Shopper search log (YOY-47): exactly one row per proxy search request —
-// including degraded, zero-hit, and throttled searches — for the dashboard
-// and attribution work of later milestones. Write-only in this milestone.
 // The judge answer cache (YOY-148 AC-1): one stored answer per cache key —
 // the SHA-256 of the normalized search text, the page's candidate product
 // ids in order, each candidate's card text hash, the judge provider and
@@ -355,6 +352,9 @@ model JudgeVerdict {
   @@index([searchId, productId])
 }
 
+// Shopper search log (YOY-47): exactly one row per proxy search request —
+// including degraded, zero-hit, and throttled searches — for the dashboard
+// and attribution work of later milestones. Write-only in this milestone.
 model SearchEvent {
   id          String   @id @default(uuid())
   searchId    String

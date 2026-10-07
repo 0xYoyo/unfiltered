@@ -277,7 +277,7 @@ per product photo; the shopper uploads/pastes a photo → nearest products;
 the judge may compare images. Milestone 8.
 
 **The judge — decision (prices verified 28 Sep 2026).**
-- Baseline: Gemini 3.5 Flash-Lite, one call with all page candidates inside, fixed short-code JSON output. Known multilingual, already in the engine. List price $0.30/M input, $2.50/M output. With 24 compact rows (~2–4k tokens in, ~120 tokens out) ≈ $0.001 per uncached search → ≈ $1 per 1,000 searches (estimate; measured in M6). Typically 0.7–1.2 s (measured on our own calls, thinking level low).
+- Baseline: Gemini 3.5 Flash-Lite, one call with all page candidates inside, fixed short-code JSON output. Known multilingual, already in the engine. List price $0.30/M input, $2.50/M output. With 24 compact rows (~2–4k tokens in, ~120 tokens out) ≈ $0.001 per uncached search → ≈ $1 per 1,000 searches (estimate; superseded by the YOY-152 measurement in Refinement 2 below and in §8). Typically 0.7–1.2 s (measured on our own calls, thinking level low).
 - Challenger: Jev (TypeSafe) — typed answers (yes/no with confidence;
   multi-class choice; numeric score), ~0.2 s reported, $0.042/M input,
   output free (via OpenRouter `typesafe/jev-1.13`; Cloudflare Workers AI also lists `typesafe/jev`, not used). ≈ $0.30–0.40 per 1,000 searches. Pointwise
@@ -400,8 +400,8 @@ is accepted; the friends-and-family round is the human check). Budget rules
 and half hidden; the hidden score runs at six fixed points in M6 (baseline on
 the M5 engine; after the find step; after the judge; after chips; the judge
 comparison, once per judge; before the delete), triggered on demand, never on
-every push or PR; one run is ≈ $0.05 on the M5 engine and ≈ $0.20 with the
-judge (estimates, measured on the first runs; the earlier ≈ $0.17 counted the
+every push or PR; one run is ≈ $0.05 on the M5 engine and ≈ $0.19 with the
+judge (hidden run 3 measured $0.1858; the earlier ≈ $0.17 counted the
 grader only). The hidden half lives in a GitHub Actions repository secret, not
 a repository folder. The first real queries come from the live search log
 (every submitted playground search since August), weighted most; model-written
