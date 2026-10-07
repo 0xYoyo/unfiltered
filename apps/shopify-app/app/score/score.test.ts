@@ -973,7 +973,7 @@ describe("the hidden run's leak check (YOY-141 AC-3)", () => {
 
   it("prints the shares composed without the extraction and answered by its cache, a dash when none reported (YOY-149 AC-4, AC-18)", () => {
     const [header, en, he] = table.split("\n");
-    expect(header).toMatch(/under 1 s\s+no extraction\s+extraction cached\s+failed$/);
+    expect(header).toMatch(/under 1 s \(local\)\s+no extraction\s+extraction cached\s+failed$/);
     expect(en).toMatch(/\s50%\s+25%\s+50%\s+0$/);
     expect(he).toMatch(/\s100%\s+—\s+—\s+1$/);
   });
@@ -1077,13 +1077,13 @@ describe("the score workflow (YOY-141 AC-1, AC-2)", () => {
     expect(triggers).toMatch(/ref:\n(?:\s+.*\n)*?\s+default: main/);
   });
 
-  it("scores the engine the dispatch names: v2 sets ENGINE_V2=1, v1 by default (YOY-145 AC-13)", () => {
-    expect(triggers).toMatch(/engine:\n(?:\s+.*\n)*?\s+default: v1/);
+  it("scores the engine the dispatch names: v2 sets ENGINE_V2=1, v2 by default (YOY-145 AC-13; YOY-157 AC-20)", () => {
+    expect(triggers).toMatch(/engine:\n(?:\s+.*\n)*?\s+default: v2/);
     expect(workflow).toContain("ENGINE_V2: ${{ inputs.engine == 'v2' && '1' || '0' }}");
   });
 
-  it("scores with the judge the dispatch names: gemini or jev into JUDGE_PROVIDER, gemini by default (YOY-152 AC-6)", () => {
-    expect(triggers).toMatch(/judge:\n(?:\s+.*\n)*?\s+default: gemini\n\s+type: choice\n\s+options:\n\s+- gemini\n\s+- jev\n/);
+  it("scores with the judge the dispatch names: gemini or jev into JUDGE_PROVIDER, jev by default (YOY-152 AC-6; YOY-157 AC-19)", () => {
+    expect(triggers).toMatch(/judge:\n(?:\s+.*\n)*?\s+default: jev\n\s+type: choice\n\s+options:\n\s+- gemini\n\s+- jev\n/);
     expect(workflow).toContain("JUDGE_PROVIDER: ${{ inputs.judge }}");
     expect(workflow).toContain("OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}");
   });
@@ -1114,6 +1114,20 @@ describe("the score workflow (YOY-141 AC-1, AC-2)", () => {
     expect(workflow).toContain("GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}");
     expect(workflow).toContain("HIDDEN_SET_B64: ${{ secrets.HIDDEN_SET_B64 }}");
     expect(workflow).toContain("GITHUB_STEP_SUMMARY");
+  });
+
+  it("runs the leak check from a guard checkout of the workflow's own commit, never the scored ref (YOY-157 AC-2)", () => {
+    // The guard is a second checkout pinned to github.sha, in guard/, with its own install.
+    expect(workflow).toMatch(
+      /- uses: actions\/checkout@v4\n\s+with:\n\s+ref: \$\{\{ github\.sha \}\}\n\s+path: guard\n/,
+    );
+    expect(workflow).toMatch(/name: Install the guard\n\s+working-directory: guard\n\s+run: npm ci/);
+    // The leak check runs inside guard/; the runner runs from the scored ref's checkout.
+    const check = workflow.indexOf("scripts/score-leak-check.mts");
+    const line = workflow.slice(workflow.lastIndexOf("\n", check), check);
+    expect(line).toContain('cd "$GITHUB_WORKSPACE/guard/apps/shopify-app"');
+    expect(workflow.match(/score-leak-check\.mts/g)).toHaveLength(1);
+    expect(workflow).toMatch(/ref: \$\{\{ inputs\.ref \}\}/);
   });
 
   it("prints the GEMINI_ and INTENT_ env names before the run, never their values (YOY-141 AC-13)", () => {

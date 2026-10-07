@@ -80,8 +80,10 @@ gh run view --log
 
 Two choice inputs pick what is scored: `engine` (`v1` or `v2`, sets
 `ENGINE_V2`) and `judge` (`gemini` or `jev`, sets `JUDGE_PROVIDER`; YOY-152).
-The input defaults to `gemini`; production's default judge is `jev` (see
-"Decision — Jev is the default judge"), so pass `-f judge=jev` to score it.
+Both default to what production serves (YOY-157 AC-19, AC-20): `engine`
+defaults to `v2` and `judge` to `jev` (see "Decision — Jev is the default
+judge"), so a plain dispatch scores the production engine and judge; pass
+`-f engine=v1` or `-f judge=gemini` to score the alternatives.
 A judge input that is not on the default branch's workflow yet is dispatched
 with `--ref <branch>`, so the branch's own workflow file runs.
 
@@ -90,7 +92,9 @@ request, never inside `ci.yml`. It checks out `ref`, writes the secret to
 the runner's temp directory, runs `score-run.mts --hidden-set` with
 `GEMINI_API_KEY`, and captures every byte the runner writes. Before the
 run it prints the names — never the values — of the `GEMINI_*` and
-`INTENT_*` variables it has. `score-leak-check.mts` then fails the job if
+`INTENT_*` variables it has. `score-leak-check.mts` — run from a second
+checkout of the workflow's own commit (`github.sha`) in `guard/`, never from
+the scored ref (YOY-157 AC-2) — then fails the job if
 any hidden query appears in that output as whole words (the score table,
 the cost line and the failure lines excepted: each is matched by its exact
 shape and holds only language codes, numbers, a stage or a class name),
@@ -241,8 +245,8 @@ not because the engine changed.
 Hidden-half scores per language. "Under 1 s" is the latency probe's share
 of searches under 1,000 ms server-side against the deployment
 (`scripts/latency-probe.mts --runs 5 --set all`, docs/LATENCY.md); the
-score runner's own under-1-s column times a local run and is not the
-deployment's. The runner's "no extraction" column (YOY-149 AC-4) is the
+score runner's own `under 1 s (local)` column times a local, in-process run
+and is never the source of this table's value (YOY-157 AC-3). The runner's "no extraction" column (YOY-149 AC-4) is the
 share of Engine v2 searches composed without the wish extraction — it
 answered after the grace or failed — and "extraction cached" (AC-18) the
 share the extraction cache answered with no call; both read "—" on the
@@ -403,9 +407,8 @@ and the two-meanings chip are dormant — Jev answers `close-match` where
 Flash-Lite writes `fact-differs`, and writes no second reading. The code
 keeps both for the Flash-Lite judge; the follow-up is YOY-158.
 
-`score.yml`'s `judge` input still defaults to `gemini` (a sensitive path,
-unchanged by this slice), so a hidden run scores the production judge only
-when dispatched with `-f judge=jev`.
+`score.yml`'s `judge` input defaulted to `gemini` at the time (a sensitive
+path, unchanged by this slice); it defaults to `jev` since YOY-157 AC-19.
 
 ### The public half at the Engine v2 default (YOY-153 AC-8, 2026-10-04)
 

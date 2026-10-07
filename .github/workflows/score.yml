@@ -14,20 +14,22 @@ on:
         default: main
       # Which engine the run scores (YOY-145): v2 sets ENGINE_V2=1, the
       # switch the score runner's orchestrator reads like production does.
+      # v2 by default — the engine production serves (YOY-157 AC-20).
       engine:
         description: Engine to score (v1 or v2)
         required: true
-        default: v1
+        default: v2
         type: choice
         options:
           - v1
           - v2
       # Which judge answers on Engine v2 (YOY-152 AC-6): sets JUDGE_PROVIDER,
-      # the switch the production judge factory reads.
+      # the switch the production judge factory reads. jev by default — the
+      # judge production serves (YOY-157 AC-19).
       judge:
         description: Judge to score with (gemini or jev)
         required: true
-        default: gemini
+        default: jev
         type: choice
         options:
           - gemini
@@ -45,10 +47,21 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.ref }}
+      # The leak guard comes from the workflow's own commit, never from the
+      # scored ref (YOY-157 AC-2): a ref whose runner prints query text could
+      # otherwise ship a relaxed guard beside it. Checked out into `guard/`
+      # with its own install; the scored ref still supplies the runner.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: guard
       - uses: actions/setup-node@v4
         with:
           node-version: 22
       - run: npm ci
+      - name: Install the guard
+        working-directory: guard
+        run: npm ci
       # The secret holds the hidden half exactly as score-build-set.mts wrote
       # it (base64); the runner decodes it. It goes to the runner's temp dir,
       # never into the checkout.
@@ -88,9 +101,9 @@ jobs:
             > "$RUNNER_TEMP/score-output.txt" 2>&1
           run_status=$?
           set -e
-          npx tsx scripts/score-leak-check.mts \
+          (cd "$GITHUB_WORKSPACE/guard/apps/shopify-app" && npx tsx scripts/score-leak-check.mts \
             --hidden-set "$RUNNER_TEMP/hidden.b64" \
-            --output "$RUNNER_TEMP/score-output.txt"
+            --output "$RUNNER_TEMP/score-output.txt")
           cat "$RUNNER_TEMP/score-output.txt"
           {
             echo "### Hidden score — \`$SCORE_REF\`"

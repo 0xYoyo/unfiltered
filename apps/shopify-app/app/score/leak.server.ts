@@ -16,7 +16,7 @@ import { SCORE_LANGUAGES, type ScoreSetEntry } from "./set.server";
 
 const LANGUAGE = `(?:${SCORE_LANGUAGES.join("|")})`;
 const TABLE_HEADER =
-  /^language\s+score\s+searches\s+model-written\s+under 1 s\s+no extraction\s+extraction cached\s+failed$/;
+  /^language\s+score\s+searches\s+model-written\s+under 1 s \(local\)\s+no extraction\s+extraction cached\s+failed$/;
 // The "no extraction" (YOY-149 AC-4) and "extraction cached" (AC-18) cells
 // are each a share or an em dash.
 const TABLE_ROW = new RegExp(

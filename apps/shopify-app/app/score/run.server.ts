@@ -393,7 +393,7 @@ export function formatScoreTable(report: ScoreReport): string {
       "score",
       "searches",
       "model-written",
-      "under 1 s",
+      "under 1 s (local)",
       "no extraction",
       "extraction cached",
       "failed",
