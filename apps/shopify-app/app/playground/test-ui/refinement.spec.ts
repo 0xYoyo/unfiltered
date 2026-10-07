@@ -13,6 +13,13 @@ const input = (page: Page) => page.getByTestId("playground-input");
 const chips = (page: Page) => page.getByTestId("playground-chip");
 const reading = (page: Page) => page.getByTestId("playground-other-reading");
 const newSearch = (page: Page) => page.getByTestId("playground-new-search");
+const status = (page: Page) => page.getByTestId("playground-status");
+
+const LOADING = new RegExp(
+  Object.values(PLAYGROUND_STRING_CATALOG)
+    .map((strings) => strings.loading)
+    .join("|"),
+);
 
 function recordSubmitted(page: Page): URL[] {
   const urls: URL[] = [];
@@ -30,18 +37,43 @@ async function submit(page: Page, query: string): Promise<void> {
   await input(page).press("Enter");
 }
 
+function isSubmittedSearch(response: { url(): string }): boolean {
+  const url = new URL(response.url());
+  return url.pathname === "/api/playground/search" && url.searchParams.get("mode") !== "preview";
+}
+
+/**
+ * Run `act`, which sends one submitted search, then wait until the page has
+ * applied that search's response (YOY-157 AC-32). The carry the next submit
+ * sends is the last response's, so a dependent submit must not go out before
+ * it is held — waiting on the request count alone raced it. The response on
+ * the wire is not enough either: the page reads the body afterwards, and the
+ * status line leaves "Searching…" in the same update that holds the carry.
+ */
+async function settleAfter(page: Page, act: () => Promise<void>): Promise<void> {
+  const response = page.waitForResponse(isSubmittedSearch);
+  await act();
+  await response;
+  await expect(status(page)).not.toHaveText(LOADING);
+}
+
+/** Submit, then wait for that search's response to be applied. */
+async function submitAndSettle(page: Page, query: string): Promise<void> {
+  await settleAfter(page, () => submit(page, query));
+}
+
 test("verify 2: a second search carries previousQuery equal to the first response's carry (AC-1, AC-3)", async ({
   page,
 }) => {
   const urls = recordSubmitted(page);
   await page.goto("/try");
-  const first = page.waitForResponse((response) => response.url().includes("/api/playground/search?") && !response.url().includes("mode=preview"));
-  await submit(page, "refine black dress");
+  const first = page.waitForResponse(isSubmittedSearch);
+  await submitAndSettle(page, "refine black dress");
   const carry = ((await (await first).json()) as { carry: string }).carry;
   expect(carry).toBe("refine black dress");
   await expect(chips(page)).toHaveCount(1);
 
-  await submit(page, "refine same but cheaper");
+  await submitAndSettle(page, "refine same but cheaper");
   await expect.poll(() => urls.length).toBe(2);
   expect(urls[0]!.searchParams.has("previousQuery")).toBe(false);
   expect(urls[1]!.searchParams.get("previousQuery")).toBe(carry);
@@ -59,7 +91,8 @@ test("verify 3: New search clears the held carry — the next search has no prev
 }) => {
   const urls = recordSubmitted(page);
   await page.goto("/try");
-  await submit(page, "refine black dress");
+  // The response is applied before New search, so New search is what clears the carry.
+  await submitAndSettle(page, "refine black dress");
   await expect(newSearch(page)).toBeVisible();
   await newSearch(page).click();
   await submit(page, "refine same but cheaper");
@@ -70,15 +103,15 @@ test("verify 3: New search clears the held carry — the next search has no prev
 test("a removed chip stays removed across a refinement in the same chain (AC-11)", async ({ page }) => {
   const urls = recordSubmitted(page);
   await page.goto("/try");
-  await submit(page, "refine dress size m");
+  await submitAndSettle(page, "refine dress size m");
   await expect(chips(page)).toHaveCount(1);
-  await page.locator("[data-field='size']").click();
+  await settleAfter(page, () => page.locator("[data-field='size']").click());
   await expect(chips(page)).toHaveCount(0);
   await expect.poll(() => urls.length).toBe(2);
   // The removal re-asks the same search, with no previous chain of its own.
   expect(urls[1]!.searchParams.has("previousQuery")).toBe(false);
 
-  await submit(page, "refine same but cheaper");
+  await submitAndSettle(page, "refine same but cheaper");
   await expect.poll(() => urls.length).toBe(3);
   expect(urls[2]!.searchParams.get("previousQuery")).toBe("refine dress size m");
   expect(JSON.parse(urls[2]!.searchParams.get("removedChips") ?? "null")).toEqual([
@@ -96,7 +129,7 @@ for (const locale of ["en", "he"] as const) {
   }) => {
     const urls = recordSubmitted(page);
     await page.goto(path);
-    await submit(page, "two meanings wedding dress");
+    await submitAndSettle(page, "two meanings wedding dress");
     await expect(reading(page)).toHaveText(strings.otherReading.replace("{reading}", "Bridal gowns"));
     // First in the row.
     await expect(page.locator("[data-testid='playground-chips'] > li").first()).toContainText(
@@ -105,7 +138,7 @@ for (const locale of ["en", "he"] as const) {
     await expect(page.getByRole("dialog")).toHaveCount(0);
     await expect(page.getByRole("alertdialog")).toHaveCount(0);
 
-    await reading(page).click();
+    await settleAfter(page, () => reading(page).click());
     await expect.poll(() => urls.length).toBe(2);
     expect(urls[1]!.searchParams.get("query")).toBe("Bridal gowns");
     expect(urls[1]!.searchParams.has("previousQuery")).toBe(false);
