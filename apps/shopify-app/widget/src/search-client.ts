@@ -27,15 +27,9 @@ export interface ProxyResult {
   currencyCode: string;
   available: boolean;
   /**
-   * The product passed a color filter without color evidence (YOY-67 AC-5):
-   * rendered de-emphasized with a label. Optional so the widget tolerates
-   * responses from a server predating the field.
-   */
-  colorUnknown?: boolean;
-  /**
    * How the result misses a stated wish (YOY-147 AC-9, YOY-149 AC-12): a
    * template name and its values, rendered as the card's one label line
-   * (YOY-151). Null when it misses nothing; absent from the old engine.
+   * (YOY-151). Null when it misses nothing; absent on classic results.
    */
   label?: ProxyLabel | null;
 }
@@ -49,14 +43,8 @@ export interface ProxyLabel {
 /** One applied-constraint chip as the proxy serves it. */
 export interface ProxyChip {
   field:
-    | "category"
     | "priceMin"
     | "priceMax"
-    | "colorsInclude"
-    | "colorsExclude"
-    | "attributesExclude"
-    | "attributesInclude"
-    | "occasion"
     | "availability"
     // Engine v2 (YOY-149): the shopper's size as typed, and one exclusion
     // field for any excluded term.
@@ -65,8 +53,7 @@ export interface ProxyChip {
   value: string;
   /**
    * The ISO currency of an engine v2 price chip's number (YOY-149), when
-   * the shopper's query or the store named one. Display-only; absent on
-   * v1 chips, whose currency rides the echoed intent.
+   * the shopper's query or the store named one. Display-only.
    */
   currency?: string;
 }
@@ -77,12 +64,6 @@ export interface ProxyChip {
  */
 export type RemovedChip = Pick<ProxyChip, "field" | "value">;
 
-/**
- * The proxy's echoed intent (YOY-49): held client-side between requests and
- * sent back verbatim as `previousIntent` — the widget never reads inside it.
- */
-export type ProxyIntent = Record<string, unknown>;
-
 /** The search response as the widget consumes it (YOY-46 contract). */
 export interface ProxySearchResponse {
   searchId: string;
@@ -90,14 +71,11 @@ export interface ProxySearchResponse {
   degraded: boolean;
   results: ProxyResult[];
   chips: ProxyChip[];
-  intent: ProxyIntent | null;
   /**
-   * Classic near-misses on an AI zero-hit response; on a judged page with
-   * matches (non-empty `results`), the page's close products (YOY-166).
+   * On a judged page with matches (non-empty `results`), the page's close
+   * products (YOY-166), rendered under the "Close matches" heading.
    */
   closeMatches?: ProxyResult[];
-  /** Constraint names the server relaxed to find them (YOY-111). */
-  closeMatchesRelaxed?: string[];
   /**
    * The page `results` holds and the size of the whole result order
    * (YOY-146): present on every paged response. Absent from a server that
@@ -130,15 +108,10 @@ export interface PageRequest {
 
 /** Optional context a search request carries (YOY-49). */
 export interface SearchRequestContext {
-  /** The previous response's echoed intent, for refinement. */
-  previousIntent?: ProxyIntent;
-  /** Chip the shopper dismissed; requires `previousIntent`. */
-  removeChip?: ProxyChip;
   /**
-   * Engine v2 chip removal (YOY-149 AC-15): EVERY chip the shopper has
-   * removed in this search chain, the newest included. A v2 response
-   * echoes no intent, so the same query is re-asked with this list instead
-   * of `previousIntent`/`removeChip`.
+   * Chip removal (YOY-149 AC-15): EVERY chip the shopper has removed in
+   * this search chain, the newest included; the same query is re-asked
+   * with this list.
    */
   removedChips?: readonly RemovedChip[];
   /**
@@ -155,7 +128,7 @@ export interface SearchRequestContext {
   /**
    * Keystroke preview (YOY-68): the request rides `mode=preview` and the
    * server serves classic-only results with no logging and no AI spend.
-   * Mutually exclusive with `previousIntent`/`removeChip` by contract.
+   * Mutually exclusive with `previousQuery` by contract.
    */
   preview?: boolean;
   /**
@@ -163,7 +136,7 @@ export interface SearchRequestContext {
    * rides `mode=classic` and the server serves the same zero-LLM keyword
    * results as a preview, but logs it as a real SearchEvent (routeReason
    * "client-timeout-rescue") and returns an attributable searchId. Mutually
-   * exclusive with `preview`, `previousIntent`, and `removeChip`.
+   * exclusive with `preview` and `previousQuery`.
    */
   classic?: boolean;
   /**
@@ -219,8 +192,8 @@ export class SearchTimeoutError extends Error {
 }
 
 /**
- * Serialize one search request onto the wire. Objects (previousIntent,
- * removeChip) travel as JSON inside their query parameter; the parse layer
+ * Serialize one search request onto the wire. Objects (removedChips)
+ * travel as JSON inside their query parameter; the parse layer
  * (`parseProxySearchParams`) is the exact mirror, and the YOY-60 contract
  * test pins this pair with no stub between them.
  */
@@ -230,14 +203,6 @@ export function buildSearchParams(
   context?: SearchRequestContext,
 ): URLSearchParams {
   const params = new URLSearchParams({ query, sessionId });
-  // previousIntent is OMITTED (not null) when nothing is held —
-  // "no previousIntent field" is the new-search contract (YOY-49 AC-5).
-  if (context?.previousIntent !== undefined) {
-    params.set("previousIntent", JSON.stringify(context.previousIntent));
-  }
-  if (context?.removeChip !== undefined) {
-    params.set("removeChip", JSON.stringify(context.removeChip));
-  }
   if (context?.removedChips !== undefined && context.removedChips.length > 0) {
     params.set(
       "removedChips",

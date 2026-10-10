@@ -27,8 +27,7 @@ import { queryCardIndex, type CardIndexHit } from "./card-retrieval.server";
  *   once at its nearer distance. Keyword matches stay on the new sentence.
  * - Embedding failure (AC-8): the keyword order alone, flagged `degraded`.
  *   A card-index failure takes the same fallback — both are the vector half
- *   of the find step; a keyword-store failure is an outage and propagates,
- *   as it does on the old engine.
+ *   of the find step; a keyword-store failure is an outage and propagates.
  */
 
 /** Env var naming the find-set size (AC-1). */

@@ -1,12 +1,5 @@
-import type { Intent } from "@unfiltered/engine";
-
 import { PLAYGROUND_RESULT_LIMIT } from "../playground/api.server";
-import type {
-  SearchEngine,
-  SearchOrchestrator,
-  SearchPaging,
-  SearchResponse,
-} from "./orchestrator.server";
+import type { SearchOrchestrator, SearchPaging, SearchResponse } from "./orchestrator.server";
 import type { RemovedChip } from "./wishes.server";
 
 /**
@@ -26,19 +19,13 @@ export interface PlaygroundSearchInput {
   preview?: boolean;
   /** Classic rescue of a search that timed out client-side. */
   classic?: boolean;
-  /** A playground guard tripped: forced classic, no AI spend. */
+  /** A playground guard tripped: find order, no judge spend. */
   limited?: boolean;
-  /** Chip removal: search with this intent as-is. */
-  resolvedIntent?: Intent;
-  /** Refinement: the session's previous intent. */
-  previousIntent?: Intent;
-  /** The engine for this request (YOY-145 AC-6); the env default when absent. */
-  engine?: SearchEngine;
   /** One page of results (YOY-145 AC-4); `limit` is then ignored. */
   paging?: SearchPaging;
-  /** Chips removed from an Engine v2 response (YOY-149 AC-15). */
+  /** Chips removed from a previous response (YOY-149 AC-15). */
   removedChips?: RemovedChip[];
-  /** The previous response's `carry` (YOY-150 AC-1); Engine v2 reads it. */
+  /** The previous response's `carry` (YOY-150 AC-1). */
   previousQuery?: string;
 }
 
@@ -56,7 +43,6 @@ export async function runPlaygroundSearch(
     query: input.query,
     shopDomain: input.storeKey,
     limit: input.limit ?? PLAYGROUND_RESULT_LIMIT,
-    ...(input.engine !== undefined ? { engine: input.engine } : {}),
     ...(input.paging !== undefined ? { paging: input.paging } : {}),
     ...(input.removedChips !== undefined && input.preview !== true && input.classic !== true
       ? { removedChips: input.removedChips }
@@ -70,11 +56,7 @@ export async function runPlaygroundSearch(
         ? { forceClassic: true, forceClassicReason: "client-timeout-rescue" }
         : input.limited === true
           ? { forceClassic: true }
-          : input.resolvedIntent !== undefined
-            ? { resolvedIntent: input.resolvedIntent }
-            : input.previousIntent !== undefined
-              ? { previousIntent: input.previousIntent }
-              : {}),
+          : {}),
   });
   return { response, latencyMs: Date.now() - startedAt };
 }

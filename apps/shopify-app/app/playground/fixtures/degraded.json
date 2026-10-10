@@ -11,8 +11,7 @@
       "priceMin": 320,
       "priceMax": 320,
       "currencyCode": "ILS",
-      "available": true,
-      "colorUnknown": false
+      "available": true
     },
     {
       "productId": "p-2",
@@ -22,8 +21,7 @@
       "priceMin": 280,
       "priceMax": 320,
       "currencyCode": "ILS",
-      "available": true,
-      "colorUnknown": false
+      "available": true
     },
     {
       "productId": "p-3",
@@ -33,21 +31,18 @@
       "priceMin": 210,
       "priceMax": 210,
       "currencyCode": "ILS",
-      "available": false,
-      "colorUnknown": false
+      "available": false
     }
   ],
   "chips": [],
-  "intent": null,
   "details": {
-    "routeReason": "model",
+    "routeReason": "find-only",
     "latencyMs": 1180,
-    "limited": "daily-global",
+    "limited": null,
     "stages": {
-      "classify": 44,
-      "intent": 1002,
-      "classic": 31
+      "find": 1102,
+      "hydrate": 9
     },
-    "intentTier": null
+    "judge": null
   }
 }

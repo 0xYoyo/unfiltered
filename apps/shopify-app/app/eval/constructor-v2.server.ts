@@ -5,10 +5,6 @@ import { fileURLToPath } from "node:url";
 import type { PrismaClient } from "@prisma/client";
 import {
   createDecisionJudge,
-  createEscalatingIntentExtractor,
-  createIntentExtractor,
-  createQueryClassifier,
-  createRetriever,
   createWishExtractor,
   type CostRecorder,
   type DecisionClient,
@@ -22,7 +18,6 @@ import { writeCatalogCards } from "../catalog/card.server";
 import { createPgTrgmClassicStore } from "../search/classic-store.server";
 import { createFindStep } from "../search/find.server";
 import { createSearchOrchestrator } from "../search/orchestrator.server";
-import { createPgVectorRetrievalStore } from "../search/retrieval-store.server";
 import {
   CONSTRUCTOR_GROUPS,
   fixtureImageFetch,
@@ -46,8 +41,7 @@ import {
  * negation, price-cap and occasion-versus-category goldens, run through the
  * production v2 path — the card writer and card vectors, the find step, the
  * wish extraction and the default judge (`jev`) — over the eval catalog,
- * offline from recordings. The old engine's own Constructor run in
- * `runEval`, its floor fields and `baseline-hits.json` are untouched (NG-2).
+ * offline from recordings.
  *
  * The v2 output is asserted three ways on page 1 (the first 24 results):
  * a negation golden's excluded products never appear; on a price-cap
@@ -58,8 +52,8 @@ import {
  * query never leads with a bridal gown. "Over budget" is the engine's own
  * reading: the code-computed `price-near` / `price-far` label, against the
  * cap the extraction read in the shopper's currency ("bag under $100").
- * The per-group hit rate and `mustNot` leak (top 10, as the old engine is
- * scored) are held to the v2 floor in `constructor-floor.json`.
+ * The per-group hit rate and `mustNot` leak (top 10) are held to the v2
+ * floor in `constructor-floor.json`.
  */
 
 const SHOP_DOMAIN = "eval-v2-shop.example.com";
@@ -73,7 +67,7 @@ const V2_EVAL_DEADLINE_MS = 120_000;
 const fixturesDir = join(dirname(fileURLToPath(import.meta.url)), "fixtures");
 const recordedDir = join(fixturesDir, "recorded");
 
-/** The v2 recording files, beside the old engine's in fixtures/recorded/. */
+/** The v2 recording files, beside the index recordings in fixtures/recorded/. */
 export const V2_RECORDING_FILES = {
   card: "card.json",
   extract: "extract.json",
@@ -108,9 +102,9 @@ export interface ConstructorV2Ports {
 }
 
 /**
- * The replay ports over the committed recordings: the old engine's
- * enrichment, vision and product-vector recordings index the catalog, the
- * v2 files answer everything after. A key recorded in both embedding files
+ * The replay ports over the committed recordings: the enrichment, vision
+ * and product-vector recordings index the catalog, the v2 files answer
+ * everything after. A key recorded in both embedding files
  * must carry the same vector — otherwise the run would depend on merge order.
  */
 export function replayConstructorV2Ports(db: PrismaClient): ConstructorV2Ports {
@@ -197,7 +191,7 @@ export interface ConstructorV2Result {
   judgeLedger: Array<{ provider: string; modelId: string; calls: number }>;
 }
 
-/** The per-group v2 floor (AC-3), beside the old engine's fields. */
+/** The per-group v2 floor (AC-3). */
 export interface ConstructorV2Floor {
   recordedAt: string;
   judge: string;
@@ -316,17 +310,8 @@ export async function runConstructorV2(
   const classicStore = createPgTrgmClassicStore(db);
   const orchestrator = createSearchOrchestrator({
     db,
-    // The old engine's ports are required by the orchestrator but never
-    // reached: every golden is a submitted search on Engine v2.
-    classifier: createQueryClassifier({ llm }),
-    extractor: createEscalatingIntentExtractor({
-      lite: createIntentExtractor({ llm }),
-      accuracy: createIntentExtractor({ llm }),
-    }),
-    retriever: createRetriever({ embeddings, store: createPgVectorRetrievalStore(db) }),
     classicStore,
     find: createFindStep({ db, embeddings, classicStore }),
-    engineV2: true,
     judge: createDecisionJudge({ decisions, identity: `jev:${ports.judgeModelId}` }),
     judgeDeadlineMs: V2_EVAL_DEADLINE_MS,
     judgeGiveUpMs: V2_EVAL_DEADLINE_MS,
@@ -342,9 +327,6 @@ export async function runConstructorV2(
       searchId: `v2-${golden.id}`,
       paging: { page: 1, pageSize: V2_PAGE_SIZE },
     });
-    if (response.engine !== "v2") {
-      throw new Error(`eval v2: golden ${golden.id} was served by the ${response.engine} engine`);
-    }
     // Offline and deterministic: anything but a judged page means a
     // recording is missing or failed, and find order would masquerade as
     // the judge's quality.

@@ -123,8 +123,8 @@ test.describe("F — floors", () => {
     }
 
     // The removal fires at once rather than waiting out --dur-chip-out.
-    // The colour exclusion is the chip the fixture answers a removal for.
-    await page.locator("[data-chip-field='colorsExclude']").click();
+    // The exclusion; the fixture answers every removal (YOY-149 AC-15).
+    await page.locator("[data-chip-field='exclude']").click();
     await expect(page.getByTestId("playground-chip")).toHaveCount(2, {
       timeout: 1000,
     });

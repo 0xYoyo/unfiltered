@@ -13,12 +13,12 @@ import type {
   ProxyResult,
   ProxySearchResponse,
 } from "./search-client";
-import { closeMatchesHeadingText, getStrings, resolveLocale } from "./strings";
+import { getStrings, resolveLocale } from "./strings";
 import styles from "./widget.css?inline";
 
 /**
  * The results overlay (YOY-48, extended by YOY-49 with chips, the AI
- * zero-hit state, close matches, and a new-search control): all
+ * zero-hit state, and a new-search control): all
  * widget-rendered DOM lives inside an open shadow root on the host element,
  * so theme CSS cannot break the overlay's layout and widget CSS cannot leak
  * onto host elements (AC-7). Inheritable properties (font-family, color)
@@ -36,12 +36,10 @@ export const CLOSE_TESTID = "unfiltered-widget-close";
 export const CHIPS_TESTID = "unfiltered-widget-chips";
 export const CHIP_TESTID = "unfiltered-widget-chip";
 export const ZERO_HIT_TESTID = "unfiltered-widget-zero-hit";
-export const CLOSE_MATCHES_TESTID = "unfiltered-widget-close-matches";
 /** The "Close matches" divider inside a judged page's grid (YOY-166 AC-2). */
 export const CLOSE_MATCHES_DIVIDER_TESTID =
   "unfiltered-widget-close-matches-divider";
 export const NEW_SEARCH_TESTID = "unfiltered-widget-new-search";
-export const COLOR_NOTE_TESTID = "unfiltered-widget-color-note";
 export const PREVIEW_EMPTY_TESTID = "unfiltered-widget-preview-empty";
 export const LOADING_MORE_TESTID = "unfiltered-widget-loading-more";
 export const OTHER_READING_TESTID = "unfiltered-widget-other-reading";
@@ -204,17 +202,6 @@ export function createOverlay(options: OverlayOptions): Overlay {
   loadingMore.textContent = strings.loadingMore;
   loadingMore.hidden = true;
 
-  const closeMatches = document.createElement("section");
-  closeMatches.className = "close-matches";
-  closeMatches.setAttribute("data-testid", CLOSE_MATCHES_TESTID);
-  closeMatches.hidden = true;
-  const closeMatchesHeading = document.createElement("h2");
-  closeMatchesHeading.className = "close-matches-heading";
-  closeMatchesHeading.textContent = strings.closeMatchesHeading;
-  const closeMatchesGrid = document.createElement("div");
-  closeMatchesGrid.className = "grid";
-  closeMatches.append(closeMatchesHeading, closeMatchesGrid);
-
   overlay.append(
     bar,
     chipsRow,
@@ -224,7 +211,6 @@ export function createOverlay(options: OverlayOptions): Overlay {
     previewEmpty,
     grid,
     loadingMore,
-    closeMatches,
   );
   shadow.appendChild(overlay);
 
@@ -327,7 +313,7 @@ export function createOverlay(options: OverlayOptions): Overlay {
     const divider = document.createElement("h2");
     divider.className = "close-matches-heading grid-divider";
     divider.setAttribute("data-testid", CLOSE_MATCHES_DIVIDER_TESTID);
-    divider.textContent = closeMatchesHeadingText(strings, page.closeMatchesRelaxed);
+    divider.textContent = strings.closeMatchesHeading;
     const split = page.results.length;
     return {
       elements: [...cards.slice(0, split), divider, ...cards.slice(split)],
@@ -497,19 +483,6 @@ export function createOverlay(options: OverlayOptions): Overlay {
       anchor.appendChild(soldOut);
     }
 
-    // Color truthfulness (YOY-67 AC-5): a card that passed a color filter
-    // without color evidence renders de-emphasized with an explicit label,
-    // so it can never pose as an indistinguishable first-class match under
-    // a color chip.
-    if (result.colorUnknown === true) {
-      anchor.classList.add("card-color-unknown");
-      const label = document.createElement("span");
-      label.className = "card-color-note";
-      label.setAttribute("data-testid", COLOR_NOTE_TESTID);
-      label.textContent = strings.colorNotConfirmed;
-      anchor.appendChild(label);
-    }
-
     // The beacon fires and the anchor's own navigation proceeds untouched —
     // never prevented, never awaited (AC-5). A linkless card (null url) is
     // not a click target: no navigation, no beacon (YOY-87 AC-4).
@@ -521,10 +494,9 @@ export function createOverlay(options: OverlayOptions): Overlay {
 
   function chipElement(
     chip: ProxyChip,
-    currency: string | undefined,
     onChipRemove: ResponseHandlers["onChipRemove"],
   ): HTMLElement {
-    const { negator, value } = chipLabelParts(chip, { locale, currency });
+    const { negator, value } = chipLabelParts(chip, { locale });
     const label = negator === null ? value : `${negator} ${value}`;
     const negated = isNegationChip(chip);
     const button = document.createElement("button");
@@ -631,8 +603,6 @@ export function createOverlay(options: OverlayOptions): Overlay {
       chipsRow.hidden = true;
       chipsRow.replaceChildren();
       grid.replaceChildren();
-      closeMatches.hidden = true;
-      closeMatchesGrid.replaceChildren();
     },
     showFailure() {
       this.showIdle();
@@ -643,23 +613,11 @@ export function createOverlay(options: OverlayOptions): Overlay {
       loading.hidden = true;
       previewEmpty.hidden = true;
 
-      // Chip row (AC-1): AI-resolved responses only. Degraded responses
-      // carry no chips by the endpoint contract (AC-6), so this hides the
-      // row for them naturally.
-      // An engine v2 response (YOY-149, `intent: null`) carries chips on
-      // whichever route its judge took; it sends none it did not apply.
-      const chips =
-        response.route === "ai" || response.intent === null
-          ? response.chips
-          : [];
-      // Hebrew price chips carry the currency (YOY-50 AC-4), read from the
-      // response's echoed intent — display-only; the intent itself still
-      // round-trips verbatim.
-      const currency =
-        response.intent !== null &&
-        typeof response.intent["currency"] === "string"
-          ? response.intent["currency"]
-          : undefined;
+      // Chip row (AC-1): a response carries chips on whichever route its
+      // judge took (YOY-149) and sends none it did not apply; degraded
+      // responses carry none by the endpoint contract (AC-6), so this hides
+      // the row for them naturally.
+      const chips = response.chips;
       const reading =
         response.otherReading !== undefined && handlers.onPickReading !== undefined
           ? readingElement(response.otherReading, handlers.onPickReading)
@@ -667,7 +625,7 @@ export function createOverlay(options: OverlayOptions): Overlay {
       chipsRow.replaceChildren(
         ...(reading === null ? [] : [reading]),
         ...chips.map((chip) =>
-          chipElement(chip, currency, handlers.onChipRemove),
+          chipElement(chip, handlers.onChipRemove),
         ),
       );
       chipsRow.hidden = chips.length === 0 && reading === null;
@@ -685,32 +643,15 @@ export function createOverlay(options: OverlayOptions): Overlay {
       }
 
       // Empty states: an AI zero-hit keeps the session alive with its chips
-      // and close matches (AC-3); a classic empty set is a plain
-      // "no results" (YOY-48 AC-8).
+      // (AC-3); a classic empty set is a plain "no results" (YOY-48 AC-8).
       const empty = response.results.length === 0;
-      const aiZeroHit = empty && response.route === "ai";
-      zeroHit.hidden = !aiZeroHit;
+      zeroHit.hidden = !(empty && response.route === "ai");
       noResults.hidden = !(empty && response.route === "classic");
-
-      const matches = aiZeroHit
-        ? (response.closeMatches ?? []).map(underCloseHeading)
-        : [];
-      // The heading names what was relaxed to find them (YOY-111 AC-4).
-      closeMatchesHeading.textContent = closeMatchesHeadingText(
-        strings,
-        aiZeroHit ? response.closeMatchesRelaxed : undefined,
-      );
-      const matchCards = matches.map((result, index) =>
-        card(result, index, handlers.onCardClick),
-      );
-      closeMatchesGrid.replaceChildren(...matchCards);
-      closeMatches.hidden = matches.length === 0;
-      settleLabels(matchCards);
     },
     showPreview(response, handlers) {
       // A preview is the plain-grid subset of showResponse (YOY-68 AC-4):
-      // every full-response surface — chips, zero-hit rescue, close matches,
-      // the flat no-results panel — stays hidden, so the preview→submitted
+      // every full-response surface — chips, the zero-hit line, the flat
+      // no-results panel — stays hidden, so the preview→submitted
       // transition swaps grids without ever stacking panels (AC-5).
       overlay.hidden = false;
       loading.hidden = true;
@@ -718,8 +659,6 @@ export function createOverlay(options: OverlayOptions): Overlay {
       zeroHit.hidden = true;
       chipsRow.hidden = true;
       chipsRow.replaceChildren();
-      closeMatches.hidden = true;
-      closeMatchesGrid.replaceChildren();
       // A preview is never paged (NG-4).
       generation += 1;
       stopAppending();
@@ -742,8 +681,7 @@ export function createOverlay(options: OverlayOptions): Overlay {
 /**
  * A page's close products that sit inside its grid under the divider
  * (YOY-166): a judged page with matches carries them in `closeMatches`
- * beside non-empty `results`. A zero-hit response's close matches (empty
- * `results`) keep their own section below the grid.
+ * beside non-empty `results`.
  */
 export function inlineCloseMatches(page: ProxySearchResponse): ProxyResult[] {
   return page.results.length > 0 ? (page.closeMatches ?? []) : [];

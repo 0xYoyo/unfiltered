@@ -241,14 +241,6 @@ html:has(.playground) {
   font-size: var(--size-body-sm);
 }
 
-/* The engine a `/try?engine=` page view asks for (YOY-165): the status
-   line's muted ink and size above the bar, no colour of its own. */
-.engineBadge {
-  margin: 0 0 var(--space-3);
-  color: var(--text-muted);
-  font-size: var(--size-body-sm);
-}
-
 /* An error is a plain sentence in the critical ink, never a red box (kit
    §4 States). */
 .statusLineFailed {
@@ -498,7 +490,6 @@ html:has(.playground) {
 }
 
 .detailsRow dt,
-.detailsIntentLabel,
 .detailsStagesLabel {
   color: var(--ink-400);
   font-weight: var(--weight-medium);
@@ -526,30 +517,10 @@ html:has(.playground) {
   list-style: none;
 }
 
-/* The intent block stacks under its label and takes the panel's full width:
-   beside it, a wrapped JSON object reads as a stray column. */
-.detailsIntentRow {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  margin-block-start: var(--space-4);
-}
-
-.detailsIntent {
-  margin-block: var(--space-2) 0;
-  overflow-x: auto;
-  font-family: var(--font-mono);
-  font-size: var(--size-caption);
-}
-
 /* --- Results. --- */
 
-.closeMatches {
-  margin-block-start: var(--space-6);
-}
-
-/* The "Close matches" divider inside a judged page's grid (YOY-166): the
-   section's own heading, spanning every column, above the close products. */
+/* The "Close matches" divider inside a judged page's grid (YOY-166): its
+   heading spans every column, above the close products. */
 .closeMatchesDivider {
   grid-column: 1 / -1;
   margin-block-start: var(--space-4);
@@ -566,18 +537,6 @@ html:has(.playground) {
   color: var(--text-display);
 }
 
-/* A card that satisfied a colour filter without colour evidence: shown, but
-   not with the confidence of a real match (W-8 parity). */
-.cardDimmed {
-  opacity: 0.72;
-}
-
-.cardColorUnknown {
-  align-self: flex-start;
-  color: var(--text-muted);
-  font-size: var(--size-caption);
-}
-
 /* Reserved so the grid appearing does not move the bar (F-8). */
 .results {
   min-block-size: var(--space-8);
@@ -585,7 +544,7 @@ html:has(.playground) {
 }
 
 /* `auto-fill`, not the kit's `auto-fit`: with auto-fit a two-card answer
-   (a zero-hit rescue's close matches) stretches into two 440px cards, which
+   stretches into two 440px cards, which
    reads as a different page from the same query answered by eight. Empty
    tracks keep every card the same size whatever the result count — the
    density parity W-9 asks of the widget, held here too. */

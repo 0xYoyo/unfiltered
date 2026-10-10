@@ -85,27 +85,6 @@ describe("v2 chip labels (AC-16)", () => {
     expect(isNegationChip({ field: "size" })).toBe(false);
   });
 
-  it("v1 chips keep exactly their YOY-49/YOY-50 labels", () => {
-    expect(chipLabel({ field: "priceMax", value: "400" })).toBe("Under 400");
-    expect(chipLabel({ field: "priceMin", value: "100" })).toBe("Over 100");
-    expect(
-      chipLabel({ field: "priceMax", value: "400" }, { locale: "he", currency: "ILS" }),
-    ).toBe("עד 400 ILS");
-    expect(chipLabel({ field: "colorsExclude", value: "black" })).toBe(
-      "Not black",
-    );
-    expect(
-      chipLabel({ field: "colorsExclude", value: "black" }, { locale: "he" }),
-    ).toBe("לא שחור");
-    expect(
-      chipLabel({ field: "attributesExclude", value: "wool" }, { locale: "he" }),
-    ).toBe("לא צמר");
-    expect(chipLabel({ field: "category", value: "dress" }, { locale: "he" })).toBe(
-      "שמלה",
-    );
-    expect(chipLabel({ field: "availability", value: "true" })).toBe("In stock");
-  });
-
   it("the chip words live in the catalog, with the same keys in EN and HE", () => {
     const keys = [
       "chipPriceMax",
@@ -138,7 +117,7 @@ describe("removedChips on the wire (AC-15)", () => {
     { field: "exclude" as const, value: "black" },
   ];
 
-  it("the widget sends the whole chain as JSON, and no v1 refinement", () => {
+  it("the widget sends the whole chain as JSON", () => {
     const params = buildSearchParams("dress under 400", "s-1", {
       removedChips: removed,
       paging: { page: 1, pageSize: 24 },
@@ -147,8 +126,6 @@ describe("removedChips on the wire (AC-15)", () => {
       { field: "priceMax", value: "400" },
       { field: "exclude", value: "black" },
     ]);
-    expect(params.has("previousIntent")).toBe(false);
-    expect(params.has("removeChip")).toBe(false);
     expect(params.get("page")).toBe("1");
   });
 
@@ -175,8 +152,22 @@ describe("removedChips on the wire (AC-15)", () => {
       { field: "priceMax", value: "400" },
       { field: "exclude", value: "black" },
     ]);
-    expect(url.searchParams.has("previousIntent")).toBe(false);
-    expect(url.searchParams.has("removeChip")).toBe(false);
+  });
+
+  it("a keystroke preview carries neither a page nor a previous query", () => {
+    const url = new URL(
+      playgroundSearchUrl({
+        query: "budget dress",
+        preview: true,
+        sessionId: "s-1",
+        previousQuery: "budget dress",
+        paging: { page: 1, pageSize: 24 },
+      }),
+      "http://localhost",
+    );
+    expect(url.searchParams.get("mode")).toBe("preview");
+    expect(url.searchParams.has("previousQuery")).toBe(false);
+    expect(url.searchParams.has("page")).toBe(false);
   });
 });
 
@@ -186,9 +177,8 @@ describe("the v2-budget playground fixture", () => {
     expect(selectFixture("budget dress under 400", true)).toBe("preview");
   });
 
-  it("is a v2 response: no intent, v2 chip fields, prices under the cap", () => {
+  it("carries every chip field, prices under the cap", () => {
     const body = fixtureOutcome("v2-budget").body!;
-    expect(body.intent).toBeNull();
     expect(body.chips.map((chip) => chip.field)).toEqual([
       "priceMax",
       "size",
@@ -212,13 +202,6 @@ describe("the v2-budget playground fixture", () => {
     expect(
       outcome.body!.results.some((result) => result.priceMin > 400),
     ).toBe(true);
-  });
-
-  it("leaves a v1 fixture untouched", () => {
-    const ai = fixtureOutcome("ai");
-    expect(withoutRemovedChips(ai, [{ field: "priceMax", value: "400" }])).toBe(
-      ai,
-    );
   });
 
   it("reads removedChips leniently", () => {

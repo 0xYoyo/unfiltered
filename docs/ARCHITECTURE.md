@@ -19,20 +19,23 @@ npm-workspaces monorepo (`apps/*`, `packages/*`) with three workspaces:
   consumes the search engine strictly as a client of `packages/engine`'s
   public API — see the engine-boundary rule below.
 - **`packages/engine`** — the search engine as a standalone TypeScript
-  package with its own `tsc` build and zero runtime dependencies. Currently a
-  stub: the public API is real, the implementation returns an empty,
-  well-typed result. Also home of the vendor-free AI ports (`LlmClient`,
-  `EmbeddingClient`, `CostRecorder`) that provider adapters implement.
+  package with its own `tsc` build and zero runtime dependencies: the
+  classic-search port, the wish extraction, the judge, and the colourway
+  and taxonomy vocabularies (`createEngine()` itself is still a stub that
+  returns an empty, well-typed result). Also home of the vendor-free AI ports
+  (`LlmClient`, `DecisionClient`, `EmbeddingClient`, `CostRecorder`) that
+  provider adapters implement.
 - **`packages/provider-gemini`** — the Google AI Studio (Gemini) adapter
   implementing the engine's LLM and embedding ports over plain `fetch`, with
   every call metered through the `CostRecorder` port. Model IDs come only
   from configuration/env (`geminiModelsFromEnv()`; defaults
-  `gemini-3.5-flash-lite` for classification/enrichment and for the vision
-  enrichment pass (YOY-121, `GEMINI_VISION_MODEL`) and the card writer
-  (YOY-143, `GEMINI_CARD_MODEL`), `gemini-3.6-flash`
-  for intent, `gemini-embedding-001` for embeddings); the API key comes from
-  `GEMINI_API_KEY`. Fixture tests only by default; live round-trips run
-  solely under `LIVE_LLM_TESTS=1` locally, never in CI.
+  `gemini-3.5-flash-lite` for text enrichment, the vision enrichment pass
+  (YOY-121, `GEMINI_VISION_MODEL`), the card writer (YOY-143,
+  `GEMINI_CARD_MODEL`), the wish extraction (`GEMINI_EXTRACT_MODEL`) and the
+  Gemini judge (`GEMINI_JUDGE_MODEL`), `gemini-embedding-001` for
+  embeddings); the API key comes from `GEMINI_API_KEY`. Fixture tests only
+  by default; live round-trips run solely under `LIVE_LLM_TESTS=1` locally,
+  never in CI.
 
 ### How the app resolves the workspace packages (YOY-104)
 
@@ -58,9 +61,9 @@ package publishing, and
 `tsc --noEmit` in the app reads types from `dist/index.d.ts` — but `dist/`
 is on no execution path in this repository. Why this matters: PR #74 renamed
 the engine port key `shopDomain → storeId` in `src` and in the app; a dev
-tree whose `dist/` predated it kept executing the old retriever, so every
-AI-routed search returned zero rows and every `AiCall` lost its tenant while
-every source-aliased test stayed green (YOY-104 M1).
+tree whose `dist/` predated it kept executing the stale port, so every
+model-served search returned zero rows and every `AiCall` lost its tenant
+while every source-aliased test stayed green (YOY-104 M1).
 
 **After pulling engine or provider changes:** nothing — restart the dev
 server if it is running and the new source is what executes. `npm install`
@@ -70,9 +73,9 @@ clearly exist in source, the stale part is `dist/index.d.ts`: run
 `npm run build --workspace @unfiltered/engine --workspace @unfiltered/provider-gemini`.
 
 The seam is still guarded for consumers of the built artifact: CI's
-`dist-seam` job runs `npm run build` and then `orchestrator.test.ts` +
-`retrieval-store.test.ts` through `vitest.dist-seam.config.ts` — the same
-suites **without** the src alias, resolving `@unfiltered/*` through
+`dist-seam` job runs `npm run build` and then `orchestrator.test.ts`
+through `vitest.dist-seam.config.ts` — the same suite **without** the src
+alias, resolving `@unfiltered/*` through
 `exports` → `dist/`. A src/dist port-contract divergence fails there and
 nowhere else.
 
@@ -274,8 +277,9 @@ the text attributes as shopper phrases (`visionAttributeTerms`: "long
 sleeves", "v-neck neckline", "midi length", "floral pattern", "knit";
 "sleeveless" stays bare), so the composed-text freshness hash moves for
 exactly the products whose vision answer changed and `embedCatalog` re-embeds
-those and no others. Coverage attributes reach retrieval through the
-embedding text only — no intent-schema or filter change (NG-2).
+those and no others. Coverage attributes reach search through that
+embedding text, the product card's hints and the judge's rows — never as a
+filter.
 
 **Versioning and report.** `ENRICHMENT_VERSION` is 2: every row re-enriches
 once on the next run, and the vision pass runs for every product with images
@@ -297,8 +301,12 @@ whole 465-product run — images, text, vision, embed — cost $1.047.
 Engine v2 understands the product once, at load time: a model writes a
 plain-text **card** per product, which later steps find and judge against.
 `app/catalog/card.server.ts` (`writeCatalogCards`) runs after enrichment,
-which it reads, and before embedding; cards are not embedded yet and no
-search reads them yet.
+which it reads, and before embedding. `embedCatalogCards`
+(`app/catalog/card-embed.server.ts`, YOY-144) then turns each written card
+into `CardEmbedding` rows — one vector for the prose (`facts` + `look` +
+`read`) and one per ask language (`asks:<lang>`), re-embedding only a
+section whose text hash moved — and the find step searches them; a product
+with no written card is found by its `ProductEmbedding` row instead.
 
 **The table.** `ProductCard`, one row per `(shopDomain, productId)`:
 `facts` (what the item is and the merchant's stated details, material
@@ -353,10 +361,11 @@ measured on the seed catalog in the slice after merge.
 
 ### Multi-tenant vector search on one shared index (YOY-105)
 
-Every tenant's vectors live in one `ProductEmbedding` table under one HNSW
-cosine index — an expression index over the dimension-typed cast, built at run
-time by `ensureEmbeddingIndex()` (`app/catalog/embed.server.ts`), because the
-`embedding` column is deliberately dimensionless.
+Every tenant's vectors live in one `ProductEmbedding` table and one
+`CardEmbedding` table, each under one HNSW cosine index — an expression index
+over the dimension-typed cast, built at run time by `ensureEmbeddingIndex()`
+(`app/catalog/embed.server.ts`), because the `embedding` columns are
+deliberately dimensionless.
 
 pgvector's HNSW is a **post-filtering** index. It yields its `hnsw.ef_search`
 best candidates *table-wide* and only then applies the `shopDomain` predicate,
@@ -374,9 +383,9 @@ inside a transaction that sets
 SET LOCAL hnsw.iterative_scan = relaxed_order
 ```
 
-(`withTenantVectorScan()` in `app/catalog/hnsw.server.ts`, used by both
-`app/search/retrieval-store.server.ts` — the hard-constraint and close-matches
-paths alike, since both go through the same store port — and
+(`withTenantVectorScan()` in `app/catalog/hnsw.server.ts`, used by
+`queryCardIndex()` in `app/search/card-retrieval.server.ts` — the find step's
+card-vector scan and its raw-text `ProductEmbedding` fallback alike — and
 `similarProducts()` in `app/catalog/embed.server.ts`). The index then keeps
 scanning until the *filtered* result set fills, so recall no longer depends on
 the tenant-size ratio, at any asymmetry. `SET LOCAL` is transaction-scoped on
@@ -392,10 +401,10 @@ The transaction carries an explicit budget rather than Prisma's implicit
 interactive-transaction defaults (2 s to acquire a connection, 5 s lifetime):
 `TENANT_VECTOR_SCAN_MAX_WAIT_MS` = 5 s and `TENANT_VECTOR_SCAN_TIMEOUT_MS` =
 15 s, forwarded to `$transaction` by `withTenantVectorScan()` (YOY-96 AC-17).
-The ceiling bounds how long a wedged scan can hold a pooled connection — about
-ten times the 0.9–1.6 s the whole retrieval stage measures live, inside the
-60 s intent-call abort above it — without turning a slow-but-correct scan into
-a degraded answer; it is not the retrieval latency budget (YOY-64).
+The ceiling bounds how long a wedged scan can hold a pooled connection —
+about ten times what a whole vector scan measured live — without turning a
+slow-but-correct scan into a degraded answer; it is not the search's latency
+budget (YOY-64).
 
 Two alternatives were rejected:
 
@@ -407,16 +416,17 @@ Two alternatives were rejected:
   every tenant to serve the smallest. Index and search-parameter tuning is
   separately out of scope (YOY-64 / M5).
 
-The regression test is
-`apps/shopify-app/app/search/retrieval-tenant-recall.test.ts`: a 400-row tenant
-beside a 2,400-row one whose every vector is nearer to the query, run on the
-hermetic PGlite database (its pgvector is 0.8.1, which supports iterative
-scans, so no real-Postgres lane is needed). It forces the production-shaped
-plan with **both** `enable_seqscan = off` and `enable_sort = off` — the first
-alone leaves the planner the cheap fixture-scale option of pre-filtering
-through `ProductEmbedding_shopDomain_idx` and sorting exactly, which is correct
-but not the plan under test. Without iterative scans that plan reports
-`Rows Removed by Filter: 40` and returns the small tenant **zero** rows.
+The regression test is the small-tenant recall suite in
+`apps/shopify-app/app/search/card-retrieval.test.ts`: a 400-product tenant
+beside a 2,400-product one whose every vector is nearer to the query, three
+card vectors per product, run on the hermetic PGlite database (its pgvector
+is 0.8.1, which supports iterative scans, so no real-Postgres lane is
+needed). It forces the production-shaped plan with **both**
+`enable_seqscan = off` and `enable_sort = off` — the first alone leaves the
+planner the cheap fixture-scale option of pre-filtering through the
+`shopDomain` index and sorting exactly, which is correct but not the plan
+under test. Without iterative scans that plan returns the small tenant
+**zero** rows.
 
 ## Engine public API (current surface)
 
@@ -429,150 +439,37 @@ but not the plan under test. Without iterative scans that plan reports
 - `interface SearchResult` — `{ hits: SearchHit[]; totalCount: number; query: string }`.
 - `interface Engine` — `{ readonly version: string; search(query, options?): Promise<SearchResult> }`.
 - `createEngine(): Engine` — returns the stub implementation (every search
-  resolves to an empty result; real search runs through the classification /
-  retrieval / classic-search ports below).
+  resolves to an empty result; real search runs in the app's orchestrator,
+  below, over the engine pieces and ports listed here).
 
-Query understanding (all LLM access through the `LlmClient` port):
+The engine pieces the search path is built from, each described in its own
+section below:
 
-- `createQueryClassifier({ llm, timeoutMs?, cacheSize? }): QueryClassifier` —
-  routes a query to `"classic"` or `"ai"`: a deterministic heuristic layer
-  settles clearly-simple queries as classic with zero LLM calls — and,
-  since YOY-133 (founder decision 2026-08-27), **purpose phrases as AI**
-  with zero LLM calls (reason `purpose-phrase`): "<noun phrase> for
-  <purpose>" ("sneakers for running", "dress for a wedding", "something to
-  wear to a wedding") and, in Hebrew, a category noun followed by a `ל…`
-  purpose word ("סניקרס לריצה", "שמלה לחתונה", "מכנסיים למשרד"). Not every
-  ל-initial word is the preposition, so `HEBREW_NON_PURPOSE_L_WORDS`
-  (YOY-125 AC-15) excludes the colour forms "לבן"/"לבנה" (in
-  `CLASSIFIER_COLOR_WORDS`) plus their plurals "לבנים"/"לבנות" — white is
-  the only colour with ל-initial spellings — the negations "ללא"/"לא", and
-  the common ל-initial nouns and brands "לוגו", "לייקרה", "לקוסט",
-  "ליוויס", "לונג"; those shapes ask the model like any other query. Purpose is what
-  keyword search cannot read, and the live classifier routed that shape
-  classic in one of four cases (co09), so the shape never asks the model.
-  Everything else asks the model (operation `"classification"`), cached by
-  normalized query and failing safe to `classic`. A purpose-phrase search
-  that later degrades to classic still counts toward the per-session and
-  per-IP AI budgets, like a degraded model-routed one.
-- `createIntentExtractor({ llm }): IntentExtractor` — turns free text into a
-  vendor-free `Intent` (category, price bounds with currency, color
-  inclusions/exclusions, **negated attributes** `attributesExclude` and
-  **category-like attributes** `attributesInclude` (YOY-133, below),
-  occasion, size, availability requirement, soft attributes, and the
-  model's own `confidence` 0–1 that the hard constraints are complete and
-  correct — required of every answer by `INTENT_SCHEMA` since YOY-116;
-  answers recorded before it parse with none) via the model (operation
-  `"intent"`), with one retry on schema violation and then a typed
-  `IntentExtractionError`.
-- **Negated attributes are hard exclusions (YOY-133; PRD §3 amendment
-  (d), binding).** "top, no sleeves", "winter coat, not wool", "ז'קט לא
-  מעור" return `attributesExclude: ["sleeves"]`, `["wool"]`, `["leather"]`
-  — lowercase English words, never colours (those stay `colorsExclude`)
-  and never soft attributes — and both stores apply each as a WHERE
-  filter, never a preference (NG-1). `parseIntent` folds each word onto
-  the engine's evidence lexicon (`ATTRIBUTE_EVIDENCE_TERMS` in
-  `taxonomy.ts`: "sleeve", "woollen", "שרוולים" → `sleeves`, `wool`,
-  `sleeves`), de-duplicates, and reads an absent array — every recording
-  and stored intent from before the field — as none. Chips carry the
-  negation (`{ field: "attributesExclude", value: "wool" }`, rendered
-  "Not wool" / "לא צמר" by the widget's `chipLabel`), chip removal drops
-  it with the same LLM-free surgery as a colour chip, refinement carry-over
-  keeps it like every other constraint, and the close-match ladder never
-  relaxes it (like `colorsExclude`, keyword fallback included). The
-  negation rides the existing intent call — no new LLM call per search
-  (NG-2); the prompt grew by the two field rules.
-- **Occasion vs. category (YOY-133 AC-3).** "dress for a wedding" /
-  "שמלה לחתונה" is the guest's query — `category: dress, occasion:
-  wedding, attributesExclude: ["bridal"]` — while "wedding dress" /
-  "שמלת כלה" is the bridal category-like intent: `attributesInclude:
-  ["bridal"]`, a hard, evidence-required inclusion. `attributesInclude` is
-  pinned by the schema to the closed `CATEGORY_LIKE_ATTRIBUTES` set (today
-  `["bridal"]`) — a positive evidence filter the model could invent
-  ("linen shirt" → require linen) would kill recall on a sparse catalog,
-  so only attributes that behave like a category may be required; the
-  exclusion side stays open. Required category-like words also embed in
-  `composeQueryText` (after the wanted colours), exclusions never do. The
-  ladder never relaxes the include either: a "wedding dress" zero-hit's
-  rescues are the keyword close matches, not non-bridal dresses served as
-  a relaxation.
-- `createEscalatingIntentExtractor({ lite, accuracy, threshold?, classes? })`
-  — the lite-first ladder (YOY-116): an `IntentExtractor` over two tier
-  extractors that asks the lite tier first and escalates to the accuracy
-  tier in exactly two cases — the query matches a committed **escalation
-  class** (`INTENT_ESCALATION_CLASSES` in `intent-escalation.ts`: today
-  `mixed-script`, Hebrew and Latin letters in one query, and `occasion`,
-  occasion-bearing phrases EN/HE), in which case the accuracy tier is asked
-  directly with no lite call — **hedged** (YOY-64 AC-6): when that accuracy
-  call is still pending after `hedgeAfterMs` (`DEFAULT_INTENT_HEDGE_AFTER_MS`,
-  2500; the app reads `INTENT_HEDGE_AFTER_MS`) the lite tier is fired
-  alongside it and the first schema-valid answer wins, the loser aborted
-  through its own signal; a lite win reports `escalation: { kind: "hedge" }`
-  with `intentTier: "lite"`, and the confidence floor does not apply to it.
-  The YOY-64 live run put the accuracy model at 1.5–7 s on occasion-class
-  prompts with a hang to the 8 s deadline in 13 of 60 calls while the lite
-  tier answered in 640–1400 ms; running the class lite-first instead
-  regressed g09 on the harness (the lite tier labels gold wedding sandals
-  `sneakers`, the golden needs `shoes`), so the class stays and the hedge
-  bounds its tail. The accuracy call after a low-confidence or failed lite
-  answer is never hedged; or the lite answer's `confidence` is below the
-  threshold (`DEFAULT_INTENT_ESCALATION_THRESHOLD`, 0.8, the lowest
-  confidence a correct lite answer reported on the eval set) or missing, in
-  which case the accuracy answer replaces the lite one entirely. Both calls
-  carry the same `searchId` and operation `"intent"` through their own port,
-  so the ledger keeps their model ids apart. `extractDetailed` reports
-  `{ intent, tier, escalation }`; the orchestrator surfaces the tier as
-  `intentTier` (playground `details.intentTier`, the proxy's `[search]
-  stages` log line — never the storefront contract). Refinements follow the
-  same rules on the follow-up text; chip removal never reaches an extractor.
-  Measured on the eval set (2026-08-26): 14 of 25 AI goldens escalate, all by class (11 `occasion`, 3 `mixed-script`), none by low confidence — every lite answer reported 0.8–1.0; 11 are answered by the lite tier with every rank preserved (gc05 improved 2 → 1); 1 of 9 follow-ups escalates (`mixed-script`). The one lite miss in the diff, g15, is the mixed-script class's reason to exist.
-- Refinement (`extract(query, { previousIntent })`): a follow-up query is
-  extracted against the intent of the previous one. The prompt asks the model
-  to decide between a **refinement** — the previous intent with only the new
-  query's deltas applied, every untouched constraint and soft attribute
-  preserved, a comparative like "cheaper" tightening the existing bound — and
-  a **topic change**, where the previous intent is discarded whole. The answer
-  is always a complete `Intent` conforming to `INTENT_SCHEMA`, never a patch;
-  the schema, the operation, and the retry ladder are unchanged. The engine
-  holds no session state: `previousIntent` is supplied per call, and where a
-  caller keeps it between requests is the caller's decision. Omitting it
-  leaves the prompt byte-for-byte what it was before refinement existed, so
-  recordings and caches keyed on it stay valid. Only one previous intent is
-  ever considered — this is a refinement contract, not a chat history.
-
-Retrieval (the AI result path; data reached only through injected ports):
-
-- `interface RetrievalStore` — the store port the consumer implements over
-  its own database (the app: Postgres/pgvector in
-  `apps/shopify-app/app/search/retrieval-store.server.ts`). One
-  `query({ storeId, constraints, vector, limit })` call returns products
-  matching every hard constraint, ranked by cosine distance; constraints are
-  WHERE filters inside the store, never post-ranking.
-- `createRetriever({ embeddings, store, cacheSize? }): Retriever` —
-  `retrieve({ intent, storeId, limit?, searchId? })` maps the Intent's
-  hard constraints to store filters (`constraintsFromIntent`; size is
-  deliberately unmapped — no per-size inventory exists to filter on), embeds
-  the intent's descriptive signal (`composeQueryText`, metered as operation
-  `"embedding"` and cached for identical inputs), and returns
-  `{ hits: [{ productId, score }], appliedConstraints, timings? }` — `timings`
-  is `{ embedMs, retrieveMs }`, the retrieval's own wall-time split
-  (YOY-114; a cache hit reports an embed of ~0) — with
-  `score = 1 - cosine distance`. Cosine distance spans [0, 2], so scores span
-  [-1, 1]: anti-correlated vectors score below zero and are valid hits —
-  consumers must not filter by `score > 0`. An intent with no descriptive
-  signal (nothing for `composeQueryText` to embed) rejects with
-  `EmptyQueryTextError` before any embedding call; the caller picks the
-  fallback (e.g. classic constraint-only search).
+- **Wish extraction** (`src/extract.ts`): `createWishExtractor`,
+  `parseExtractAnswer`, `EXTRACT_SCHEMA`, `EXTRACT_PROMPT_VERSION` — the
+  stated wishes of one sentence ("Engine v2: stated wishes" below).
+- **Judge** (`src/judge.ts`): `createJudge`, `judgeProviderFromEnv`,
+  `judgeRow`, `orderByVerdict`, `parseJudgeAnswer`, `JUDGE_PROMPT_VERSION`
+  ("Engine v2: the judge" below).
+- **Vocabularies** (`src/taxonomy.ts`, `src/colors.ts`): the closed
+  category, occasion and vision-attribute vocabularies the enrichment and
+  vision passes answer in (`CANONICAL_CATEGORIES`, `CANONICAL_OCCASIONS`,
+  `CATEGORY_GROUPS`, the `VISION_*` lists, with their normalizers), and the
+  colourway words the product-family rule strips from a title
+  (`COLORWAY_WORDS`, `isColorwayDesignator`; Data layer above).
 
 Classic keyword search (the zero-LLM result path; YOY-41):
 
 - `interface ClassicSearchStore` — the keyword-search port the consumer
-  implements over its own database. One
-  `search({ storeId, query?, constraints?, limit? })` call returns
-  `{ hits: [{ productId, score }] }` — ranked keyword hits, score in [0, 1],
-  higher is better. A request with constraints and no query text is
-  constraint-only mode: results are filtered without text ranking and every
-  hit scores 0. A classic search never issues an LLM or embedding call, so
-  it writes no `AiCall` rows.
+  implements over its own database. One `search({ storeId, query?, limit? })`
+  call returns `{ hits: [{ productId, score }] }` — ranked keyword hits,
+  score in [0, 1], higher is better. A request with no query text returns
+  every product of the store, unranked, each scoring 0; an absent `limit`
+  means the full match set (YOY-107). `normalizeQuery` (trimmed,
+  whitespace-collapsed, lowercased) is the shared normalizer. A classic
+  search never issues an LLM or embedding call, so it writes no `AiCall`
+  rows. It serves keystroke previews, the client-timeout rescue, and the
+  find step's keyword half.
 - The app's implementation (`apps/shopify-app/app/search/classic-store.server.ts`,
   `createPgTrgmClassicStore`) is Postgres/pg_trgm trigram search. The
   `20260808160000_pg_trgm_classic_search` migration enables the `pg_trgm`
@@ -580,104 +477,54 @@ Classic keyword search (the zero-LLM result path; YOY-41):
   `CatalogProduct`'s keyword fields (title, tags, vendor, productType,
   imageAltTexts) — and creates a trigram GIN index over that expression;
   classic queries filter with `query <% catalog_search_text(...)` (word
-  similarity, threshold lowered to 0.30) and rank by
-  `word_similarity(query, ...)`, so the index serves the plan and one- or
-  two-edit typos ("nkie air max") still find the intended product, in
-  English and Hebrew alike. **One statement per search (YOY-115 AC-1):**
+  similarity, threshold lowered to 0.30) and rank title-first
+  (`0.7 × word_similarity(query, title) + 0.3 × word_similarity(query, …)`,
+  YOY-52 AC-13), so the index serves the plan and one- or two-edit typos
+  ("nkie air max") still find the intended product, in English and Hebrew
+  alike. **One statement per search (YOY-115 AC-1):**
   the threshold is set inside the statement — a one-row
   `SELECT set_config('pg_trgm.word_similarity_threshold', '0.3', true)`
   subquery is the outer side of a `CROSS JOIN LATERAL` whose inner side is
   the search and references that row, so the executor runs `set_config`
   before the `<%` scan reads the GUC (the plan is one Nested Loop with the
   threshold subquery outer; `classic-store.test.ts` pins that order and
-  counts exactly one statement per search in both modes). `is_local` scopes
+  counts exactly one statement per search). `is_local` scopes
   the setting to the statement's transaction, so it never leaks through a
   pooler. The same statement returns the card fields (title, url, image,
   prices, currency, availability) on every hit (`ClassicCardHit`), so the
   orchestrator builds classic result cards without a follow-up hydration
-  query — a classic-routed response's `stages` reads `classify, classic`
-  with no `hydrate` (AC-3), and a keystroke preview or classic rescue is
-  exactly one database round trip. A classic store that returns bare hits
-  (a fake, another implementation) still hydrates as before. Constraint predicates mirror the pgvector store
-  verbatim: unknown enrichment passes positive occasion/color constraints,
-  category is evidence-required and expands through the taxonomy's category
-  groups, a colour exclusion applies to `primaryColor` only, and a price cap
-  compares against `priceMin`.
+  query — a preview's or a rescue's `stages` reads `classic` with no
+  `hydrate` (AC-3), and each is exactly one database round trip. A classic
+  store that returns bare hits (a fake, another implementation) still
+  hydrates.
 
 **One card per product family (YOY-117 AC-2, founder decision):** public
 catalogs and the seed alike expose colourways as separate products ("Mesh
 Over Dress in Pink" / "in Navy"; six "Wildfire Retro Treeline T-Shirt"
-cards on `/s/tentree`). Both stores collapse each `familyKey` to one
-representative INSIDE the SQL (`DISTINCT ON (family)` over the ranked
-candidates, the limit applied after the collapse, so any page and any
-count is of families, never colourways): the best-ranked member whose
-`primaryColor` is one of the query's `colorsInclude` when it names
-colours, else the best-ranked member. An empty `familyKey` is its own
-family, and two products sharing vendor and title but not product type
-never collapse, so the rule can never hide a different product. The
-result shape is unchanged. The eval golden g26 `pink rib knit top` pins
-it (pink member first, navy and black never in the top 10).
+cards on `/s/tentree`). The classic store and the card index both collapse
+each `familyKey` to one representative INSIDE the SQL (`DISTINCT ON
+(family)` over the ranked candidates, the limit applied after the collapse,
+so any count is of families, never colourways): the classic store keeps the
+best-ranked member, the card index the nearest one, and the find step's
+merge keeps each family once across the two (the earlier member stands for
+it). An empty `familyKey` is its own family, and two products sharing vendor
+and title but not product type never collapse, so the rule can never hide a
+different product.
 
-The vector candidate scan keeps a bound of its own (YOY-125 AC-10):
-`max(limit, 1) * FAMILY_OVERSCAN` rows, `FAMILY_OVERSCAN = 8` in
-`retrieval-store.server.ts`. An unbounded `ORDER BY distance` inside the
-`candidates` CTE cannot use the HNSW iterative scan `withTenantVectorScan`
-enables (YOY-105) — Postgres would compute the distance for every embedding
-of the tenant passing the WHERE clause and sort them, on every AI search:
-invisible on the seed catalog, a latency regression proportional to catalog
-size on `/s/tentree`, `/s/whitestuff`, and any real merchant. The trade-off
-the constant buys: a page whose window is filled by more than eight
-colourways of one family can crowd out a further family that would otherwise
-have made it. Eight is the headroom that keeps the common colourway depth
-(three to six members) fully visible to the collapse.
-
-**Attribute evidence rule (YOY-133, binding — PRD §3 amendment (d)):**
-both stores judge `attributesExclude` and `attributesInclude` on the same
-evidence text — `attributeConstraintSql` in `retrieval-store.server.ts`,
-shared by the classic store — the product's platform-free snapshot text
-(title, tags, description) plus the enrichment evidence (`fit`,
-`styleTags`, and the five vision attribute values), concatenated with
-`concat_ws` so an unenriched product is judged on its snapshot alone. One
-predicate per word: `NOT (evidence ~* pattern)` for an exclusion (absent
-evidence passes, as for every enrichment constraint) and `(evidence ~*
-pattern)` for a category-like inclusion (evidence-required, as a category
-is). The pattern (`attributeEvidencePattern`) is every surface form of the
-word from the engine's lexicon — EN and HE; the word itself with its
-singular/plural when unlisted, so "not polyester" still filters — matched
-as a WHOLE word in either script ("sleeveless" is not "sleeves"; "long
-sleeve" is), optionally behind one attached Hebrew preposition/article
-(מצמר, העור), case-insensitively, and NEVER when the mention is negated:
-a term right after "no", "not", "without", "non", "ללא", "בלי", "לא", or
-read as "<term>-free", is a statement of absence — the nylon coat whose
-description says "ללא צמר" survives "not wool", the tank top described
-"ללא שרוולים" survives "no sleeves". A word the lexicon cannot turn into a
-term (an empty or multi-word value) applies no predicate: a filter that
-can match nothing is never applied. The eval's Constructor-bar set pins
-the rule end to end (cn05–cn10, co01, co03, co04: 0 mustNot leaks; with
-the purpose-phrase route for co09 the whole set is at 0 / 30 of 30 clean,
-and `baseline-hits.json` `routes` pins every golden's route). The
-generic-store analog (PRD portability rule) is the rule itself: every
-evidence column is the platform-free snapshot or the enrichment row every
-ingestion adapter fills, and the lexicon is the engine's; a Door 2 store
-gets the identical predicate with no adapter work.
-
-**Colour exclusion rule (YOY-110, binding — PRD §3 amendment, founder
-decision 2026-08-22):** `colorsExclude` is applied by both stores against
-the enrichment's `primaryColor` alone, case-insensitively — a pink dress
-that also comes in black is not excluded by "not black" — and a null
-`primaryColor` passes (unknown passes, as for every enrichment constraint).
-`colorsInclude` is unchanged and still reads every colourway in `colors`.
-The colour-evidence tier flag `colorUnknown` follows the evidence the
-constraint reads: under an exclusion-only colour constraint it means
-`primaryColor IS NULL`; under an inclusion it still means `colors` is empty
-(`colorUnknownSql` in `retrieval-store.server.ts`, shared by both stores).
-The eval harness's `findViolations` judges excluded colours by
-`primaryColor` the same way. The live seed catalog re-enriches at version 1
-on the next `npm run ingest` (AC-6, a separate slice).
-- The eval harness routes goldens marked `expectedRoute: "classic"` through
-  this store (≥8 classic goldens: exact EN, EN typo, Hebrew, and SKU-like
-  queries) and asserts the expected product ranks in the top 5 at zero AI
-  cost; the per-1,000-searches cost bar divides over AI-routed goldens only.
+The card-index candidate scan keeps a bound of its own (YOY-125 AC-10,
+YOY-144): `limit × FAMILY_OVERSCAN × cardSectionsPerProduct(...)` card rows
+(`FAMILY_OVERSCAN = 8`; sections per product are one prose vector plus one
+per ask language, never fewer than `CARD_SECTION_OVERSCAN = 3`) and
+`limit × FAMILY_OVERSCAN` raw-text rows, in `card-retrieval.server.ts`. An
+unbounded `ORDER BY distance` inside the scan's CTE cannot use the HNSW
+iterative scan `withTenantVectorScan` enables (YOY-105) — Postgres would
+compute the distance for every vector of the tenant and sort them, on every
+search: invisible on the seed catalog, a latency regression proportional to
+catalog size on `/s/tentree`, `/s/whitestuff`, and any real merchant. The
+trade-off the constant buys: a window filled by more than eight colourways
+of one family can crowd out a further family that would otherwise have made
+it. Eight is the headroom that keeps the common colourway depth (three to
+six members) fully visible to the collapse.
 
 AI ports (vendor-free; implemented by provider adapter packages):
 
@@ -687,10 +534,14 @@ AI ports (vendor-free; implemented by provider adapter packages):
   image bytes with their MIME type, vendor-free; the Gemini adapter sends
   each as an `inlineData` part **before** the text part and meters usage
   exactly as `usageMetadata` reports it, image tokens included. Absent or
-  empty, the request body is byte-for-byte the text-only call. No caller
-  sends images yet (YOY-121 adds the vision pass).
+  empty, the request body is byte-for-byte the text-only call. The vision
+  pass (YOY-121) and the card writer (YOY-143) send images.
 - `interface InlineImage` — `{ mimeType: string; data: Uint8Array }`.
 - `interface LlmClient` — `{ completeStructured(request): Promise<unknown> }`.
+- `interface DecisionClient` — `{ decide(request): Promise<Record<string, DecisionAnswer>> }`:
+  typed answers (`choice` or `yes-no`) to typed questions, no free text
+  (YOY-152); the Jev judge's port, implemented over OpenRouter in
+  `app/ai/openrouter.server.ts`.
 - `interface EmbeddingRequest` — `{ texts: string[]; operation?; storeId?; searchId? }`.
 - `interface EmbeddingClient` — `{ readonly dimension: number; embed(request): Promise<number[][]> }`.
 - `interface AiCallUsage` / `interface CostRecorder` — the metering port every
@@ -699,214 +550,101 @@ AI ports (vendor-free; implemented by provider adapter packages):
 The app's `/healthz` route (`apps/shopify-app/app/routes/healthz.tsx`) calls
 `createEngine().search(...)` and proves the wiring end to end.
 
-## Hybrid search orchestrator and the fallback ladder (YOY-45)
+## Search orchestrator (YOY-45)
 
 `apps/shopify-app/app/search/orchestrator.server.ts`
-(`createSearchOrchestrator({ db, classifier, extractor, retriever,
-classicStore })`) is the one server-side entry point behind the product's
-single search bar — a function; the HTTP surface over it is the app-proxy
-endpoint below (YOY-46). `runSearch({ query, shopDomain, previousIntent?,
-resolvedIntent?, forceClassic?, searchId?, limit? })` always resolves to one
-response shape:
-`{ searchId, route, routeReason, intent, hits, chips, degraded,
-closeMatches, stages }`, where `hits` and `closeMatches` are display-ready product
-cards (`productId`, `title`, `url`, `imageUrl`, `priceMin`/`priceMax`,
+(`createSearchOrchestrator({ db, classicStore, find, judge?, wishExtractor?,
+… })`) is the one server-side entry point behind the product's single
+search bar — a function; the HTTP surfaces over it are the app-proxy
+endpoint (YOY-46) and the playground API (YOY-90) below.
+`runSearch({ query, shopDomain, previousQuery?, removedChips?, preview?,
+forceClassic?, forceClassicReason?, searchId?, limit?, paging? })` always
+resolves to one response shape:
+`{ searchId, route, routeReason, hits, chips, degraded, stages }`, plus on a
+submitted search `page`, `totalCount`, `extractionInTime`,
+`extractionCached` and `carry`, and — when they apply — `labelsPending`,
+`otherReading` and `judgeCalls`. `hits` are display-ready product cards
+(`productId`, `title`, `url`, `imageUrl`, `priceMin`/`priceMax`,
 `currencyCode`, `available`; `handle` never leaves the adapter — YOY-87)
-hydrated from the `CatalogProduct` snapshot in
-hit order, and `chips` echoes the retrieval's applied constraints. One
-`searchId` is generated per search (unless the caller threads its own) and
-forwarded to every AI port call, so all `AiCall` rows serving one search
-share it. `previousIntent` is passed through to the extractor context
-unchanged; the orchestrator holds no session state. `resolvedIntent` (YOY-46
-chip removal) is an intent the caller already holds: the orchestrator skips
-classification and extraction — zero LLM calls — and enters the AI path at
-retrieval, with `routeReason: "resolved-intent"` and the same fallback
-ladder below it. `forceClassic` (YOY-47 throttle) skips the classifier
-entirely and serves classic keyword results with `degraded: true` and
-`routeReason: "throttled"` — also zero LLM calls.
+hydrated from the `CatalogProduct` snapshot in rank order, with `label` on
+every submitted-search card and the diagnostic `verdict`/`standIn` the
+playground shows. One `searchId` is generated per search (unless the caller
+threads its own) and forwarded to every AI port call, so all `AiCall` rows
+serving one search share it. The orchestrator holds no session state: the
+refinement chain (`previousQuery`) and the removed chips arrive with each
+request.
 
-Routing: the classifier's heuristics settle clearly-simple queries instantly;
-everything else the LLM classifier decides. Classic-routed queries run the
-trigram keyword engine on the raw query and carry no chips. AI-routed queries
-run intent extraction → vector retrieval and return ranked hits plus chips
-derived from the applied constraints.
+There is one search path, and two keyword-only requests beside it. (The
+engine that preceded it is preserved at the `engine-v1-last` tag.)
 
-The fallback ladder — every edge, top to bottom; no error shape from the AI
-path ever reaches the caller:
+1. **A submitted search** runs the find step (YOY-145) with the wish
+   extraction started alongside it (YOY-149), composes the stated wishes
+   onto the find order, hydrates one page, and judges the page's part
+   inside the find set (YOY-147). The sections below describe each step.
+   A throttled session or a playground cap (`forceClassic`, YOY-47) runs
+   the same steps but never calls the judge: the page is served in composed
+   find order, route `classic`, reason `capped`.
+2. **A keystroke preview** (`preview`, YOY-68) and **the widget's
+   client-timeout rescue** (`forceClassicReason: "client-timeout-rescue"`,
+   YOY-96 AC-9) are classic keyword search on the raw query — zero model
+   and zero embedding calls, route `classic`, no chips, no labels. The
+   rescue is `degraded: true` and pages by slicing its full result; a
+   preview is never paged.
 
-1. **Classifier failure or timeout** — the classifier never rejects; it
-   answers `{ route: "classic", reason: "model-error" }`, which the
-   orchestrator serves as classic keyword results with `degraded: true`.
-2. **Any AI-path failure** — intent LLM error or timeout (the Gemini
-   adapter's `GeminiTimeoutError`/`GeminiApiError` taxonomy propagating
-   through the port), `IntentExtractionError`, embedding failure, retrieval
-   store error — yields classic keyword results for the raw query with
-   `degraded: true` and no chips. The catch is deliberately type-blind:
-   whatever threw, the shopper gets results.
-3. **`EmptyQueryTextError`** (intent has constraints but no descriptive text,
-   e.g. "not black under ₪400") is a designed edge, not a failure: the
-   orchestrator runs constraint-only classic search, KEEPS the chips for the
-   applied constraints, and does not set `degraded`.
-4. **AI zero-hits** — retrieval succeeded but nothing satisfied every
-   constraint: the response keeps the chips, an empty primary hit list, and
-   `closeMatches` from classic keyword search on the raw query.
+No model failure reaches the caller. A failed embedding or card-index query
+serves the keyword order with `degraded: true` and nothing judged; a late or
+failed extraction composes the page without stated wishes; a judge that
+times out, fails, or answers invalidly twice serves find order. Classic-store
+errors are not caught: the keyword store is the floor and shares its
+database with everything else, so a failure there is an infrastructure
+outage that must surface to the caller's own error handling.
 
-Classic-store errors are not caught: classic search is the ladder's floor and
-shares its database with everything else, so a failure there is an
-infrastructure outage that must surface to the caller's own error handling.
+The eval's Constructor suite (`app/eval/constructor-v2.test.ts`, see
+`app/eval/README.md`) searches every golden through this orchestrator and
+treats a degraded or unjudged answer as a hard error: offline replay must
+never let a fallback mask a missing recording.
 
-The eval harness (`apps/shopify-app/app/eval/harness.server.ts`) routes every
-golden — classic and AI alike — through `runSearch`, and treats a `degraded`
-response as a hard error: offline replay must never let the silent fallback
-mask a broken recording as classic-quality results.
+### Latency work on the search path (YOY-64)
 
-### Latency work on the AI path (YOY-64)
-
-Four mechanisms, all inside the orchestrator and its wiring, none touching
-retrieval semantics:
-
-- **The ledger leaves the hot path (AC-1).** Production wraps the Prisma
-  `CostRecorder` in `createQueuedCostRecorder`
-  (`app/ai/cost-recorder.server.ts`): `record` validates the usage
-  synchronously (an unpriced model still throws, before anything is queued)
-  and resolves as soon as the insert is queued; writes chain in order, a
-  failed insert is logged (`[ai-cost] ledger write failed …`) and never
-  fails the search, and `flush()` awaits the queue. The synchronous
-  recorder is what tests and the eval harness use, so ledger assertions
-  stay exact.
-- **Per-operation intent abort (AC-3).** The accuracy-tier intent client
-  runs with `GEMINI_INTENT_TIMEOUT_MS` (default 4500 — the shopper's
-  worst-case wait, YOY-124 AC-12; 8000 before) and the lite tier with
-  `GEMINI_INTENT_LITE_TIMEOUT_MS` (default 3000, strictly below the
-  deadline so a hung lite call still escalates), and the same
-  `GEMINI_INTENT_TIMEOUT_MS` is the **deadline of the whole lite-first
-  ladder**: `createEscalatingIntentExtractor({ deadlineMs })` arms one
-  `AbortSignal` per extraction and forwards it to both tiers through
-  `IntentExtractionContext.signal` → `StructuredCompletionRequest.signal`,
-  which the Gemini adapter honours on top of its own per-request timeout.
-  A lite call that fails with the budget spent degrades right there instead
-  of escalating (lite 8 s + accuracy 8 s in series was ~16 s before the
-  classic fallback); an accuracy call reached with budget left is cut at the
-  deadline. So a never-answering upstream degrades the search to classic
-  inside the widget's budgets — after its 3 s classic-rescue budget and long
-  before its 30 s primary budget (`orchestrator.test.ts` asserts the relation
-  against the widget's exported constants, over the whole ladder). The
-  adapter's 60 s default stays for enrichment and embedding.
-- **Exact-query intent reuse (AC-4).** Every submitted AI search that was
-  served non-degraded stores its `Intent` and the normalized query
-  (trimmed, whitespace-collapsed, case-folded) on its `SearchEvent`
-  (`intent`, `normalizedQuery`; migration
-  `20260826150000_search_event_intent_reuse`). A later query with the same
-  normalized text from the same store within
-  `INTENT_REUSE_WINDOW_MINUTES` (default 60; `0` disables) is answered from
-  that intent with **zero LLM calls** — no classification, no extraction —
-  as `routeReason: "intent-reuse"`, `intentTier: null`, and `stages` without
-  `classify`/`intent`; retrieval still runs, so a catalog change reaches
-  the repeated query. Refinements (`previousIntent`) and chip removals never
-  reuse; a lookup failure falls through to the full ladder. A reuse is
-  logged as a normal `SearchEvent` but spends no budget: the per-session and
-  per-IP throttles and the playground's daily ceilings skip it. Exact text
-  only — semantic caching is deferred (NG-5).
-- **Concurrency (AC-5).** Intent extraction depends on the query, not on
-  the classifier's decision, so when the classifier has no settled answer
-  (`QueryClassifier.settled` — a heuristic rule or a cached model decision;
-  an engine peek that never spends a call) the extraction starts alongside
-  the model classification; a model-decided classic route discards the
-  in-flight extraction and its cost is the price of the overlap on that
-  rare shape, while heuristic-classic queries stay LLM-free. On the AI path
-  the zero-hit rescue's keyword search runs alongside retrieval and is
-  dropped when retrieval finds hits. `stages` books each stage's own wall
-  time, so their sum may now exceed the response's wall time — that excess
-  is the overlap; no single stage exceeds it.
-
-The intent prompt itself was trimmed on AC-2 (the category vocabulary left
-the prompt — the response schema's enum binds it — and every rule is stated
-once) and the eval harness prints `intent input tokens: before N / after M
-(−P %)` against `fixtures/intent-token-baseline.json`, asserting ≥ 30 % fewer
-input tokens with every quality bar intact. Two guardrails survived the trim
-on live evidence against the lite tier (6 samples per golden): the occasion
-vocabulary stays spelled out with "null when the query states no occasion",
-and the "omit / never invent" rule sits last, right before the query —
-without either the lite model invents an occasion on g10/r09 in 2–3 of 6
-samples. The comment on `buildIntentPrompt` carries the numbers.
+**The ledger leaves the hot path (AC-1).** Production wraps the Prisma
+`CostRecorder` in `createQueuedCostRecorder`
+(`app/ai/cost-recorder.server.ts`): `record` validates the usage
+synchronously (an unpriced model still throws, before anything is queued)
+and resolves as soon as the insert is queued; writes chain in order, a
+failed insert is logged (`[ai-cost] ledger write failed …`) and never
+fails the search, and `flush()` awaits the queue. The synchronous
+recorder is what tests and the eval harness use, so ledger assertions
+stay exact. The other latency levers of the search path — the extraction
+running alongside find, the judge's deadline and the answer and extraction
+caches — are described with their steps below.
 
 ### Per-stage timing: `stages` (YOY-114)
 
 Every response carries `stages: Partial<Record<SearchStage, number>>` — whole
 milliseconds per pipeline stage the search actually ran, keyed in pipeline
 order from the fixed set in `app/search/stages.ts`:
-`classify | intent | embed | retrieve | classic | hydrate | closeMatches`. A
-stage that did not run is absent, so the key set is itself the route's
-evidence: a classic search reads `classify, classic, hydrate`; an AI search
-`classify, intent, embed, retrieve, hydrate`; a preview or forced-classic
-response has no `classify`; a chip removal starts at `embed`. `embed` and
-`retrieve` come from the retriever's own split (`RetrievalResult.timings`);
-`hydrate` accumulates every card hydration the response needed (hits and
-close matches both); `closeMatches` covers the zero-hit rescue — the
-relaxation ladder plus the keyword fallback. Values are floored, so their sum never
-exceeds the wall time around `runSearch` (`orchestrator.test.ts` pins both
-the key sets per route and the sum bound). `stages` is diagnostic: the
-playground shows it, the proxy route logs it, nothing persists it (no
-migration), and the storefront contract never carries it. The measurement
-method built on it is docs/LATENCY.md.
-
-### Close matches: the relaxation ladder (YOY-111)
-
-**Binding (PRD §3 amendment, founder decision 2026-08-22):** close matches
-never violate an explicit exclusion, constraints relax one at a time —
-price first — and the shopper is told which constraint was relaxed. On an
-AI zero-hit (`retrieve` ran and nothing satisfied every constraint) the
-orchestrator re-queries the vector store with the intent's cached
-embedding down a fixed ladder (`relaxationLadder` in
-`orchestrator.server.ts`): rung by rung it drops one more constraint group
-— `priceMin`/`priceMax` (together, as the budget) → `occasion` →
-`availabilityRequired` → `colorsInclude` → `category` — keeping every
-constraint not yet relaxed, skipping groups the intent never stated, and
-stopping at the first rung with hits. `colorsExclude` is never relaxed: it
-rides every rung, and the final fallback — the raw-query trigram search
-that already ran alongside retrieval (YOY-64 AC-5) — now runs in constraint
-mode with the same exclusions, so a "not black" close match can never be
-black-primary (the exclusion itself is judged by `primaryColor`, YOY-110).
-`attributesExclude` rides every rung and the keyword fallback the same way
-(YOY-133: a "not wool" close match is never a wool coat), and
-`attributesInclude` rides every rung too — neither is a `RelaxedConstraint`.
-The response carries `closeMatchesRelaxed: RelaxedConstraint[]` — the names
-relaxed, in order; `[]` when nothing was (every non-zero-hit response, and
-a zero-hit with no close matches). Both APIs serialize it beside
-`closeMatches` (present exactly when `closeMatches` is); nothing else in the
-contracts changed. The playground and the widget (overlay and native view)
-render the close-matches heading from the string catalog as "Close matches
-— <a>, <b>" (`closeMatchesHeadingText`): budget → "over your budget" /
-"מעל התקציב", occasion → "other occasions" / "אירועים אחרים",
-availability → "including sold out" / "כולל אזל מהמלאי", colour
-inclusions → "other colours" / "צבעים אחרים", category → "other
-categories" / "קטגוריות אחרות"; plain "Close matches" when the list is
-empty. Chips, the zero-hit status line, `CLOSE_MATCH_LIMIT` (10), and card
-anatomy are unchanged. The constraint-only classic path (an intent with no
-descriptive text, `EmptyQueryTextError`) has no vector to relax and still
-answers `closeMatches: []`. The eval harness scores the ladder with a
-zero-hit golden (g25, `zeroHit: { relaxedFirst: "priceMax" }`) and counts
-an excluded primary colour among close matches as a hard-constraint
-violation.
+`find | compose | classic | hydrate | judgeRows | judge`. A stage that did
+not run is absent, so the key set is itself the path's evidence: a preview
+or a rescue reads `classic` alone; a submitted search reads `find`,
+`compose` when a stated wish applied, `hydrate`, and `judgeRows` and `judge`
+when the judge step ran. `find` times the whole find step (the embedding,
+the card-index query and the keyword search); `compose` the stated wishes
+applied to the find order; `judgeRows` the judge step's database work and
+`judge` the rest of it, the call and its wait (YOY-159). Values are floored
+and the stages run one after another, so none exceeds the wall time around
+`runSearch` (`orchestrator.test.ts` pins the key sets and the bound). `stages` is diagnostic: the
+playground shows it, the proxy route logs it, nothing persists it, and the
+storefront contract never carries it. The measurement method built on it is
+docs/LATENCY.md.
 
 ## Engine v2: the find step and server-side pages (YOY-145)
 
 `apps/shopify-app/app/search/find.server.ts` (`createFindStep({ db,
-embeddings, classicStore, findSetSize? })`) is the first half of Engine v2,
-behind a switch. The orchestrator takes it as `find` and `engineV2` (the
-default engine); `runSearch` accepts `engine: "v1" | "v2"` to override that
-default per request and `paging: { page, pageSize }` for one page, and the
-response gains `engine` and — on a paged response only — `page` and
-`totalCount`.
+embeddings, classicStore, findSetSize? })`) is the first step of every
+submitted search. The orchestrator takes it as `find`; `runSearch` takes
+`paging: { page, pageSize }` for one page, and a submitted-search response
+carries `page` and `totalCount`.
 
-- **The switch.** Engine v2 is the default (YOY-153): with `ENGINE_V2`
-  unset, or any value but `0`, a submitted search runs v2
-  (`engineV2FromEnv`); `ENGINE_V2=0` serves the old engine, which stays one
-  env value away until it is deleted. Keystroke previews stay the keyword
-  path on either engine. Only the playground API reads a request's
-  `engine=v1|v2` (an unknown value answers 400); the storefront proxy never
-  parses it, so the storefront takes the env default. `.github/workflows/
-  score.yml` takes an `engine` input that sets `ENGINE_V2` for a hidden run.
 - **Find.** The raw sentence, trimmed, is embedded as one vector (one
   `embedding` ledger row per new query; the find step caches recent query
   vectors, so a page request re-embeds nothing) and the nearest
@@ -921,19 +659,17 @@ response gains `engine` and — on a paged response only — `page` and
   set in vector order; then every remaining keyword match in keyword order.
   Each product appears once, and each family once (the earlier member stands
   for it).
-- **Response.** `chips: []`, `intent: null`, no close matches; only the
-  page's products are hydrated. The `find` stage times the whole step. Route
-  and routeReason come from the judge (next section). When the embedding call
-  (or the card-index query) fails the page is the keyword order,
-  `degraded: true`, with no find set to judge; a keyword-store failure
-  propagates, as on the old engine.
-- **Pages on both engines.** Both search APIs take `page` (1-based; anything
-  else is 1) and `pageSize` (1–48; anything else is 24). The old engine pages
-  by slicing its full result (the request's `limit` is dropped); v2 always
-  pages, the first page of 24 when no page parameter came. Without page
-  parameters the old engine's response — and the proxy body — is
-  byte-identical to before. Keystroke previews ignore paging and never reach
-  the find step: zero model and zero embedding calls on either engine.
+- **Failure.** Only the page's products are hydrated. Route and routeReason
+  come from the judge (next section). When the embedding call (or the
+  card-index query) fails the page is the keyword order, `degraded: true`,
+  with no find set to judge; a keyword-store failure propagates.
+- **Pages.** Both search APIs take `page` (1-based; anything else is 1) and
+  `pageSize` (1–48; anything else is 24). A submitted search always pages,
+  the first page of 24 when no page parameter came. The client-timeout
+  rescue pages by slicing its full keyword result (the request's `limit` is
+  dropped) and, without page parameters, answers unpaged. Keystroke previews
+  ignore paging and never reach the find step: zero model and zero embedding
+  calls.
 - **Logging.** `SearchEvent.page` (default 1) records the page each request
   served: one row per page request.
 - **Measured on recall, not order.** A description wish ("long sleeves") is
@@ -1000,8 +736,9 @@ runs one page.
   "not relevant" does, with no label, and never counts toward the
   all-not-relevant case — a page of only stand-ins is served in find order
   without labels. Playground `details.judge.verdicts` mark it `standIn`. A fact-differs value longer than three words, or a missing
-  value, drops that label. Every v2 result on the wire carries `label`
-  (`{ template, values }` or null); the old engine's wire has no `label` key.
+  value, drops that label. Every submitted-search result on the wire carries
+  `label` (`{ template, values }` or null); a classic result has no `label`
+  key.
   The verdict never reaches the storefront.
   On the wire a judged page with a match serves its close products in
   `closeMatches`, under the "Close matches" divider (`splitCloseVerdicts`,
@@ -1020,7 +757,7 @@ runs one page.
   answer cache, timed out, failed or find-only — and `classic` only for a
   capped or forced-classic page, a preview or the client-timeout rescue.
   The session throttle and the playground's daily caps (both counted from
-  `route = "ai"`) therefore count every Engine v2 search, cached ones
+  `route = "ai"`) therefore count every find-path search, cached ones
   included. `routeReason` is
   one of `judged`, `judge-timeout`, `judge-error`, `judge-cached`, `capped`,
   `find-only`.
@@ -1047,10 +784,7 @@ runs one page.
   still running count as the time they had run and `open` is true. Null
   when no call started (a cached answer). The probe's `[judge, all sets]`
   line prints the p50/p95 of `judgeRows`, of the slowest call and of the
-  median call. None of it reaches the storefront wire. `scripts/latency-probe.mts --engine v1|v2` sends that `engine`
-  to the playground API, so either engine can be timed whatever the
-  deployment's default; without it the probe times the engine the
-  deployment serves.
+  median call. None of it reaches the storefront wire.
 
 ### Answer cache, verdict log and late labels (YOY-148)
 
@@ -1063,8 +797,8 @@ runs one page.
   schema change. Price and stock are not in the key, so a price or stock
   change still hits; a card rewrite misses. A hit makes no call and serves
   the stored verdict order with `routeReason: "judge-cached"` and route
-  `classic` (so caps and the throttle do not count it). No eviction or
-  expiry; kept at uninstall.
+  `ai`, so caps and the throttle count it like any other find-path search
+  (YOY-157 AC-23). No eviction or expiry; kept at uninstall.
 - **Verdict log.** `JudgeVerdict`: one row per product on every judged or
   cache-served page — search id, store, product, page, whole-order position
   as served, verdict, missed-wish flags, label template, `cached`. A click
@@ -1123,7 +857,8 @@ The three kinds of wishes (docs/PRD.md §3) applied by code. Packages:
   own spend and `extract calls` line.
 - **Removed chips.** Both APIs take `removedChips` (a JSON array of
   `{ field, value }`, at most 20). A removed fact is not applied and its
-  chip is absent.
+  chip is absent. Removing a chip is a fresh submitted search of the same
+  query with the removed list and the held chain — no special path.
 - **Composer** (`composeWishes`, the `compose` stage), over every result of
   the find step before pages are cut:
   - Walls remove products from the results and the count: a firm price
@@ -1161,8 +896,8 @@ The three kinds of wishes (docs/PRD.md §3) applied by code. Packages:
 ## Engine v2: refinement and the second reading (YOY-150)
 
 "Same but cheaper" means nothing without the sentence before it, and
-"wedding dress" can mean a bridal gown or a guest's dress. Engine v2
-handles both without an intent form.
+"wedding dress" can mean a bridal gown or a guest's dress. The engine
+handles both with plain sentences, not a structured query form.
 
 - **The chain on the wire.** Both APIs accept `previousQuery` (a plain
   string, at most 2,000 characters; never on a preview or the classic
@@ -1171,8 +906,7 @@ handles both without an intent form.
   alone on a fresh search or when the extraction says it replaces the
   chain; otherwise the chain's first sentence plus its two most recent
   refinements, one sentence per line. A late or failed extraction counts as
-  refining. The old engine ignores `previousQuery` and answers no `carry`
-  (NG-4: its `previousIntent` path is untouched).
+  refining. Previews and the rescue answer no `carry`.
 - **Find.** With a previous chain, one embedding call embeds the new
   sentence alone and the chain plus the new sentence; the two nearest sets
   merge by distance, each product once at its nearer distance
@@ -1219,22 +953,28 @@ comes exclusively from the signature-verified query params (`shop`) — never
 from the request body, which a shopper controls. A malformed body is answered
 `400`, also with an empty body.
 
-**Request JSON.**
+**Request.** The widget sends GET query parameters (YOY-60 AC-1: the proxy
+edge rejects browser POSTs, which carry `Origin`); the route's action keeps
+the same contract as a JSON POST body, and both go through
+`parseProxySearchBody`:
 
 ```json
 {
   "query": "elegant dress for a wedding",
   "sessionId": "widget-generated-id",
-  "previousIntent": { "…": "the previous response's intent, echoed as-is" },
-  "removeChip": { "field": "occasion", "value": "wedding" }
+  "mode": "preview | classic — absent on a submitted search",
+  "page": 1,
+  "pageSize": 24,
+  "previousQuery": "the previous response's carry, as-is",
+  "removedChips": [{ "field": "exclude", "value": "black" }]
 }
 ```
 
-`query` and `sessionId` are required (`sessionId` is carried for later
-milestones; nothing is persisted — no query logging in this issue).
-`previousIntent` alone marks a refinement: it is passed to the intent
-extractor's context unchanged. `removeChip` (requires `previousIntent`) is
-chip removal, below.
+`query` and `sessionId` are required. `mode=preview` is a keystroke preview
+and `mode=classic` the client-timeout rescue; both are bare classic fetches
+and reject `previousQuery` (400). `page`/`pageSize` are lenient (see Pages
+above); `previousQuery` (at most 2,000 characters) and `removedChips` (at
+most 20, each a known chip field) are strict, and a violation answers 400.
 
 **Response JSON** — the exact contract, pinned by a shape test; no field
 beyond it appears in any response body, including on the degraded path, and
@@ -1259,19 +999,29 @@ line per submitted search, never per preview:
       "priceMin": 100,
       "priceMax": 150,
       "currencyCode": "ILS",
-      "available": true
+      "available": true,
+      "label": { "template": "price-near", "values": ["…"] }
     }
   ],
-  "chips": [{ "field": "occasion", "value": "wedding" }],
-  "intent": { "…": "full intent, absent optionals as null — or null" },
-  "closeMatches": [{ "…": "results shape; present only on AI zero-hits" }]
+  "chips": [{ "field": "priceMax", "value": "400", "currency": "ILS" }],
+  "closeMatches": [{ "…": "results shape; a judged page's close products" }],
+  "page": 1,
+  "totalCount": 87,
+  "labelsPending": true,
+  "carry": "elegant dress for a wedding",
+  "otherReading": "bridal gowns"
 }
 ```
 
-`intent` is what the client echoes back as `previousIntent` on a follow-up.
-The serializer re-maps every field explicitly (`serializeProxySearchResponse`),
-so orchestrator-internal diagnostics like `routeReason` — and anything the
-orchestrator response grows later — cannot leak to a shopper.
+`label` is on every submitted-search result (null when it carries none) and
+absent on classic results. `closeMatches` appears only on a judged page that
+holds both a match and a close product (`splitCloseVerdicts`, YOY-166); `page` and `totalCount` on a
+paged response; `labelsPending` only after a judge deadline miss; `carry` on
+every submitted-search response; `otherReading` only when a page-1 product
+fits it. The serializer re-maps every field explicitly
+(`serializeProxySearchResponse`), so orchestrator-internal diagnostics like
+`routeReason` and the judge's verdicts — and anything the orchestrator
+response grows later — cannot leak to a shopper.
 
 **Search logging (YOY-47).** Every submitted search request — degraded,
 zero-hit, throttled, and classic-rescued included — writes exactly one
@@ -1280,10 +1030,11 @@ orchestrator's `routeReason`, degraded flag, latency, result count) through
 `app/search/events.server.ts`. The write is an observer: a logging failure
 is swallowed and logged server-side, never failing the shopper's response.
 `routeReason` (YOY-96 AC-9; nullable, rows from before the column are null)
-is what tells a classic row's cause apart in the ledger — a heuristic or
-model decision, a `throttled` session, or the widget's
-`client-timeout-rescue` — so rescue frequency and AI-value searches can be
-measured rather than inferred.
+is what tells a row's cause apart in the ledger — the judge's outcome on a
+submitted search, `capped` for a throttled or capped one, or the widget's
+`client-timeout-rescue` — so rescue frequency and judged searches can be
+measured rather than inferred. The table's `intent`
+and `normalizedQuery` columns are kept but no longer written.
 
 **The classic rescue (YOY-108, YOY-96 AC-9).** When the widget's SUBMITTED
 search runs out its own client-side budget it re-asks the same query with
@@ -1293,7 +1044,7 @@ no throttle budget consumed, `degraded: true` — and, unlike a
 `mode=preview` keystroke fetch, logs it as a real `SearchEvent` and returns
 an attributable `searchId`, so the widget keeps it as `currentSearchId` and
 a click on a rescued card beacons like any other. Like `preview`, `classic`
-is a bare classic fetch and rejects `previousIntent`/`removeChip` (400).
+is a bare classic fetch and rejects `previousQuery` (400).
 
 **Click beacon (YOY-47).** `POST /apps/unfiltered/click`
 (`app/routes/apps.unfiltered.click.tsx`), signature-verified exactly like
@@ -1305,26 +1056,17 @@ writes nothing. Success answers `204` with an empty body and one
 
 **Per-session AI throttle (YOY-47).** `app/search/throttle.server.ts` keeps
 an in-process sliding one-minute window per `sessionId`. Once a session has
-run `SEARCH_AI_THROTTLE_PER_MINUTE` (default 10) AI-routed searches inside
-the window, further searches from it are forced onto the classic path with
-zero LLM calls — served `degraded: true` on the unchanged contract shape,
-and still logged. Classic-routed searches and chip-removal requests neither
-consume budget nor get forced (chip removal makes no classification or
-intent call to begin with). The state is deliberately in-process: the limit
-is per Node instance, so horizontal scaling multiplies the effective
-ceiling, and a restart clears the windows — accepted for now; a distributed
-store is a later milestone's concern.
-
-**Chip removal.** A request carrying the previous response's `intent` plus
-one `removeChip` (`field` + `value`) recomputes results without that
-constraint: the server drops the constraint from the intent
-(`removeChipFromIntent` — pure intent surgery; array-valued fields remove
-just the named value, `availability` clears the flag) and runs the
-orchestrator with `resolvedIntent`, which skips classification and
-extraction entirely. The round-trip makes zero LLM calls — no new `AiCall`
-rows with a `classification` or `intent` operation — and the response's chip
-list no longer carries the removed chip. Embedding calls (cached, estimated)
-still occur, as the adjusted intent is re-retrieved.
+run `SEARCH_AI_THROTTLE_PER_MINUTE` (default 10) find-path searches inside
+the window, its further submitted searches are served find order with no
+judge call — route `classic`, reason `capped`, on the unchanged contract
+shape — and still logged. Only page 1 of a search served with route `ai`
+spends budget (YOY-157 AC-29); a later page, a preview and a classic rescue
+neither consume budget nor get forced. Removing a chip is a submitted
+search like any other and spends budget the same way. The state is
+deliberately in-process: the limit is per Node instance, so horizontal
+scaling multiplies the effective ceiling, and a restart clears the
+windows — accepted for now; a distributed store is a later milestone's
+concern.
 
 ## AI cost metering
 
@@ -1339,20 +1081,12 @@ The internal admin at `/internal/costs` renders ledger aggregates and is
 gated by `ADMIN_TOKEN` (`?token=` query parameter): without the exact token
 it answers 404, indistinguishable from a nonexistent route.
 
-Intent extraction is lite-first (YOY-116): the app wires
-`createEscalatingIntentExtractor` over two metered Gemini clients —
-`GEMINI_INTENT_LITE_MODEL` (default `gemini-3.5-flash-lite`) at
-`GEMINI_INTENT_LITE_THINKING_LEVEL` (default `low`, explicit, never the model
-default) and `GEMINI_INTENT_MODEL` (the accuracy tier, unchanged) — with
-`INTENT_ESCALATION_THRESHOLD` (default the engine's 0.8) as the confidence
-floor. The eval harness replays the same ladder over two recording sets
-(`intent-lite*.json` beside the accuracy `intent*.json`) and prints the
-escalation rate, calls per tier, and the blended per-search cost, whose bar
-is **≤ $0.60 per 1,000 AI searches** (PRD §8). `config/ai-prices.json` was
-corrected on YOY-116 AC-8: `gemini-3.6-flash` is $0.75 / $3.75 per 1M tokens
-through 2026-12-31 (the $1.50 / $7.50 the table carried is the 2027 price),
-so every cost figure from before that date is 2× over-metered on the
-accuracy tier. Measured on the eval harness (2026-08-26, YOY-116): blended per-search cost **$0.52 per 1,000 AI searches** on the routed blend (the accuracy-only blend at the same corrected prices is $0.54; at the over-metered 2026 table it read $1.07), refinement follow-ups $0.60 per 1,000, escalation rate 56% of AI searches and 11% of follow-ups, intent calls 19 lite / 15 accuracy across 25 AI goldens and 9 follow-ups. Under the corrected accuracy price the bar is met by pricing alone by a hair; lite-first is what moves the blend off the line and, on the live tail, is the cheaper tier for the majority of plain queries.
+A submitted search's model spend is one query embedding (cached per find
+step, so later pages re-embed nothing), one wish extraction (`extract`,
+answered from the extraction cache on a repeated sentence) and one judge
+call per page inside the find set (`judge`, answered from the answer cache
+on a repeated page); previews and the rescue spend nothing. Ingestion's
+spend is the `enrichment`, `vision`, `card` and `embedding` operations.
 
 Embedding calls are the one estimated entry in the ledger: Gemini
 `batchEmbedContents` returns no usage metadata, so the adapter meters input
@@ -1366,9 +1100,9 @@ metadata for embeddings, it replaces the estimate.
 Aborted calls are metered by the same estimate (YOY-125 AC-6). A structured
 completion cut short by the caller's signal or by the adapter's own request
 timeout raises `GeminiTimeoutError` before any usage metadata exists, but
-Google bills the prompt tokens of a request it has begun — and since the
-intent hedge (`hedgedAccuracy`) aborts the losing tier on every occasion-class
-query, an aborted intent call is a normal outcome, not a rare deadline cut.
+Google bills the prompt tokens of a request it has begun — and the judge's
+give-up (`JUDGE_GIVE_UP_MS`) and every client's request timeout cut calls
+short as a normal outcome, not a rare accident.
 The adapter therefore records one `AiCall` row with `inputTokens` estimated
 from the prompt through the same `ESTIMATED_CHARS_PER_TOKEN` path,
 `outputTokens: 0` (whatever the model produced before the abort never reached
@@ -1437,7 +1171,7 @@ bundle and calls `window.UnfilteredWidget.init({ locale, storeId })`.
 Widget behavior (YOY-48): `init` locates the theme's own search input
 (`input[type="search"]`, or a `/search`-action form's `q` input) and takes
 it over — focus or typing opens a results overlay, typing is debounced into
-`POST /apps/unfiltered/search` (query + a sessionStorage-held per-session
+`GET /apps/unfiltered/search` (query + a sessionStorage-held per-session
 sessionId), and results render as product cards: image or placeholder,
 title, price formatted with the currency code (a range when
 priceMin ≠ priceMax), and a sold-out marker. While the overlay is open the
@@ -1452,23 +1186,24 @@ search request removes the widget so the theme's native search behaves
 exactly as without the app — no error UI ever. `init` is idempotent and
 never throws into the merchant's page.
 
-AI states (YOY-49): an AI-routed response renders its applied constraints
-as a chip row above the grid — one removable chip per constraint, labeled
-in English ("dress", "Under 400", "Not black", "In stock") with an
-accessible remove label. Removing a chip resends the last query carrying
-the held intent plus the dismissed chip (the endpoint's chip-removal
-contract — zero LLM calls server-side) and the whole overlay re-renders
-from the response. The widget holds the latest response's echoed `intent`
-in memory only (page-view lifetime, never persisted — NG-4): a follow-up
-typed into the bar rides it as `previousIntent` so the server refines
-rather than restarts, and each response's echo replaces the held one. A
-"New search" control clears the held intent, input, chips, and results; the
-next request carries no `previousIntent` field at all. AI zero-hits render
-a "Nothing matches all of these" message, the still-removable chip row, and
-the response's `closeMatches` as standard cards under a "Close matches"
-heading that names what the server relaxed to find them (YOY-111:
-"Close matches — over your budget"). Degraded responses (route classic, `degraded: true`) render as
-plain classic cards with no chips and no error messaging.
+AI states (YOY-49, YOY-149, YOY-150): a submitted search's kept stated
+facts render as a chip row above the grid — one removable chip per fact,
+labeled by `chipLabel` in the shopper's language ("Under ₪400", "Size M",
+"In stock", "Not black" with the value struck) with an accessible remove
+label, and the second-reading chip ("{reading} instead?") first when the
+response carries one. Removing a chip re-asks the same query with every
+chip removed so far in this chain (`removedChips`) and the chain that
+produced the results on screen, and the whole overlay re-renders from the
+response. The widget holds the latest response's `carry` in memory only
+(page-view lifetime, never persisted): a follow-up typed into the bar sends
+it as `previousQuery` so the server refines rather than restarts, and each
+response's `carry` replaces the held one. A "New search" control clears the
+held chain, removed chips, input, and results. A submitted search with no
+results renders a "Nothing matches all of these" message and the
+still-removable chip row; a judged page's `closeMatches` render as
+standard cards under a "Close matches" divider after its matches (YOY-166).
+Each card shows its label line (DESIGN W-11). Degraded responses render
+plain cards with no error messaging.
 
 UI tests are a separate lane from Vitest: Playwright
 (root `playwright.config.ts`, specs in `apps/shopify-app/widget/test-ui/`)
@@ -1476,7 +1211,9 @@ starts the widget dev harness — the same Vite config serving
 `widget/index.html` (fake storefront with a theme-like search form and
 contract-shaped stubbed search/beacon endpoints selected via `?fixture=`:
 results, empty, error, timeout, delayed, beacon-missing, ai, ai-zero-hit,
-ai-delayed, degraded — plus a contract-correct chip-removal echo),
+ai-delayed, degraded, and the find-path states — chips with a removed-chip
+echo, refinement, the second reading, labels, the close-matches divider and
+pages),
 `widget/no-search-form.html`, and `widget/hostile-css.html` (a deliberately
 hostile theme for the style-isolation tests) — and runs fully offline.
 `npm run test:ui` from the root is the single entry point, locally and in
@@ -1607,9 +1344,9 @@ the SAME orchestrator the storefront proxy runs — `getProxySearchOrchestrator`
 plus the engine details the playground shows on demand.
 
 - **`GET /api/playground/search`** (`app/routes/api.playground.search.tsx`)
-  takes the proxy's own parameters — `query`, `sessionId`, `mode=preview`,
-  `previousIntent`, `removeChip` — parsed by the proxy's own
-  `parseProxySearchParams`, so preview, refinement, and chip-removal
+  takes the proxy's own parameters — `query`, `sessionId`, `mode`, `page`,
+  `pageSize`, `previousQuery`, `removedChips` — parsed by the proxy's own
+  `parseProxySearchParams`, so preview, paging, refinement, and chip-removal
   semantics cannot drift between the two APIs. Plus `catalog`, a registry
   slug: absent means the seed catalog, whose tenant key comes from
   `PLAYGROUND_SEED_STORE_KEY`. An unset seed with no `catalog` answers `503`
@@ -1618,15 +1355,15 @@ plus the engine details the playground shows on demand.
   Every response — every status — carries `Cache-Control: no-store` and no
   CORS headers at all: the playground's pages are same-origin, and a third
   party must not be able to spend our AI budget from their site.
-- **Response body** = the proxy contract (`searchId`, `route`, `degraded`,
-  `results[]`, `chips`, `intent`, `closeMatches?`) plus
-  `details: { routeReason, latencyMs, limited, stages }`, built by
+- **Response body** = the proxy contract (above) plus
+  `details: { routeReason, latencyMs, limited, stages, judge,
+  extractionInTime, extractionCached }`, built by
   `serializePlaygroundSearchResponse` (`app/playground/api.server.ts`), which
-  delegates the card/chip/intent mapping to the proxy's own serializer and
-  adds exactly those four fields — `stages` copied key by key in pipeline
-  order (YOY-114). A shape test pins the top-level keys and the `details`
-  keys, so a later orchestrator field cannot leak out. Primary hits are
-  capped at 24.
+  delegates the card and chip mapping to the proxy's own serializer and adds
+  exactly those fields — `stages` copied key by key in pipeline order
+  (YOY-114), `judge` the judge's outcome, per-result verdicts and call times
+  (null off the find path). A shape test pins the top-level keys and the
+  `details` keys, so a later orchestrator field cannot leak out.
 - **`POST /api/playground/click`** (`app/routes/api.playground.click.tsx`)
   takes the beacon body `{ searchId, sessionId, productId, position }` and
   the same `catalog` parameter. POST rather than the proxy's GET because
@@ -1637,9 +1374,10 @@ plus the engine details the playground shows on demand.
 ### Abuse guards
 
 Unauthenticated means the exposure is the AI bill, so three guards sit in
-front of the AI path. Every one degrades to classic results rather than to an
-error: a visitor who trips a ceiling still gets a working search, told
-honestly through `degraded` and `details.limited`.
+front of the judge. Every one serves the composed find order with no judge
+call (route `classic`, reason `capped`) rather than an error: a visitor who
+trips a ceiling still gets a working search, told honestly through
+`details.limited`.
 
 | Guard | Env var | Default | `details.limited` |
 |---|---|---|---|
@@ -1665,19 +1403,21 @@ proxy's session throttle.
 
 The two daily ceilings are counted from `SearchEvent` rows with `route = "ai"`
 since 00:00 UTC — from the log, not from memory, so a restart cannot reset a
-spend guard and multiple instances share one count. Only AI-routed rows
-count: a search served classic (throttled, capped, or simply keyword-routed)
-spent no LLM budget and must not consume the ceiling it was denied.
+spend guard and multiple instances share one count. Only page-1 rows with
+route `ai` count (YOY-157 AC-29): a search served classic (capped, or a
+classic rescue) spent no judge budget and must not consume the ceiling it
+was denied.
 
 Precedence when several would bind is broadest-first — global, then catalog,
 then IP — because the broadest binding constraint is the one that explains
 the degradation; naming `"ip"` while the whole playground is capped would
 send a visitor chasing their own behavior for a condition they cannot affect.
 
-Previews and chip removals are never limited and never counted: a preview is
-classic-only by contract and a chip removal makes no LLM call, so neither can
-burn budget. Previews write no `SearchEvent`; every submitted search writes
-exactly one, limited ones included — the ceilings are counted from that table.
+Previews and classic rescues are never limited and never counted: both are
+classic-only by contract, so neither can burn budget. A chip removal is a
+submitted search and is guarded like one. Previews write no `SearchEvent`;
+every submitted search writes exactly one, limited ones included — the
+ceilings are counted from that table.
 
 Route tests (`app/playground-api.test.ts`) run on the PGlite test DB with a
 fake orchestrator threaded through the real `getProxySearchOrchestrator`, so
@@ -1689,7 +1429,7 @@ Vitest, ESLint, and `tsc --noEmit` run from the root as `npm test`,
 `npm run lint`, and `npm run typecheck`; `.github/workflows/ci.yml` runs all
 three on every pull request, plus the `ui` job running `npm run test:ui`
 (Playwright, Chromium) against the widget harness, plus the `dist-seam` job
-that builds the workspaces and runs the retrieval-path suites through
+that builds the workspaces and runs the orchestrator suite through
 compiled `dist/` (see "How the app resolves the workspace packages"). The engine-boundary rule
 is mechanically enforced by `packages/engine/test/boundary.test.ts`, which
 fails the suite if the engine's manifest or source ever references a
@@ -1758,27 +1498,26 @@ asserts its own patterns catch violations so it cannot silently stop working.
 What the shell renders is a search box; what makes the playground worth
 showing is the layer above it — the part a filter UI cannot do.
 
-- **Chips are output, not input.** An AI-routed response's applied
-  constraints render as removable pills through the widget's own
-  `chipLabel`, so Hebrew display cannot drift between the two surfaces
-  (P-5). They never render on a preview, on classic results, or on a
-  degraded response: a chip claims an understanding, and a degraded response
-  is classic results wearing the AI route's name (W-7).
-- **Refinement lives in the bar, not in a transcript.** Exactly one intent is
-  held, in memory: each response's echoed intent replaces it, a follow-up
-  rides it as `previousIntent`, and removing a chip re-requests with
-  `removeChip` and re-renders from the answer rather than editing the chip
-  row locally. "New search" drops it. There is no history and no chat
-  (NG-2, X-2), and nothing is persisted.
+- **Chips are output, not input.** A submitted search's kept stated facts
+  render as removable pills through the widget's own `chipLabel`, so Hebrew
+  display cannot drift between the two surfaces (P-5). They never render on
+  a preview, on classic results, or on a degraded response: a chip claims
+  an understanding, and a degraded response is keyword results (W-7).
+- **Refinement lives in the bar, not in a transcript.** Exactly one chain is
+  held, in memory: each response's `carry` replaces it, a follow-up sends it
+  as `previousQuery`, and removing a chip re-requests with `removedChips`
+  and re-renders from the answer rather than editing the chip row locally.
+  "New search" drops it. There is no history and no chat (NG-2, X-2), and
+  nothing is persisted.
 - **Engine details are opt-in and live in the URL.** The toggle writes
   `?details=1`, so an opened panel survives a reload and can be shared as a
   link; closed, the panel is absent from the DOM rather than hidden with its
-  space reserved. The intent JSON is the one place monospace is permitted
-  (P-4, DESIGN §2). The panel's stage rows
+  space reserved. The panel's rows are the route, the routeReason, the
+  latency, `degraded` and `limited`; its stage rows
   (`[data-testid="playground-details-stages"]`, YOY-114) list one
   `<stage> · <ms> ms` row per stage the search ran, in pipeline order, from
-  `details.stages`; a classic search's missing `intent`/`embed`/`retrieve`
-  rows are the visible proof it made no LLM call.
+  `details.stages`; a preview's lone `classic` row is the visible proof it
+  made no model call.
 - **Example queries are the page's argument for itself.** Six are shown —
   four in the chrome language and two in the other, because the claim is
   that either works. Each is tagged with the capability it demonstrates
@@ -1786,10 +1525,12 @@ showing is the layer above it — the part a filter UI cannot do.
   refinement) and `playground-examples.test.ts` asserts the set still covers
   all six, so an edit cannot quietly cost the page its point.
 
-Fixture mode gains the matching states (`ai`, `ai-zero-hit`, `ai-delayed`,
-`degraded`, `color-unknown`) plus a chip-removal echo: removing a constraint
-answers a response with that chip gone from the intent AND the products it
-excluded back in the set, so a broken remove-and-re-render cannot pass. The
+Fixture mode gains the matching states (`ai`, `ai-delayed`, `degraded`,
+the chip, refinement and second-reading states `v2-budget`, `v2-refine`,
+`v2-two-meanings`, the label, close-divider and paged states) plus a
+removed-chips echo: removing a chip answers a response with that chip gone
+AND, once the price cap is among them, the product the cap kept out back in
+the set, so a broken remove-and-re-render cannot pass. The
 fixture is chosen by whole words in the query, not substrings — "ai" lives
 inside "rail" and "available".
 
@@ -1854,21 +1595,22 @@ combined. Three pieces implement it:
 - **`apps/shopify-app/scripts/latency-probe.mts`**: drives the deployed
   playground with `scripts/latency-probe-queries.json` (5 classic, 5 EN AI,
   5 HE AI), one discarded warm-up then sequential runs with a fresh
-  `sessionId` each, and prints per set n, p50, p95, the mean per stage, and
-  the count of `degraded`/`limited`/`reused` responses. Every AI-set request
-  carries an invisible marker (four zero-width format characters as base-4
-  digits of a per-invocation nonce plus the run number, appended after a
-  space) so its exact-query reuse key differs per run and per invocation:
-  without it, runs 2..N would be answered from the stored intent with zero
-  LLM calls (YOY-64 AC-4) and the probe would measure the cache, not the
-  pipeline. The marker is invisible, not absent: the orchestrator passes the
-  raw query to the LLM classifier and the intent model, so both receive the
-  committed query plus the marker as-is — roughly 6 extra input tokens per
-  call, no retrieval change — and the AI bars are measured on
-  committed-query-plus-marker, not on a byte-identical shopper query; only
-  `visibleQueryText` strips it, and only for the probe's reporting.
-  `reused` in the summary is the count of samples the marker failed to
-  protect and must read 0. `--assert-classic-p95`,
+  `sessionId` each, and prints per set n, p50, p95, the mean per stage, the
+  count of `degraded`/`limited` responses, the share composed without the
+  wish extraction and the share the extraction cache answered, and a last
+  line for the judge stage (its p50/p95, the outcomes, `judgeRows`, and the
+  slowest and median single call). Every AI-set request carries an
+  invisible marker (four zero-width format characters as base-4 digits of a
+  per-invocation nonce plus the run number, appended after a space) so its
+  text differs per run and per invocation: without it, runs 2..N would be
+  answered by the judge's answer cache and the extraction cache with no
+  model call and the probe would measure the caches, not the pipeline. The
+  marker is invisible, not absent: the orchestrator passes the raw query to
+  the embedding, the wish extraction and the judge, so each receives the
+  committed query plus the marker as-is — a few extra input tokens per call
+  — and the AI bars are measured on committed-query-plus-marker, not on a
+  byte-identical shopper query; only `visibleQueryText` strips it, and only
+  for the probe's reporting. `--assert-classic-p95`,
   `--assert-ai-p50`, `--assert-ai-p95` turn the bars into an exit code. The
   AI sets are paced under the playground's per-IP throttle so the probe
   measures the pipeline, not the guard. `scripts/latency-probe.test.ts`
@@ -1878,8 +1620,10 @@ combined. Three pieces implement it:
 
 `apps/shopify-app/scripts/live-smoke.mts` runs four read-only probes against
 the deployment — `/healthz` (HTTP 200 and `engine.version` equal to the
-engine's source `version`), classic `dress`, EN AI `elegant evening dress
-under 400`, HE AI `שמלה אלגנטית לערב מתחת ל-400` — with the ceilings in
+engine's source `version`), the keystroke preview `dress` (classic, zero
+model calls), and the submitted EN `elegant evening dress under 400` and HE
+`שמלה אלגנטית לערב מתחת ל-400` (the find-path shape: not degraded, results,
+`page` and `totalCount`) — with the ceilings in
 `scripts/live-smoke.config.json`, prints a JSON report and a one-screen
 summary, and exits 1 on any failure; every probe runs even after an earlier
 failure. `scripts/live-smoke.test.ts` drives it against an in-process fake
@@ -1938,8 +1682,8 @@ our ranked results, whatever page it was submitted from.
 - **Owned elements.** Inside the theme's page the widget adds only the
   removable chips row (and the second-reading chip), the status text
   (loading, no results, the zero-hit message), the "Close matches" heading
-  — as a section below the grid on a zero-hit page, as a full-row divider
-  inside the page's grid on a judged page with matches — and the one label
+  as a full-row divider inside the page's grid on a judged page with
+  matches, and the one label
   line under a card's price (DESIGN W-11). Everything else is the theme's.
 - **No new-search control.** Unlike the overlay, the theme-native view has
   no new-search/close control (DESIGN W-2): the browser's Back leaves the

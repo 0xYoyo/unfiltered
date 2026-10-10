@@ -40,9 +40,8 @@ import { assertEngineSourceExecution } from "./source-guard.server";
 // extraction, card-section and query vectors) and OpenRouter's Jev (the
 // judge's per-product decisions), writing fixtures/recorded/card.json,
 // extract.json, judge-jev.json and embeddings-v2.json. The catalog index is
-// replayed from the old engine's committed enrichment, vision and product
-// vectors, so it is byte-identical to theirs and nothing of theirs is
-// re-recorded (NG-2). Never runs by default and never in CI:
+// replayed from the committed enrichment, vision and product vectors, so it
+// is byte-identical to theirs and nothing of theirs is re-recorded. Never runs by default and never in CI:
 //
 //   LIVE_LLM_TESTS=1 REGEN_SCOPE=constructor-v2 GEMINI_API_KEY=… OPENROUTER_API_KEY=… \
 //     npx vitest run apps/shopify-app/app/eval/constructor-v2-regen.test.ts
@@ -102,7 +101,7 @@ describe.runIf(live)("Engine v2 Constructor recordings (live, YOY-153 AC-2)", ()
       const judgeModelId = openRouterModelsFromEnv().judgeModel;
       const indexEmbeddings = readRecording<EmbeddingRecording>("embeddings.json");
 
-      // The catalog index replays the old engine's recordings byte for byte.
+      // The catalog index replays its committed recordings byte for byte.
       const indexLlm = createReplayLlmClient({
         recordings: {
           enrichment: readRecording<LlmRecording>("enrichment.json"),

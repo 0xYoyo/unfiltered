@@ -18,24 +18,17 @@ import type {
  * a live run would (AC-2, AC-4).
  *
  * Recordings are keyed by stable content extracted from each request — the
- * product title for enrichment, the query line for classification and intent,
- * the exact text for embeddings — so prompt-wording changes don't orphan
+ * product title for enrichment, vision and cards, the query line for the wish
+ * extraction, the exact text for embeddings — so prompt-wording changes don't orphan
  * recordings. A missing recording always throws: silently skipping a call
  * would hide a coverage gap in the fixtures.
  */
 
-/** One recorded LLM completion — or a recorded failure (YOY-116). */
+/** One recorded LLM completion. */
 export interface RecordedCompletion {
   output: unknown;
   inputTokens: number;
   outputTokens: number;
-  /**
-   * The live call failed with this error name (a timeout, say) after every
-   * retry; replaying it throws the same way instead of answering, so the
-   * lite-first ladder's `lite-error` escalation is scored on what the
-   * model actually did. Recorded only for the lite tier; `output` is null.
-   */
-  error?: string;
 }
 
 /** One operation's recorded completions, keyed by extracted request content. */
@@ -59,8 +52,8 @@ export interface EmbeddingRecording {
 
 const PROVIDER = "google";
 
-/** Extract the recording key from a prompt: enrichment prompts carry a
- * `Title:` line, classification and intent prompts a `Query:` line. */
+/** Extract the recording key from a prompt: product prompts carry a
+ * `Title:` line, query prompts a `Query:` line. */
 export function recordingKeyFromPrompt(prompt: string): string {
   const match = /^(?:Title|Query): (.*)$/m.exec(prompt);
   if (match === null) {
@@ -134,13 +127,6 @@ export function createReplayLlmClient({
         storeId: request.storeId,
         searchId: request.searchId,
       });
-      if (entry.error !== undefined) {
-        // A recorded failure replays as the failure it was — the ledger row
-        // above matches a live hung call, which is metered by nothing.
-        const error = new Error(`eval replay: recorded ${entry.error} for key "${key}"`);
-        error.name = entry.error;
-        throw error;
-      }
       return structuredClone(entry.output);
     },
   };

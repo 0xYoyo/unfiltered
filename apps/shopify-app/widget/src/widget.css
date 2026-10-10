@@ -121,14 +121,6 @@
   opacity: 0.7;
 }
 
-.close-matches {
-  margin-block-start: 16px;
-}
-
-.close-matches[hidden] {
-  display: none;
-}
-
 .close-matches-heading {
   margin-block: 0 8px;
   font-size: 1em;
@@ -228,20 +220,4 @@
   border: 1px solid currentColor;
   border-radius: 999px;
   opacity: 0.7;
-}
-
-/* Color truthfulness (YOY-67 AC-5): unknown-color results under a color
-   filter are visibly second-class — dimmed, with an explicit note. */
-.card-color-unknown {
-  opacity: 0.65;
-}
-
-.card-color-note {
-  display: inline-block;
-  margin-block-start: 6px;
-  padding: 2px 8px;
-  font-size: 0.85em;
-  border: 1px dashed currentColor;
-  border-radius: 999px;
-  opacity: 0.8;
 }

@@ -1,5 +1,4 @@
 import type { PrismaClient } from "@prisma/client";
-import type { RetrievalConstraints } from "@unfiltered/engine";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { createTestDb } from "../testing/helpers.server";
@@ -17,25 +16,9 @@ import {
 
 const SHOP = "classic-shop.myshopify.com";
 
-function noConstraints(): RetrievalConstraints {
-  return {
-    category: undefined,
-    priceMin: undefined,
-    priceMax: undefined,
-    colorsInclude: [],
-    colorsExclude: [],
-    attributesExclude: [],
-    attributesInclude: [],
-    occasion: undefined,
-    availableOnly: false,
-  };
-}
-
 interface SeedProduct {
   productId: string;
   title: string;
-  /** Description text the attribute filter reads (YOY-133); no keyword index over it. */
-  description?: string;
   tags?: string[];
   vendor?: string;
   productType?: string;
@@ -50,17 +33,6 @@ interface SeedProduct {
   /** Product-family key (YOY-117); "" (the default) is its own family. */
   familyKey?: string;
   shopDomain?: string;
-  /** undefined seeds no enrichment row (an unenriched product). */
-  enrichment?: {
-    category?: string | null;
-    colors?: string[];
-    /** Displayed colour (YOY-110); defaults to the first of `colors`. */
-    primaryColor?: string | null;
-    occasions?: string[];
-    /** Enrichment evidence the attribute filter reads (YOY-133). */
-    styleTags?: string[];
-    fit?: string | null;
-  };
 }
 
 async function seed(db: PrismaClient, products: SeedProduct[]): Promise<void> {
@@ -71,7 +43,7 @@ async function seed(db: PrismaClient, products: SeedProduct[]): Promise<void> {
         shopDomain,
         productId: product.productId,
         title: product.title,
-        description: product.description ?? "",
+        description: "",
         tags: product.tags ?? [],
         vendor: product.vendor ?? "fixture",
         productType: product.productType ?? "",
@@ -87,30 +59,6 @@ async function seed(db: PrismaClient, products: SeedProduct[]): Promise<void> {
         contentHash: `hash-${product.productId}`,
       },
     });
-    if (product.enrichment !== undefined) {
-      await db.productEnrichment.create({
-        data: {
-          shopDomain,
-          productId: product.productId,
-          contentHash: `hash-${product.productId}`,
-          status: "enriched",
-          category: product.enrichment.category ?? null,
-          colors: product.enrichment.colors ?? [],
-          occasions: product.enrichment.occasions ?? [],
-          // Default primary colour = the first stated colour, mirroring the
-          // enrichment fallback rule (YOY-110); pass `primaryColor` to seed a
-          // colourway product whose displayed colour differs, or null for an
-          // unknown one.
-          primaryColor:
-            product.enrichment.primaryColor === undefined
-              ? (product.enrichment.colors?.[0] ?? null)
-              : product.enrichment.primaryColor,
-          fit: product.enrichment.fit ?? null,
-          styleTags: product.enrichment.styleTags ?? [],
-          seasons: [],
-        },
-      });
-    }
   }
 }
 
@@ -118,7 +66,6 @@ async function searchIds(
   db: PrismaClient,
   request: {
     query?: string;
-    constraints?: RetrievalConstraints;
     shopDomain?: string;
     limit?: number;
   },
@@ -126,7 +73,6 @@ async function searchIds(
   const result = await createPgTrgmClassicStore(db).search({
     storeId: request.shopDomain ?? SHOP,
     query: request.query,
-    constraints: request.constraints,
     // Forwarded verbatim, absence included: no limit is the full match set
     // (YOY-107), which is what the storefront asks for.
     ...(request.limit !== undefined ? { limit: request.limit } : {}),
@@ -255,252 +201,6 @@ describe("typo-tolerant keyword search (AC-2, AC-3)", () => {
   });
 });
 
-describe("constraint-only mode mirrors pgvector predicate semantics (AC-4)", () => {
-  let db: PrismaClient;
-
-  beforeAll(async () => {
-    db = await createTestDb();
-    await seed(db, [
-      {
-        productId: "cheap-dress",
-        title: "Budget Dress",
-        priceMin: 100,
-        priceMax: 150,
-        enrichment: { category: "dress", colors: ["red"], occasions: ["wedding"] },
-      },
-      {
-        productId: "pricey-dress",
-        title: "Couture Dress",
-        priceMin: 900,
-        priceMax: 1200,
-        enrichment: { category: "dress", colors: ["black"], occasions: ["evening"] },
-      },
-      {
-        productId: "sneaker",
-        title: "Court Sneaker",
-        enrichment: { category: "sneakers", colors: [], occasions: [] },
-      },
-      {
-        productId: "unknown-attrs",
-        title: "Mystery Piece",
-        enrichment: { category: null, colors: [], occasions: [] },
-      },
-      { productId: "unenriched", title: "Raw Import" },
-      { productId: "sold-out", title: "Gone Dress", available: false },
-      // Colourway products (YOY-110): displayed pink, also sold in black;
-      // and one with stated colours but no primary colour.
-      {
-        productId: "mesh-pink",
-        title: "Mesh Over Dress in Pink",
-        priceMin: 128,
-        enrichment: { category: "dress", colors: ["pink", "black", "navy"], primaryColor: "pink" },
-      },
-      {
-        productId: "stated-no-primary",
-        title: "Mystery Dress",
-        enrichment: { category: "dress", colors: ["black"], primaryColor: null },
-      },
-    ]);
-  });
-
-  it("price cap compares against priceMin", async () => {
-    const ids = await searchIds(db, {
-      constraints: { ...noConstraints(), priceMax: 400 },
-    });
-    expect(ids).not.toContain("pricey-dress");
-    expect(ids).toContain("cheap-dress");
-  });
-
-  it("availability filters to available products", async () => {
-    const ids = await searchIds(db, {
-      constraints: { ...noConstraints(), availableOnly: true },
-    });
-    expect(ids).not.toContain("sold-out");
-  });
-
-  it("category is evidence-required and expands through category groups", async () => {
-    // Parent constraint admits group members: shoes → sneakers.
-    const shoes = await searchIds(db, {
-      constraints: { ...noConstraints(), category: "shoes" },
-    });
-    expect(shoes).toEqual(["sneaker"]);
-    // Evidence-required: null-category and unenriched products are excluded.
-    const dresses = await searchIds(db, {
-      constraints: { ...noConstraints(), category: "dress" },
-    });
-    expect(dresses).not.toContain("unknown-attrs");
-    expect(dresses).not.toContain("unenriched");
-  });
-
-  it("unknown enrichment passes positive occasion and color constraints", async () => {
-    const wedding = await searchIds(db, {
-      constraints: { ...noConstraints(), occasion: "wedding" },
-    });
-    expect(wedding).toContain("cheap-dress");
-    expect(wedding).toContain("unknown-attrs");
-    expect(wedding).toContain("unenriched");
-    expect(wedding).not.toContain("pricey-dress");
-
-    const red = await searchIds(db, {
-      constraints: { ...noConstraints(), colorsInclude: ["red"] },
-    });
-    expect(red).toContain("cheap-dress");
-    expect(red).toContain("unknown-attrs");
-    expect(red).not.toContain("pricey-dress");
-  });
-
-  it("color exclusion drops stated matches and keeps unknowns", async () => {
-    const ids = await searchIds(db, {
-      constraints: { ...noConstraints(), colorsExclude: ["black"] },
-    });
-    expect(ids).not.toContain("pricey-dress");
-    expect(ids).toContain("unknown-attrs");
-    expect(ids).toContain("unenriched");
-  });
-
-  it("color exclusion judges the PRIMARY colour only; a colourway product survives (YOY-110 AC-3, AC-4)", async () => {
-    // The colourway shape from the seed: mesh-pink also comes in black.
-    const ids = await searchIds(db, {
-      constraints: { ...noConstraints(), colorsExclude: ["Black"] },
-    });
-    expect(ids).toContain("mesh-pink");
-    expect(ids).toContain("stated-no-primary");
-    expect(ids).not.toContain("pricey-dress");
-    // The same product with query text (keyword mode) — same predicate.
-    // This is the close-match keyword fallback's shape (YOY-111 AC-1, AC-3):
-    // the raw query plus the exclusion, and the black-primary dress never
-    // rides it.
-    const keyword = await searchIds(db, {
-      query: "dress",
-      constraints: { ...noConstraints(), colorsExclude: ["black"] },
-    });
-    expect(keyword).toContain("mesh-pink");
-    expect(keyword).not.toContain("pricey-dress");
-    // Inclusion still reads every colourway (NG-1).
-    expect(
-      await searchIds(db, { constraints: { ...noConstraints(), colorsInclude: ["black"] } }),
-    ).toContain("mesh-pink");
-  });
-
-  it("under an exclusion-only colour constraint, colorUnknown means the primary colour is unknown (YOY-110 AC-3)", async () => {
-    const result = await createPgTrgmClassicStore(db).search({
-      storeId: SHOP,
-      constraints: { ...noConstraints(), colorsExclude: ["black"] },
-    });
-    const byId = new Map(result.hits.map((hit) => [hit.productId, hit]));
-    expect(byId.get("mesh-pink")!.colorUnknown).toBe(false);
-    expect(byId.get("stated-no-primary")!.colorUnknown).toBe(true);
-    expect(byId.get("unenriched")!.colorUnknown).toBe(true);
-  });
-
-  it("tiers unknown-color hits below known matches and flags them (YOY-67 AC-5)", async () => {
-    await seed(db, [
-      {
-        productId: "cs-known-blue",
-        title: "Constraint Fixture Known",
-        enrichment: { colors: ["blue"] },
-      },
-      {
-        productId: "cs-unknown-a",
-        title: "Constraint Fixture Unknown A",
-        enrichment: { colors: [] },
-      },
-    ]);
-
-    const result = await createPgTrgmClassicStore(db).search({
-      storeId: SHOP,
-      constraints: {
-        category: undefined,
-        priceMin: undefined,
-        priceMax: undefined,
-        colorsInclude: ["blue"],
-        colorsExclude: [],
-        attributesExclude: [],
-        attributesInclude: [],
-        occasion: undefined,
-        availableOnly: false,
-      },
-      limit: 50,
-    });
-
-    const ids = result.hits.map((hit) => hit.productId);
-    // productId order alone would put cs-known-blue after unenriched seeds
-    // from other tests; the color tier overrides it: every known match
-    // before every unknown-passes hit, each tier ordered by productId.
-    const knownIndex = ids.indexOf("cs-known-blue");
-    const unknownIndex = ids.indexOf("cs-unknown-a");
-    expect(knownIndex).toBeGreaterThanOrEqual(0);
-    expect(unknownIndex).toBeGreaterThanOrEqual(0);
-    expect(knownIndex).toBeLessThan(unknownIndex);
-    const byId = new Map(result.hits.map((hit) => [hit.productId, hit]));
-    expect(byId.get("cs-known-blue")!.colorUnknown).toBe(false);
-    expect(byId.get("cs-unknown-a")!.colorUnknown).toBe(true);
-  });
-
-  it("tiers and flags unknowns under an exclusion-only color constraint too (YOY-67 AC-5 fix round 1)", async () => {
-    await seed(db, [
-      {
-        productId: "cs-excl-known-red",
-        title: "Exclusion Fixture Known",
-        enrichment: { colors: ["red"] },
-      },
-      {
-        productId: "cs-excl-unknown",
-        title: "Exclusion Fixture Unknown",
-        enrichment: { colors: [] },
-      },
-    ]);
-
-    const result = await createPgTrgmClassicStore(db).search({
-      storeId: SHOP,
-      constraints: {
-        category: undefined,
-        priceMin: undefined,
-        priceMax: undefined,
-        colorsInclude: [],
-        colorsExclude: ["black"],
-        attributesExclude: [],
-        attributesInclude: [],
-        occasion: undefined,
-        availableOnly: false,
-      },
-      limit: 50,
-    });
-
-    const ids = result.hits.map((hit) => hit.productId);
-    const knownIndex = ids.indexOf("cs-excl-known-red");
-    const unknownIndex = ids.indexOf("cs-excl-unknown");
-    expect(knownIndex).toBeGreaterThanOrEqual(0);
-    expect(unknownIndex).toBeGreaterThanOrEqual(0);
-    expect(knownIndex).toBeLessThan(unknownIndex);
-    const byId = new Map(result.hits.map((hit) => [hit.productId, hit]));
-    expect(byId.get("cs-excl-known-red")!.colorUnknown).toBe(false);
-    expect(byId.get("cs-excl-unknown")!.colorUnknown).toBe(true);
-  });
-
-  it("scores every constraint-only hit 0, ordered deterministically", async () => {
-    const result = await createPgTrgmClassicStore(db).search({
-      storeId: SHOP,
-      constraints: noConstraints(),
-    });
-    expect(result.hits.length).toBeGreaterThan(0);
-    for (const hit of result.hits) {
-      expect(hit.score).toBe(0);
-    }
-    const ids = result.hits.map((hit) => hit.productId);
-    expect(ids).toEqual([...ids].sort());
-  });
-
-  it("combines query text with constraints as filters, not preferences", async () => {
-    const ids = await searchIds(db, {
-      query: "dress",
-      constraints: { ...noConstraints(), priceMax: 400 },
-    });
-    expect(ids).toContain("cheap-dress");
-    expect(ids).not.toContain("pricey-dress");
-  });
-});
-
 describe("one hit per product family (YOY-117 AC-2)", () => {
   let db: PrismaClient;
   const FAMILY = "eval|rib knit top|tops";
@@ -508,42 +208,32 @@ describe("one hit per product family (YOY-117 AC-2)", () => {
   beforeAll(async () => {
     db = await createTestDb();
     await seed(db, [
-      { productId: "rib-black", title: "Rib Knit Top in Black", familyKey: FAMILY, enrichment: { category: "top", colors: ["black"], primaryColor: "black" } },
-      { productId: "rib-navy", title: "Rib Knit Top in Navy", familyKey: FAMILY, enrichment: { category: "top", colors: ["navy"], primaryColor: "navy" } },
-      { productId: "rib-pink", title: "Rib Knit Top in Pink", familyKey: FAMILY, enrichment: { category: "top", colors: ["pink"], primaryColor: "pink" } },
-      { productId: "knit-dress", title: "Rib Knit Dress", familyKey: "eval|rib knit dress|dresses", enrichment: { category: "dress", colors: ["black"], primaryColor: "black" } },
+      { productId: "rib-black", title: "Rib Knit Top in Black", familyKey: FAMILY },
+      { productId: "rib-navy", title: "Rib Knit Top in Navy", familyKey: FAMILY },
+      { productId: "rib-pink", title: "Rib Knit Top in Pink", familyKey: FAMILY },
+      { productId: "knit-dress", title: "Rib Knit Dress", familyKey: "eval|rib knit dress|dresses" },
       // Empty keys: own families, never collapsed together.
-      { productId: "legacy-a", title: "Knit Scarf", enrichment: { colors: [] } },
-      { productId: "legacy-b", title: "Knit Beanie", enrichment: { colors: [] } },
+      { productId: "legacy-a", title: "Knit Scarf" },
+      { productId: "legacy-b", title: "Knit Beanie" },
     ]);
   });
 
-  it("keyword mode returns one member per family — the best-ranked when no colour is asked", async () => {
+  it("keyword mode returns one member per family — the best-ranked", async () => {
     const ids = await searchIds(db, { query: "rib knit top" });
     const family = ids.filter((id) => id.startsWith("rib-"));
     expect(family).toHaveLength(1);
     expect(ids).toContain("knit-dress");
   });
 
-  it("keyword mode prefers the member whose primary colour is in colorsInclude", async () => {
-    const ids = await searchIds(db, {
-      query: "rib knit top",
-      constraints: { ...noConstraints(), colorsInclude: ["pink"] },
-    });
-    expect(ids[0]).toBe("rib-pink");
-    expect(ids).not.toContain("rib-black");
-    expect(ids).not.toContain("rib-navy");
-  });
-
-  it("constraint-only mode collapses too, counts families in a limited page, and keeps empty keys apart", async () => {
-    const all = await searchIds(db, { constraints: noConstraints() });
+  it("a search with no query text collapses too, counts families in a limited page, and keeps empty keys apart", async () => {
+    const all = await searchIds(db, {});
     expect(all.filter((id) => id.startsWith("rib-"))).toHaveLength(1);
     expect(all).toContain("legacy-a");
     expect(all).toContain("legacy-b");
-    // Constraint-only order is by productId, so the family's representative
-    // (its best-ranked member, "rib-black") is the fourth family: a page of
-    // four holds it exactly once and no sibling.
-    const page = await searchIds(db, { constraints: noConstraints(), limit: 4 });
+    // With no query text the order is by productId, so the family's
+    // representative (its best-ranked member, "rib-black") is the fourth
+    // family: a page of four holds it exactly once and no sibling.
+    const page = await searchIds(db, { limit: 4 });
     expect(page).toEqual(["knit-dress", "legacy-a", "legacy-b", "rib-black"]);
   });
 
@@ -551,10 +241,8 @@ describe("one hit per product family (YOY-117 AC-2)", () => {
     const result = await createPgTrgmClassicStore(db).search({
       storeId: SHOP,
       query: "rib knit top",
-      constraints: { ...noConstraints(), colorsInclude: ["pink"] },
     });
-    expect(result.hits[0]).toMatchObject({ productId: "rib-pink", colorUnknown: false });
-    expect(Object.keys(result.hits[0]!).sort()).toEqual(["card", "colorUnknown", "productId", "score"]);
+    expect(Object.keys(result.hits[0]!).sort()).toEqual(["card", "productId", "score"]);
     expect(Object.keys(result.hits[0]!.card).sort()).toEqual(
       ["available", "currencyCode", "imageUrl", "priceMax", "priceMin", "title", "url"],
     );
@@ -574,7 +262,7 @@ describe("zero AI calls and index usage (AC-1, AC-5)", () => {
 
   it("a classic search writes no AiCall rows (AC-5)", async () => {
     await searchIds(db, { query: "nkie air max" });
-    await searchIds(db, { constraints: { ...noConstraints(), priceMax: 400 } });
+    await searchIds(db, {});
     expect(await db.aiCall.count()).toBe(0);
   });
 
@@ -621,15 +309,12 @@ describe("the full match set, uncapped (YOY-107 AC-1)", () => {
     expect(ids).toHaveLength(25);
   });
 
-  it("returns every constraint-only match when the request carries no limit", async () => {
-    const ids = await searchIds(db, {
-      constraints: { ...noConstraints(), priceMax: 1000 },
-    });
+  it("returns every product of the store when the request carries neither query nor limit", async () => {
+    const ids = await searchIds(db, {});
     expect(ids).toHaveLength(25);
   });
 
   it("still honors an explicit limit, and its page is the top of the same ranking", async () => {
-    // Close matches are the caller that still states a cap (AC-5).
     const capped = await searchIds(db, { query: "dress", limit: 10 });
     const full = await searchIds(db, { query: "dress" });
     expect(capped).toHaveLength(10);
@@ -683,7 +368,6 @@ describe("one statement per classic search, cards included (YOY-115 AC-1)", () =
         productId: "aurora",
         title: "Aurora Maxi Dress",
         productType: "Dresses",
-        enrichment: { colors: ["red"] },
       },
     ]);
   });
@@ -698,12 +382,9 @@ describe("one statement per classic search, cards included (YOY-115 AC-1)", () =
     expect(statements.some((sql) => /^\s*(BEGIN|COMMIT)/i.test(sql))).toBe(false);
   });
 
-  it("a constraint-only search is exactly one statement too", async () => {
+  it("a search with no query text is exactly one statement too", async () => {
     await startCounting();
-    await createPgTrgmClassicStore(db).search({
-      storeId: SHOP,
-      constraints: { ...noConstraints(), priceMax: 400, colorsExclude: ["black"] },
-    });
+    await createPgTrgmClassicStore(db).search({ storeId: SHOP });
     await drained(1);
     expect(statements).toHaveLength(1);
     expect(statements[0]).not.toContain("<%");
@@ -738,18 +419,6 @@ describe("one statement per classic search, cards included (YOY-115 AC-1)", () =
     expect(result.hits[0]).not.toHaveProperty("colorUnknown");
   });
 
-  it("keeps colour-evidence tiering and the colorUnknown flag beside the card", async () => {
-    const result = await createPgTrgmClassicStore(db).search({
-      storeId: SHOP,
-      constraints: { ...noConstraints(), colorsInclude: ["red"] },
-    });
-    expect(result.hits.map((hit) => [hit.productId, hit.colorUnknown])).toEqual([
-      ["aurora", false],
-      ["nike", true],
-    ]);
-    expect(result.hits[1]!.card.title).toBe("Nike Air Max 90");
-  });
-
   it("the plan runs set_config before the search scan: the threshold row is the outer side of the join", async () => {
     // The whole point of the LATERAL form: the executor must produce the
     // set_config row before it scans CatalogProduct with `<%`, or the GIN
@@ -770,85 +439,5 @@ describe("one statement per classic search, cards included (YOY-115 AC-1)", () =
     expect(plan.slice(searchAt)).toContain("<%");
     // Exactly one statement: the plan tree has one root.
     expect(plan.split("\n").filter((line) => !line.startsWith(" "))).toHaveLength(1);
-  });
-});
-
-describe("negated and category-like attributes mirror the pgvector semantics, keyword mode included (YOY-133 AC-2)", () => {
-  let db: PrismaClient;
-
-  beforeAll(async () => {
-    db = await createTestDb();
-    await seed(db, [
-      { productId: "wool-title", title: "Wool Winter Coat", enrichment: { category: "coat" } },
-      { productId: "wool-tag", title: "Heavy Winter Coat", tags: ["wool"], enrichment: { category: "coat" } },
-      { productId: "wool-styletag", title: "Warm Winter Coat", enrichment: { category: "coat", styleTags: ["wool"] } },
-      { productId: "wool-hebrew", title: "מעיל צמר אפור", enrichment: { category: "coat" } },
-      { productId: "no-wool-hebrew", title: "מעיל פוך ניילון", description: "מעיל פוך קל, ללא צמר.", enrichment: { category: "coat" } },
-      { productId: "plain-coat", title: "Puffer Winter Coat", enrichment: { category: "coat" } },
-      { productId: "unenriched-coat", title: "Camel Winter Coat" },
-      { productId: "sleeveless", title: "Sleeveless Linen Top", enrichment: { category: "top", fit: "sleeveless" } },
-      { productId: "long-sleeve", title: "Long-Sleeve Cotton Top", enrichment: { category: "top", styleTags: ["long sleeve"] } },
-      { productId: "bridal", title: "Ivory Lace Wedding Dress", enrichment: { category: "dress", styleTags: ["bridal"] } },
-      { productId: "bridal-hebrew", title: "שמלת כלה שנהב", tags: ["כלה"], enrichment: { category: "dress" } },
-      { productId: "guest", title: "Sage Guest Midi Dress", enrichment: { category: "dress" } },
-    ]);
-  });
-
-  it("constraint-only mode excludes on title, tags, styleTags, and Hebrew evidence; passes unknowns and negated mentions", async () => {
-    const ids = await searchIds(db, {
-      constraints: { ...noConstraints(), category: "coat", attributesExclude: ["wool"] },
-    });
-    expect(ids.sort()).toEqual(["no-wool-hebrew", "plain-coat"]);
-    // Without the category the unenriched product passes as well.
-    expect(
-      await searchIds(db, { constraints: { ...noConstraints(), attributesExclude: ["wool"] } }),
-    ).toContain("unenriched-coat");
-  });
-
-  it("keyword mode honours the exclusion too: 'winter coat' with 'not wool' never ranks a wool coat", async () => {
-    const all = await searchIds(db, { query: "winter coat" });
-    expect(all).toContain("wool-title");
-    const ids = await searchIds(db, {
-      query: "winter coat",
-      constraints: { ...noConstraints(), attributesExclude: ["wool"] },
-    });
-    expect(ids.length).toBeGreaterThan(0);
-    expect(ids).not.toContain("wool-title");
-    expect(ids).not.toContain("wool-tag");
-    expect(ids).not.toContain("wool-styletag");
-    expect(ids).not.toContain("wool-hebrew");
-    expect(ids).toContain("plain-coat");
-  });
-
-  it('"sleeveless" survives "no sleeves"; "long sleeve" does not', async () => {
-    expect(
-      await searchIds(db, {
-        constraints: { ...noConstraints(), category: "top", attributesExclude: ["sleeves"] },
-      }),
-    ).toEqual(["sleeveless"]);
-  });
-
-  it("a category-like inclusion is evidence-required, EN and HE; the guest's exclusion is its mirror", async () => {
-    expect(
-      (
-        await searchIds(db, {
-          constraints: { ...noConstraints(), category: "dress", attributesInclude: ["bridal"] },
-        })
-      ).sort(),
-    ).toEqual(["bridal", "bridal-hebrew"]);
-    expect(
-      await searchIds(db, {
-        constraints: { ...noConstraints(), category: "dress", attributesExclude: ["bridal"] },
-      }),
-    ).toEqual(["guest"]);
-  });
-
-  it("is still exactly one statement and writes no AiCall rows", async () => {
-    const before = await db.aiCall.count();
-    await searchIds(db, {
-      query: "coat",
-      constraints: { ...noConstraints(), attributesExclude: ["wool"], attributesInclude: [] },
-    });
-    expect(await db.aiCall.count()).toBe(before);
   });
 });

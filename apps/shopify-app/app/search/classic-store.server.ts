@@ -4,14 +4,8 @@ import type {
   ClassicSearchRequest,
   ClassicSearchResult,
   ClassicSearchStore,
-  RetrievalConstraints,
 } from "@unfiltered/engine";
-import { expandCategoryConstraint, normalizeQuery } from "@unfiltered/engine";
-
-import {
-  attributeConstraintSql,
-  colorUnknownSql,
-} from "./retrieval-store.server";
+import { normalizeQuery } from "@unfiltered/engine";
 
 /**
  * Postgres/pg_trgm implementation of the engine's ClassicSearchStore port
@@ -37,23 +31,13 @@ import {
  * every classic search — every keystroke preview, every rescue — is exactly
  * one round trip to the database.
  *
- * Constraint predicates mirror the pgvector RetrievalStore
- * (retrieval-store.server.ts) verbatim — the two stores must never drift,
- * because the orchestrator falls back from one to the other: unknown
- * enrichment passes positive occasion/color constraints, category stays
- * evidence-required and expands through the taxonomy's category groups, a
- * colour exclusion applies to the primary colour only (YOY-110), negated
- * attributes exclude and category-like attributes require on the same
- * text-and-enrichment evidence (YOY-133, `attributeConstraintSql`), and a
- * price cap compares against `priceMin`. Constraint-only requests (no
- * query text) filter without ranking and score every hit 0, ordered
- * deterministically by productId.
+ * A request with no query text returns every product of the store,
+ * scoring every hit 0, ordered deterministically by productId.
  *
- * One hit per product family (YOY-117 AC-2), mirroring the pgvector store:
- * colourways sharing `familyKey` collapse to one representative inside the
- * statement (`DISTINCT ON`), the member matching a requested colour first,
- * else the best-ranked; the limit applies after the collapse, so pages
- * count families. An empty `familyKey` is its own family.
+ * One hit per product family (YOY-117 AC-2): colourways sharing
+ * `familyKey` collapse to one representative inside the statement
+ * (`DISTINCT ON`), the best-ranked; the limit applies after the collapse,
+ * so pages count families. An empty `familyKey` is its own family.
  */
 
 /** word_similarity floor for a row to count as a keyword match. */
@@ -77,14 +61,6 @@ const SECONDARY_WEIGHT = 0.3;
  * Exported for the EXPLAIN test proving the index serves this expression.
  */
 export const SEARCH_TEXT = `catalog_search_text(p."title", p."tags", p."vendor", p."productType", p."imageAltTexts")`;
-
-const NO_CONSTRAINTS: RetrievalConstraints = {
-  colorsInclude: [],
-  colorsExclude: [],
-  attributesExclude: [],
-  attributesInclude: [],
-  availableOnly: false,
-};
 
 /** The display fields a classic hit carries, read in the same statement. */
 export interface ClassicCard {
@@ -120,11 +96,10 @@ export function buildClassicSearchSql(request: ClassicSearchRequest): {
   sql: string;
   params: unknown[];
 } {
-  const constraints = request.constraints ?? NO_CONSTRAINTS;
   const query = normalizeQuery(request.query ?? "");
   // Absent limit = the full ranked match set (YOY-107): the parity floor is
-  // every product matching the query and constraints, and the consumer
-  // paginates it. A present limit is still validated.
+  // every product matching the query, and the consumer paginates it. A
+  // present limit is still validated.
   const limit = request.limit;
   if (limit !== undefined && (!Number.isInteger(limit) || limit <= 0)) {
     throw new RangeError(`limit must be a positive integer, got ${limit}`);
@@ -144,17 +119,6 @@ export function buildClassicSearchSql(request: ClassicSearchRequest): {
     return `$${params.length}`;
   };
 
-  // Color-evidence tiering (YOY-67 AC-5), mirroring the pgvector store:
-  // under a color constraint — inclusion or exclusion; both render a color
-  // chip — unknown-passes hits rank strictly below evidence-backed hits and
-  // are flagged for the consumer.
-  const colorUnknownExpr =
-    constraints.colorsInclude.length > 0 || constraints.colorsExclude.length > 0
-      ? colorUnknownSql(constraints)
-      : null;
-  const colorTierPrefix =
-    colorUnknownExpr === null ? "" : `t."colorUnknown" ASC, `;
-
   let select: string;
   let orderBy: string;
   if (query !== "") {
@@ -162,74 +126,21 @@ export function buildClassicSearchSql(request: ClassicSearchRequest): {
     where.push(`${queryParam} <% ${SEARCH_TEXT}`);
     select = `(${TITLE_WEIGHT} * word_similarity(${queryParam}, p."title")
         + ${SECONDARY_WEIGHT} * word_similarity(${queryParam}, ${SEARCH_TEXT}))::float8 AS score`;
-    orderBy = `${colorTierPrefix}t.score DESC, t."productId" ASC`;
+    orderBy = `t.score DESC, t."productId" ASC`;
   } else {
     select = `0::float8 AS score`;
-    orderBy = `${colorTierPrefix}t."productId" ASC`;
+    orderBy = `t."productId" ASC`;
   }
-  if (colorUnknownExpr !== null) {
-    select += `,\n        ${colorUnknownExpr} AS "colorUnknown"`;
-  }
-  // Family collapse (YOY-117 AC-2): the family and the colour-preference
-  // flag ride the inner select; DISTINCT ON keeps one row per family.
+  // Family collapse (YOY-117 AC-2): the family rides the inner select;
+  // DISTINCT ON keeps one row per family.
   select += `,\n        COALESCE(NULLIF(p."familyKey", ''), p."productId") AS "family"`;
-  select +=
-    constraints.colorsInclude.length > 0
-      ? `,\n        COALESCE(lower(en."primaryColor") IN (SELECT lower(v)
-             FROM json_array_elements_text(${param(JSON.stringify(constraints.colorsInclude))}::json) v), false) AS "preferred"`
-      : `,\n        false AS "preferred"`;
-
-  if (constraints.priceMax !== undefined) {
-    // Violates the cap when even its cheapest variant is above it.
-    where.push(`p."priceMin" <= ${param(constraints.priceMax)}`);
-  }
-  if (constraints.priceMin !== undefined) {
-    where.push(`p."priceMax" >= ${param(constraints.priceMin)}`);
-  }
-  if (constraints.availableOnly) {
-    where.push(`p."available"`);
-  }
-  if (constraints.category !== undefined) {
-    where.push(
-      `lower(en."category") IN (SELECT lower(v)
-         FROM json_array_elements_text(${param(JSON.stringify(expandCategoryConstraint(constraints.category)))}::json) v)`,
-    );
-  }
-  if (constraints.occasion !== undefined) {
-    where.push(
-      `(COALESCE(cardinality(en."occasions"), 0) = 0
-         OR EXISTS (SELECT 1 FROM unnest(en."occasions") o
-           WHERE lower(o) = lower(${param(constraints.occasion)})))`,
-    );
-  }
-  if (constraints.colorsInclude.length > 0) {
-    where.push(
-      `(COALESCE(cardinality(en."colors"), 0) = 0
-         OR EXISTS (SELECT 1 FROM unnest(en."colors") c
-           WHERE lower(c) IN (SELECT lower(v)
-             FROM json_array_elements_text(${param(JSON.stringify(constraints.colorsInclude))}::json) v)))`,
-    );
-  }
-  where.push(...attributeConstraintSql(constraints, param));
-  if (constraints.colorsExclude.length > 0) {
-    // Exclusion by PRIMARY colour (YOY-110 AC-3), mirroring the pgvector
-    // store: only the primary/displayed colour can violate an exclusion,
-    // and a null primary colour passes.
-    where.push(
-      `(en."primaryColor" IS NULL
-         OR lower(en."primaryColor") NOT IN (SELECT lower(v)
-           FROM json_array_elements_text(${param(JSON.stringify(constraints.colorsExclude))}::json) v))`,
-    );
-  }
 
   // The threshold row: `s."threshold"` is referenced by the inner WHERE, so
   // the LATERAL dependency is real and the executor runs set_config first.
   // Ordering and the cap sit on the outer query over the joined columns —
   // one statement, one plan, one round trip.
   const sql = `SELECT t."productId", t."title", t."url", t."imageUrl",
-        t."priceMin", t."priceMax", t."currencyCode", t."available", t.score${
-    colorUnknownExpr === null ? "" : `, t."colorUnknown"`
-  }
+        t."priceMin", t."priceMax", t."currencyCode", t."available", t.score
      FROM (
        SELECT DISTINCT ON (t."family") t.*
        FROM (SELECT set_config('pg_trgm.word_similarity_threshold', '${WORD_SIMILARITY_THRESHOLD}', true) AS "threshold") s
@@ -237,13 +148,10 @@ export function buildClassicSearchSql(request: ClassicSearchRequest): {
          SELECT p."productId", ${CARD_COLUMNS},
           ${select}
          FROM "CatalogProduct" p
-         LEFT JOIN "ProductEnrichment" en
-           ON en."shopDomain" = p."shopDomain" AND en."productId" = p."productId"
-          AND en."status" = 'enriched'
          WHERE s."threshold" IS NOT NULL
            AND ${where.join("\n           AND ")}
        ) t
-       ORDER BY t."family", t."preferred" DESC, ${orderBy}
+       ORDER BY t."family", ${orderBy}
      ) t
      ORDER BY ${orderBy}${limit === undefined ? "" : `
      LIMIT ${limit}`}`;
@@ -253,7 +161,6 @@ export function buildClassicSearchSql(request: ClassicSearchRequest): {
 interface ClassicRow extends ClassicCard {
   productId: string;
   score: number;
-  colorUnknown?: boolean;
 }
 
 /** The pg_trgm store's result: the port's shape with every hit carrying its card. */
@@ -276,9 +183,6 @@ export function createPgTrgmClassicStore(db: PrismaClient): PgTrgmClassicStore {
       const hits: ClassicCardHit[] = rows.map((row) => ({
         productId: row.productId,
         score: row.score,
-        ...(row.colorUnknown !== undefined
-          ? { colorUnknown: row.colorUnknown === true }
-          : {}),
         card: {
           title: row.title,
           url: row.url,

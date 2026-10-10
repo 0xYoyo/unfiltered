@@ -3,9 +3,9 @@ import { expect, test, type Page } from "@playwright/test";
 /**
  * Visual baselines for the playground (YOY-92 AC-8; re-recorded against the
  * 2026-08-28 direction by YOY-123 AC-3). EN and HE, desktop and 360px, over
- * every state the issue's verify steps name: the initial page, classic
- * results, the AI state with its chip row, the zero-hit rescue with its
- * close matches, the opened engine panel, and the store-preload page.
+ * every state the issue's verify steps name: the initial page, results,
+ * the AI state with its chip row, the opened engine panel, and the
+ * store-preload page.
  *
  * Per-OS like the widget's, so a font-rendering difference between a laptop
  * and CI is a missing baseline rather than a false failure.
@@ -70,23 +70,6 @@ test.describe("visual baselines", () => {
         await settle(page);
         await expect(page).toHaveScreenshot(
           `playground-ai-${locale}-${device}.png`,
-          { fullPage: true },
-        );
-      });
-
-      // Zero hit AND close matches in one frame: the fixture answers with no
-      // results and two close matches under a relaxed-budget heading.
-      test(`zero hit and close matches — ${locale} ${device}`, async ({
-        page,
-      }) => {
-        await page.setViewportSize(viewport);
-        await page.goto(base);
-        await submit(page, "ai zero hit");
-        await expect(page.getByTestId("playground-chip")).toHaveCount(3);
-        await expect(page.locator(".closeMatches")).toBeVisible();
-        await settle(page);
-        await expect(page).toHaveScreenshot(
-          `playground-zero-hit-${locale}-${device}.png`,
           { fullPage: true },
         );
       });

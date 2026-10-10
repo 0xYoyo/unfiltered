@@ -1,5 +1,4 @@
-import { Prisma, type PrismaClient } from "@prisma/client";
-import { parseIntent, type Intent } from "@unfiltered/engine";
+import type { PrismaClient } from "@prisma/client";
 
 /**
  * Search/click event writes (YOY-47). Write-only in this milestone (NG-1):
@@ -15,10 +14,10 @@ export interface SearchEventInput {
   route: string;
   /**
    * Why the search took its route — the orchestrator's `routeReason`,
-   * written for every submitted search (YOY-96 AC-9) so a classic row can
-   * be told apart by cause: a heuristic or model decision, a throttled
-   * session, or the widget's "client-timeout-rescue" of a search that
-   * timed out on its side. Rows from before the column are null.
+   * written for every submitted search (YOY-96 AC-9) so a row can be told
+   * apart by cause: the judge's outcome, a capped session, or the widget's
+   * "client-timeout-rescue" of a search that timed out on its side. Rows
+   * from before the column are null.
    */
   routeReason: string;
   degraded: boolean;
@@ -29,66 +28,15 @@ export interface SearchEventInput {
    * page request. Absent means 1 — an unpaged search is its own first page.
    */
   page?: number;
-  /**
-   * The intent the search was served with, when the AI path produced one
-   * and the response was not degraded (YOY-64 AC-4); an identical query
-   * within the reuse window is answered from it without any LLM call.
-   * Stored together with `normalizedQuery`, the reuse key.
-   */
-  intent?: Intent | null;
-  normalizedQuery?: string | null;
 }
 
 /**
- * The exact-query reuse key (YOY-64 AC-4): trimmed, whitespace-collapsed,
- * case-folded. Exact text only — no paraphrase, no stemming (NG-5).
+ * The exact-query key the judge answer cache and the extraction cache are
+ * keyed by (YOY-148, YOY-149 AC-18): trimmed, whitespace-collapsed,
+ * case-folded. Exact text only — no paraphrase, no stemming.
  */
 export function normalizeReuseQuery(query: string): string {
   return query.trim().replace(/\s+/g, " ").toLowerCase();
-}
-
-/** Which stored intent a search may reuse, and from which row. */
-export interface ReusableIntent {
-  intent: Intent;
-  searchId: string;
-  createdAt: Date;
-}
-
-/**
- * The most recent intent this shop was served for the same normalized
- * query within `windowMs` (YOY-64 AC-4), or null. Only rows that stored an
- * intent qualify — classic, degraded, and pre-column rows never do — and a
- * stored intent that no longer parses (a schema drift) is skipped rather
- * than served.
- */
-export async function findReusableIntent(
-  db: PrismaClient,
-  options: {
-    shopDomain: string;
-    normalizedQuery: string;
-    windowMs: number;
-    now?: Date;
-  },
-): Promise<ReusableIntent | null> {
-  const now = options.now ?? new Date();
-  const rows = await db.searchEvent.findMany({
-    where: {
-      shopDomain: options.shopDomain,
-      normalizedQuery: options.normalizedQuery,
-      createdAt: { gte: new Date(now.getTime() - options.windowMs) },
-      intent: { not: Prisma.DbNull },
-    },
-    orderBy: { createdAt: "desc" },
-    take: 3,
-    select: { searchId: true, createdAt: true, intent: true },
-  });
-  for (const row of rows) {
-    const intent = parseIntent(row.intent);
-    if (intent !== null) {
-      return { intent, searchId: row.searchId, createdAt: row.createdAt };
-    }
-  }
-  return null;
 }
 
 /**
@@ -101,19 +49,7 @@ export async function writeSearchEvent(
   event: SearchEventInput,
 ): Promise<void> {
   try {
-    const { intent, normalizedQuery, ...rest } = event;
-    await db.searchEvent.create({
-      data: {
-        ...rest,
-        normalizedQuery: normalizedQuery ?? null,
-        // Prisma distinguishes a JSON null from an absent column; the
-        // column is absent (SQL NULL) when there is nothing to reuse.
-        intent:
-          intent === undefined || intent === null
-            ? Prisma.DbNull
-            : (intent as unknown as Prisma.InputJsonValue),
-      },
-    });
+    await db.searchEvent.create({ data: event });
   } catch (error) {
     console.error(
       `search-event write failed for search ${event.searchId}:`,

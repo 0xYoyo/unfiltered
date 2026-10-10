@@ -11,8 +11,7 @@
       "priceMin": 180,
       "priceMax": 180,
       "currencyCode": "USD",
-      "available": true,
-      "colorUnknown": false
+      "available": true
     },
     {
       "productId": "p-v2-2",
@@ -22,8 +21,7 @@
       "priceMin": 240,
       "priceMax": 240,
       "currencyCode": "USD",
-      "available": true,
-      "colorUnknown": false
+      "available": true
     },
     {
       "productId": "p-v2-3",
@@ -33,12 +31,10 @@
       "priceMin": 990,
       "priceMax": 990,
       "currencyCode": "USD",
-      "available": true,
-      "colorUnknown": false
+      "available": true
     }
   ],
   "chips": [],
-  "intent": null,
   "details": {
     "routeReason": "judged",
     "latencyMs": 912,
@@ -48,8 +44,6 @@
       "hydrate": 9,
       "judge": 702
     },
-    "intentTier": null,
-    "engine": "v2",
     "judge": null
   },
   "page": 1,

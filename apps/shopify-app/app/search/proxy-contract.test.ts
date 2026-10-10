@@ -20,23 +20,6 @@ import {
  * the body the client really consumes.
  */
 
-// The wire form of an echoed intent — a previous response's `intent` field,
-// absent optionals as null — exactly what the widget holds and echoes back.
-const WIRE_INTENT = {
-  category: "dress",
-  priceMin: null,
-  priceMax: 400,
-  currency: "ILS",
-  colorsInclude: [],
-  colorsExclude: ["black"],
-  attributesExclude: [],
-  attributesInclude: [],
-  occasion: null,
-  size: null,
-  availabilityRequired: false,
-  softAttributes: ["elegant"],
-};
-
 const ORCHESTRATOR_RESPONSE = {
   searchId: "search-contract-1",
   route: "ai",
@@ -55,10 +38,7 @@ const ORCHESTRATOR_RESPONSE = {
     },
   ],
   chips: [{ field: "priceMax", value: "400" }],
-  intent: null,
-  closeMatches: [],
-  closeMatchesRelaxed: [],
-  stages: { classify: 30, intent: 400, embed: 90, retrieve: 40, hydrate: 5 },
+  stages: { find: 300, compose: 4, hydrate: 5, judgeRows: 3, judge: 450 },
 } as unknown as SearchResponse;
 
 interface CapturedRequest {
@@ -87,14 +67,14 @@ afterEach(() => {
 });
 
 describe("search request: widget serialization → route parsing", () => {
-  it("round-trips a refinement request with previousIntent and removeChip", async () => {
+  it("round-trips a refinement request with previousQuery and removedChips", async () => {
     const captured: CapturedRequest[] = [];
     captureFetch(captured);
 
     const client = createSearchClient();
     await client.search("elegant dress", "session-1", {
-      previousIntent: WIRE_INTENT,
-      removeChip: { field: "priceMax", value: "400" },
+      previousQuery: "black dress",
+      removedChips: [{ field: "priceMax", value: "400" }],
     });
 
     expect(captured).toHaveLength(1);
@@ -111,30 +91,33 @@ describe("search request: widget serialization → route parsing", () => {
     expect(parsed).not.toBeNull();
     expect(parsed?.query).toBe("elegant dress");
     expect(parsed?.sessionId).toBe("session-1");
-    expect(parsed?.removeChip).toEqual({ field: "priceMax", value: "400" });
-    // parseIntent normalizes the wire nulls away; the constraints survive.
-    expect(parsed?.previousIntent).toMatchObject({
-      category: "dress",
-      priceMax: 400,
-      colorsExclude: ["black"],
-      attributesExclude: [],
-      attributesInclude: [],
-      availabilityRequired: false,
-    });
-    expect(parsed?.previousIntent?.priceMin).toBeUndefined();
+    expect(parsed?.previousQuery).toBe("black dress");
+    expect(parsed?.removedChips).toEqual([{ field: "priceMax", value: "400" }]);
   });
 
-  it("omits previousIntent entirely on a new search (YOY-49 AC-5)", async () => {
+  it("sends no refinement context on a new search (YOY-49 AC-5)", async () => {
     const captured: CapturedRequest[] = [];
     captureFetch(captured);
 
     await createSearchClient().search("snowboard", "session-2");
 
     const url = new URL(captured[0].url, "https://shop.example");
-    expect(url.searchParams.has("previousIntent")).toBe(false);
-    expect(url.searchParams.has("removeChip")).toBe(false);
+    expect(url.searchParams.has("previousQuery")).toBe(false);
+    expect(url.searchParams.has("removedChips")).toBe(false);
     const parsed = parseProxySearchParams(url.searchParams);
     expect(parsed).toEqual({ query: "snowboard", sessionId: "session-2" });
+  });
+
+  it("does not read the removed intent fields: previousIntent and removeChip are ignored (YOY-155 AC-5)", () => {
+    const parsed = parseProxySearchParams(
+      new URLSearchParams({
+        query: "dress",
+        sessionId: "s",
+        previousIntent: JSON.stringify({ category: "dress" }),
+        removeChip: JSON.stringify({ field: "category", value: "dress" }),
+      }),
+    );
+    expect(parsed).toEqual({ query: "dress", sessionId: "s" });
   });
 
   it("round-trips the classic rescue as mode=classic (YOY-96 AC-9)", async () => {
@@ -216,22 +199,16 @@ describe("search response: route serialization → widget consumption", () => {
     // Every response shape the orchestrator produces, each with a ledger
     // the proxy must keep off the storefront wire.
     const shapes: Array<Partial<SearchResponse>> = [
-      { route: "classic", stages: { classify: 1, classic: 20, hydrate: 3 } },
+      { route: "ai", stages: { find: 300, compose: 4, hydrate: 5, judgeRows: 3, judge: 450 } },
+      { route: "ai", degraded: true, stages: { find: 20, hydrate: 3 } },
+      { route: "classic", routeReason: "capped", stages: { find: 300, hydrate: 5 } },
+      { route: "classic", routeReason: "preview", stages: { classic: 20 } },
       {
         route: "classic",
+        routeReason: "client-timeout-rescue",
         degraded: true,
-        stages: { classify: 40, intent: 900, classic: 20, hydrate: 3 },
+        stages: { classic: 20, hydrate: 3 },
       },
-      { route: "ai", stages: { classify: 30, intent: 400, embed: 90, retrieve: 40, hydrate: 5 } },
-      {
-        route: "ai",
-        hits: [],
-        closeMatches: ORCHESTRATOR_RESPONSE.hits,
-        closeMatchesRelaxed: ["priceMax"],
-        stages: { classify: 30, intent: 400, embed: 90, retrieve: 40, closeMatches: 25, hydrate: 5 },
-      },
-      { route: "classic", routeReason: "preview", stages: { classic: 20, hydrate: 3 } },
-      { route: "classic", routeReason: "throttled", stages: { classic: 20, hydrate: 3 } },
     ] as Array<Partial<SearchResponse>>;
     for (const shape of shapes) {
       const body = serializeProxySearchResponse({
@@ -240,6 +217,38 @@ describe("search response: route serialization → widget consumption", () => {
       });
       expect(body).not.toHaveProperty("stages");
       expect(JSON.stringify(body)).not.toContain("stages");
+    }
+  });
+
+  it("carries none of the removed fields, and closeMatches keeps its close-verdict shape (YOY-155 AC-5)", () => {
+    const card = (productId: string, verdict: string) => ({
+      ...ORCHESTRATOR_RESPONSE.hits[0]!,
+      productId,
+      label: verdict === "close" ? { template: "close-match", values: [] } : null,
+      verdict,
+    });
+    const judged = serializeProxySearchResponse(
+      {
+        ...ORCHESTRATOR_RESPONSE,
+        routeReason: "judged",
+        hits: [card("a", "exact"), card("b", "close")],
+      } as unknown as SearchResponse,
+      "jev",
+    );
+    expect(judged.results.map((result) => result.productId)).toEqual(["a"]);
+    expect(judged.closeMatches).toEqual([
+      {
+        ...ORCHESTRATOR_RESPONSE.hits[0]!,
+        productId: "b",
+        label: { template: "close-match", values: [] },
+      },
+    ]);
+    const unjudged = serializeProxySearchResponse(ORCHESTRATOR_RESPONSE);
+    expect(unjudged).not.toHaveProperty("closeMatches");
+    for (const body of [judged, unjudged]) {
+      for (const removed of ["intent", "closeMatchesRelaxed", "colorUnknown"]) {
+        expect(JSON.stringify(body)).not.toContain(`"${removed}"`);
+      }
     }
   });
 });
@@ -269,12 +278,12 @@ describe("server-side pages (YOY-145 AC-4 to AC-6)", () => {
     expect(parsePaging(undefined, 100)).toEqual({ page: 1, pageSize: 24 });
   });
 
-  it("leaves a request without page parameters unpaged, and never reads engine on the proxy", () => {
+  it("leaves a request without page parameters unpaged, and never reads engine", () => {
     expect(parseProxySearchParams(params({}))).toEqual({
       query: "midi dress",
       sessionId: "session-p",
     });
-    // The storefront proxy ignores `engine` (AC-6): nothing of it survives parsing.
+    // There is one engine (YOY-155 AC-3): nothing of `engine` survives parsing.
     expect(parseProxySearchParams(params({ engine: "v2" }))).toEqual({
       query: "midi dress",
       sessionId: "session-p",

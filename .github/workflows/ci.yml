@@ -85,7 +85,7 @@ jobs:
       - run: >-
           npx vitest run --config vitest.dist-seam.config.ts
           apps/shopify-app/app/search/orchestrator.test.ts
-          apps/shopify-app/app/search/retrieval-store.test.ts
+          apps/shopify-app/app/search/engine-v2.test.ts
 
   # Image-build guard (YOY-91 AC-4): the deployment is a Docker web service
   # built from the repo-root Dockerfile, and Render builds it only after the

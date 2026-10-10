@@ -4,8 +4,12 @@ import type { PrismaClient } from "@prisma/client";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { createTestDb } from "../testing/helpers.server";
-import { CARD_SECTION_OVERSCAN, cardSectionsPerProduct, queryCardIndex } from "./card-retrieval.server";
-import { FAMILY_OVERSCAN } from "./retrieval-store.server";
+import {
+  CARD_SECTION_OVERSCAN,
+  cardSectionsPerProduct,
+  FAMILY_OVERSCAN,
+  queryCardIndex,
+} from "./card-retrieval.server";
 
 // The card index query (YOY-144 AC-3 to AC-7) on the embedded PGlite DB.
 // Vectors are written directly, so every distance is known: the cosine

@@ -12,29 +12,10 @@
  * common, and those come from the server module.
  */
 
-import type {
-  ProxyChip,
-  ProxyIntent,
-  ProxyLabel,
-  ProxyLabelsResponse,
-} from "../search/proxy.server";
+import type { ProxyLabel, ProxyLabelsResponse } from "../search/proxy.server";
 import type { PlaygroundSearchResponse } from "./api.server";
 
 export const PREVIEW_DEBOUNCE_MS = 200;
-
-/** The engine a playground page view asks for (YOY-165): `/try?engine=`. */
-export type PlaygroundEngine = "v1" | "v2";
-
-/**
- * The engine named by a page URL's `engine` parameter (YOY-165 AC-1):
- * `v1` or `v2`; anything else, or nothing, is ignored and the server
- * default answers.
- */
-export function playgroundEngineParam(
-  value: string | null,
-): PlaygroundEngine | undefined {
-  return value === "v1" || value === "v2" ? value : undefined;
-}
 
 /**
  * One removed engine v2 chip as it rides `removedChips` (YOY-149): the
@@ -85,17 +66,9 @@ export interface PlaygroundSearchRequest {
   /** Registry slug; absent means the seed catalog. */
   catalog?: string;
   /**
-   * The held intent from the last AI response, echoed so a follow-up
-   * modifies that search instead of starting a new one (YOY-93 AC-2).
-   */
-  previousIntent?: ProxyIntent;
-  /** Chip the visitor dismissed; the server adjusts `previousIntent`. */
-  removeChip?: ProxyChip;
-  /**
-   * Engine v2 chip removal (YOY-149 AC-15): every chip removed so far in
-   * this search chain, the newest included. A v2 response echoes no
-   * intent, so the same query is re-asked with this list instead of
-   * `previousIntent`/`removeChip`.
+   * Chip removal (YOY-149 AC-15): every chip removed so far in this
+   * search chain, the newest included; the same query is re-asked with
+   * this list.
    */
   removedChips?: readonly RemovedChip[];
   /**
@@ -108,11 +81,6 @@ export interface PlaygroundSearchRequest {
    * one; a keystroke preview never does.
    */
   paging?: { page: number; pageSize: number };
-  /**
-   * The engine the page view asks for (YOY-165 AC-1); absent means the
-   * server default. Never on a preview.
-   */
-  engine?: PlaygroundEngine;
   signal?: AbortSignal;
 }
 
@@ -121,12 +89,9 @@ export function playgroundSearchUrl(request: {
   preview: boolean;
   sessionId: string;
   catalog?: string;
-  previousIntent?: ProxyIntent;
-  removeChip?: ProxyChip;
   removedChips?: readonly RemovedChip[];
   previousQuery?: string;
   paging?: { page: number; pageSize: number };
-  engine?: PlaygroundEngine;
 }): string {
   const params = new URLSearchParams({
     query: request.query,
@@ -140,12 +105,6 @@ export function playgroundSearchUrl(request: {
   }
   // Refinement rides the wire exactly as the proxy's own parameters do
   // (NG-3: the playground changes no contract).
-  if (request.previousIntent !== undefined) {
-    params.set("previousIntent", JSON.stringify(request.previousIntent));
-  }
-  if (request.removeChip !== undefined) {
-    params.set("removeChip", JSON.stringify(request.removeChip));
-  }
   if (request.removedChips !== undefined && request.removedChips.length > 0) {
     params.set(
       "removedChips",
@@ -164,11 +123,6 @@ export function playgroundSearchUrl(request: {
     params.set("page", String(request.paging.page));
     params.set("pageSize", String(request.paging.pageSize));
   }
-  // A keystroke preview is classic-only, so it never names an engine
-  // (YOY-165 AC-1).
-  if (request.engine !== undefined && !request.preview) {
-    params.set("engine", request.engine);
-  }
   return `/api/playground/search?${params.toString()}`;
 }
 
@@ -181,12 +135,6 @@ export async function searchPlayground(
     preview: request.preview,
     sessionId: getPlaygroundSessionId(),
     ...(request.catalog === undefined ? {} : { catalog: request.catalog }),
-    ...(request.previousIntent === undefined
-      ? {}
-      : { previousIntent: request.previousIntent }),
-    ...(request.removeChip === undefined
-      ? {}
-      : { removeChip: request.removeChip }),
     ...(request.removedChips === undefined
       ? {}
       : { removedChips: request.removedChips }),
@@ -194,7 +142,6 @@ export async function searchPlayground(
       ? {}
       : { previousQuery: request.previousQuery }),
     ...(request.paging === undefined ? {} : { paging: request.paging }),
-    ...(request.engine === undefined ? {} : { engine: request.engine }),
   });
   const response = await fetch(url, {
     ...(request.signal === undefined ? {} : { signal: request.signal }),

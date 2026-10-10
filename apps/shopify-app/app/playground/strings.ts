@@ -74,22 +74,10 @@ export interface PlaygroundStrings {
   otherReading: string;
   /** AI zero-hit: nothing satisfied every applied constraint. */
   zeroHit: string;
+  /** The heading of a judged page's close products (YOY-166). */
   closeMatchesHeading: string;
-  /**
-   * The close-matches heading when the server relaxed constraints to find
-   * them (YOY-111 AC-4): {list} is the relaxed constraints, comma-joined,
-   * each named by one of the `relaxed*` strings.
-   */
-  closeMatchesHeadingRelaxed: string;
-  relaxedBudget: string;
-  relaxedOccasion: string;
-  relaxedAvailability: string;
-  relaxedColors: string;
-  relaxedCategory: string;
-  /** The one secondary button, shown once an AI response is held. */
+  /** The one secondary button, shown once a refinement chain is held. */
   newSearch: string;
-  /** Label on a card that passed a colour filter without colour evidence. */
-  colorNotConfirmed: string;
   /**
    * The card's label line (YOY-151 AC-1), the widget's five templates
    * verbatim, filled by `labelText` in widget/src/labels.ts: {size} the
@@ -107,21 +95,11 @@ export interface PlaygroundStrings {
   /** Field labels inside the engine-details panel. */
   detailsRoute: string;
   detailsRouteReason: string;
-  /** Which model tier extracted the intent (YOY-116). */
-  detailsIntentTier: string;
   detailsLatency: string;
   detailsDegraded: string;
   detailsLimited: string;
-  detailsIntent: string;
   /** Heading of the per-stage timing rows (YOY-114). */
   detailsStages: string;
-  /** Which engine answered (YOY-165 AC-2). */
-  detailsEngine: string;
-  /**
-   * The badge near the search field when `/try?engine=` names an engine
-   * (YOY-165 AC-2); {engine} is `v1` or `v2`.
-   */
-  engineBadge: string;
   /** Value shown for a detail the response left null. */
   detailsNone: string;
   detailsYes: string;
@@ -176,14 +154,7 @@ export const PLAYGROUND_STRING_CATALOG: Record<
     otherReading: "{reading} instead?",
     zeroHit: "Nothing matches all of these",
     closeMatchesHeading: "Close matches",
-    closeMatchesHeadingRelaxed: "Close matches — {list}",
-    relaxedBudget: "over your budget",
-    relaxedOccasion: "other occasions",
-    relaxedAvailability: "including sold out",
-    relaxedColors: "other colours",
-    relaxedCategory: "other categories",
     newSearch: "New search",
-    colorNotConfirmed: "Color not confirmed",
     labelPriceNear: "slightly over budget",
     labelPriceFar: "over budget",
     labelSizeMissing: "size {size} not in stock",
@@ -192,14 +163,10 @@ export const PLAYGROUND_STRING_CATALOG: Record<
     engineDetailsToggle: "How it understood you",
     detailsRoute: "Route",
     detailsRouteReason: "Reason",
-    detailsIntentTier: "Intent tier",
     detailsLatency: "Latency",
     detailsDegraded: "Degraded",
     detailsLimited: "Limited",
-    detailsIntent: "Extracted intent",
     detailsStages: "Stages",
-    detailsEngine: "Engine",
-    engineBadge: "Engine {engine}",
     detailsNone: "none",
     detailsYes: "yes",
     detailsNo: "no",
@@ -240,14 +207,7 @@ export const PLAYGROUND_STRING_CATALOG: Record<
     otherReading: "{reading} במקום?",
     zeroHit: "אין פריט שעונה על כל אלה",
     closeMatchesHeading: "התאמות קרובות",
-    closeMatchesHeadingRelaxed: "התאמות קרובות — {list}",
-    relaxedBudget: "מעל התקציב",
-    relaxedOccasion: "אירועים אחרים",
-    relaxedAvailability: "כולל אזל מהמלאי",
-    relaxedColors: "צבעים אחרים",
-    relaxedCategory: "קטגוריות אחרות",
     newSearch: "חיפוש חדש",
-    colorNotConfirmed: "הצבע לא אומת",
     labelPriceNear: "מעט מעל התקציב",
     labelPriceFar: "מעל התקציב",
     labelSizeMissing: "מידה {size} לא במלאי",
@@ -256,14 +216,10 @@ export const PLAYGROUND_STRING_CATALOG: Record<
     engineDetailsToggle: "איך זה הבין אתכם",
     detailsRoute: "מסלול",
     detailsRouteReason: "סיבה",
-    detailsIntentTier: "רמת חילוץ",
     detailsLatency: "זמן תגובה",
     detailsDegraded: "מצומצם",
     detailsLimited: "הוגבל",
-    detailsIntent: "כוונה שחולצה",
     detailsStages: "שלבים",
-    detailsEngine: "מנוע",
-    engineBadge: "מנוע {engine}",
     detailsNone: "אין",
     detailsYes: "כן",
     detailsNo: "לא",
@@ -278,52 +234,6 @@ export const PLAYGROUND_STRING_CATALOG: Record<
 };
 
 /** Text direction of a chrome language (AC-3). */
-/**
- * The close-matches heading for a response (YOY-111 AC-4), the widget's
- * rule verbatim (`widget/src/strings.ts`): plain when nothing was relaxed,
- * else "Close matches — <a>, <b>" naming each relaxed constraint. Budget
- * (`priceMin`/`priceMax`) is one name, listed once; an unknown name is
- * skipped rather than rendered raw.
- */
-export function closeMatchesHeadingText(
-  strings: Pick<
-    PlaygroundStrings,
-    | "closeMatchesHeading"
-    | "closeMatchesHeadingRelaxed"
-    | "relaxedBudget"
-    | "relaxedOccasion"
-    | "relaxedAvailability"
-    | "relaxedColors"
-    | "relaxedCategory"
-  >,
-  relaxed: readonly string[] | undefined,
-): string {
-  const labels: string[] = [];
-  for (const name of relaxed ?? []) {
-    const label =
-      name === "priceMax" || name === "priceMin"
-        ? strings.relaxedBudget
-        : name === "occasion"
-          ? strings.relaxedOccasion
-          : name === "availabilityRequired"
-            ? strings.relaxedAvailability
-            : name === "colorsInclude"
-              ? strings.relaxedColors
-              : name === "category"
-                ? strings.relaxedCategory
-                : null;
-    if (label !== null && !labels.includes(label)) {
-      labels.push(label);
-    }
-  }
-  return labels.length === 0
-    ? strings.closeMatchesHeading
-    : strings.closeMatchesHeadingRelaxed.replace(
-        "{list}",
-        labels.join(", "),
-      );
-}
-
 export function localeDirection(locale: PlaygroundLocale): "ltr" | "rtl" {
   return locale === "he" ? "rtl" : "ltr";
 }

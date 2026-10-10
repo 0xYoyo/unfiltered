@@ -10,13 +10,13 @@ import { defineConfig } from "vitest/config";
 // between app and engine must hold for the built artifact too: PR #74's
 // shopDomain → storeId rename went green on src-aliased tests while a stale
 // dist returned zero rows for every AI-routed search. CI's `dist-seam` job
-// builds the workspaces and runs the retrieval-path suites through this
+// builds the workspaces and runs the search-path suites through this
 // config; a src/dist contract divergence fails there and nowhere else.
 //
 //   npm run build
 //   npx vitest run --config vitest.dist-seam.config.ts \
 //     apps/shopify-app/app/search/orchestrator.test.ts \
-//     apps/shopify-app/app/search/retrieval-store.test.ts
+//     apps/shopify-app/app/search/engine-v2.test.ts
 export default defineConfig({
   test: {
     setupFiles: ["./vitest.setup.ts"],

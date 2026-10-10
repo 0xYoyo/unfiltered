@@ -83,10 +83,6 @@
   display: none;
 }
 
-.unfiltered-native__close-matches[hidden] {
-  display: none;
-}
-
 /* The close-matches heading is a plain heading element: the theme's own
    heading styles apply, nothing of ours beyond spacing. */
 .unfiltered-native__close-matches-heading {
@@ -102,19 +98,6 @@
   width: 100%;
   max-width: 100%;
   list-style: none;
-}
-
-/* Color truthfulness (YOY-67 AC-5) carried onto native cards: the item is
-   dimmed and labeled, so a color-unknown hit never poses as a confirmed
-   match under a color chip. */
-.unfiltered-native__item--color-unknown {
-  opacity: 0.6;
-}
-
-.unfiltered-native__note {
-  display: block;
-  font-size: 0.85em;
-  opacity: 0.8;
 }
 
 /* The label line (YOY-151 AC-5, W-11): the only element added to a theme

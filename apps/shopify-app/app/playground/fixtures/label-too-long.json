@@ -12,7 +12,6 @@
       "priceMax": 310,
       "currencyCode": "ILS",
       "available": true,
-      "colorUnknown": false,
       "label": {
         "template": "fact-differs",
         "values": [
@@ -30,7 +29,6 @@
       "priceMax": 420,
       "currencyCode": "ILS",
       "available": true,
-      "colorUnknown": false,
       "label": {
         "template": "price-near",
         "values": [
@@ -51,7 +49,6 @@
       "value": "M"
     }
   ],
-  "intent": null,
   "details": {
     "routeReason": "judged",
     "latencyMs": 912,
@@ -61,8 +58,6 @@
       "hydrate": 9,
       "judge": 702
     },
-    "intentTier": null,
-    "engine": "v2",
     "judge": null
   }
 }

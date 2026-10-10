@@ -528,7 +528,6 @@
     "language": "en",
     "group": "occasionVsCategory",
     "query": "wedding dress",
-    "expectedRoute": "classic",
     "expectedProductIds": [
       "p67",
       "p68"
@@ -695,7 +694,6 @@
     "language": "en",
     "group": "occasionVsCategory",
     "query": "sneakers for running",
-    "expectedRoute": "ai",
     "expectedProductIds": [
       "p24",
       "p61"

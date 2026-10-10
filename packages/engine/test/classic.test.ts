@@ -1,13 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import type {
-  ClassicSearchRequest,
-  ClassicSearchStore,
+import {
+  normalizeQuery,
+  type ClassicSearchRequest,
+  type ClassicSearchStore,
 } from "../src/index.js";
 
 // The classic-search port (AC-2): the engine owns the contract, consumers
 // implement it. An in-memory implementation proves the request/response
-// shapes compose — text query, constraint-only, and limit — without the
+// shapes compose — text query, no query text, and limit — without the
 // engine gaining any runtime dependency.
 
 function createInMemoryStore(
@@ -46,18 +47,9 @@ describe("ClassicSearchStore port contract", () => {
     expect(result.hits).toEqual([{ productId: "p1", score: 1 }]);
   });
 
-  it("accepts constraint-only requests: no query text, zero scores", async () => {
+  it("accepts requests with no query text: zero scores", async () => {
     const store = createInMemoryStore(rows);
-    const result = await store.search({
-      storeId: "a.example.com",
-      constraints: {
-        colorsInclude: [],
-        colorsExclude: [],
-        attributesExclude: [],
-        attributesInclude: [],
-        availableOnly: false,
-      },
-    });
+    const result = await store.search({ storeId: "a.example.com" });
     expect(result.hits.map((hit) => hit.score)).toEqual([0, 0]);
   });
 
@@ -68,5 +60,12 @@ describe("ClassicSearchStore port contract", () => {
       limit: 1,
     });
     expect(result.hits).toHaveLength(1);
+  });
+});
+
+describe("normalizeQuery", () => {
+  it("lowercases, trims and collapses inner whitespace", () => {
+    expect(normalizeQuery("  Red   DRESS\tunder 400 ")).toBe("red dress under 400");
+    expect(normalizeQuery("שמלה  אדומה")).toBe("שמלה אדומה");
   });
 });

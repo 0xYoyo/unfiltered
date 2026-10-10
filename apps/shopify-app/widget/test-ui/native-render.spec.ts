@@ -308,9 +308,8 @@ test.describe("Variant A — alternate-template fetch (AC-1)", () => {
     await expect(items(page)).toHaveCount(3);
     await expect(nativeChips(page)).toHaveCount(3);
     await expect(nativeChips(page).nth(1)).toContainText("Under 400");
-    // Color truthfulness carries onto native cards (YOY-67 AC-5).
-    await expect(items(page).nth(2)).toHaveClass(/color-unknown/);
-    await expect(items(page).nth(2)).toContainText("Color not confirmed");
+    // Every card renders alike: no colour note on any (YOY-155).
+    await expect(page.getByTestId("unfiltered-widget-color-note")).toHaveCount(0);
     expect(await altTemplateRequests(page)).toHaveLength(3);
 
     await nativeChips(page).filter({ hasText: "Under 400" }).click();
@@ -329,7 +328,7 @@ test.describe("Variant A — alternate-template fetch (AC-1)", () => {
     });
   });
 
-  test("AI zero hit: the zero-hit state and close matches render natively", async ({
+  test("AI zero hit: the zero-hit state renders natively, with no close-matches section", async ({
     page,
   }) => {
     await page.goto(
@@ -338,16 +337,13 @@ test.describe("Variant A — alternate-template fetch (AC-1)", () => {
 
     await submitQuery(page, "blue dress under 400");
     await expect(page.getByTestId("unfiltered-native-zero-hit")).toBeVisible();
+    await expect(nativeChips(page)).toHaveCount(3);
+    // No card and no "Close matches" heading of any wording (YOY-155).
+    await expect(items(page)).toHaveCount(0);
+    await expect(page.getByTestId("unfiltered-native-close-matches")).toHaveCount(0);
     await expect(
-      page.getByTestId("unfiltered-native-close-matches"),
-    ).toBeVisible();
-    // The native heading names the relaxed constraint too (YOY-111 AC-4).
-    await expect(
-      page.getByTestId("unfiltered-native-close-matches").locator("h2"),
-    ).toHaveText("Close matches — over your budget");
-    await expect(
-      page.getByTestId("unfiltered-native-close-matches").locator(".card-wrapper"),
-    ).toHaveCount(1);
+      page.getByTestId("unfiltered-native-results").locator("h2"),
+    ).toHaveCount(0);
   });
 });
 
@@ -1217,24 +1213,24 @@ test.describe("the full match set, paged by the theme (YOY-107)", () => {
   const titles = (page: Page) => items(page).locator(".card__heading a");
 
 
-  // 30 products, 12 per page: 3 pages of the widened set, and the blue
+  // 30 products, 12 per page: 3 pages of the widened set, and the narrowed
   // subset (every third) is 10 products — a single page.
   const FULL_SET = "/theme-native.html?native=A&fixture=full-set&results=30&pageSize=12&debounce=30000";
 
   test("a page holds the theme's page size, the count line states the true total, and the theme's own pagination spans the set (AC-1, AC-2)", async ({
     page,
   }) => {
-    await page.goto(`${FULL_SET}&removeChipFirst=1`);
+    await page.goto(FULL_SET);
     await submitQuery(page, "dress");
     await expect(items(page)).toHaveCount(10);
 
-    // The blue subset: 10 results, one page — the theme renders no
+    // The narrowed subset: 10 results, one page — the theme renders no
     // pagination for a single page, and neither does the mirror.
     await expect(themeCount(page)).toHaveText('10 results found for “dress”');
     await expect(page.getByTestId("theme-pagination")).toBeHidden();
 
-    // Widen the set by removing the colour chip: 30 results over 3 pages.
-    await nativeChips(page).filter({ hasText: "blue" }).click();
+    // Widen the set by removing the exclusion chip: 30 results over 3 pages.
+    await nativeChips(page).filter({ hasText: "black" }).click();
     await expect(items(page)).toHaveCount(12);
     await expect(themeCount(page)).toHaveText('30 results found for “dress”');
     await expect(page.getByTestId("theme-pagination")).toBeVisible();
@@ -1254,7 +1250,7 @@ test.describe("the full match set, paged by the theme (YOY-107)", () => {
   }) => {
     await page.goto(FULL_SET);
     await submitQuery(page, "dress");
-    await nativeChips(page).filter({ hasText: "blue" }).click();
+    await nativeChips(page).filter({ hasText: "black" }).click();
     await expect(items(page)).toHaveCount(12);
     await expect(titles(page).first()).toHaveText("Full Set Dress 00");
 
@@ -1293,7 +1289,7 @@ test.describe("the full match set, paged by the theme (YOY-107)", () => {
     // as disabled and lose the theme's link styling.
     await page.goto(FULL_SET);
     await submitQuery(page, "dress");
-    await nativeChips(page).filter({ hasText: "blue" }).click();
+    await nativeChips(page).filter({ hasText: "black" }).click();
     await expect(items(page)).toHaveCount(12);
     await expect(themePages(page)).toHaveCount(3);
 
@@ -1336,10 +1332,10 @@ test.describe("the full match set, paged by the theme (YOY-107)", () => {
   }) => {
     await page.goto(FULL_SET);
     await submitQuery(page, "dress");
-    await nativeChips(page).filter({ hasText: "blue" }).click();
+    await nativeChips(page).filter({ hasText: "black" }).click();
     await expect(items(page)).toHaveCount(12);
 
-    // Page 1 of 30 results cost 12 template fetches (the 10 blue ones came
+    // Page 1 of 30 results cost 12 template fetches (the 10 narrowed ones came
     // first), not 30 — and never more than a page's worth per page.
     const afterFirstPage = (await altTemplateRequests(page)).length;
     expect(afterFirstPage).toBeLessThanOrEqual(22);
@@ -1368,7 +1364,7 @@ test.describe("the full match set, paged by the theme (YOY-107)", () => {
     const before = await titles(page).allTextContents();
     expect(before).toHaveLength(10);
 
-    await nativeChips(page).filter({ hasText: "blue" }).click();
+    await nativeChips(page).filter({ hasText: "black" }).click();
     await expect(items(page)).toHaveCount(12);
 
     // Every product from the narrower set is still in the widened one —
@@ -1392,7 +1388,7 @@ test.describe("the full match set, paged by the theme (YOY-107)", () => {
   test("a results-view URL naming a page opens on that page (AC-1)", async ({
     page,
   }) => {
-    await page.goto(`${FULL_SET}&q=dress&page=3&removeChip=1`);
+    await page.goto(`${FULL_SET}&q=dress&page=3`);
     await page.evaluate(() =>
       window.history.replaceState(
         { unfilteredNativeMirror: true },
@@ -1404,7 +1400,7 @@ test.describe("the full match set, paged by the theme (YOY-107)", () => {
 
     await expect(items(page)).toHaveCount(10);
     await expect(themeCount(page)).toHaveText('10 results found for “dress”');
-    // The blue subset is one page, so page 3 clamps to the only page there
+    // The narrowed subset is one page, so page 3 clamps to the only page there
     // is rather than rendering an empty grid.
     await expect(page.getByTestId("theme-pagination")).toBeHidden();
     expect(new URL(page.url()).searchParams.has("page")).toBe(false);
@@ -1464,7 +1460,7 @@ test.describe("the full match set, paged by the theme (YOY-107)", () => {
   }) => {
     await page.goto(`${FULL_SET}&shell=missing`);
     await submitQuery(page, "dress");
-    await nativeChips(page).filter({ hasText: "blue" }).click();
+    await nativeChips(page).filter({ hasText: "black" }).click();
     await expect(items(page)).toHaveCount(12);
 
     // No theme pagination to mirror and none invented (NG-3, YOY-146

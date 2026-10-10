@@ -8,10 +8,10 @@ import {
 
 /**
  * The playground's AI states (YOY-93): chips as removable output,
- * refinement carried in the bar, the zero-hit rescue, degraded silence, the
- * opt-in engine-details panel, and the example queries. Every assertion here
- * is one of the issue's "How to verify" steps, driven against the built app
- * in fixture mode.
+ * refinement carried in the bar, degraded silence, the opt-in
+ * engine-details panel, and the example queries. Every assertion here is
+ * one of the issue's "How to verify" steps, driven against the built app in
+ * fixture mode.
  */
 
 const DESKTOP = { width: 1280, height: 800 };
@@ -40,6 +40,14 @@ async function submit(page: Page, query: string): Promise<void> {
   await input(page).press("Enter");
 }
 
+/** The `ai` fixture's price chip: the shopper's 400 in shekels. */
+const money = (locale: PlaygroundLocale) =>
+  new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency: "ILS",
+    maximumFractionDigits: 0,
+  }).format(400);
+
 /** The submitted requests only — previews are noise for these assertions. */
 const submitted = (urls: URL[]) =>
   urls.filter((url) => url.searchParams.get("mode") !== "preview");
@@ -52,7 +60,7 @@ test.describe("chips are the applied constraints (AC-1, verify 1)", () => {
     await submit(page, "ai elegant dress");
     await expect(chips(page)).toHaveCount(3);
     // The remove glyph is part of the chip's text content, hence the ×.
-    await expect(chips(page)).toHaveText(["dress×", "Under 400×", "Not black×"]);
+    await expect(chips(page)).toHaveText([`Under ${money("en")}×`, "Size M×", "Not black×"]);
 
     // The whole chip is the remove control, and it says so (F-3, F-4).
     await expect(chips(page).nth(2)).toHaveAttribute(
@@ -73,12 +81,12 @@ test.describe("chips are the applied constraints (AC-1, verify 1)", () => {
     await expect(chips(page)).toHaveCount(3);
     // The currency rides the label exactly as it does in the widget, because
     // both surfaces call the same `chipLabel`.
-    await expect(chips(page).nth(0)).toContainText("שמלה");
-    await expect(chips(page).nth(1)).toContainText("עד 400");
-    await expect(chips(page).nth(2)).toContainText("לא שחור");
+    await expect(chips(page).nth(0)).toContainText(`עד ${money("he")}`);
+    await expect(chips(page).nth(1)).toContainText("מידה M");
+    await expect(chips(page).nth(2)).toContainText("לא black");
   });
 
-  test("chips never render on a preview or a classic response (W-7)", async ({
+  test("chips never render on a preview or on a response that applied none (W-7)", async ({
     page,
   }) => {
     await page.goto("/try");
@@ -88,7 +96,7 @@ test.describe("chips are the applied constraints (AC-1, verify 1)", () => {
     await expect(cards(page)).toHaveCount(2);
     await expect(chips(page)).toHaveCount(0);
 
-    // Classic-routed submit.
+    // A submitted answer with no stated wishes.
     await submit(page, "dress");
     await expect(cards(page)).toHaveCount(4);
     await expect(chips(page)).toHaveCount(0);
@@ -96,65 +104,15 @@ test.describe("chips are the applied constraints (AC-1, verify 1)", () => {
 });
 
 test.describe("refinement (AC-2, AC-3, verify 2 and 3)", () => {
-  test("removing a chip re-requests with the held intent and removeChip", async ({
+  test("a follow-up typed at human speed still rides the held carry", async ({
     page,
   }) => {
-    const urls = recordSearchRequests(page);
-    await page.goto("/try");
-    await submit(page, "ai elegant dress");
-    await expect(chips(page)).toHaveCount(3);
-    await expect(cards(page)).toHaveCount(3);
-
-    await chips(page).nth(2).click();
-
-    await expect.poll(() => submitted(urls).length).toBe(2);
-    const removal = submitted(urls)[1];
-    expect(
-      JSON.parse(removal.searchParams.get("removeChip") ?? "null"),
-    ).toEqual({ field: "colorsExclude", value: "black" });
-    const previous = JSON.parse(
-      removal.searchParams.get("previousIntent") ?? "null",
-    );
-    expect(previous.colorsExclude).toEqual(["black"]);
-
-    // Re-rendered from the response, not from local surgery: the chip is
-    // gone AND the products it excluded are back.
-    await expect(chips(page)).toHaveCount(2);
-    await expect(cards(page)).toHaveCount(4);
-  });
-
-  test("a follow-up rides the held intent as previousIntent", async ({
-    page,
-  }) => {
-    const urls = recordSearchRequests(page);
-    await page.goto("/try");
-    await submit(page, "ai elegant dress");
-    await expect(chips(page)).toHaveCount(3);
-
-    await submit(page, "ai cheaper");
-    await expect.poll(() => submitted(urls).length).toBe(2);
-
-    const followUp = submitted(urls)[1];
-    const previous = JSON.parse(
-      followUp.searchParams.get("previousIntent") ?? "null",
-    );
-    expect(previous).toMatchObject({
-      category: "dress",
-      priceMax: 400,
-      colorsExclude: ["black"],
-    });
-    expect(followUp.searchParams.get("removeChip")).toBeNull();
-  });
-
-  test("a follow-up typed at human speed still rides the held intent", async ({
-    page,
-  }) => {
-    // Regression: previews echo `intent: null`, and replacing the held
-    // intent on every response erased the refinement memory between two
-    // keystrokes — so a follow-up anyone actually types (any pause ≥200ms
-    // fires a preview) went out with no `previousIntent` at all. The
-    // original spec missed it because fill() + immediate Enter never lets
-    // the debounce fire.
+    // Regression guard: a preview carries no `carry`, so replacing the held
+    // one on every response would erase the refinement memory between two
+    // keystrokes — a follow-up anyone actually types (any pause ≥200ms
+    // fires a preview) would go out with no `previousQuery` at all.
+    // fill() + immediate Enter never lets the debounce fire, hence the
+    // typing.
     const urls = recordSearchRequests(page);
     await page.goto("/try");
     await submit(page, "ai elegant dress");
@@ -175,22 +133,20 @@ test.describe("refinement (AC-2, AC-3, verify 2 and 3)", () => {
     await input(page).press("Enter");
     await expect.poll(() => submitted(urls).length).toBe(2);
     const followUp = submitted(urls)[1];
-    expect(
-      JSON.parse(followUp.searchParams.get("previousIntent") ?? "null"),
-    ).toMatchObject({ colorsExclude: ["black"] });
+    expect(followUp.searchParams.get("previousQuery")).toBe("ai elegant dress");
   });
 
-  test("the first submitted search carries no previousIntent", async ({
+  test("the first submitted search carries no previousQuery", async ({
     page,
   }) => {
     const urls = recordSearchRequests(page);
     await page.goto("/try");
     await submit(page, "ai elegant dress");
     await expect(chips(page)).toHaveCount(3);
-    expect(submitted(urls)[0].searchParams.get("previousIntent")).toBeNull();
+    expect(submitted(urls)[0].searchParams.get("previousQuery")).toBeNull();
   });
 
-  test("New search clears everything and drops the held intent", async ({
+  test("New search clears everything and drops the held carry", async ({
     page,
   }) => {
     const urls = recordSearchRequests(page);
@@ -212,7 +168,7 @@ test.describe("refinement (AC-2, AC-3, verify 2 and 3)", () => {
 
     await submit(page, "ai elegant dress");
     await expect.poll(() => submitted(urls).length).toBe(2);
-    expect(submitted(urls)[1].searchParams.get("previousIntent")).toBeNull();
+    expect(submitted(urls)[1].searchParams.get("previousQuery")).toBeNull();
   });
 
   test("it is the only secondary button on the page (P-2)", async ({
@@ -241,82 +197,7 @@ test.describe("refinement (AC-2, AC-3, verify 2 and 3)", () => {
   });
 });
 
-test.describe("negated attributes are chips too (YOY-133 AC-5, verify 2)", () => {
-  test("a negation renders as a 'Not wool' chip, and removing it re-runs without the word", async ({
-    page,
-  }) => {
-    const urls = recordSearchRequests(page);
-    await page.goto("/try");
-    await submit(page, "ai winter coat not wool");
-    await expect(chips(page)).toHaveCount(2);
-    await expect(chips(page)).toHaveText(["coat×", "Not wool×"]);
-    await expect(chips(page).nth(1)).toHaveAttribute("data-chip-field", "attributesExclude");
-    await expect(cards(page)).toHaveCount(2);
-    // No wool coat on the page while the negation stands.
-    await expect(cards(page).filter({ hasText: "Wool Winter Coat" })).toHaveCount(0);
-
-    await chips(page).nth(1).click();
-
-    await expect.poll(() => submitted(urls).length).toBe(2);
-    const removal = submitted(urls)[1];
-    expect(JSON.parse(removal.searchParams.get("removeChip") ?? "null")).toEqual({
-      field: "attributesExclude",
-      value: "wool",
-    });
-    const previous = JSON.parse(removal.searchParams.get("previousIntent") ?? "null");
-    expect(previous.attributesExclude).toEqual(["wool"]);
-    // Re-rendered from the response: the chip is gone and the wool coat is back.
-    await expect(chips(page)).toHaveCount(1);
-    await expect(cards(page)).toHaveCount(3);
-    await expect(cards(page).filter({ hasText: "Wool Winter Coat" })).toHaveCount(1);
-  });
-
-  test("the negation chip is localized in Hebrew chrome, RTL", async ({ page }) => {
-    await page.goto("/try?lang=he");
-    await submit(page, "ai winter coat not wool");
-    await expect(chips(page)).toHaveCount(2);
-    await expect(chips(page).nth(0)).toContainText("מעיל");
-    await expect(chips(page).nth(1)).toContainText("לא צמר");
-    await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
-  });
-});
-
-test.describe("zero hit, degraded, and colorUnknown (AC-4, verify 4)", () => {
-  test("an AI zero hit names what did not match and offers close matches", async ({
-    page,
-  }) => {
-    await page.goto("/try");
-    await submit(page, "ai zero hit");
-
-    await expect(status(page)).toHaveText(strings("en").zeroHit);
-    // The chips stay, and stay removable: the way out of a zero hit is to
-    // drop a constraint.
-    await expect(chips(page)).toHaveCount(3);
-    // The heading names what the server relaxed to find them (YOY-111
-    // AC-4): the fixture relaxed the budget cap.
-    await expect(
-      page.getByRole("heading", { name: "Close matches — over your budget" }),
-    ).toBeVisible();
-    await expect(cards(page)).toHaveCount(2);
-  });
-
-  test("the Hebrew close-matches heading names the relaxed constraint in Hebrew, RTL (YOY-111 AC-4)", async ({
-    page,
-  }) => {
-    await page.goto("/try?lang=he");
-    await submit(page, "ai zero hit");
-
-    await expect(status(page)).toHaveText(strings("he").zeroHit);
-    const heading = page.getByRole("heading", {
-      name: "התאמות קרובות — מעל התקציב",
-    });
-    await expect(heading).toBeVisible();
-    await expect(heading).toHaveText("התאמות קרובות — מעל התקציב");
-    await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
-    // The chips and the zero-hit line are untouched by the heading change.
-    await expect(chips(page)).toHaveCount(3);
-  });
-
+test.describe("degraded (AC-4, verify 4)", () => {
   test("a degraded response is plain classic cards with no chips and no error language", async ({
     page,
   }) => {
@@ -328,29 +209,6 @@ test.describe("zero hit, degraded, and colorUnknown (AC-4, verify 4)", () => {
     // Nothing announces the degradation to the visitor (W-8, X-4).
     await expect(status(page)).toHaveText("");
     await expect(page.getByTestId("playground-new-search")).toHaveCount(0);
-  });
-
-  test("a colorUnknown card is labelled and de-emphasised (widget parity)", async ({
-    page,
-  }) => {
-    await page.goto("/try");
-    await submit(page, "ai color beige");
-
-    const first = cards(page).nth(0);
-    await expect(
-      first.getByTestId("playground-card-color-unknown"),
-    ).toHaveText(strings("en").colorNotConfirmed);
-    await expect(first).toHaveAttribute("data-color-unknown", "true");
-
-    const opacity = await first.evaluate(
-      (element) => getComputedStyle(element).opacity,
-    );
-    expect(Number.parseFloat(opacity)).toBeLessThan(1);
-
-    // Only that card is dimmed.
-    await expect(
-      cards(page).nth(1).getByTestId("playground-card-color-unknown"),
-    ).toHaveCount(0);
   });
 });
 
@@ -369,7 +227,7 @@ test.describe("engine details (AC-5, verify 5)", () => {
   }) => {
     // Regression: the toggle was a plain link, so clicking it reloaded the
     // page — discarding the response, the chips, and the memory-only held
-    // intent, and showing an empty panel until the visitor searched again.
+    // carry, and showing an empty panel until the visitor searched again.
     const urls = recordSearchRequests(page);
     await page.goto("/try");
     await submit(page, "ai elegant dress");
@@ -381,9 +239,6 @@ test.describe("engine details (AC-5, verify 5)", () => {
     const opened = page.getByTestId("playground-details-panel");
     await expect(opened).toBeVisible();
     await expect(opened).toContainText("812 ms");
-    await expect(
-      page.getByTestId("playground-details-intent"),
-    ).toContainText('"category": "dress"');
     // The answer it explains is untouched, and nothing was re-fetched.
     await expect(chips(page)).toHaveCount(3);
     expect(submitted(urls)).toHaveLength(1);
@@ -394,18 +249,14 @@ test.describe("engine details (AC-5, verify 5)", () => {
     await expect(page).not.toHaveURL(/details=1/);
   });
 
-  test("shows route, reason, latency, and the intent", async ({ page }) => {
+  test("shows route, reason, and latency", async ({ page }) => {
     await page.goto("/try?details=1");
     await submit(page, "ai elegant dress");
     const panel = page.getByTestId("playground-details-panel");
     await expect(panel).toBeVisible();
-    await expect(panel).toContainText("ai");
-    await expect(panel).toContainText("model");
+    await expect(panel).toContainText(`${strings("en").detailsRoute}ai`);
+    await expect(panel).toContainText(`${strings("en").detailsRouteReason}judged`);
     await expect(panel).toContainText("812 ms");
-
-    const intent = page.getByTestId("playground-details-intent");
-    await expect(intent).toContainText('"category": "dress"');
-    await expect(intent).toContainText('"priceMax": 400');
   });
 
   test("lists one row per stage the search ran, in pipeline order (YOY-114 AC-2)", async ({
@@ -414,22 +265,21 @@ test.describe("engine details (AC-5, verify 5)", () => {
     await page.goto("/try?details=1");
     await submit(page, "ai elegant dress");
     const rows = page.getByTestId("playground-details-stages").locator("li");
-    // The AI fixture ran classify → intent → embed → retrieve → hydrate; no
-    // classic and no closeMatches row, because those stages did not run.
+    // The AI fixture ran find → hydrate → judgeRows → judge; no compose and
+    // no classic row, because those stages did not run.
     await expect(rows).toHaveText([
-      "classify · 38 ms",
-      "intent · 412 ms",
-      "embed · 96 ms",
-      "retrieve · 57 ms",
+      "find · 96 ms",
       "hydrate · 9 ms",
+      "judgeRows · 12 ms",
+      "judge · 640 ms",
     ]);
 
-    // A classic search shows only the stages a keyword search runs — the
-    // absent intent/embed/retrieve rows are the proof of zero LLM calls, and
-    // the absent hydrate row is the one-statement search (YOY-115 AC-3):
-    // `classify`, `classic`, and nothing else.
-    await submit(page, "dress");
-    await expect(rows).toHaveText(["classify · 1 ms", "classic · 28 ms"]);
+    // A keystroke preview shows only the stage a keyword search runs — the
+    // absent find/judge rows are the proof of zero model calls, and the
+    // absent hydrate row is the one-statement search (YOY-115 AC-3):
+    // `classic` and nothing else.
+    await input(page).fill("dress");
+    await expect(rows).toHaveText(["classic · 24 ms"]);
     await expect(rows.filter({ hasText: "hydrate" })).toHaveCount(0);
 
     // Every row is numeric milliseconds in the `<stage> · <ms> ms` form.
@@ -452,36 +302,6 @@ test.describe("engine details (AC-5, verify 5)", () => {
     ]);
   });
 
-  test("names the intent tier: lite on the AI fixture, none on a classic response (YOY-116 AC-3)", async ({
-    page,
-  }) => {
-    await page.goto("/try?details=1");
-    await submit(page, "ai elegant dress");
-    const panel = page.getByTestId("playground-details-panel");
-    await expect(panel).toContainText(`${strings("en").detailsIntentTier}lite`);
-
-    await submit(page, "dress");
-    await expect(panel).toContainText(
-      `${strings("en").detailsIntentTier}${strings("en").detailsNone}`,
-    );
-    await expect(panel).not.toContainText("accuracy");
-  });
-
-  test("a reused intent reads reason intent-reuse with no classify or intent row (YOY-64 AC-4)", async ({
-    page,
-  }) => {
-    await page.goto("/try?details=1");
-    await submit(page, "ai reuse elegant dress");
-    const panel = page.getByTestId("playground-details-panel");
-    await expect(panel).toContainText("intent-reuse");
-    const rows = page.getByTestId("playground-details-stages").locator("li");
-    await expect(rows).toHaveText(["embed · 1 ms", "retrieve · 52 ms", "hydrate · 8 ms"]);
-    await expect(rows.filter({ hasText: "classify" })).toHaveCount(0);
-    await expect(rows.filter({ hasText: "intent" })).toHaveCount(0);
-    // Still the AI answer: chips and results as on any AI response.
-    await expect(chips(page)).toHaveCount(3);
-  });
-
   test("the stage rows exist only while the panel is open", async ({ page }) => {
     await page.goto("/try");
     await submit(page, "ai elegant dress");
@@ -493,16 +313,6 @@ test.describe("engine details (AC-5, verify 5)", () => {
 
     await page.getByTestId("playground-details-toggle").click();
     await expect(page.getByTestId("playground-details-stages")).toHaveCount(0);
-  });
-
-  test("a zero-hit response adds the closeMatches row last", async ({
-    page,
-  }) => {
-    await page.goto("/try?details=1");
-    await submit(page, "ai zero hit dress");
-    const rows = page.getByTestId("playground-details-stages").locator("li");
-    await expect(rows).toHaveCount(5);
-    await expect(rows.last()).toHaveText("closeMatches · 63 ms");
   });
 
   test("monospace is confined to prices and the engine panel (DESIGN §2)", async ({
@@ -578,9 +388,8 @@ test.describe("example queries (AC-6, verify 6)", () => {
     page,
   }) => {
     // The page's suggestions are the committed `EXAMPLE_QUERIES` set and
-    // nothing else: the eval fixture (example-goldens.json) vouches for
-    // exactly these strings, so a rendered text that drifts from the set
-    // is a suggestion nobody has proven answerable.
+    // nothing else: a rendered text that drifts from the set is a
+    // suggestion nobody has checked.
     for (const [locale, path] of [
       ["en", "/try"],
       ["he", "/try?lang=he"],

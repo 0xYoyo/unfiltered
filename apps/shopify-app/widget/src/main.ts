@@ -11,7 +11,6 @@ import {
   SearchTimeoutError,
   type PageRequest,
   type ProxyChip,
-  type ProxyIntent,
   type ProxyLabel,
   type ProxySearchResponse,
   type RemovedChip,
@@ -321,17 +320,16 @@ export function init(config: WidgetConfig): void {
     let debouncePending = false;
     let settledSequence = 0;
     let consecutiveFailures = 0;
-    // Refinement memory (YOY-49 AC-4): the latest response's echoed intent,
-    // held in memory only — it lives exactly as long as this page view and
-    // never crosses browser sessions (NG-4). The last query text backs chip
-    // removal, whose request still needs a query by the endpoint contract.
-    let heldIntent: ProxyIntent | null = null;
+    // Refinement memory, in memory only — it lives exactly as long as this
+    // page view and never crosses browser sessions (NG-4). The last query
+    // text backs chip removal, whose request still needs a query by the
+    // endpoint contract.
     let lastQuery = "";
     /**
-     * Engine v2 chip removal (YOY-149 AC-15): every chip removed so far in
-     * the current search chain. A v2 response echoes no intent, so removal
-     * re-asks the same query with this whole list; a search the shopper
-     * submits themselves starts a new chain with an empty one.
+     * Chip removal (YOY-149 AC-15): every chip removed so far in the
+     * current search chain. Removal re-asks the same query with this whole
+     * list; a search the shopper submits themselves starts a new chain with
+     * an empty one.
      */
     let removedChips: RemovedChip[] = [];
     /**
@@ -339,8 +337,8 @@ export function init(config: WidgetConfig): void {
      * the last submitted Engine v2 response's `carry`, which every
      * submitted search sends as `previousQuery` (AC-4); `chainQuery` is the
      * `previousQuery` that produced the response on screen, which a chip
-     * removal re-asks with. A v1 response carries no `carry`, so nothing is
-     * held and nothing is sent.
+     * removal re-asks with. A response with no `carry` (a classic one)
+     * holds nothing and nothing is sent.
      */
     let heldCarry: string | null = null;
     let chainQuery: string | null = null;
@@ -379,9 +377,7 @@ export function init(config: WidgetConfig): void {
         dismiss();
       },
       onNewSearch: () => {
-        // AC-5: clear the held intent, the input, the chips, and the
-        // results; the next query is sent without previousIntent.
-        heldIntent = null;
+        // AC-5: clear the input, the chips, and the results.
         lastQuery = "";
         // YOY-150 AC-5: "New search" clears the held carry too.
         dropChain();
@@ -555,9 +551,6 @@ export function init(config: WidgetConfig): void {
       consecutiveFailures = 0;
       currentSearchId = response.searchId;
       lastQuery = query;
-      // A classic response carries no intent, exactly as a server-degraded
-      // one does; refinement has nothing to hold either way.
-      heldIntent = response.intent;
       overlay.showResponse(response, {
         onCardClick,
         onChipRemove,
@@ -610,7 +603,7 @@ export function init(config: WidgetConfig): void {
           // Previews are not attributable searches (YOY-68 AC-3): no
           // SearchEvent row exists server-side, so the click beacon must
           // not fire against this searchId — and the refinement memory
-          // (heldIntent/lastQuery) stays whatever the last SUBMITTED
+          // (lastQuery) stays whatever the last SUBMITTED
           // search established, so submit-gated refinement still works.
           currentSearchId = null;
           overlay.showPreview(response, { onCardClick, onChipRemove });
@@ -618,9 +611,6 @@ export function init(config: WidgetConfig): void {
         }
         currentSearchId = response.searchId;
         lastQuery = query;
-        // The response's echoed intent replaces the held one (AC-4) — also
-        // when it is null (a classic response holds no intent to refine).
-        heldIntent = response.intent;
         if (context?.submitted === true) {
           // The response's carry is the chain the next submit refines
           // (YOY-150 AC-3). One with no earlier sentence started a new
@@ -677,26 +667,13 @@ export function init(config: WidgetConfig): void {
     };
 
     /**
-     * Chip removal (AC-2): resend the last query carrying the held intent
-     * and the dismissed chip; the server recomputes without that constraint
-     * and the whole overlay re-renders from its response.
-     *
-     * An engine v2 response (YOY-149 AC-15) echoes `intent: null`, so there
-     * is no intent to adjust: the same query is re-asked, page 1, with
-     * `removedChips` — every chip removed in this search chain, the new one
-     * included — and no `previousIntent`/`removeChip`.
+     * Chip removal (YOY-149 AC-15): the same query is re-asked, page 1,
+     * with `removedChips` — every chip removed in this search chain, the
+     * new one included; the server recomputes without them and the whole
+     * overlay re-renders from its response.
      */
     const onChipRemove = (chip: ProxyChip): void => {
       if (inert) {
-        return;
-      }
-      if (heldIntent !== null) {
-        debouncePending = false;
-        window.clearTimeout(debounceTimer);
-        void runSearch(lastQuery, {
-          previousIntent: heldIntent,
-          removeChip: chip,
-        });
         return;
       }
       if (lastQuery === "") {
@@ -727,7 +704,6 @@ export function init(config: WidgetConfig): void {
       debouncePending = false;
       window.clearTimeout(debounceTimer);
       dropChain();
-      heldIntent = null;
       input.value = reading;
       void runSearch(reading, { submitted: true });
     };
@@ -749,7 +725,7 @@ export function init(config: WidgetConfig): void {
         debouncePending = false;
         // Typing is preview-only (YOY-68 AC-1): a live, classic-only fetch
         // with no refinement context — the full pipeline (and the held
-        // intent riding along, AC-4) waits for the explicit submit.
+        // carry riding along) waits for the explicit submit.
         void runSearch(query, { preview: true });
       }, debounceMs);
     };
@@ -852,7 +828,6 @@ export function init(config: WidgetConfig): void {
       }
       void runSearch(query, {
         submitted: true,
-        ...(heldIntent !== null ? { previousIntent: heldIntent } : {}),
         ...(heldCarry !== null ? { previousQuery: heldCarry } : {}),
         ...(heldCarry !== null && removedChips.length > 0 ? { removedChips } : {}),
       });

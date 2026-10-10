@@ -2,7 +2,18 @@ import type { PrismaClient } from "@prisma/client";
 
 import { cardLanguagesFromEnv } from "../catalog/card.server";
 import { withTenantVectorScan } from "../catalog/hnsw.server";
-import { FAMILY_OVERSCAN } from "./retrieval-store.server";
+
+/**
+ * Colourways per family the candidate scan can absorb before a family may be
+ * under-represented (YOY-125 AC-10). The scan reads `max(limit, 1) *
+ * FAMILY_OVERSCAN` products, so collapsing by family still has several
+ * members of each family to choose its representative from while the bound
+ * keeps the scan index-driven. The trade-off: a page whose window is filled
+ * by more than FAMILY_OVERSCAN colourways of one family can crowd out a
+ * further family that would otherwise have made it — which is why the
+ * number is not 1 and not unbounded.
+ */
+export const FAMILY_OVERSCAN = 8;
 
 /**
  * Card vectors per product the candidate scan absorbs before a product may

@@ -4,15 +4,13 @@
   "degraded": false,
   "results": [],
   "chips": [],
-  "intent": null,
   "details": {
-    "routeReason": "classic-zero-hit",
+    "routeReason": "capped",
     "latencyMs": 21,
-    "limited": null,
+    "limited": "ip",
     "stages": {
-      "classify": 2,
-      "classic": 19
+      "find": 19
     },
-    "intentTier": null
+    "judge": null
   }
 }

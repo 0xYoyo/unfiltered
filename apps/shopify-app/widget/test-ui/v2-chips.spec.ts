@@ -5,15 +5,14 @@ import { STRING_CATALOG } from "../src/strings";
 /**
  * Engine v2 chips on both widget paths (YOY-149 AC-15 client half, AC-16).
  *
- * A v2 response echoes `intent: null` and carries chips of the v2 fields:
+ * A response carries chips of the v2 fields:
  * a price cap with the shopper's own number and its ISO currency, the size
  * as typed, availability, and one `exclude` field for any excluded term.
  * The widget labels them from its string catalog in EN and HE, marks an
  * `exclude` chip with the existing achromatic exclusion treatment (W-3),
  * renders them in the EXISTING owned chip row only on the theme-native
  * path (NG-6), and removes one by re-asking the same query with
- * `removedChips` — every chip removed in the chain, the new one included —
- * instead of `previousIntent`/`removeChip`.
+ * `removedChips` — every chip removed in the chain, the new one included.
  *
  * Harness fixtures: `?fixture=budget|exclude|size` (widget/index.html and
  * widget/theme-native.html).
@@ -21,8 +20,6 @@ import { STRING_CATALOG } from "../src/strings";
 
 interface LoggedRequest {
   query: string;
-  previousIntent?: unknown;
-  removeChip?: unknown;
   removedChips?: Array<{ field: string; value: string }>;
   mode?: string;
   page?: number;
@@ -164,8 +161,6 @@ test.describe("overlay path", () => {
     expect(requests[1]!.removedChips).toEqual([
       { field: "exclude", value: "black" },
     ]);
-    expect(requests[1]!.previousIntent).toBeUndefined();
-    expect(requests[1]!.removeChip).toBeUndefined();
     expect(requests[1]!.page).toBe(1);
 
     // The chain accumulates: the next removal carries both.
@@ -187,23 +182,6 @@ test.describe("overlay path", () => {
     expect(requests).toHaveLength(4);
     expect(requests[3]!.removedChips).toBeUndefined();
   });
-
-  test("v1 removal still sends removeChip with previousIntent", async ({
-    page,
-  }) => {
-    await page.goto("/?fixture=ai&debounce=30000");
-    await submitQuery(page, "elegant dress");
-    await expect(overlayChips(page)).toHaveCount(3);
-    await page.locator("[data-field='colorsExclude']").click();
-    await expect(overlayChips(page)).toHaveCount(2);
-    const requests = await submitted(page);
-    expect(requests[1]!.removeChip).toEqual({
-      field: "colorsExclude",
-      value: "black",
-    });
-    expect(requests[1]!.previousIntent).toBeDefined();
-    expect(requests[1]!.removedChips).toBeUndefined();
-  });
 });
 
 test.describe("theme-native path", () => {
@@ -224,12 +202,12 @@ test.describe("theme-native path", () => {
   test("verify 5: a size chip renders in the owned chip row and nothing else is added", async ({
     page,
   }) => {
-    // The owned chrome a v1 AI response produces, for comparison.
+    // The owned chrome the plain AI fixture produces, for comparison.
     await page.goto("/theme-native.html?native=A&fixture=ai&debounce=30000");
     await submitQuery(page, "blue dress");
     await expect(nativeChips(page)).toHaveCount(3);
     await expect(nativeItems(page)).toHaveCount(3);
-    const v1Owned = await ownedTestIds(page);
+    const aiOwned = await ownedTestIds(page);
 
     await page.goto("/theme-native.html?native=A&fixture=size&debounce=30000");
     await submitQuery(page, "dress size m in stock");
@@ -247,9 +225,9 @@ test.describe("theme-native path", () => {
       ),
     ).toContainText("In stock");
 
-    // No new owned control (NG-6): the same owned chrome as a v1 response,
+    // No new owned control (NG-6): the same owned chrome as the AI fixture,
     // and no owned button outside the chips beyond the theme cards' own.
-    expect(await ownedTestIds(page)).toEqual(v1Owned);
+    expect(await ownedTestIds(page)).toEqual(aiOwned);
     const panelButtons = await nativePanel(page)
       .locator("button:not([data-testid='unfiltered-native-chip'])")
       .count();
@@ -318,8 +296,6 @@ test.describe("theme-native path", () => {
     expect(requests).toHaveLength(2);
     expect(requests[1]!.query).toBe("dress size m in stock");
     expect(requests[1]!.removedChips).toEqual([{ field: "size", value: "M" }]);
-    expect(requests[1]!.previousIntent).toBeUndefined();
-    expect(requests[1]!.removeChip).toBeUndefined();
     expect(requests[1]!.page).toBe(1);
   });
 });

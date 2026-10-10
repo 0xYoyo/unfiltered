@@ -1,17 +1,8 @@
 import type { PrismaClient } from "@prisma/client";
 import {
-  createEscalatingIntentExtractor,
-  createIntentExtractor,
   createJudge,
-  judgeProviderFromEnv,
-  DEFAULT_INTENT_ESCALATION_THRESHOLD,
-  DEFAULT_INTENT_HEDGE_AFTER_MS,
-  createQueryClassifier,
-  createRetriever,
   createWishExtractor,
-  parseIntent,
-  type AppliedConstraint,
-  type Intent,
+  judgeProviderFromEnv,
   type JudgeProvider,
 } from "@unfiltered/engine";
 import {
@@ -46,7 +37,6 @@ import {
   type SearchPaging,
   type SearchResponse,
 } from "./orchestrator.server";
-import { createPgVectorRetrievalStore } from "./retrieval-store.server";
 import {
   extractionGraceMsFromEnv,
   priceNearPercentFromEnv,
@@ -66,12 +56,12 @@ import {
  */
 
 /**
- * One applied-constraint chip, exactly as the widget renders it. Engine v2
- * answers the fields of `WishChipField` (YOY-149 AC-14); a price chip there
- * carries the shopper's own `currency` when they stated one.
+ * One applied-constraint chip, exactly as the widget renders it: one kept
+ * stated fact (YOY-149 AC-14); a price chip carries the shopper's own
+ * `currency` when they stated one.
  */
 export interface ProxyChip {
-  field: AppliedConstraint["field"] | WishChipField;
+  field: WishChipField;
   value: string;
   currency?: string;
 }
@@ -82,18 +72,14 @@ export interface ProxySearchBody {
   query: string;
   /** Widget-generated session correlation ID (used by later milestones). */
   sessionId: string;
-  /** The `intent` of the previous response, echoed back for refinement. */
-  previousIntent?: Intent;
-  /** Chip the shopper dismissed; requires `previousIntent` to adjust. */
-  removeChip?: ProxyChip;
   /**
-   * Every chip the shopper removed from an Engine v2 response in this search
+   * Every chip the shopper removed from a response in this search
    * (YOY-149 AC-15): the facts they name are not applied and their chips
    * are absent. A JSON array of `{ field, value }`.
    */
   removedChips?: RemovedChip[];
   /**
-   * The `carry` of the previous Engine v2 response in this chain (YOY-150
+   * The `carry` of the previous response in this chain (YOY-150
    * AC-1): the search refines or replaces it. At most
    * `MAX_PREVIOUS_QUERY_CHARS` characters; absent on a fresh search.
    */
@@ -107,7 +93,7 @@ export interface ProxySearchBody {
    * routeReason "client-timeout-rescue") with an attributable searchId.
    * Absent on ordinary submitted searches, which run the full pipeline.
    * Both modes are bare classic fetches, so neither combines with
-   * `previousIntent`, `removeChip` or `previousQuery`.
+   * `previousQuery`.
    */
   mode?: ProxySearchMode;
   /**
@@ -130,23 +116,9 @@ const SEARCH_MODES: ReadonlySet<string> = new Set(["preview", "classic"]);
  */
 export const MAX_PREVIOUS_QUERY_CHARS = 2_000;
 
-const CHIP_FIELDS: ReadonlySet<string> = new Set([
-  "category",
-  "priceMin",
-  "priceMax",
-  "colorsInclude",
-  "colorsExclude",
-  "attributesExclude",
-  "attributesInclude",
-  "occasion",
-  "availability",
-]);
-
 /**
  * Validate a proxy request body. Returns null on any violation — the route
  * answers 400 without detail, so parsing is strict rather than forgiving.
- * `previousIntent` goes through the engine's own `parseIntent`, which
- * normalizes the nulls the serialized wire format carries back to undefined.
  */
 export function parseProxySearchBody(value: unknown): ProxySearchBody | null {
   if (typeof value !== "object" || value === null) {
@@ -171,7 +143,7 @@ export function parseProxySearchBody(value: unknown): ProxySearchBody | null {
     // fetch (YOY-68 AC-1): refinement context belongs to the full submitted
     // pipeline, so combining them is a contract violation, not a request to
     // guess about.
-    if (record.previousIntent != null || record.removeChip != null || record.previousQuery != null) {
+    if (record.previousQuery != null) {
       return null;
     }
     body.mode = record.mode as ProxySearchMode;
@@ -179,35 +151,6 @@ export function parseProxySearchBody(value: unknown): ProxySearchBody | null {
 
   if (record.page !== undefined || record.pageSize !== undefined) {
     body.paging = parsePaging(record.page, record.pageSize);
-  }
-
-  if (record.previousIntent !== undefined && record.previousIntent !== null) {
-    const intent = parseIntent(record.previousIntent);
-    if (intent === null) {
-      return null;
-    }
-    body.previousIntent = intent;
-  }
-
-  if (record.removeChip !== undefined && record.removeChip !== null) {
-    const chip = record.removeChip as Record<string, unknown>;
-    if (
-      typeof chip !== "object" ||
-      typeof chip.field !== "string" ||
-      !CHIP_FIELDS.has(chip.field) ||
-      typeof chip.value !== "string"
-    ) {
-      return null;
-    }
-    if (body.previousIntent === undefined) {
-      // A chip only exists as part of a previous response's intent; removal
-      // without that intent has nothing to recompute from.
-      return null;
-    }
-    body.removeChip = {
-      field: chip.field as AppliedConstraint["field"],
-      value: chip.value,
-    };
   }
 
   if (record.removedChips !== undefined && record.removedChips !== null) {
@@ -315,28 +258,11 @@ export function parseProxySearchParams(
   if (mode !== null) {
     record.mode = mode;
   }
-  // Page parameters (YOY-145 AC-4). `engine` is deliberately not read: the
-  // storefront proxy ignores it (AC-6); only the playground route honours it.
+  // Page parameters (YOY-145 AC-4).
   for (const key of ["page", "pageSize"] as const) {
     const value = params.get(key);
     if (value !== null) {
       record[key] = value;
-    }
-  }
-  const previousIntent = params.get("previousIntent");
-  if (previousIntent !== null) {
-    try {
-      record.previousIntent = JSON.parse(previousIntent);
-    } catch {
-      return null;
-    }
-  }
-  const removeChip = params.get("removeChip");
-  if (removeChip !== null) {
-    try {
-      record.removeChip = JSON.parse(removeChip);
-    } catch {
-      return null;
     }
   }
   const removedChips = params.get("removedChips");
@@ -465,60 +391,6 @@ export function parseClickBeaconParams(
 }
 
 /**
- * Drop one dismissed chip's constraint from an intent (YOY-46 AC-4). Pure
- * intent surgery — no model involved, which is what keeps the chip-removal
- * round-trip LLM-free.
- */
-export function removeChipFromIntent(intent: Intent, chip: ProxyChip): Intent {
-  const next: Intent = {
-    ...intent,
-    colorsInclude: [...intent.colorsInclude],
-    colorsExclude: [...intent.colorsExclude],
-    attributesExclude: [...intent.attributesExclude],
-    attributesInclude: [...intent.attributesInclude],
-    softAttributes: [...intent.softAttributes],
-  };
-  switch (chip.field) {
-    case "category":
-      delete next.category;
-      break;
-    case "priceMin":
-      delete next.priceMin;
-      break;
-    case "priceMax":
-      delete next.priceMax;
-      break;
-    case "colorsInclude":
-      next.colorsInclude = next.colorsInclude.filter(
-        (color) => color !== chip.value,
-      );
-      break;
-    case "colorsExclude":
-      next.colorsExclude = next.colorsExclude.filter(
-        (color) => color !== chip.value,
-      );
-      break;
-    case "attributesExclude":
-      next.attributesExclude = next.attributesExclude.filter(
-        (word) => word !== chip.value,
-      );
-      break;
-    case "attributesInclude":
-      next.attributesInclude = next.attributesInclude.filter(
-        (word) => word !== chip.value,
-      );
-      break;
-    case "occasion":
-      delete next.occasion;
-      break;
-    case "availability":
-      next.availabilityRequired = false;
-      break;
-  }
-  return next;
-}
-
-/**
  * The judge's label on the wire (YOY-147 AC-9): `fact-differs` with the
  * product's value then the asked one, or `close-match` with none.
  */
@@ -540,35 +412,11 @@ export interface ProxyResult {
   currencyCode: string;
   available: boolean;
   /**
-   * Passed a positive color constraint on unknown-passes leniency, not on
-   * evidence (YOY-67 AC-5): the widget de-emphasizes and labels such cards.
-   * False whenever no positive color constraint was applied.
-   */
-  colorUnknown: boolean;
-  /**
-   * The judge's label or null (YOY-147 AC-9), on every Engine v2 result;
-   * absent on the old engine, whose wire is unchanged. The verdict never
-   * reaches the storefront (AC-12).
+   * The judge's label or null (YOY-147 AC-9), on every submitted-search
+   * result; absent on classic results. The verdict never reaches the
+   * storefront (AC-12).
    */
   label?: ProxyLabel | null;
-}
-
-/** The intent on the wire: every field present, absent optionals as null. */
-export interface ProxyIntent {
-  category: string | null;
-  priceMin: number | null;
-  priceMax: number | null;
-  currency: string | null;
-  colorsInclude: string[];
-  colorsExclude: string[];
-  /** Negated attribute words (YOY-133); always present, possibly empty. */
-  attributesExclude: string[];
-  /** Required category-like attributes (YOY-133); always present, possibly empty. */
-  attributesInclude: string[];
-  occasion: string | null;
-  size: string | null;
-  availabilityRequired: boolean;
-  softAttributes: string[];
 }
 
 /** The response body the proxy endpoint answers with (YOY-46 AC-3). */
@@ -578,19 +426,11 @@ export interface ProxySearchResponse {
   degraded: boolean;
   results: ProxyResult[];
   chips: ProxyChip[];
-  /** For the client to echo back as `previousIntent` on a follow-up. */
-  intent: ProxyIntent | null;
   /**
-   * Classic near-misses on an AI zero-hit response; on an Engine v2 judged
-   * page with a match, the page's `close` products (YOY-166 AC-1).
+   * On a judged page with a match, the page's `close` products (YOY-166
+   * AC-1), rendered under the "Close matches" heading; absent otherwise.
    */
   closeMatches?: ProxyResult[];
-  /**
-   * The constraints relaxed to fill `closeMatches` (YOY-111 AC-2), in
-   * order; present exactly when `closeMatches` is, `[]` when the matches
-   * came without relaxing anything.
-   */
-  closeMatchesRelaxed?: string[];
   /** The page `results` holds (YOY-145 AC-4); present on paged responses only. */
   page?: number;
   /** Results across every page; present exactly when `page` is. */
@@ -602,7 +442,7 @@ export interface ProxySearchResponse {
   labelsPending?: true;
   /**
    * What the client sends as `previousQuery` on its next search (YOY-150
-   * AC-3); present on Engine v2 find-path responses only.
+   * AC-3); present on find-path responses only.
    */
   carry?: string;
   /**
@@ -621,7 +461,6 @@ function serializeCard(card: {
   priceMax: number;
   currencyCode: string;
   available: boolean;
-  colorUnknown: boolean;
   label?: ProxyLabel | null;
 }): ProxyResult {
   return {
@@ -633,7 +472,6 @@ function serializeCard(card: {
     priceMax: card.priceMax,
     currencyCode: card.currencyCode,
     available: card.available,
-    colorUnknown: card.colorUnknown,
     ...(card.label !== undefined
       ? {
           label:
@@ -642,23 +480,6 @@ function serializeCard(card: {
               : { template: card.label.template, values: [...card.label.values] },
         }
       : {}),
-  };
-}
-
-function serializeIntent(intent: Intent): ProxyIntent {
-  return {
-    category: intent.category ?? null,
-    priceMin: intent.priceMin ?? null,
-    priceMax: intent.priceMax ?? null,
-    currency: intent.currency ?? null,
-    colorsInclude: intent.colorsInclude,
-    colorsExclude: intent.colorsExclude,
-    attributesExclude: intent.attributesExclude,
-    attributesInclude: intent.attributesInclude,
-    occasion: intent.occasion ?? null,
-    size: intent.size ?? null,
-    availabilityRequired: intent.availabilityRequired,
-    softAttributes: intent.softAttributes,
   };
 }
 
@@ -721,20 +542,13 @@ export function serializeProxySearchResponse(
     chips: response.chips.map((chip) => ({
       field: chip.field,
       value: chip.value,
-      ...("currency" in chip && chip.currency !== undefined ? { currency: chip.currency } : {}),
+      ...(chip.currency !== undefined ? { currency: chip.currency } : {}),
     })),
-    intent: response.intent === null ? null : serializeIntent(response.intent),
   };
-  if (response.closeMatches.length > 0) {
-    body.closeMatches = response.closeMatches.map(serializeCard);
-    body.closeMatchesRelaxed = [...response.closeMatchesRelaxed];
-  } else {
-    const split = splitCloseVerdicts(response.hits, judgeProvider);
-    if (split !== null) {
-      body.results = split.matched.map(serializeCard);
-      body.closeMatches = split.close.map(serializeCard);
-      body.closeMatchesRelaxed = [];
-    }
+  const split = splitCloseVerdicts(response.hits, judgeProvider);
+  if (split !== null) {
+    body.results = split.matched.map(serializeCard);
+    body.closeMatches = split.close.map(serializeCard);
   }
   // Only a paged response carries the page keys, so an unpaged one stays
   // byte-identical to the pre-paging contract (YOY-145 AC-5).
@@ -752,101 +566,6 @@ export function serializeProxySearchResponse(
     body.otherReading = response.otherReading;
   }
   return body;
-}
-
-/** Env var naming the lite-tier confidence floor (YOY-116 AC-2). */
-export const INTENT_ESCALATION_THRESHOLD_ENV = "INTENT_ESCALATION_THRESHOLD";
-
-/**
- * The confidence below which a lite intent answer escalates to the accuracy
- * tier: `INTENT_ESCALATION_THRESHOLD`, a number in [0, 1]; unset means the
- * engine's committed default. A malformed value is a misconfiguration and
- * fails here, at construction, rather than silently routing everything to
- * one tier.
- */
-export function intentEscalationThresholdFromEnv(
-  env: Record<string, string | undefined> = process.env,
-): number {
-  const raw = env[INTENT_ESCALATION_THRESHOLD_ENV];
-  if (raw === undefined) {
-    return DEFAULT_INTENT_ESCALATION_THRESHOLD;
-  }
-  const threshold = Number(raw);
-  if (raw.trim() === "" || !Number.isFinite(threshold) || threshold < 0 || threshold > 1) {
-    throw new Error(
-      `${INTENT_ESCALATION_THRESHOLD_ENV} must be a number within [0, 1], got ${JSON.stringify(raw)}`,
-    );
-  }
-  return threshold;
-}
-
-/** Env var naming the class-escalation hedge delay, in milliseconds (YOY-64 AC-6). */
-export const INTENT_HEDGE_AFTER_MS_ENV = "INTENT_HEDGE_AFTER_MS";
-
-/**
- * How long a class-escalated accuracy-tier intent call may run before the
- * lite tier is fired alongside it and the first valid answer wins:
- * `INTENT_HEDGE_AFTER_MS`, a positive number of milliseconds; unset means
- * the engine's committed default. A malformed value fails at construction.
- */
-export function intentHedgeAfterMsFromEnv(
-  env: Record<string, string | undefined> = process.env,
-): number {
-  const raw = env[INTENT_HEDGE_AFTER_MS_ENV];
-  if (raw === undefined) {
-    return DEFAULT_INTENT_HEDGE_AFTER_MS;
-  }
-  const ms = Number(raw);
-  if (raw.trim() === "" || !Number.isFinite(ms) || ms <= 0) {
-    throw new Error(
-      `${INTENT_HEDGE_AFTER_MS_ENV} must be a positive number of milliseconds, got ${JSON.stringify(raw)}`,
-    );
-  }
-  return ms;
-}
-
-/** Env var naming the exact-query intent reuse window, in minutes (YOY-64 AC-4). */
-export const INTENT_REUSE_WINDOW_MINUTES_ENV = "INTENT_REUSE_WINDOW_MINUTES";
-/**
- * Default reuse window: an hour covers a demo's repeated "Try:" examples and
- * a shopper re-running a search, while a catalog change still reaches a
- * repeated query within the hour (the intent is reused, retrieval is not).
- */
-export const DEFAULT_INTENT_REUSE_WINDOW_MINUTES = 60;
-
-/**
- * The reuse window in milliseconds from `INTENT_REUSE_WINDOW_MINUTES`; unset
- * means the committed default, `0` disables reuse, and a malformed value
- * fails at construction.
- */
-export function intentReuseWindowMsFromEnv(
-  env: Record<string, string | undefined> = process.env,
-): number {
-  const raw = env[INTENT_REUSE_WINDOW_MINUTES_ENV];
-  if (raw === undefined) {
-    return DEFAULT_INTENT_REUSE_WINDOW_MINUTES * 60_000;
-  }
-  const minutes = Number(raw);
-  if (raw.trim() === "" || !Number.isFinite(minutes) || minutes < 0) {
-    throw new Error(
-      `${INTENT_REUSE_WINDOW_MINUTES_ENV} must be a non-negative number of minutes, got ${JSON.stringify(raw)}`,
-    );
-  }
-  return minutes * 60_000;
-}
-
-/** Env var switching the default engine to v2 (YOY-145 AC-1). */
-export const ENGINE_V2_ENV = "ENGINE_V2";
-
-/**
- * Whether Engine v2 is the default: on unless `ENGINE_V2=0` (YOY-153 AC-1).
- * Unset, empty or any other value serves Engine v2; `0` serves the old
- * engine, which stays one env value away until it is deleted.
- */
-export function engineV2FromEnv(
-  env: Record<string, string | undefined> = process.env,
-): boolean {
-  return env[ENGINE_V2_ENV]?.trim() !== "0";
 }
 
 /**
@@ -870,7 +589,6 @@ export function createProxySearchOrchestrator(
 ): SearchOrchestrator {
   const models = geminiModelsFromEnv();
   const openRouterModels = openRouterModelsFromEnv();
-  const reuseWindowMs = intentReuseWindowMsFromEnv();
   const embeddings = createGeminiEmbeddingClient({
     modelId: models.embeddingModel,
     dimension: models.embeddingDimension,
@@ -878,70 +596,16 @@ export function createProxySearchOrchestrator(
   });
   const classicStore = createPgTrgmClassicStore(db);
   return createSearchOrchestrator({
-    ...(reuseWindowMs > 0 ? { intentReuse: { windowMs: reuseWindowMs } } : {}),
     db,
-    classifier: createQueryClassifier({
-      llm: createGeminiLlmClient({
-        modelId: models.classificationModel,
-        costRecorder,
-      }),
-    }),
-    // Lite-first intent extraction (YOY-116): the lite tier answers first
-    // and the accuracy tier takes over on low confidence or a known-weak
-    // query class. Two metered clients, one searchId, each its own model id
-    // in the ledger.
-    extractor: createEscalatingIntentExtractor({
-      lite: createIntentExtractor({
-        llm: createGeminiLlmClient({
-          modelId: models.intentLiteModel,
-          costRecorder,
-          // Explicit thinking on the lite call too (YOY-109 lesson): never
-          // the model default.
-          thinkingLevel: models.intentLiteThinkingLevel,
-          // A hung lite call escalates to the accuracy tier; it must give
-          // up fast (gemini-3.5-flash-lite hangs on some refinement prompts).
-          requestTimeoutMs: models.intentLiteTimeoutMs,
-        }),
-      }),
-      accuracy: createIntentExtractor({
-        llm: createGeminiLlmClient({
-          modelId: models.intentModel,
-          costRecorder,
-          // Low thinking on the intent call (YOY-109): the model default's
-          // queue tail and hangs were the live degraded-with-intent-null
-          // failures.
-          thinkingLevel: models.intentThinkingLevel,
-          // A hung accuracy call degrades to classic inside the widget's
-          // budget (YOY-64 AC-3) instead of the adapter's 60 s default.
-          requestTimeoutMs: models.intentTimeoutMs,
-        }),
-      }),
-      threshold: intentEscalationThresholdFromEnv(),
-      // A class match's accuracy call is hedged with the lite tier past this
-      // delay (YOY-64 AC-6): the accuracy model's occasion-class tail — and
-      // its hangs to the deadline — no longer decide the AI p95 alone.
-      hedgeAfterMs: intentHedgeAfterMsFromEnv(),
-      // One budget for the whole ladder (YOY-64 AC-3): a hung upstream
-      // degrades to classic at GEMINI_INTENT_TIMEOUT_MS, not at the lite
-      // timeout plus the accuracy timeout in series.
-      deadlineMs: models.intentTimeoutMs,
-    }),
-    retriever: createRetriever({
-      embeddings,
-      store: createPgVectorRetrievalStore(db),
-    }),
     classicStore,
-    // Engine v2's find step (YOY-145), the default since YOY-153 AC-1
-    // (`ENGINE_V2=0` serves the old engine); the playground may still ask
-    // for either engine per request (YOY-145 AC-6).
+    // The find step (YOY-145).
     find: createFindStep({
       db,
       embeddings,
       classicStore,
       findSetSize: findSetSizeFromEnv(),
     }),
-    engineV2: engineV2FromEnv(),
-    // Engine v2's judge (YOY-147): one call per page inside the find set,
+    // The judge (YOY-147): one call per page inside the find set,
     // through the one factory — `JUDGE_PROVIDER` picks the client, and the
     // model is the provider's own config (AC-1). Built only for the
     // selected provider; `jev` is the decision-model challenger over
@@ -978,7 +642,7 @@ export function createProxySearchOrchestrator(
     }),
     judgeDeadlineMs: judgeDeadlineMsFromEnv(),
     judgeGiveUpMs: judgeGiveUpMsFromEnv(),
-    // Engine v2's wish extraction (YOY-149 AC-1): Flash-Lite, operation
+    // The wish extraction (YOY-149 AC-1): Flash-Lite, operation
     // `extract`, in parallel with find.
     wishExtractor: createWishExtractor({
       // The extraction-cache key names the model (YOY-149 AC-18).
@@ -999,13 +663,10 @@ export function createProxySearchOrchestrator(
 let orchestratorSingleton: SearchOrchestrator | undefined;
 
 /**
- * The production orchestrator as a module singleton (YOY-67 AC-7): the
- * classifier's decision cache and the retriever's query-embedding cache are
- * per-instance, so per-request construction threw them away on every search
- * — observed live as the same normalized query taking opposite routes 1.6s
- * apart despite temperature 0. Memoizing the first successful construction
- * makes the caches the cross-request determinism layer they were designed to
- * be. A construction failure caches nothing, so a missing GEMINI_API_KEY
+ * The production orchestrator as a module singleton (YOY-67 AC-7): its
+ * clients — the judge's shared keep-alive pool among them (YOY-159 AC-3) —
+ * are per-instance, so per-request construction would throw them away on
+ * every search. A construction failure caches nothing, so a missing GEMINI_API_KEY
  * stays a per-request 500 rather than a poisoned process. The `factory`
  * parameter exists for tests, which memoize their fake builds through the
  * same code path production takes.

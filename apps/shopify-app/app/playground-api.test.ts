@@ -27,15 +27,21 @@ vi.mock("./search/proxy.server", async (importOriginal) => {
         }
         const forced = request.forceClassic === true;
         const preview = request.preview === true;
+        // The classic rescue (YOY-96 AC-9) is the one keyword path a
+        // submitted search takes; a guard-forced search keeps the find path
+        // with no judge call (route "classic", reason "capped").
+        const rescue = request.forceClassicReason === "client-timeout-rescue";
+        const keyword = preview || rescue;
         return Promise.resolve({
           searchId: `search-${orchestratorSeam.requests.length}`,
           route: forced || preview ? "classic" : "ai",
-          routeReason: forced
-            ? ((request.forceClassicReason as string | undefined) ?? "throttled")
-            : preview
-              ? "preview"
-              : "model",
-          intent: null,
+          routeReason: preview
+            ? "preview"
+            : rescue
+              ? "client-timeout-rescue"
+              : forced
+                ? "capped"
+                : "judged",
           hits: [
             {
               productId: "p1",
@@ -46,22 +52,16 @@ vi.mock("./search/proxy.server", async (importOriginal) => {
               priceMax: 120,
               currencyCode: "ILS",
               available: true,
-              colorUnknown: false,
             },
           ],
-          chips: forced || preview ? [] : [{ field: "category", value: "dress" }],
-          degraded: forced,
-          closeMatches: [],
-          closeMatchesRelaxed: [],
+          chips: keyword ? [] : [{ field: "priceMax", value: "400", currency: "ILS" }],
+          degraded: rescue,
           // Out of pipeline order on purpose: the serializer re-orders.
-          stages:
-            forced || preview
-              ? { classic: 12 }
-              : { hydrate: 4, retrieve: 30, embed: 80, intent: 400, classify: 25 },
-          intentTier: forced || preview ? null : "lite",
-          // The engine the request resolved to (YOY-145 AC-11): the
-          // request's own, else the env default this fake takes as v1.
-          engine: (request.engine as string | undefined) ?? "v1",
+          stages: keyword
+            ? { classic: 12 }
+            : forced
+              ? { hydrate: 4, compose: 6, find: 80 }
+              : { judge: 300, hydrate: 4, compose: 6, find: 80 },
           ...(request.paging !== undefined
             ? { page: (request.paging as { page: number }).page, totalCount: 30 }
             : {}),
@@ -101,17 +101,14 @@ const CONTRACT_KEYS = [
   "chips",
   "degraded",
   "details",
-  "intent",
   "results",
   "route",
   "searchId",
 ].sort();
 
 const DETAIL_KEYS = [
-  "engine",
   "extractionCached",
   "extractionInTime",
-  "intentTier",
   "judge",
   "latencyMs",
   "limited",
@@ -121,7 +118,6 @@ const DETAIL_KEYS = [
 
 const RESULT_KEYS = [
   "available",
-  "colorUnknown",
   "currencyCode",
   "imageUrl",
   "priceMax",
@@ -305,11 +301,15 @@ describe("the response contract (AC-2)", () => {
     // serializer's explicit mapping — never the top level.
     expect(body).not.toHaveProperty("routeReason");
     expect(body).not.toHaveProperty("hits");
-    expect((body.details as { routeReason: string }).routeReason).toBe("model");
+    expect((body.details as { routeReason: string }).routeReason).toBe("judged");
     expect((body.details as { limited: unknown }).limited).toBeNull();
-    // The old engine has no judge details (YOY-147 AC-12).
-    expect((body.details as { judge: unknown }).judge).toBeNull();
-    // Nor the wish extraction's flag (YOY-149 AC-4).
+    // The judge's outcome and verdict per result (YOY-147 AC-12).
+    expect((body.details as { judge: unknown }).judge).toEqual({
+      outcome: "judged",
+      verdicts: [{ productId: "p1", verdict: null }],
+      calls: null,
+    });
+    // The fake answers no wish extraction flag (YOY-149 AC-4).
     expect((body.details as { extractionInTime: unknown }).extractionInTime).toBeNull();
     expect((body.details as { extractionCached: unknown }).extractionCached).toBeNull();
     expect(
@@ -321,58 +321,36 @@ describe("the response contract (AC-2)", () => {
     const ai = (await (
       await searchLoader(loaderArgs(searchRequest({})))
     ).json()) as { details: { stages: Record<string, number> } };
-    expect(Object.keys(ai.details.stages)).toEqual([
-      "classify",
-      "intent",
-      "embed",
-      "retrieve",
-      "hydrate",
-    ]);
-    expect(ai.details.stages).toEqual({
-      classify: 25,
-      intent: 400,
-      embed: 80,
-      retrieve: 30,
-      hydrate: 4,
-    });
+    expect(Object.keys(ai.details.stages)).toEqual(["find", "compose", "hydrate", "judge"]);
+    expect(ai.details.stages).toEqual({ find: 80, compose: 6, hydrate: 4, judge: 300 });
 
     const preview = (await (
       await searchLoader(loaderArgs(searchRequest({ mode: "preview" })))
     ).json()) as { details: { stages: Record<string, number> } };
     expect(Object.keys(preview.details.stages)).toEqual(["classic"]);
-    // The intent tier rides details too (YOY-116 AC-3): the tier that
-    // answered on the AI route, null when no intent call ran.
-    expect((ai.details as { intentTier?: unknown }).intentTier).toBe("lite");
-    expect((preview.details as { intentTier?: unknown }).intentTier).toBeNull();
   });
 
-  it("includes closeMatches only when the response carries them", async () => {
-    orchestratorSeam.response = {
-      hits: [],
-      closeMatches: [
-        {
-          productId: "p2",
-          title: "Close",
-          url: null,
-          imageUrl: null,
-          priceMin: 10,
-          priceMax: 10,
-          currencyCode: "ILS",
-          available: true,
-          colorUnknown: false,
-        },
-      ],
-    };
+  it("includes closeMatches only on a judged page with a match and a close product (YOY-166 AC-1)", async () => {
+    const card = (productId: string, verdict: string) => ({
+      productId,
+      title: productId,
+      url: null,
+      imageUrl: null,
+      priceMin: 10,
+      priceMax: 10,
+      currencyCode: "ILS",
+      available: true,
+      verdict,
+    });
+    orchestratorSeam.response = { hits: [card("p1", "exact"), card("p2", "close")] };
 
     const body = (await (
       await searchLoader(loaderArgs(searchRequest({})))
-    ).json()) as Record<string, unknown>;
+    ).json()) as { results: Array<{ productId: string }>; closeMatches: Array<{ productId: string }> };
 
-    // `closeMatchesRelaxed` rides beside `closeMatches` (YOY-111 AC-2).
-    expect(Object.keys(body).sort()).toEqual(
-      [...CONTRACT_KEYS, "closeMatches", "closeMatchesRelaxed"].sort(),
-    );
-    expect(body.closeMatchesRelaxed).toEqual([]);
+    expect(Object.keys(body).sort()).toEqual([...CONTRACT_KEYS, "closeMatches"].sort());
+    expect(body.results.map((result) => result.productId)).toEqual(["p1"]);
+    expect(body.closeMatches.map((result) => result.productId)).toEqual(["p2"]);
   });
 
   it("asks the orchestrator for 24 primary hits", async () => {
@@ -382,39 +360,10 @@ describe("the response contract (AC-2)", () => {
   });
 });
 
-describe("engine and pages (YOY-145)", () => {
-  it("honours engine=v1|v2 for the request and reports it in details (AC-6, AC-11)", async () => {
-    const v2 = (await (
-      await searchLoader(loaderArgs(searchRequest({ engine: "v2" })))
-    ).json()) as { details: { engine: string } };
-    const v1 = (await (
-      await searchLoader(loaderArgs(searchRequest({ engine: "v1" })))
-    ).json()) as { details: { engine: string } };
-    const unset = (await (
-      await searchLoader(loaderArgs(searchRequest({})))
-    ).json()) as { details: { engine: string } };
-
-    expect(orchestratorSeam.requests.map((request) => request.engine)).toEqual([
-      "v2",
-      "v1",
-      undefined,
-    ]);
-    expect([v2.details.engine, v1.details.engine, unset.details.engine]).toEqual([
-      "v2",
-      "v1",
-      "v1",
-    ]);
-  });
-
-  it("answers 400 for an unknown engine, before any search runs", async () => {
-    const response = await searchLoader(loaderArgs(searchRequest({ engine: "v3" })));
-    expect(response.status).toBe(400);
-    expect(orchestratorSeam.requests).toHaveLength(0);
-  });
-
+describe("pages (YOY-145)", () => {
   it("forwards page parameters and answers page and totalCount, logging the page (AC-4, AC-10)", async () => {
     const response = await searchLoader(
-      loaderArgs(searchRequest({ engine: "v2", page: "2", pageSize: "24" })),
+      loaderArgs(searchRequest({ page: "2", pageSize: "24" })),
     );
     const body = (await response.json()) as Record<string, unknown>;
 
@@ -473,114 +422,38 @@ describe("preview, refinement, and chip removal pass through (AC-3)", () => {
     await searchLoader(loaderArgs(searchRequest({})));
     const events = await db.searchEvent.findMany();
     expect(events).toHaveLength(1);
-    expect(events[0]!.routeReason).toBe("model");
+    expect(events[0]!.routeReason).toBe("judged");
   });
 
-  it("a refinement forwards previousIntent verbatim", async () => {
-    const intent = {
-      category: "dress",
-      priceMin: null,
-      priceMax: 400,
-      currency: "ILS",
-      colorsInclude: ["blue"],
-      colorsExclude: [],
-      attributesExclude: [],
-      attributesInclude: [],
-      occasion: null,
-      size: null,
-      availabilityRequired: false,
-      softAttributes: [],
-    };
-
-    await searchLoader(
-      loaderArgs(searchRequest({ previousIntent: JSON.stringify(intent) })),
-    );
-
-    expect(orchestratorSeam.requests[0].previousIntent).toMatchObject({
-      category: "dress",
-      priceMax: 400,
-      colorsInclude: ["blue"],
-    });
-  });
-
-  it("a chip removal enters at retrieval with the surgery applied", async () => {
-    const intent = {
-      category: "dress",
-      priceMin: null,
-      priceMax: 400,
-      currency: "ILS",
-      colorsInclude: ["blue"],
-      colorsExclude: [],
-      attributesExclude: [],
-      attributesInclude: [],
-      occasion: null,
-      size: null,
-      availabilityRequired: false,
-      softAttributes: [],
-    };
-
+  it("a refinement and a chip removal forward previousQuery and removedChips (YOY-149 AC-15, YOY-150 AC-1)", async () => {
     await searchLoader(
       loaderArgs(
         searchRequest({
-          previousIntent: JSON.stringify(intent),
-          removeChip: JSON.stringify({
-            field: "colorsInclude",
-            value: "blue",
-          }),
+          previousQuery: "elegant dress",
+          removedChips: JSON.stringify([{ field: "priceMax", value: "400" }]),
         }),
       ),
     );
 
-    const request = orchestratorSeam.requests[0];
-    expect(request.resolvedIntent).toMatchObject({ colorsInclude: [] });
-    expect(request.previousIntent).toBeUndefined();
-    expect(request.forceClassic).toBeUndefined();
+    expect(orchestratorSeam.requests[0]).toMatchObject({
+      previousQuery: "elegant dress",
+      removedChips: [{ field: "priceMax", value: "400" }],
+    });
+    expect(orchestratorSeam.requests[0].forceClassic).toBeUndefined();
   });
 
-  it("neither a preview nor a chip removal is limited, even over a cap", async () => {
-    // Caps guard AI spend; these paths make no LLM call, so limiting them
+  it("a preview is never limited, even over a cap", async () => {
+    // Caps guard judge spend; a preview makes no model call, so limiting it
     // would degrade a visitor for budget they cannot consume.
     process.env.PLAYGROUND_DAILY_AI_CAP = "1";
     await seedAiSearches(SEED_KEY, 5);
-    const intent = {
-      category: "dress",
-      priceMin: null,
-      priceMax: null,
-      currency: null,
-      colorsInclude: ["blue"],
-      colorsExclude: [],
-      attributesExclude: [],
-      attributesInclude: [],
-      occasion: null,
-      size: null,
-      availabilityRequired: false,
-      softAttributes: [],
-    };
 
     const preview = (await (
       await searchLoader(loaderArgs(searchRequest({ mode: "preview" })))
     ).json()) as { details: { limited: unknown } };
-    const removal = (await (
-      await searchLoader(
-        loaderArgs(
-          searchRequest({
-            previousIntent: JSON.stringify(intent),
-            removeChip: JSON.stringify({
-              field: "colorsInclude",
-              value: "blue",
-            }),
-          }),
-        ),
-      )
-    ).json()) as { details: { limited: unknown } };
 
     expect(preview.details.limited).toBeNull();
-    expect(removal.details.limited).toBeNull();
-    expect(
-      orchestratorSeam.requests.every(
-        (request) => request.forceClassic === undefined,
-      ),
-    ).toBe(true);
+    expect(orchestratorSeam.requests[0]!.forceClassic).toBeUndefined();
   });
 });
 
@@ -599,10 +472,10 @@ describe("per-IP AI throttle (AC-4)", () => {
 
     const limited = (await (
       await searchLoader(loaderArgs(searchRequest({}, headers)))
-    ).json()) as { details: { limited: unknown }; degraded: boolean };
+    ).json()) as { details: { limited: unknown }; route: string };
 
     expect(limited.details.limited).toBe("ip");
-    expect(limited.degraded).toBe(true);
+    expect(limited.route).toBe("classic");
     expect(orchestratorSeam.requests.at(-1)).toMatchObject({
       forceClassic: true,
     });
@@ -628,11 +501,11 @@ describe("per-IP AI throttle (AC-4)", () => {
 
     // One search scrolled through four pages spends one unit.
     for (const page of ["1", "2", "3", "4"]) {
-      expect(await limitedOf({ engine: "v2", page, pageSize: "24" })).toBeNull();
+      expect(await limitedOf({ page, pageSize: "24" })).toBeNull();
     }
     // So a second search still fits the budget of two, and only a third is limited.
-    expect(await limitedOf({ engine: "v2", page: "1", pageSize: "24", query: "linen shirt" })).toBeNull();
-    expect(await limitedOf({ engine: "v2", page: "1", pageSize: "24", query: "wool coat" })).toBe("ip");
+    expect(await limitedOf({ page: "1", pageSize: "24", query: "linen shirt" })).toBeNull();
+    expect(await limitedOf({ page: "1", pageSize: "24", query: "wool coat" })).toBe("ip");
   });
 
   it("keys the throttle by the last trusted X-Forwarded-For hop, then the connection address, then unknown (YOY-96 AC-11)", () => {
@@ -692,9 +565,9 @@ describe("per-IP AI throttle (AC-4)", () => {
       await searchLoader(
         loaderArgs(searchRequest({}, { "x-forwarded-for": "10.66.0.99, 203.0.113.9" })),
       )
-    ).json()) as { details: { limited: unknown }; degraded: boolean };
+    ).json()) as { details: { limited: unknown }; route: string };
     expect(eleventh.details.limited).toBe("ip");
-    expect(eleventh.degraded).toBe(true);
+    expect(eleventh.route).toBe("classic");
     expect(orchestratorSeam.requests.at(-1)).toMatchObject({ forceClassic: true });
 
     // A different last hop is a different visitor, whatever the first entry says.
@@ -718,10 +591,10 @@ describe("daily AI caps (AC-5)", () => {
 
     const body = (await (
       await searchLoader(loaderArgs(searchRequest({})))
-    ).json()) as { details: { limited: unknown }; degraded: boolean };
+    ).json()) as { details: { limited: unknown }; route: string };
 
     expect(body.details.limited).toBe("daily-global");
-    expect(body.degraded).toBe(true);
+    expect(body.route).toBe("classic");
     expect(orchestratorSeam.requests[0]).toMatchObject({ forceClassic: true });
     expect(await db.aiCall.count()).toBe(0);
   });
@@ -850,7 +723,7 @@ describe("event logging and the click beacon (AC-6)", () => {
       where: { sessionId: "s1" },
     });
     expect(events).toHaveLength(1);
-    expect(events[0]).toMatchObject({ route: "classic", degraded: true });
+    expect(events[0]).toMatchObject({ route: "classic", routeReason: "capped" });
   });
 
   it("records a click against that catalog's own search", async () => {
@@ -949,30 +822,7 @@ describe("event logging and the click beacon (AC-6)", () => {
   });
 });
 
-describe("daily AI ceilings ignore exact-query reuse rows (YOY-64 AC-4)", () => {
-  it("counts AI-routed rows except those served from a stored intent", async () => {
-    const { countAiSearchesToday } = await import("./playground/api.server");
-    const now = new Date("2026-08-26T12:00:00Z");
-    const base = {
-      shopDomain: SEED_KEY,
-      sessionId: "s",
-      query: "q",
-      degraded: false,
-      latencyMs: 10,
-      resultCount: 1,
-      createdAt: now,
-    };
-    await db.searchEvent.createMany({
-      data: [
-        { ...base, searchId: "a1", route: "ai", routeReason: "model" },
-        { ...base, searchId: "a2", route: "ai", routeReason: null },
-        { ...base, searchId: "a3", route: "ai", routeReason: "intent-reuse" },
-        { ...base, searchId: "c1", route: "classic", routeReason: "short-query" },
-      ],
-    });
-    expect(await countAiSearchesToday(db, [SEED_KEY], now)).toBe(2);
-  });
-
+describe("daily AI ceilings count searches, not pages (YOY-157 AC-29)", () => {
   it("counts page-1 rows only: a later page of the same search is not another search (YOY-157 AC-29)", async () => {
     const { countAiSearchesToday } = await import("./playground/api.server");
     const now = new Date("2026-10-07T12:00:00Z");

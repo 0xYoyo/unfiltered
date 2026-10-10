@@ -4,18 +4,8 @@ import { fileURLToPath } from "node:url";
 
 import type { PrismaClient } from "@prisma/client";
 import {
-  constraintsFromIntent,
-  createEscalatingIntentExtractor,
-  createIntentExtractor,
-  createQueryClassifier,
-  createRetriever,
-  DEFAULT_INTENT_ESCALATION_THRESHOLD,
   expandCategoryConstraint,
-  parseIntent,
   type EmbeddingClient,
-  type Intent,
-  type IntentEscalation,
-  type IntentTier,
   type LlmClient,
 } from "@unfiltered/engine";
 
@@ -29,19 +19,6 @@ import {
 import { hashImageBytes } from "../catalog/images.server";
 import { computeContentHash, computeFamilyKey } from "../catalog/mapping.server";
 import {
-  EXAMPLE_QUERIES,
-  EXAMPLE_QUERY_KINDS,
-  PLAYGROUND_LOCALES,
-  type ExampleQueryKind,
-  type PlaygroundLocale,
-} from "../playground/strings";
-import { createPgTrgmClassicStore } from "../search/classic-store.server";
-import {
-  createSearchOrchestrator,
-  type ProductCard,
-} from "../search/orchestrator.server";
-import { createPgVectorRetrievalStore } from "../search/retrieval-store.server";
-import {
   createReplayEmbeddingClient,
   createReplayLlmClient,
   type EmbeddingRecording,
@@ -49,12 +26,13 @@ import {
 } from "./replay.server";
 
 /**
- * The sparse-catalog eval harness (YOY-27): indexes the fixture catalog
- * (enrichment → embedding) from recorded LLM/embedding outputs, then runs
- * every golden query through the hybrid search orchestrator end to end
- * (YOY-45 AC-8) — classification, intent, retrieval, and the classic keyword
- * engine behind one call — entirely offline and deterministic, and scores
- * each golden against its expectations.
+ * The sparse-catalog eval harness (YOY-27): seeds the fixture catalog and
+ * indexes it the way production does — text enrichment, the vision pass
+ * over the listing images, product vectors — from recorded model outputs,
+ * entirely offline and deterministic. The index evaluation here scores the
+ * vision pass (contamination cases, sparse-product goldens); the
+ * Constructor-bar set runs on the same index through the search engine in
+ * `constructor-v2.server.ts`.
  */
 
 const fixturesDir = join(
@@ -222,9 +200,9 @@ export interface GoldenConstraints {
   colorsInclude: string[];
   colorsExclude: string[];
   /**
-   * Negated / required attribute words (YOY-133); absent on every golden
-   * written before them, which reads as none. The Constructor-bar goldens
-   * pin the negation outcome through `mustNotProductIds` instead.
+   * Negated / required attribute words (YOY-133); absent reads as none. The
+   * Constructor-bar goldens pin the negation outcome through
+   * `mustNotProductIds` instead.
    */
   attributesExclude?: string[];
   attributesInclude?: string[];
@@ -232,47 +210,13 @@ export interface GoldenConstraints {
   availabilityRequired: boolean;
 }
 
-/** One golden query, as checked into goldens.json. */
+/** One golden query: its text, the products it expects, and its hard constraints. */
 export interface Golden {
   id: string;
   language: "en" | "he" | "mixed";
   query: string;
-  /** Route the classifier must resolve; absent means "ai" (YOY-41 AC-6). */
-  expectedRoute?: "classic" | "ai";
   hardConstraints: GoldenConstraints;
   expectedProductIds: string[];
-  /**
-   * Products that must NOT appear in the top 10 (YOY-117 AC-3): the other
-   * colourways of a family whose representative is expected. Each
-   * appearance is scored as a violation.
-   */
-  mustNotProductIds?: string[];
-  /**
-   * A zero-hit golden (YOY-111 AC-5): the constraints' intersection is
-   * empty on the fixture catalog by design, so the golden scores the
-   * close-match ladder instead of a rank — hits must be empty, close
-   * matches non-empty, none of them may carry the excluded primary colour,
-   * and the first relaxed constraint must be `relaxedFirst`. Such a golden
-   * lists no expected products.
-   */
-  zeroHit?: { relaxedFirst: string };
-}
-
-/**
- * One curated example query of the playground page (YOY-136 AC-3): the
- * committed `EXAMPLE_QUERIES` set of `app/playground/strings.ts`, replayed
- * end to end against the fixture catalog. The page's own suggestions must
- * never come back empty, so each is scored on one thing — at least one
- * primary hit — rather than on rank; `expectedProductIds` is empty by
- * design and `hardConstraints` names the constraint the kind demonstrates.
- * A `refinement` example carries the `previousIntent` the runbook gives it
- * (the same locale's negation example, submitted immediately before), and
- * runs the full path with it, exactly as the page does.
- */
-export interface ExampleGolden extends Golden {
-  kind: ExampleQueryKind;
-  language: PlaygroundLocale;
-  previousIntent?: Intent;
 }
 
 /**
@@ -287,7 +231,7 @@ export type ConstructorGroup = (typeof CONSTRUCTOR_GROUPS)[number];
 export interface ConstructorGolden extends Golden {
   language: "en" | "he";
   group: ConstructorGroup;
-  /** Required on this set: the products the query must keep out of its top 10. */
+  /** The products the query must keep out of its results. */
   mustNotProductIds: string[];
 }
 
@@ -298,322 +242,8 @@ export const CONSTRUCTOR_SET_MINIMUMS = {
   perGroup: 8,
 } as const;
 
-/**
- * The committed Constructor-bar floor (YOY-118 AC-3): the overall hit rate
- * the harness achieved, rounded down to a whole percent. The floor records
- * what the engine does today; raise it only from a measured run.
- */
-export interface ConstructorFloor {
-  recordedAt: string;
-  overallHitRatePercent: number;
-  /**
-   * The measured `mustNot` leak (AC-3, amended 2026-08-27): the engine has
-   * no hard filter for material/sleeve/bridal negations today, so the
-   * harness asserts no regression against these — at most this many
-   * `mustNotProductIds` appearances, and at least this share of goldens
-   * with none — while 0 stays the reported target (moved there by the
-   * follow-up engine issue, YOY-133).
-   */
-  mustNotViolationsMax: number;
-  mustNotCleanRatePercent: number;
-}
-
-/**
- * One refinement golden (YOY-42): the intent from the shopper's previous
- * query, the follow-up query, and the constraint outcome the extractor must
- * produce for it. `outcome` documents which behavior the golden pins — a
- * refinement of the previous intent, or a fresh intent after a topic change.
- */
-export interface RefinementGolden {
-  id: string;
-  language: "en" | "he" | "mixed";
-  /** What this golden demonstrates, for the scorecard and review. */
-  note: string;
-  previousIntent: Intent;
-  query: string;
-  outcome: "refinement" | "fresh";
-  expectedConstraints: GoldenConstraints;
-  /**
-   * Comparative-tightening bounds (YOY-52 AC-15). When present, the named
-   * price field is scored as an inequality against the previous intent's
-   * bound — "cheaper" must land strictly below, "more expensive" strictly
-   * above — instead of the exact `expectedConstraints` value, because a live
-   * model's exact figure is its own choice; only the direction is the
-   * contract.
-   */
-  expectedPriceMaxBelow?: number;
-  expectedPriceMinAbove?: number;
-  /** Expected size constraint, when the follow-up states or preserves one. */
-  expectedSize?: string;
-  /** Soft attributes the merged intent must carry, in order. */
-  expectedSoftAttributes: string[];
-}
-
-/** The scorecard row for one refinement golden. */
-export interface RefinementScore {
-  golden: RefinementGolden;
-  intent: Intent | null;
-  /** Which tier answered the follow-up's intent call (YOY-116). */
-  intentTier: IntentTier | null;
-  /** Why it escalated, when it did. */
-  escalation: IntentEscalation | null;
-  /** Constraint outcomes that missed the golden's expectation (empty is clean). */
-  violations: string[];
-  costUsd: number;
-}
-
-/** The scorecard row for one golden query. */
-export interface QueryScore {
-  golden: Golden;
-  route: string;
-  routeReason: string;
-  intent: Intent | null;
-  /** Which tier answered the intent call; null on classic routes (YOY-116). */
-  intentTier: IntentTier | null;
-  hits: ProductCard[];
-  /** The zero-hit rescue, when the response carried one (YOY-111). */
-  closeMatches: ProductCard[];
-  closeMatchesRelaxed: string[];
-  /** 1-based rank of the first expected product in the top 10, or null. */
-  firstExpectedRank: number | null;
-  /**
-   * For a `zeroHit` golden: whether the ladder answered as specified
-   * (YOY-111 AC-5). Null for every other golden. A satisfied zero-hit
-   * golden counts as a hit in `hitRate` and the baseline.
-   */
-  zeroHitSatisfied: boolean | null;
-  /** Constraint violations found in the top 10 (empty means clean). */
-  violations: string[];
-  /**
-   * The `mustNotProductIds` appearances among `violations` (YOY-117 AC-3),
-   * listed on their own so the Constructor bar (YOY-118) can report them
-   * apart from the hard-constraint violations.
-   */
-  mustNotViolations: string[];
-  costUsd: number;
-}
-
-/** Whether a scored golden counts as a hit: a ranked expected product, or a satisfied zero-hit contract. */
-export function goldenHit(score: Pick<QueryScore, "firstExpectedRank" | "zeroHitSatisfied">): boolean {
-  return score.firstExpectedRank !== null || score.zeroHitSatisfied === true;
-}
-
-/** The outcome of one full eval run. */
-export interface EvalRunResult {
-  catalogSize: number;
-  perQuery: QueryScore[];
-  /** One row per refinement golden (YOY-42). */
-  perRefinement: RefinementScore[];
-  /** Constraint-outcome misses across every refinement golden. */
-  refinementViolationCount: number;
-  /** True when any replayed LLM recording is hand-written, not live. */
-  synthesizedRecordings: boolean;
-  /** Fraction of goldens with an expected product in the top 10. */
-  hitRate: number;
-  /** Total constraint violations across every query's top 10. */
-  violationCount: number;
-  /** One-time indexing cost: enrichment + catalog embedding, USD. */
-  oneTimeCostUsd: number;
-  /** Blended per-search cost projected per 1,000 searches, USD. */
-  perSearchCostPer1000Usd: number;
-  /**
-   * The blended figure's denominator (YOY-52 AC-2): AI-routed goldens that
-   * ran the full per-search path. Refinement goldens run an intent call
-   * only, so they are excluded from the blend and reported separately.
-   */
-  blendedAiSearchCount: number;
-  /** Intent-only refinement cost projected per 1,000 follow-ups, USD. */
-  refinementCostPer1000Usd: number;
-  /**
-   * Lite-first routing (YOY-116): the share of AI-routed goldens whose
-   * intent came from the accuracy tier (a class match or a low-confidence
-   * escalation), and the same for refinement follow-ups.
-   */
-  escalationRate: number;
-  refinementEscalationRate: number;
-  /** Intent-operation ledger rows per tier, by the recordings' model ids. */
-  intentCalls: { lite: number; accuracy: number };
-  /** The threshold the routed blend was scored under. */
-  escalationThreshold: number;
-  /** Intent prompt size vs the pre-trim baseline (YOY-64 AC-2). */
-  intentInputTokens: { before: number; after: number; reduction: number };
-  /** One row per Constructor-bar golden (YOY-118), scored like the goldens. */
-  perConstructor: QueryScore[];
-  /** The Constructor bar block (YOY-118 AC-3). */
-  constructorBar: ConstructorBar;
-  /** One row per sparse-product golden (YOY-122 AC-2), scored like the goldens. */
-  perSparse: QueryScore[];
-  /** Fraction of the sparse goldens with an expected product in the top 10 (bar ≥ 0.8). */
-  sparseHitRate: number;
-  /**
-   * One row per curated example query (YOY-136 AC-3), scored like the
-   * goldens; the bar is ≥ 1 primary hit on every one of them, and their
-   * spend stays out of the blend like the other side sets.
-   */
-  perExample: QueryScore[];
-  /** Contamination cases scored (YOY-122 AC-1). */
-  contaminationCases: number;
-  /** Every contamination violation across the cases (bar: none). */
-  contaminationViolations: string[];
-  /** Products the vision pass analysed from fixture images. */
-  visionProducts: number;
-  /** The `vision` ledger rows of the run, USD: one-time indexing cost, reported on its own line. */
-  visionCostUsd: number;
-}
-
-/** Hit rate over a slice of the Constructor set, with its size. */
-export interface ConstructorHitRate {
-  hits: number;
-  total: number;
-  /** hits / total; 0 for an empty slice. */
-  rate: number;
-}
-
-/** The Constructor bar (YOY-118 AC-3): hit rate per group, per language, overall; violations; escalation; cost. */
-export interface ConstructorBar {
-  overall: ConstructorHitRate;
-  byLanguage: Record<"en" | "he", ConstructorHitRate>;
-  byGroup: Record<ConstructorGroup, ConstructorHitRate & { byLanguage: Record<"en" | "he", ConstructorHitRate> }>;
-  /** `mustNotProductIds` appearances across the set's top 10s. */
-  mustNotViolationCount: number;
-  /** Goldens whose top 10 carries none of their `mustNotProductIds`. */
-  mustNotCleanRate: ConstructorHitRate;
-  /** Hard-constraint violations across the set's top 10s (mustNot excluded). */
-  hardConstraintViolationCount: number;
-  /** Share of the set's AI-routed goldens answered by the accuracy tier. */
-  escalationRate: number;
-  /** Full-path per-search cost of the set, projected per 1,000 AI searches. */
-  costPer1000Usd: number;
-  /** The set's full-path AI searches (the cost denominator). */
-  aiSearchCount: number;
-}
-
-/**
- * The per-golden zero-regression baseline (YOY-116 AC-5): which goldens hit
- * and which refinements were clean before lite-first routing landed.
- */
-export interface BaselineHits {
-  recordedAt: string;
-  goldens: Record<string, boolean>;
-  refinements: Record<string, boolean>;
-  /**
-   * Every golden's route — main, Constructor-bar, and sparse sets (YOY-133
-   * AC-4): the harness asserts each run's route equals it, so a routing
-   * change shows in the scorecard diff instead of passing silently.
-   */
-  routes: Record<string, "classic" | "ai">;
-}
-
-export function loadBaselineHits(): BaselineHits {
-  return readJson<BaselineHits>("baseline-hits.json");
-}
-
-/** The pre-trim intent prompt size (YOY-64 AC-2). */
-export interface IntentTokenBaseline {
-  recordedAt: string;
-  meanInputTokens: number;
-  goldens: number;
-}
-
-export function loadIntentTokenBaseline(): IntentTokenBaseline {
-  return readJson<IntentTokenBaseline>("intent-token-baseline.json");
-}
-
-/**
- * Mean accuracy-tier intent input tokens over the goldens' recordings — the
- * prompt-size metric YOY-64 AC-2 trims — and its reduction vs the baseline.
- */
-export function intentInputTokenStats(
-  recording: LlmRecording,
-  goldens: Golden[],
-  baseline: IntentTokenBaseline,
-): { before: number; after: number; reduction: number } {
-  const samples = goldens
-    .map((golden) => recording.entries[golden.query]?.inputTokens)
-    .filter((tokens): tokens is number => typeof tokens === "number");
-  const after =
-    samples.length === 0 ? 0 : samples.reduce((sum, tokens) => sum + tokens, 0) / samples.length;
-  return {
-    before: baseline.meanInputTokens,
-    after,
-    reduction: baseline.meanInputTokens === 0 ? 0 : 1 - after / baseline.meanInputTokens,
-  };
-}
-
 export function loadCatalog(): EvalProduct[] {
   return readJson<EvalProduct[]>("catalog.json");
-}
-
-export function loadGoldens(): Golden[] {
-  return readJson<Golden[]>("goldens.json");
-}
-
-/**
- * The curated examples, validated against the committed set (YOY-136 AC-3):
- * exactly one golden per kind per locale, its query byte-identical to the
- * `EXAMPLE_QUERIES` entry — so a curation edit in strings.ts fails offline
- * until its recording lands, and a stale fixture cannot vouch for a query
- * the page no longer offers. Refinement examples must carry a valid
- * previous intent; no other kind may.
- */
-export function loadExampleGoldens(): ExampleGolden[] {
-  const goldens = readJson<
-    (Omit<ExampleGolden, "previousIntent"> & { previousIntent?: unknown })[]
-  >("example-goldens.json");
-  const ids = new Set<string>();
-  const seen = new Set<string>();
-  const loaded = goldens.map((golden): ExampleGolden => {
-    if (ids.has(golden.id)) {
-      throw new Error(`eval: example golden ${golden.id} is listed twice`);
-    }
-    ids.add(golden.id);
-    const committed = EXAMPLE_QUERIES[golden.language]?.find(
-      (query) => query.kind === golden.kind,
-    );
-    if (committed === undefined || committed.text !== golden.query) {
-      throw new Error(
-        `eval: example golden ${golden.id} (${golden.language} ${golden.kind}: ${JSON.stringify(golden.query)}) does not match EXAMPLE_QUERIES${committed === undefined ? "" : ` (${JSON.stringify(committed.text)})`} — update example-goldens.json and record it (REGEN_SCOPE=goldens)`,
-      );
-    }
-    const slot = `${golden.language}/${golden.kind}`;
-    if (seen.has(slot)) {
-      throw new Error(`eval: example golden ${golden.id} duplicates ${slot}`);
-    }
-    seen.add(slot);
-    const { previousIntent: rawPreviousIntent, ...plain } = golden;
-    if (golden.kind === "refinement") {
-      const previousIntent = parseIntent(rawPreviousIntent);
-      if (previousIntent === null) {
-        throw new Error(`eval: example golden ${golden.id} carries an invalid previousIntent`);
-      }
-      return { ...plain, previousIntent };
-    }
-    if (rawPreviousIntent !== undefined) {
-      throw new Error(`eval: example golden ${golden.id} is not a refinement but carries a previousIntent`);
-    }
-    return plain;
-  });
-  for (const locale of PLAYGROUND_LOCALES) {
-    for (const kind of EXAMPLE_QUERY_KINDS) {
-      if (!seen.has(`${locale}/${kind}`)) {
-        throw new Error(`eval: example-goldens.json has no ${locale} ${kind} entry`);
-      }
-    }
-  }
-  return loaded;
-}
-
-export function loadRefinementGoldens(): RefinementGolden[] {
-  // The committed previous intents predate the attribute arrays (YOY-133)
-  // and carry wire-format nulls; parsing them exactly as the proxy parses an
-  // echoed intent gives the extractor the same Intent production would see.
-  return readJson<RefinementGolden[]>("refinement-goldens.json").map((golden) => {
-    const previousIntent = parseIntent(golden.previousIntent);
-    if (previousIntent === null) {
-      throw new Error(`eval: refinement golden ${golden.id} carries an invalid previousIntent`);
-    }
-    return { ...golden, previousIntent };
-  });
 }
 
 /**
@@ -665,124 +295,6 @@ export function loadConstructorGoldens(): ConstructorGolden[] {
   return goldens;
 }
 
-export function loadConstructorFloor(): ConstructorFloor {
-  return readJson<ConstructorFloor>("constructor-floor.json");
-}
-
-/** The Constructor bar over the scored set (YOY-118 AC-3). */
-export function computeConstructorBar(
-  scores: QueryScore[],
-  costRows: { searchId: string | null; costUsd: number }[],
-): ConstructorBar {
-  const goldenOf = (score: QueryScore): ConstructorGolden => score.golden as ConstructorGolden;
-  const rate = (slice: QueryScore[]): ConstructorHitRate => {
-    const hits = slice.filter(goldenHit).length;
-    return { hits, total: slice.length, rate: slice.length === 0 ? 0 : hits / slice.length };
-  };
-  const byLanguage = (slice: QueryScore[]): Record<"en" | "he", ConstructorHitRate> => ({
-    en: rate(slice.filter((score) => goldenOf(score).language === "en")),
-    he: rate(slice.filter((score) => goldenOf(score).language === "he")),
-  });
-  const byGroup = Object.fromEntries(
-    CONSTRUCTOR_GROUPS.map((group) => {
-      const slice = scores.filter((score) => goldenOf(score).group === group);
-      return [group, { ...rate(slice), byLanguage: byLanguage(slice) }];
-    }),
-  ) as ConstructorBar["byGroup"];
-  const mustNotViolationCount = scores.reduce(
-    (sum, score) => sum + score.mustNotViolations.length,
-    0,
-  );
-  const clean = scores.filter((score) => score.mustNotViolations.length === 0).length;
-  const mustNotCleanRate: ConstructorHitRate = {
-    hits: clean,
-    total: scores.length,
-    rate: scores.length === 0 ? 0 : clean / scores.length,
-  };
-  const hardConstraintViolationCount =
-    scores.reduce((sum, score) => sum + score.violations.length, 0) - mustNotViolationCount;
-  const aiScores = scores.filter((score) => score.intentTier !== null);
-  const escalationRate =
-    aiScores.length === 0
-      ? 0
-      : aiScores.filter((score) => score.intentTier === "accuracy").length / aiScores.length;
-  const searchIds = new Set(scores.map((score) => score.golden.id));
-  const total = costRows
-    .filter((row) => row.searchId !== null && searchIds.has(row.searchId))
-    .reduce((sum, row) => sum + row.costUsd, 0);
-  const aiSearchCount = scores.filter((score) => score.route === "ai").length;
-  return {
-    overall: rate(scores),
-    byLanguage: byLanguage(scores),
-    byGroup,
-    mustNotViolationCount,
-    mustNotCleanRate,
-    hardConstraintViolationCount,
-    escalationRate,
-    costPer1000Usd: aiSearchCount === 0 ? 0 : (total / aiSearchCount) * 1000,
-    aiSearchCount,
-  };
-}
-
-/**
- * Score one refinement golden: the merged intent's hard constraints — the
- * ones retrieval would filter on — against the outcome the golden documents.
- * Soft attributes are not filters and are asserted by the harness tests, not
- * counted here.
- */
-export function refinementViolations(
-  golden: RefinementGolden,
-  intent: Intent,
-): string[] {
-  const expected = golden.expectedConstraints;
-  const actual = constraintsFromIntent(intent);
-  const violations: string[] = [];
-  const compare = (field: string, got: unknown, want: unknown): void => {
-    if (JSON.stringify(got ?? null) !== JSON.stringify(want ?? null)) {
-      violations.push(
-        `${golden.id}: ${field} ${JSON.stringify(got ?? null)} ≠ expected ${JSON.stringify(want ?? null)}`,
-      );
-    }
-  };
-  const bound = (
-    field: string,
-    got: number | null | undefined,
-    check: (value: number) => boolean,
-    want: string,
-  ): void => {
-    if (got === null || got === undefined || !check(got)) {
-      violations.push(
-        `${golden.id}: ${field} ${JSON.stringify(got ?? null)} ≠ expected ${want}`,
-      );
-    }
-  };
-  compare("category", actual.category, expected.category);
-  if (golden.expectedPriceMinAbove !== undefined) {
-    const above = golden.expectedPriceMinAbove;
-    bound("priceMin", actual.priceMin, (value) => value > above, `> ${above}`);
-  } else {
-    compare("priceMin", actual.priceMin, expected.priceMin);
-  }
-  if (golden.expectedPriceMaxBelow !== undefined) {
-    const below = golden.expectedPriceMaxBelow;
-    bound("priceMax", actual.priceMax, (value) => value < below, `< ${below}`);
-  } else {
-    compare("priceMax", actual.priceMax, expected.priceMax);
-  }
-  compare("colorsInclude", actual.colorsInclude, expected.colorsInclude);
-  compare("colorsExclude", actual.colorsExclude, expected.colorsExclude);
-  compare("occasion", actual.occasion, expected.occasion);
-  compare("availableOnly", actual.availableOnly, expected.availabilityRequired);
-  // Case-insensitive belt-and-braces (YOY-52): parseIntent already
-  // canonicalizes size casing, but the golden's own casing must not matter.
-  compare(
-    "size",
-    intent.size?.toUpperCase(),
-    golden.expectedSize?.toUpperCase(),
-  );
-  return violations;
-}
-
 /** The enrichment facts the violation scorer reads per product. */
 export interface ScoredEnrichment {
   category: string | null;
@@ -792,15 +304,14 @@ export interface ScoredEnrichment {
   primaryColor: string | null;
 }
 
-/** Check one returned product against a golden's hard constraints. Exported
- * for the harness's own scoring tests (YOY-29 AC-11). Mirrors the retrieval
- * filter's semantics (YOY-35 AC-2): empty enrichment occasions/colors are
- * unknown, not violations of positive constraints — only stated-and-mismatched
- * values violate — and a category constraint admits its taxonomy group's
- * members (AC-5), the same expansion retrieval filters through. An excluded
- * colour is judged by the primary colour alone (YOY-110 AC-5): a product that
- * also comes in the excluded colour is not a violation, and a null primary
- * colour is unknown. */
+/** Check one indexed product against a golden's hard constraints. Exported
+ * for the harness's own scoring tests (YOY-29 AC-11). Empty enrichment
+ * occasions/colors are unknown, not violations of positive constraints —
+ * only stated-and-mismatched values violate (YOY-35 AC-2) — and a category
+ * constraint admits its taxonomy group's members (AC-5). An excluded colour
+ * is judged by the primary colour alone (YOY-110 AC-5): a product that also
+ * comes in the excluded colour is not a violation, and a null primary colour
+ * is unknown. */
 export function findViolations(
   golden: Golden,
   productId: string,
@@ -868,7 +379,7 @@ export function findViolations(
  * Seed the eval catalog into `shopDomain` and index it exactly the way
  * production does: the snapshot rows and listing images, then the real
  * enrichment (text and vision) and embedding pipelines over the given
- * ports. Shared by the eval run and the Engine v2 Constructor suite
+ * ports. Shared by the index eval and the Engine v2 Constructor suite
  * (YOY-153 AC-2). Returns how many products carry listing images.
  */
 export async function indexEvalCatalog({
@@ -929,149 +440,89 @@ export async function indexEvalCatalog({
   }
   if ((enrichResult.vision?.failed ?? 0) > 0) {
     throw new Error(
-      `eval vision pass failed for ${enrichResult.vision?.failed} products — a vision recording is missing or broken; regenerate with REGEN_SCOPE=goldens`,
+      `eval vision pass failed for ${enrichResult.vision?.failed} products — a vision recording is missing or broken; regenerate with REGEN_SCOPE=vision`,
     );
   }
   await embedCatalog({ db, shopDomain, embeddings });
   return visionProducts;
 }
 
-/** Run the full eval and print the per-query scorecard (AC-6). */
-export async function runEval(db: PrismaClient): Promise<EvalRunResult> {
+/** One sparse-product golden scored on the index (YOY-122 AC-2). */
+export interface SparseScore {
+  golden: Golden;
+  /** The expected products whose indexed facts satisfy the query, in golden order. */
+  satisfied: string[];
+  /** Why each other expected product falls short (empty when every one satisfies it). */
+  gaps: string[];
+}
+
+/**
+ * The facts a sparse golden asks of one expected product (YOY-122 AC-2):
+ * its hard constraints hold on the indexed product (`findViolations`), and
+ * the colour it asks for is stated — on a title-only product only the
+ * vision pass can state it, so an unknown colour is a gap here, not a pass.
+ */
+export function sparseGaps(
+  golden: Golden,
+  productId: string,
+  products: Map<string, EvalProduct>,
+  enrichments: Map<string, ScoredEnrichment>,
+): string[] {
+  const gaps = findViolations(golden, productId, products, enrichments);
+  const colors = enrichments.get(productId)?.colors ?? [];
+  if (golden.hardConstraints.colorsInclude.length > 0 && colors.length === 0) {
+    gaps.push(`${productId}: no colour stated`);
+  }
+  return gaps;
+}
+
+/** The outcome of one index evaluation run. */
+export interface IndexEvalResult {
+  catalogSize: number;
+  /** Contamination cases scored (YOY-122 AC-1). */
+  contaminationCases: number;
+  /** Every contamination violation across the cases (bar: none). */
+  contaminationViolations: string[];
+  /** One row per sparse-product golden (YOY-122 AC-2). */
+  perSparse: SparseScore[];
+  /** Fraction of the sparse goldens with a satisfied expected product (bar ≥ 0.8). */
+  sparseHitRate: number;
+  /** Products the vision pass analysed from fixture images. */
+  visionProducts: number;
+  /** The `vision` ledger rows of the run, USD: one-time indexing cost, reported on its own line. */
+  visionCostUsd: number;
+  /** The whole indexing run, USD: enrichment, vision and product vectors. */
+  oneTimeCostUsd: number;
+}
+
+/**
+ * Index the fixture catalog from the committed enrichment, vision and
+ * product-vector recordings, then score the vision pass: every
+ * contamination case on the vision answer, and every sparse-product golden
+ * on the merged facts its expected products were indexed with.
+ */
+export async function runIndexEval(db: PrismaClient): Promise<IndexEvalResult> {
   const shopDomain = "eval-shop.example.com";
   const catalog = loadCatalog();
-  const goldens = loadGoldens();
-  const refinementGoldens = loadRefinementGoldens();
-  const constructorGoldens = loadConstructorGoldens();
-  // Refinement extractions are ordinary "intent" port calls, so their
-  // recordings merge into the intent recording the replay client looks up.
-  // They live in their own file to keep their provenance visible (YOY-42): a
-  // key present in both would silently replay the wrong answer, so a
-  // collision is an error rather than a precedence rule.
-  const intentRecording = readJson<LlmRecording>("recorded", "intent.json");
-  const refinementRecording = readJson<LlmRecording>(
-    "recorded",
-    "intent-refinement.json",
-  );
-  const collisions = Object.keys(refinementRecording.entries).filter(
-    (key) => key in intentRecording.entries,
-  );
-  if (collisions.length > 0) {
-    throw new Error(
-      `eval: refinement recordings collide with base intent recordings on ${collisions.join(", ")}`,
-    );
-  }
-  // Synthesized classification completions (YOY-67 AC-2): the non-Latin
-  // heuristic guard re-routed the Hebrew short-query goldens to the model,
-  // which had never been asked about them, so no live recording exists until
-  // the run-8 regeneration. Same separate-file pattern as the refinement
-  // intents: own provenance, collision is an error, and the regenerate flow
-  // empties this file once the live answers land in classification.json.
-  const classificationRecording = readJson<LlmRecording>(
-    "recorded",
-    "classification.json",
-  );
-  const classificationSynthesized = readJson<LlmRecording>(
-    "recorded",
-    "classification-synthesized.json",
-  );
-  const classificationCollisions = Object.keys(
-    classificationSynthesized.entries,
-  ).filter((key) => key in classificationRecording.entries);
-  if (classificationCollisions.length > 0) {
-    throw new Error(
-      `eval: synthesized classification recordings collide with live ones on ${classificationCollisions.join(", ")} — empty classification-synthesized.json after regenerating`,
-    );
-  }
-  // Lite-tier recordings (YOY-116): the same query set answered by the lite
-  // model, each answer carrying its `confidence`, so the routed blend —
-  // lite first, accuracy on a class match or low confidence — replays
-  // deterministically. Own files, same collision rule.
-  const liteRecording = readJson<LlmRecording>("recorded", "intent-lite.json");
-  const liteRefinementRecording = readJson<LlmRecording>(
-    "recorded",
-    "intent-lite-refinement.json",
-  );
-  const liteCollisions = Object.keys(liteRefinementRecording.entries).filter(
-    (key) => key in liteRecording.entries,
-  );
-  if (liteCollisions.length > 0) {
-    throw new Error(
-      `eval: lite refinement recordings collide with base lite recordings on ${liteCollisions.join(", ")}`,
-    );
-  }
-  // Vision recordings (YOY-122): the vision pass's answers per product title,
-  // replayed through the same client under operation "vision".
-  const visionRecording = readJson<LlmRecording>("recorded", "vision.json");
   const visionGoldens = loadVisionGoldens();
-  const exampleGoldens = loadExampleGoldens();
   const contaminationCases = loadContaminationCases();
-  const recordings: Record<string, LlmRecording> = {
-    enrichment: readJson<LlmRecording>("recorded", "enrichment.json"),
-    vision: visionRecording,
-    classification: {
-      modelId: classificationRecording.modelId,
-      entries: {
-        ...classificationRecording.entries,
-        ...classificationSynthesized.entries,
-      },
-    },
-    intent: {
-      modelId: intentRecording.modelId,
-      entries: { ...intentRecording.entries, ...refinementRecording.entries },
-    },
-  };
-  const liteRecordings: Record<string, LlmRecording> = {
-    intent: {
-      modelId: liteRecording.modelId,
-      entries: {
-        ...liteRecording.entries,
-        ...liteRefinementRecording.entries,
-      },
-    },
-  };
-  const embeddingRecording = readJson<EmbeddingRecording>(
-    "recorded",
-    "embeddings.json",
-  );
-
   const costRecorder = createPrismaCostRecorder(db);
-  const llm = createReplayLlmClient({ recordings, costRecorder });
-  const liteLlm = createReplayLlmClient({ recordings: liteRecordings, costRecorder });
+  const llm = createReplayLlmClient({
+    recordings: {
+      enrichment: readJson<LlmRecording>("recorded", "enrichment.json"),
+      vision: readJson<LlmRecording>("recorded", "vision.json"),
+    },
+    costRecorder,
+  });
   const embeddings = createReplayEmbeddingClient({
-    recording: embeddingRecording,
+    recording: readJson<EmbeddingRecording>("recorded", "embeddings.json"),
     costRecorder,
   });
 
   const visionProducts = await indexEvalCatalog({ db, shopDomain, catalog, llm, embeddings });
 
-  const classifier = createQueryClassifier({ llm });
-  // The production ladder over the two replay tiers (YOY-116 AC-5): the
-  // committed classes and threshold decide which recording answers, exactly
-  // as they decide which model is called live.
-  const escalationThreshold = DEFAULT_INTENT_ESCALATION_THRESHOLD;
-  const extractor = createEscalatingIntentExtractor({
-    lite: createIntentExtractor({ llm: liteLlm }),
-    accuracy: createIntentExtractor({ llm }),
-    threshold: escalationThreshold,
-  });
-  // Goldens run through the orchestrator end to end (YOY-45 AC-8): the same
-  // routing and fallback ladder production takes, over the replay ports.
-  const orchestrator = createSearchOrchestrator({
-    db,
-    classifier,
-    extractor,
-    retriever: createRetriever({
-      embeddings,
-      store: createPgVectorRetrievalStore(db),
-    }),
-    classicStore: createPgTrgmClassicStore(db),
-  });
-
   const products = new Map(catalog.map((product) => [product.productId, product]));
-  const enrichmentRows = await db.productEnrichment.findMany({
-    where: { shopDomain },
-  });
+  const enrichmentRows = await db.productEnrichment.findMany({ where: { shopDomain } });
   const enrichments = new Map(
     enrichmentRows.map((row) => [
       row.productId,
@@ -1087,432 +538,74 @@ export async function runEval(db: PrismaClient): Promise<EvalRunResult> {
   // (`visionAttributes`), not the merged columns — the question is what the
   // model attributed to the sold item, before the text answer had its say.
   const visionByProduct = new Map(
-    enrichmentRows.map((row) => [
-      row.productId,
-      visionAttributesFromStored(row.visionAttributes),
-    ]),
+    enrichmentRows.map((row) => [row.productId, visionAttributesFromStored(row.visionAttributes)]),
   );
   const contamination = contaminationCases.flatMap((kase) =>
     contaminationViolations(kase, visionByProduct.get(kase.productId) ?? null),
   );
-
-  const scoreGolden = async (
-    golden: Golden,
-    previousIntent?: Intent,
-  ): Promise<QueryScore> => {
-    const searchId = golden.id;
-    const response = await orchestrator.runSearch({
-      query: golden.query,
-      shopDomain,
-      searchId,
-      limit: 10,
-      ...(previousIntent === undefined ? {} : { previousIntent }),
-    });
-    // The eval is offline and deterministic: a degraded response means a
-    // replay recording is missing or broken, and the silent fallback would
-    // otherwise let classic results masquerade as the AI path's quality.
-    if (response.degraded) {
-      throw new Error(
-        `eval: golden ${golden.id} degraded to classic — a replay recording is missing or failed`,
-      );
+  // Sparse goldens (YOY-122 AC-2): on the MERGED facts, the ones search reads.
+  const perSparse = visionGoldens.map((golden): SparseScore => {
+    const satisfied: string[] = [];
+    const gaps: string[] = [];
+    for (const productId of golden.expectedProductIds) {
+      const found = sparseGaps(golden, productId, products, enrichments);
+      if (found.length === 0) {
+        satisfied.push(productId);
+      } else {
+        gaps.push(...found);
+      }
     }
+    return { golden, satisfied, gaps };
+  });
 
-    const hits = response.hits;
-    const rankIndex = hits.findIndex((hit) =>
-      golden.expectedProductIds.includes(hit.productId),
-    );
-    const violations = hits.flatMap((hit) =>
-      findViolations(golden, hit.productId, products, enrichments),
-    );
-    // Family collapse (YOY-117 AC-3) and the Constructor bar (YOY-118): a
-    // golden may name products that must never share its top 10 with the
-    // expected ones.
-    const mustNotViolations = hits
-      .filter((hit) => golden.mustNotProductIds?.includes(hit.productId))
-      .map((hit) => `${hit.productId}: must not appear (forbidden by the golden)`);
-    violations.push(...mustNotViolations);
-    // Close matches may relax anything but an explicit exclusion (YOY-111
-    // AC-1): a close match carrying an excluded primary colour is a
-    // hard-constraint violation like any other.
-    const exclusionOnly: Golden = {
-      ...golden,
-      hardConstraints: {
-        category: null,
-        priceMin: null,
-        priceMax: null,
-        colorsInclude: [],
-        colorsExclude: golden.hardConstraints.colorsExclude,
-        occasion: null,
-        availabilityRequired: false,
-      },
-    };
-    violations.push(
-      ...response.closeMatches.flatMap((card) =>
-        findViolations(exclusionOnly, card.productId, products, enrichments).map(
-          (violation) => `close match ${violation}`,
-        ),
-      ),
-    );
-    const zeroHitSatisfied =
-      golden.zeroHit === undefined
-        ? null
-        : hits.length === 0 &&
-          response.closeMatches.length > 0 &&
-          response.closeMatchesRelaxed[0] === golden.zeroHit.relaxedFirst &&
-          !violations.some((violation) => violation.startsWith("close match "));
-    const ledger = await db.aiCall.findMany({ where: { searchId } });
-    return {
-      golden,
-      route: response.route,
-      routeReason: response.routeReason,
-      intent: response.intent,
-      intentTier: response.intentTier,
-      hits,
-      closeMatches: response.closeMatches,
-      closeMatchesRelaxed: [...response.closeMatchesRelaxed],
-      firstExpectedRank: rankIndex === -1 ? null : rankIndex + 1,
-      zeroHitSatisfied,
-      violations,
-      mustNotViolations,
-      costUsd: ledger.reduce((sum, row) => sum + row.costUsd, 0),
-    };
-  };
-
-  const perQuery: QueryScore[] = [];
-  for (const golden of goldens) {
-    perQuery.push(await scoreGolden(golden));
-  }
-  // The Constructor bar (YOY-118): the same end-to-end scoring over its own
-  // set, kept out of the main bars — its hit rate has its own floor, and its
-  // spend is reported on its own line rather than blended.
-  const perConstructor: QueryScore[] = [];
-  for (const golden of constructorGoldens) {
-    perConstructor.push(await scoreGolden(golden));
-  }
-  // The sparse-product goldens (YOY-122 AC-2): title-only products whose
-  // only searchable attributes came from their images, scored end to end
-  // like the goldens and kept out of the main bars and the blend.
-  const perSparse: QueryScore[] = [];
-  for (const golden of visionGoldens) {
-    perSparse.push(await scoreGolden(golden));
-  }
-  // The curated examples (YOY-136 AC-3): the page's own suggestions, run
-  // end to end — a refinement example with the previous intent the runbook
-  // hands it — and scored on answering at all, outside every bar above.
-  const perExample: QueryScore[] = [];
-  for (const golden of exampleGoldens) {
-    perExample.push(await scoreGolden(golden, golden.previousIntent));
-  }
-
-  // Refinement goldens (YOY-42): one intent call each, with the previous
-  // intent supplied by the golden — no classification or retrieval, because a
-  // follow-up is scored on the constraints it merges, not on ranking.
-  const perRefinement: RefinementScore[] = [];
-  for (const golden of refinementGoldens) {
-    const { intent, tier, escalation } = await extractor.extractDetailed(golden.query, {
-      storeId: shopDomain,
-      searchId: golden.id,
-      previousIntent: golden.previousIntent,
-    });
-    const ledger = await db.aiCall.findMany({ where: { searchId: golden.id } });
-    perRefinement.push({
-      golden,
-      intent,
-      intentTier: tier,
-      escalation,
-      violations: refinementViolations(golden, intent),
-      costUsd: ledger.reduce((sum, row) => sum + row.costUsd, 0),
-    });
-  }
-
-  // Cost split (AC-4): rows with a searchId serve one search (classification,
-  // intent, query embedding); rows without one are the one-time indexing cost
-  // (enrichment, catalog embedding).
-  const allRows = await db.aiCall.findMany();
-  const oneTimeCostUsd = allRows
-    .filter((row) => row.searchId === null)
-    .reduce((sum, row) => sum + row.costUsd, 0);
-  // Refinement goldens run an intent call only — no classification, no query
-  // embedding, no retrieval — so blending them in would understate what a
-  // production follow-up search costs (YOY-52 AC-2). The blend covers only
-  // the AI-routed goldens that ran the full per-search path; refinement cost
-  // is reported as its own line. Classic-routed goldens spend nothing by
-  // construction (YOY-41 AC-5), so counting them in the denominator would
-  // understate the cost of the searches that do pay.
-  const refinementSearchIds = new Set(
-    refinementGoldens.map((golden) => golden.id),
-  );
-  const constructorSearchIds = new Set(
-    constructorGoldens.map((golden) => golden.id),
-  );
-  const sparseSearchIds = new Set(visionGoldens.map((golden) => golden.id));
-  const exampleSearchIds = new Set(exampleGoldens.map((golden) => golden.id));
-  const perSearchTotal = allRows
-    .filter(
-      (row) =>
-        row.searchId !== null &&
-        !refinementSearchIds.has(row.searchId) &&
-        !constructorSearchIds.has(row.searchId) &&
-        !sparseSearchIds.has(row.searchId) &&
-        !exampleSearchIds.has(row.searchId),
-    )
-    .reduce((sum, row) => sum + row.costUsd, 0);
-  const refinementTotal = allRows
-    .filter(
-      (row) => row.searchId !== null && refinementSearchIds.has(row.searchId),
-    )
-    .reduce((sum, row) => sum + row.costUsd, 0);
-  const blendedAiSearchCount = perQuery.filter(
-    (score) => score.route === "ai",
-  ).length;
-  const perSearchCostPer1000Usd =
-    blendedAiSearchCount === 0
-      ? 0
-      : (perSearchTotal / blendedAiSearchCount) * 1000;
-  const refinementCostPer1000Usd =
-    refinementGoldens.length === 0
-      ? 0
-      : (refinementTotal / refinementGoldens.length) * 1000;
-
-  const hitCount = perQuery.filter(goldenHit).length;
-  // Escalation metrics (YOY-116): over the goldens that ran an intent call.
-  const aiScores = perQuery.filter((score) => score.intentTier !== null);
-  const escalationRate =
-    aiScores.length === 0
-      ? 0
-      : aiScores.filter((score) => score.intentTier === "accuracy").length /
-        aiScores.length;
-  const refinementEscalationRate =
-    perRefinement.length === 0
-      ? 0
-      : perRefinement.filter((score) => score.intentTier === "accuracy").length /
-        perRefinement.length;
-  const intentRows = allRows.filter((row) => row.operation === "intent");
-  const intentCalls = {
-    lite: intentRows.filter((row) => row.modelId === liteRecording.modelId).length,
-    accuracy: intentRows.filter((row) => row.modelId === intentRecording.modelId)
-      .length,
-  };
-  const result: EvalRunResult = {
+  const rows = await db.aiCall.findMany();
+  const result: IndexEvalResult = {
     catalogSize: catalog.length,
-    perQuery,
-    perRefinement,
-    refinementViolationCount: perRefinement.reduce(
-      (sum, score) => sum + score.violations.length,
-      0,
-    ),
-    synthesizedRecordings:
-      intentRecording.provenance === "synthesized" ||
-      visionRecording.provenance === "synthesized" ||
-      refinementRecording.provenance === "synthesized" ||
-      Object.keys(classificationSynthesized.entries).length > 0,
-    hitRate: hitCount / goldens.length,
-    violationCount: perQuery.reduce((sum, score) => sum + score.violations.length, 0),
-    oneTimeCostUsd,
-    perSearchCostPer1000Usd,
-    blendedAiSearchCount,
-    refinementCostPer1000Usd,
-    escalationRate,
-    refinementEscalationRate,
-    intentCalls,
-    escalationThreshold,
-    intentInputTokens: intentInputTokenStats(
-      intentRecording,
-      goldens,
-      loadIntentTokenBaseline(),
-    ),
-    perConstructor,
-    constructorBar: computeConstructorBar(perConstructor, allRows),
-    perSparse,
-    perExample,
-    sparseHitRate:
-      perSparse.length === 0 ? 0 : perSparse.filter(goldenHit).length / perSparse.length,
     contaminationCases: contaminationCases.length,
     contaminationViolations: contamination,
+    perSparse,
+    sparseHitRate:
+      perSparse.length === 0
+        ? 0
+        : perSparse.filter((score) => score.satisfied.length > 0).length / perSparse.length,
     visionProducts,
-    visionCostUsd: allRows
+    visionCostUsd: rows
       .filter((row) => row.operation === "vision")
       .reduce((sum, row) => sum + row.costUsd, 0),
+    oneTimeCostUsd: rows.reduce((sum, row) => sum + row.costUsd, 0),
   };
-  printScorecard(result);
+  printIndexReport(result);
   return result;
 }
 
-/** Per-query scorecard (AC-6): rank, violations, and cost per golden. */
-function printScorecard(result: EvalRunResult): void {
+/** The index scorecard: sparse goldens, contamination, and the indexing cost. */
+function printIndexReport(result: IndexEvalResult): void {
   const lines = [
     "",
-    "eval scorecard — sparse catalog quality harness",
-    "query                                     | lang  | route      | tier     | rank | viol | cost USD",
-    "------------------------------------------+-------+------------+----------+------+------+---------",
+    "index eval — the vision pass over the sparse catalog (YOY-122)",
+    "id   | lang  | satisfied | query",
+    "-----+-------+-----------+------",
   ];
-  for (const score of result.perQuery) {
-    const query =
-      score.golden.query.length > 40
-        ? `${score.golden.query.slice(0, 39)}…`
-        : score.golden.query.padEnd(40);
-    lines.push(
-      [
-        query.padEnd(41),
-        score.golden.language.padEnd(5),
-        `${score.route}/${score.routeReason}`.padEnd(10),
-        (score.intentTier ?? "-").padEnd(8),
-        String(
-          score.zeroHitSatisfied === null
-            ? (score.firstExpectedRank ?? "MISS")
-            : score.zeroHitSatisfied
-              ? "0-ok"
-              : "0-XX",
-        ).padStart(4),
-        String(score.violations.length).padStart(4),
-        score.costUsd.toFixed(6),
-      ].join(" | "),
-    );
-    for (const violation of score.violations) {
-      lines.push(`  VIOLATION: ${violation}`);
-    }
-  }
-  lines.push(
-    "",
-    "refinement goldens — follow-up query merged into the previous intent",
-    "id  | lang  | outcome    | tier     | viol | cost USD | what it pins",
-    "----+-------+------------+----------+------+----------+-------------",
-  );
-  for (const score of result.perRefinement) {
-    lines.push(
-      [
-        score.golden.id.padEnd(3),
-        score.golden.language.padEnd(5),
-        score.golden.outcome.padEnd(10),
-        (score.intentTier ?? "-").padEnd(8),
-        String(score.violations.length).padStart(4),
-        score.costUsd.toFixed(6).padStart(8),
-        score.golden.note,
-      ].join(" | "),
-    );
-    for (const violation of score.violations) {
-      lines.push(`  VIOLATION: ${violation}`);
-    }
-  }
-  lines.push(
-    "",
-    "Constructor bar — negations, price caps, occasion ≠ category (YOY-118)",
-    "id   | group              | lang  | route      | tier     | rank | must | viol | cost USD | query",
-    "-----+--------------------+-------+------------+----------+------+------+------+----------+------",
-  );
-  for (const score of result.perConstructor) {
-    const golden = score.golden as ConstructorGolden;
-    lines.push(
-      [
-        golden.id.padEnd(4),
-        golden.group.padEnd(18),
-        golden.language.padEnd(5),
-        `${score.route}/${score.routeReason}`.padEnd(10),
-        (score.intentTier ?? "-").padEnd(8),
-        String(score.firstExpectedRank ?? "MISS").padStart(4),
-        String(score.mustNotViolations.length).padStart(4),
-        String(score.violations.length - score.mustNotViolations.length).padStart(4),
-        score.costUsd.toFixed(6).padStart(8),
-        golden.query,
-      ].join(" | "),
-    );
-    for (const violation of score.violations) {
-      lines.push(`  VIOLATION: ${violation}`);
-    }
-  }
-  const bar = result.constructorBar;
-  const percent = (rate: ConstructorHitRate): string =>
-    `${(rate.rate * 100).toFixed(0)} % (${rate.hits}/${rate.total})`;
-  const groupLine = (group: ConstructorGroup): string => {
-    const slice = bar.byGroup[group];
-    return `${group} ${percent(slice)}; EN ${percent(slice.byLanguage.en)}, HE ${percent(slice.byLanguage.he)}`;
-  };
-  lines.push(
-    `Constructor bar: overall ${percent(bar.overall)} (${CONSTRUCTOR_GROUPS.map((group) => `${group} ${(bar.byGroup[group].rate * 100).toFixed(0)} %`).join(", ")}), mustNot violations ${bar.mustNotViolationCount}`,
-    `  EN ${percent(bar.byLanguage.en)}, HE ${percent(bar.byLanguage.he)}`,
-    ...CONSTRUCTOR_GROUPS.map((group) => `  ${groupLine(group)}`),
-    `  hard-constraint violations: ${bar.hardConstraintViolationCount} (bar: 0); mustNot violations: ${bar.mustNotViolationCount} (target 0; floor: no regression), mustNot-clean goldens ${percent(bar.mustNotCleanRate)}`,
-    `  intent escalation rate: ${(bar.escalationRate * 100).toFixed(0)} % of the set's AI searches`,
-    `  per-search cost per 1,000 AI searches (${bar.aiSearchCount} full-path searches): $${bar.costPer1000Usd.toFixed(2)}`,
-  );
-  lines.push(
-    "",
-    "sparse-product goldens — title-only products, attributes from their images (YOY-122)",
-    "id   | lang  | route      | tier     | rank | viol | cost USD | query",
-    "-----+-------+------------+----------+------+------+----------+------",
-  );
   for (const score of result.perSparse) {
     lines.push(
       [
         score.golden.id.padEnd(4),
         score.golden.language.padEnd(5),
-        `${score.route}/${score.routeReason}`.padEnd(10),
-        (score.intentTier ?? "-").padEnd(8),
-        String(score.firstExpectedRank ?? "MISS").padStart(4),
-        String(score.violations.length).padStart(4),
-        score.costUsd.toFixed(6).padStart(8),
+        (score.satisfied.join(",") || "MISS").padEnd(9),
         score.golden.query,
       ].join(" | "),
     );
-    for (const violation of score.violations) {
-      lines.push(`  VIOLATION: ${violation}`);
+    for (const gap of score.gaps) {
+      lines.push(`  GAP: ${gap}`);
     }
   }
-  const sparseHits = result.perSparse.filter(goldenHit).length;
+  const sparseHits = result.perSparse.filter((score) => score.satisfied.length > 0).length;
   lines.push(
     `sparse goldens: ${sparseHits}/${result.perSparse.length} (${(result.sparseHitRate * 100).toFixed(0)} %; bar: ≥ 80 %)`,
     `contamination violations: ${result.contaminationViolations.length} over ${result.contaminationCases} cases (bar: 0)`,
     ...result.contaminationViolations.map((violation) => `  VIOLATION: ${violation}`),
-    `one-time vision cost (${result.visionProducts} products with images, reported separately): $${result.visionCostUsd.toFixed(4)}`,
-  );
-  lines.push(
-    "",
-    "curated example queries — the playground page's own suggestions (YOY-136)",
-    "id   | lang | kind              | route      | tier     | hits | viol | cost USD | query",
-    "-----+------+-------------------+------------+----------+------+------+----------+------",
-  );
-  for (const score of result.perExample) {
-    const golden = score.golden as ExampleGolden;
-    lines.push(
-      [
-        golden.id.padEnd(4),
-        golden.language.padEnd(4),
-        golden.kind.padEnd(17),
-        `${score.route}/${score.routeReason}`.padEnd(10),
-        (score.intentTier ?? "-").padEnd(8),
-        String(score.hits.length).padStart(4),
-        String(score.violations.length).padStart(4),
-        score.costUsd.toFixed(6).padStart(8),
-        golden.query,
-      ].join(" | "),
-    );
-    for (const violation of score.violations) {
-      lines.push(`  VIOLATION: ${violation}`);
-    }
-  }
-  const answered = result.perExample.filter((score) => score.hits.length > 0).length;
-  lines.push(
-    `curated examples answered: ${answered}/${result.perExample.length} (bar: every one ≥ 1 primary hit)`,
-  );
-  if (result.synthesizedRecordings) {
-    lines.push(
-      "",
-      "NOTE: some replayed LLM recordings are synthesized, not live model",
-      "output — regenerate them (LIVE_LLM_TESTS=1) before trusting these rows",
-      "as evidence of model behavior.",
-    );
-  }
-  lines.push(
-    "",
-    `hit rate (expected product in top 10): ${(result.hitRate * 100).toFixed(0)}% (bar: ≥80%)`,
-    `refinement constraint misses: ${result.refinementViolationCount} (bar: 0)`,
-    `hard-constraint violations in any top 10: ${result.violationCount} (bar: 0)`,
-    `one-time indexing cost (enrichment + embedding, ${result.catalogSize} products): $${result.oneTimeCostUsd.toFixed(4)}`,
-    `blended per-search cost per 1,000 AI searches (${result.blendedAiSearchCount} full-path searches): $${result.perSearchCostPer1000Usd.toFixed(2)} (bar: ≤ $0.60)`,
-    `refinement-only intent cost per 1,000 follow-ups (reported separately, not blended): $${result.refinementCostPer1000Usd.toFixed(2)}`,
-    `intent escalation rate (lite → accuracy, threshold ${result.escalationThreshold}): ${(result.escalationRate * 100).toFixed(0)}% of AI searches, ${(result.refinementEscalationRate * 100).toFixed(0)}% of follow-ups`,
-    `intent calls per tier: lite ${result.intentCalls.lite}, accuracy ${result.intentCalls.accuracy}`,
-    `intent input tokens: before ${result.intentInputTokens.before.toFixed(0)} / after ${result.intentInputTokens.after.toFixed(0)} (−${(result.intentInputTokens.reduction * 100).toFixed(0)} %; bar: −≥30 %)`,
+    `one-time vision cost (${result.visionProducts} products with images): $${result.visionCostUsd.toFixed(4)}`,
+    `one-time indexing cost (enrichment + vision + embedding, ${result.catalogSize} products): $${result.oneTimeCostUsd.toFixed(4)}`,
     "",
   );
   console.log(lines.join("\n"));

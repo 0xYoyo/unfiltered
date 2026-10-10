@@ -74,26 +74,34 @@ describe("chip labels come from the widget's own display maps (AC-1)", () => {
   // would mean a shopper and a merchant reading different words for the
   // same constraint (P-5).
   const chips = [
-    { field: "category", value: "dress" },
-    { field: "priceMax", value: "400" },
-    { field: "colorsExclude", value: "black" },
+    { field: "priceMax", value: "400", currency: "ILS" },
+    { field: "size", value: "M" },
+    { field: "exclude", value: "black" },
   ] as const;
+  const money = (locale: "en" | "he") =>
+    new Intl.NumberFormat(locale, {
+      style: "currency",
+      currency: "ILS",
+      maximumFractionDigits: 0,
+    }).format(400);
 
   it("labels the applied constraints in English", () => {
     expect(chips.map((chip) => chipLabel(chip, { locale: "en" }))).toEqual([
-      "dress",
-      "Under 400",
+      `Under ${money("en")}`,
+      "Size M",
       "Not black",
     ]);
   });
 
-  it("labels them in Hebrew, with the currency the intent echoed", () => {
-    expect(
-      chips.map((chip) => chipLabel(chip, { locale: "he", currency: "ILS" })),
-    ).toEqual(["שמלה", "עד 400 ILS", "לא שחור"]);
+  it("labels them in Hebrew, each price chip with its own currency", () => {
+    expect(chips.map((chip) => chipLabel(chip, { locale: "he" }))).toEqual([
+      `עד ${money("he")}`,
+      "מידה M",
+      "לא black",
+    ]);
   });
 
-  it("omits the currency when the response echoed none", () => {
-    expect(chipLabel(chips[1], { locale: "he" })).toBe("עד 400");
+  it("shows the bare number when a price chip carries no currency", () => {
+    expect(chipLabel({ field: "priceMax", value: "400" }, { locale: "he" })).toBe("עד 400");
   });
 });

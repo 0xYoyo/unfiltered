@@ -2,7 +2,6 @@ import type { LoaderFunctionArgs, MetaFunction } from "react-router";
 import { useLoaderData } from "react-router";
 
 import { PlaygroundPage } from "../playground/PlaygroundPage";
-import { playgroundEngineParam } from "../playground/search-client";
 import {
   getPlaygroundStrings,
   resolveChromeLocale,
@@ -40,8 +39,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     // The engine-details panel is opt-in and its state IS the URL, so it
     // survives a reload and can be shared as a link (YOY-93 AC-5).
     detailsOpen: url.searchParams.get("details") === "1",
-    // The engine to compare (YOY-165 AC-1): `v1` or `v2`, else ignored.
-    engine: playgroundEngineParam(url.searchParams.get("engine")) ?? null,
   };
 };
 
@@ -56,7 +53,7 @@ export const meta: MetaFunction<typeof loader> = ({ data }) => {
 };
 
 export default function PlaygroundRoute() {
-  const { locale, pathname, initialQuery, detailsOpen, engine } =
+  const { locale, pathname, initialQuery, detailsOpen } =
     useLoaderData<typeof loader>();
 
   return (
@@ -67,7 +64,6 @@ export default function PlaygroundRoute() {
         pathname={pathname}
         initialQuery={initialQuery}
         detailsOpen={detailsOpen}
-        {...(engine === null ? {} : { engine })}
       />
       <SiteFooter />
     </>

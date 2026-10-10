@@ -78,12 +78,12 @@ gh workflow run score.yml -f ref=main   # ref: any branch, tag or SHA
 gh run view --log
 ```
 
-Two choice inputs pick what is scored: `engine` (`v1` or `v2`, sets
-`ENGINE_V2`) and `judge` (`gemini` or `jev`, sets `JUDGE_PROVIDER`; YOY-152).
-Both default to what production serves (YOY-157 AC-19, AC-20): `engine`
-defaults to `v2` and `judge` to `jev` (see "Decision — Jev is the default
-judge"), so a plain dispatch scores the production engine and judge; pass
-`-f engine=v1` or `-f judge=gemini` to score the alternatives.
+One choice input picks the judge: `judge` (`gemini` or `jev`, sets
+`JUDGE_PROVIDER`; YOY-152). It defaults to what production serves (YOY-157
+AC-19): `jev` (see "Decision — Jev is the default judge"), so a plain
+dispatch scores production; pass `-f judge=gemini` to score the
+alternative. There is one engine (YOY-155); the previous one is kept at the
+tag `engine-v1-last`.
 A judge input that is not on the default branch's workflow yet is dispatched
 with `--ref <branch>`, so the branch's own workflow file runs.
 
@@ -93,7 +93,7 @@ scored ref's code and the leak guard never share a filesystem (YOY-157
 AC-31). The `run` job checks out `ref`, writes the secret to the runner's
 temp directory, runs `score-run.mts --hidden-set` with `GEMINI_API_KEY`, and
 captures every byte the runner writes. Before the run it prints the names —
-never the values — of the `GEMINI_*` and `INTENT_*` variables it has. It
+never the values — of the `GEMINI_*` variables it has. It
 prints none of the output and writes no job summary: it uploads the output
 as a one-day artifact, encrypted with the hidden-set secret, because until
 the check has run the output may hold hidden query text. The `check` job
@@ -215,9 +215,6 @@ the noise band of the M5 baseline above.
 |---|---|---|---|---|---|---|
 | Reference | 0.590 | 0.368 | 0.470 | 0.402 | 0.406 | 0.581 |
 
-Every score run now prints its engine on its first line and refuses to
-start when `ENGINE_V2` is unset and no `--engine v1|v2` is given.
-
 **Runner guards (2026-10-03).** Each search prints a progress line to
 stderr as it finishes (`[n/78] <lang> ok|fail <stage>`, never the query);
 a search plus its grade that takes over 90 s counts as failed
@@ -267,6 +264,9 @@ line.
 | 4 | Engine v2 + stated wishes (YOY-149) + refinement and second reading (YOY-150) (`ENGINE_V2=1`, judge deadline 4,000 ms) | 0.671 | 0.407 | 0.500 | 0.657 | 0.500 | 0.421 | — (not deployed) | $0.2128 |
 | 5 (gemini judge) | Engine v2 as run 4, judge `JUDGE_PROVIDER=gemini` (YOY-152 branch) | 0.667 | 0.389 | 0.537 | 0.657 | 0.583 | 0.394 | — (not deployed) | $0.2054 |
 | 5 (jev judge) | Engine v2 as run 4, judge `JUDGE_PROVIDER=jev` (YOY-152 branch) | 0.634 | 0.407 | 0.574 | 0.657 | 0.542 | 0.398 | — (not deployed) | $0.1053 |
+| 6 control | Engine v2 on `main` at `9843486`, before the delete (YOY-155 AC-8 reference, judge `jev`) | 0.657 | 0.361 | 0.495 | 0.648 | 0.477 | 0.361 | — (not deployed) | $0.1038 |
+| 6 | One engine after the delete (YOY-155 branch, judge `jev`) | 0.606 | 0.301 | 0.495 | 0.616 | 0.444 | 0.366 | — (not deployed) | $0.1043 |
+| 1b — v1 re-check | M5 engine on `main` before its deletion (YOY-155 AC-1) | 0.560 | 0.287 | 0.375 | 0.463 | 0.407 | 0.236 | — | $0.0552 |
 | 3 (first, superseded) | Engine v2 find step + judge reading the summary (`ENGINE_V2=1`, deadline 1,500 ms) | 0.597 | 0.292 | 0.556 | 0.648 | 0.542 | 0.403 | — (not deployed) | $0.0928 |
 | 1 (invalid: 18 failures) | M5 engine | 0.306 | 0.032 | 0.181 | 0.083 | 0.167 | 0.106 | — | $0.0391 |
 
@@ -350,6 +350,34 @@ are 72 embeddings, 72 extractions, 72 grades and 1,728 one-product judge
 questions (24 per page). fr re-check (decision A): the Gemini judge's fr is
 0.583, above run 3's 0.569 — the run-4 drop does not repeat; the Jev judge's
 fr is 0.542, 0.027 under run 3, inside the 0.030 band.
+
+Run 1b — v1 re-check (YOY-155 AC-1): [run 38060035565](https://github.com/0xYoyo/unfiltered/actions/runs/38060035565),
+2026-10-10, dispatched on `main` at `9843486` (the commit tagged
+`engine-v1-last`) with the old engine and `judge=jev` (unused by it).
+Green, leak check clean (72 checked), **0 failed searches**, $0.0552 over
+256 model calls. It is the check that the old engine still scored at its
+M5 level before it was deleted: en 0.560 (+0.088 against run 1, band
+0.111) and he 0.287 (+0.018, band 0.090) both sit inside their bands. The
+latest v2 hidden score (run 5, Jev) is above run 1 in every language.
+
+Run 6 — after the delete (YOY-155 AC-8): [run 38063360614](https://github.com/0xYoyo/unfiltered/actions/runs/38063360614),
+2026-10-10, dispatched with `--ref YOY-155-delete-old-engine`,
+`ref=YOY-155-delete-old-engine` (`ce3bb15`) and `judge=jev`. Green, leak
+check clean (72 checked), **0 failed searches**, $0.1043 over 1,942 model
+calls, 72 extraction calls. Against run 5 (Jev), with each band
+`max(M5 band, 0.03)`: en −0.028 (band 0.111), **he −0.106 (band 0.090:
+outside)**, ar −0.079, ru −0.041, fr −0.098, es −0.032.
+
+Run 6 control — the reference (YOY-155 AC-8, re-based 2026-10-10):
+[run 38065068705](https://github.com/0xYoyo/unfiltered/actions/runs/38065068705),
+2026-10-10, dispatched on `main` at `9843486` (the commit the delete branch
+started from) with `engine=v2` and `judge=jev`. Green, leak check clean (72
+checked), **0 failed searches**, $0.1038 over 1,918 model calls. Run 6
+against it: en −0.051 (band 0.111) and he −0.060 (band 0.090) — **both
+inside the band, the gate is met**; ar 0.000, ru −0.032, fr −0.033,
+es +0.005. Engine v2 on `main` already sat below run 5 before the delete
+(he 0.361 against 0.407): the he drop against run 5 is tracked on YOY-171
+AC-9, not on the delete.
 
 ### Judge comparison — Flash-Lite versus Jev (YOY-152, 2026-10-04)
 

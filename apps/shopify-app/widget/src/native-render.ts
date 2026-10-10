@@ -30,7 +30,7 @@ import type {
   ProxyResult,
   ProxySearchResponse,
 } from "./search-client";
-import { closeMatchesHeadingText, getStrings, resolveLocale } from "./strings";
+import { getStrings, resolveLocale } from "./strings";
 
 /**
  * Theme-native result rendering (YOY-70 spike): the submit tier's ranked
@@ -73,7 +73,6 @@ export const NATIVE_OTHER_READING_TESTID = "unfiltered-native-other-reading";
 export const NATIVE_LOADING_TESTID = "unfiltered-native-loading";
 export const NATIVE_NO_RESULTS_TESTID = "unfiltered-native-no-results";
 export const NATIVE_ZERO_HIT_TESTID = "unfiltered-native-zero-hit";
-export const NATIVE_CLOSE_MATCHES_TESTID = "unfiltered-native-close-matches";
 /** The "Close matches" divider inside a judged page's grid (YOY-166 AC-2). */
 export const NATIVE_CLOSE_MATCHES_DIVIDER_TESTID =
   "unfiltered-native-close-matches-divider";
@@ -456,18 +455,6 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
   list.setAttribute("role", "list");
   list.setAttribute("data-testid", NATIVE_LIST_TESTID);
 
-  const closeMatches = document.createElement("section");
-  closeMatches.className = "unfiltered-native__close-matches";
-  closeMatches.setAttribute("data-testid", NATIVE_CLOSE_MATCHES_TESTID);
-  closeMatches.hidden = true;
-  const closeMatchesHeading = document.createElement("h2");
-  closeMatchesHeading.className = "unfiltered-native__close-matches-heading";
-  closeMatchesHeading.textContent = strings.closeMatchesHeading;
-  const closeMatchesList = document.createElement("ul");
-  closeMatchesList.className = config.grid.listClass;
-  closeMatchesList.setAttribute("role", "list");
-  closeMatches.append(closeMatchesHeading, closeMatchesList);
-
   section.append(
     chipsRow,
     loading,
@@ -475,7 +462,6 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
     zeroHit,
     previewEmpty,
     list,
-    closeMatches,
   );
 
   // The full-page mirror (YOY-100): the theme's search-results page around
@@ -490,7 +476,6 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
     onListClass(className) {
       gridFromShell = true;
       list.className = className;
-      closeMatchesList.className = className;
     },
     onLeave: options.onLeave,
   });
@@ -498,7 +483,7 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
   let currentQuery = "";
   /**
    * The search the view is showing (YOY-146): its first response (chips,
-   * route, intent and close matches come from it), the size of the whole
+   * route and reading come from it), the size of the whole
    * result order, and every page fetched for it so far. The server serves
    * one page per request; a page already fetched in this search is shown
    * again without a request (AC-3), and card fetches happen only for the
@@ -639,7 +624,6 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
           // prefer them over the configured default (never over the shell's).
           if (!gridFromShell) {
             list.className = className;
-            closeMatchesList.className = className;
           }
         });
 
@@ -916,14 +900,6 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
           labelHost(item.firstElementChild ?? item).appendChild(label);
         }
       }
-      if (result.colorUnknown === true) {
-        item.classList.add("unfiltered-native__item--color-unknown");
-        const note = document.createElement("span");
-        note.className = "unfiltered-native__note";
-        note.setAttribute("data-testid", "unfiltered-widget-color-note");
-        note.textContent = strings.colorNotConfirmed;
-        item.appendChild(note);
-      }
       // The beacon fires and the theme card's own anchor navigation proceeds
       // untouched — never prevented, never awaited (YOY-48 AC-5).
       item.addEventListener("click", (event) => {
@@ -941,10 +917,9 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
 
   function chipElement(
     chip: ProxyChip,
-    currency: string | undefined,
     onChipRemove: ResponseHandlers["onChipRemove"],
   ): HTMLElement {
-    const { negator, value } = chipLabelParts(chip, { locale, currency });
+    const { negator, value } = chipLabelParts(chip, { locale });
     const label = negator === null ? value : `${negator} ${value}`;
     const negated = isNegationChip(chip);
     const button = document.createElement("button");
@@ -1033,8 +1008,6 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
     chipsRow.hidden = true;
     chipsRow.replaceChildren();
     list.replaceChildren();
-    closeMatches.hidden = true;
-    closeMatchesList.replaceChildren();
   }
 
   /**
@@ -1044,9 +1017,8 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
    * page links number 1 to ceil(totalCount / pageSize). A page not yet in
    * hand is requested from the server; one fetched before is shown again
    * without a request (AC-3). Only this page's cards are fetched or cloned
-   * (YOY-107 AC-4). A zero-hit state's close matches have a single page,
-   * so they are never paged (YOY-107 AC-5); a judged page's close products
-   * sit under its own divider inside its grid (YOY-166 AC-3).
+   * (YOY-107 AC-4). A judged page's close products sit under its own
+   * divider inside its grid (YOY-166 AC-3).
    */
   async function renderPage(page: number): Promise<void> {
     if (current === null) {
@@ -1072,23 +1044,10 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
     zeroHit.hidden = true;
     previewEmpty.hidden = true;
 
-    // An engine v2 response (YOY-149, `intent: null`) carries chips on
-    // whichever route its judge took; it sends none it did not apply.
-    const chips =
-      !preview && (response.route === "ai" || response.intent === null)
-        ? response.chips
-        : [];
-    const currency =
-      response.intent !== null &&
-      typeof response.intent["currency"] === "string"
-        ? response.intent["currency"]
-        : undefined;
+    // A response carries chips on whichever route its judge took
+    // (YOY-149); it sends none it did not apply.
+    const chips = !preview ? response.chips : [];
     const empty = total === 0;
-    const aiZeroHit = !preview && empty && response.route === "ai";
-    // Under the heading, the heading is the label (YOY-168 AC-3).
-    const matches = aiZeroHit
-      ? (response.closeMatches ?? []).map(underCloseHeading)
-      : [];
 
     // The page's results and the shell (first render only — cached
     // afterwards) are awaited together, then the cards, so the theme's page
@@ -1110,15 +1069,12 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
     if (token !== renderToken) {
       return; // Superseded while fetching.
     }
-    const [built, builtMatches] = await Promise.all([
-      buildPage(
-        pageData,
-        handlers,
-        (target - 1) * pageSize,
-        labellingFor(held, target),
-      ),
-      buildItems(matches, handlers, 0, preview ? null : { pending: false }),
-    ]);
+    const built = await buildPage(
+      pageData,
+      handlers,
+      (target - 1) * pageSize,
+      labellingFor(held, target),
+    );
     if (token !== renderToken) {
       return; // Superseded while fetching.
     }
@@ -1134,7 +1090,7 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
 
     loading.hidden = true;
     // The theme's own count line now states OUR count for the shopper's
-    // query (AC-2); close matches are not results and are not counted.
+    // query (AC-2).
     mirror.setResult(query, total);
     // The theme's own pagination, over our set (YOY-107 AC-1/NG-3).
     mirror.setPages({
@@ -1155,28 +1111,21 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
         : null;
     chipsRow.replaceChildren(
       ...(reading === null ? [] : [reading]),
-      ...chips.map((chip) => chipElement(chip, currency, handlers.onChipRemove)),
+      ...chips.map((chip) => chipElement(chip, handlers.onChipRemove)),
     );
     chipsRow.hidden = chips.length === 0 && reading === null;
     list.replaceChildren(...built.elements);
-    // The heading names what was relaxed to find them (YOY-111 AC-4).
-    closeMatchesHeading.textContent = closeMatchesHeadingText(
-      strings,
-      aiZeroHit ? response.closeMatchesRelaxed : undefined,
-    );
-    closeMatchesList.replaceChildren(...builtMatches.items);
-    closeMatches.hidden = builtMatches.items.length === 0;
-    settleLabels([...built.items, ...builtMatches.items]);
+    settleLabels(built.items);
     fillLateLabels(held, target, built.items, token);
-    zeroHit.hidden = !aiZeroHit;
+    zeroHit.hidden = !(!preview && empty && response.route === "ai");
     noResults.hidden = !(!preview && empty && response.route === "classic");
     previewEmpty.hidden = !(preview && empty);
     watchLastRow(held, token, target, pageCount, !paged);
 
     // Per-PAGE render diagnostics (AC-4): the cards this page cost, not the
     // whole set's.
-    const rendered = built.items.length + builtMatches.items.length;
-    const nativeCount = built.native + builtMatches.native;
+    const rendered = built.items.length;
+    const nativeCount = built.native;
     section.setAttribute("data-native-count", String(nativeCount));
     section.setAttribute("data-fallback-count", String(rendered - nativeCount));
     section.setAttribute("data-total-count", String(total));
@@ -1187,7 +1136,7 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
       totalMs: Math.round(performance.now() - started),
       native: nativeCount,
       fallback: rendered - nativeCount,
-      cached: built.cached + builtMatches.cached,
+      cached: built.cached,
       fetchMs: fetchMs.slice(fetchesBefore),
       page: target,
       pageCount: shownPageCount,

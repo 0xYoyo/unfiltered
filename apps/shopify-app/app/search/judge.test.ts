@@ -22,12 +22,9 @@ import {
   type DecisionClient,
   type DecisionRequest,
   type EmbeddingClient,
-  type IntentExtractor,
   type Judge,
   type JudgeCandidate,
   type LlmClient,
-  type QueryClassifier,
-  type Retriever,
   type StructuredCompletionRequest,
 } from "@unfiltered/engine";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -1041,12 +1038,6 @@ const embeddings: EmbeddingClient = {
   embed: async ({ texts }) => texts.map(() => [1, 0, 0]),
 };
 
-/** Ports the old engine must never touch on the v2 path. */
-const untouchable = {
-  classifier: { classify: () => Promise.reject(new Error("unexpected classification")) } as QueryClassifier,
-  extractor: { extract: () => Promise.reject(new Error("unexpected intent")) } as IntentExtractor,
-  retriever: { retrieve: () => Promise.reject(new Error("unexpected retrieval")) } as Retriever,
-};
 
 function ledger(): CostRecorder & { rows: AiCallUsage[] } {
   const recorder = {
@@ -1097,7 +1088,6 @@ describe("the judge on Engine v2 (on the database)", () => {
   ): SearchOrchestrator {
     return createSearchOrchestrator({
       db,
-      ...untouchable,
       classicStore: createPgTrgmClassicStore(db),
       find: createFindStep({
         db,
@@ -1105,7 +1095,6 @@ describe("the judge on Engine v2 (on the database)", () => {
         classicStore: createPgTrgmClassicStore(db),
         ...(options.findSetSize !== undefined ? { findSetSize: options.findSetSize } : {}),
       }),
-      engineV2: true,
       ...(options.judge !== undefined
         ? { judge: options.judge }
         : llm !== undefined
@@ -1141,7 +1130,7 @@ describe("the judge on Engine v2 (on the database)", () => {
     // The not-relevant p2 is dropped from the page (YOY-163): the wire answers
     // only the kept products.
     expect(response.hits.map((hit) => hit.productId)).toEqual(["p3", "p1", "p4"]);
-    expect(response).toMatchObject({ route: "ai", routeReason: "judged", engine: "v2" });
+    expect(response).toMatchObject({ route: "ai", routeReason: "judged" });
     expect(response.stages.judge).toBeGreaterThanOrEqual(0);
     expect(costs.rows.map((row) => row.operation)).toEqual(["judge"]);
 
@@ -1156,7 +1145,7 @@ describe("the judge on Engine v2 (on the database)", () => {
     expect(wire.closeMatches?.map((result) => [result.productId, result.label])).toEqual([
       ["p4", { template: "close-match", values: [] }],
     ]);
-    expect(wire.closeMatchesRelaxed).toEqual([]);
+    expect(wire).not.toHaveProperty("closeMatchesRelaxed");
     // The storefront wire carries no verdict (AC-12).
     expect(JSON.stringify(wire)).not.toContain("verdict");
     expect(JSON.stringify(wire)).not.toContain("not-relevant");
@@ -1166,8 +1155,6 @@ describe("the judge on Engine v2 (on the database)", () => {
       latencyMs: 5,
       limited: null,
       stages: response.stages,
-      intentTier: response.intentTier,
-      engine: response.engine,
     });
     expect(playground.details.judge).toEqual({
       outcome: "judged",
@@ -1300,7 +1287,6 @@ describe("the judge on Engine v2 (on the database)", () => {
       return {
         results: wire.results.map((result) => result.productId),
         closeMatches: wire.closeMatches?.map((result) => [result.productId, result.label]),
-        closeMatchesRelaxed: wire.closeMatchesRelaxed,
         page: wire.page,
         totalCount: wire.totalCount,
       };
@@ -1323,7 +1309,6 @@ describe("the judge on Engine v2 (on the database)", () => {
             ["p1", { template: "close-match", values: [] }],
             ["p2", { template: "close-match", values: [] }],
           ],
-          closeMatchesRelaxed: [],
           page: 1,
           totalCount: 4,
         });
@@ -1388,7 +1373,6 @@ describe("the judge on Engine v2 (on the database)", () => {
         priceMax: 10,
         currencyCode: "USD",
         available: true,
-        colorUnknown: false,
         verdict,
         label: verdict === "exact" ? null : { template: "close-match" as const, values: [] },
       });
@@ -1398,9 +1382,6 @@ describe("the judge on Engine v2 (on the database)", () => {
         degraded: false,
         hits: [card("a", "exact"), card("b", "other-variant"), card("c", "other-variant"), card("d", "close")],
         chips: [],
-        intent: null,
-        closeMatches: [],
-        closeMatchesRelaxed: [],
       } as unknown as Parameters<typeof serializeProxySearchResponse>[0];
       const shape = (wire: ReturnType<typeof serializeProxySearchResponse>) => [
         wire.results.map((result) => result.productId),
@@ -1425,7 +1406,6 @@ describe("the judge on Engine v2 (on the database)", () => {
       expect(wireShape(response)).toEqual({
         results: ["p1", "p2", "p3", "p4"],
         closeMatches: undefined,
-        closeMatchesRelaxed: undefined,
         page: 1,
         totalCount: 4,
       });
@@ -1451,7 +1431,6 @@ describe("the judge on Engine v2 (on the database)", () => {
       expect(wireShape(response)).toEqual({
         results: ["p1", "p2", "p3", "p4"],
         closeMatches: undefined,
-        closeMatchesRelaxed: undefined,
         page: 1,
         totalCount: 4,
       });
@@ -1466,7 +1445,7 @@ describe("the judge on Engine v2 (on the database)", () => {
     // The proxy's throttle and the playground's caps both force classic.
     const response = await search(orchestrator(llm), { forceClassic: true });
     expect(response.hits.map((hit) => hit.productId)).toEqual(["p1", "p2", "p3", "p4"]);
-    expect(response).toMatchObject({ route: "classic", routeReason: "capped", engine: "v2" });
+    expect(response).toMatchObject({ route: "classic", routeReason: "capped" });
     expect(costs.rows).toEqual([]);
     expect(response.stages.judge).toBeUndefined();
     expect(serializeProxySearchResponse(response).results.every((result) => result.label === null)).toBe(true);
@@ -1545,18 +1524,12 @@ describe("the judge on Engine v2 (on the database)", () => {
     expect(response.hits.map((hit) => hit.label)).toEqual([null, null, null, null]);
   });
 
-  it("leaves the old engine's wire without a label key", async () => {
+  it("leaves a keystroke preview's wire without a label key", async () => {
     await seed(db, FOUR);
-    const v1 = await createSearchOrchestrator({
-      db,
-      ...untouchable,
-      classifier: {
-        classify: () => Promise.resolve({ route: "classic", reason: "short-query" }),
-      },
-      classicStore: createPgTrgmClassicStore(db),
-    }).runSearch({ query: "dress", shopDomain: SHOP });
-    expect(v1.engine).toBe("v1");
-    for (const result of serializeProxySearchResponse(v1).results) {
+    const preview = await search(orchestrator(undefined), { query: "midi dress", preview: true });
+    expect(preview.routeReason).toBe("preview");
+    expect(preview.hits.length).toBeGreaterThan(0);
+    for (const result of serializeProxySearchResponse(preview).results) {
       expect(result).not.toHaveProperty("label");
     }
   });
@@ -1580,8 +1553,6 @@ describe("the judge on Engine v2 (on the database)", () => {
       latencyMs: 1,
       limited: null,
       stages: second.stages,
-      intentTier: null,
-      engine: "v2",
     });
     expect(playground.details.judge?.outcome).toBe("judge-cached");
   });
@@ -1907,8 +1878,6 @@ describe("the judge on Engine v2 (on the database)", () => {
         latencyMs: 1,
         limited: null,
         stages: response.stages,
-        intentTier: response.intentTier,
-        engine: response.engine,
       });
 
     it("judged: judgeRows beside judge, and the slowest and median call in the playground details only", async () => {

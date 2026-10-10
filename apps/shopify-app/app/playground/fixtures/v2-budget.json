@@ -11,8 +11,7 @@
       "priceMin": 380,
       "priceMax": 380,
       "currencyCode": "ILS",
-      "available": true,
-      "colorUnknown": false
+      "available": true
     },
     {
       "productId": "p-v2-2",
@@ -22,8 +21,7 @@
       "priceMin": 290,
       "priceMax": 290,
       "currencyCode": "ILS",
-      "available": true,
-      "colorUnknown": false
+      "available": true
     },
     {
       "productId": "p-v2-3",
@@ -33,8 +31,7 @@
       "priceMin": 245,
       "priceMax": 245,
       "currencyCode": "ILS",
-      "available": true,
-      "colorUnknown": false
+      "available": true
     }
   ],
   "chips": [
@@ -56,7 +53,6 @@
       "value": "black"
     }
   ],
-  "intent": null,
   "details": {
     "routeReason": "judged",
     "latencyMs": 912,
@@ -67,8 +63,6 @@
       "judgeRows": 14,
       "judge": 688
     },
-    "intentTier": null,
-    "engine": "v2",
     "judge": null
   },
   "page": 1,

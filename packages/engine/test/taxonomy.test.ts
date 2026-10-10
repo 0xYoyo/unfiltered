@@ -1,12 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  ATTRIBUTE_EVIDENCE_TERMS,
-  attributeEvidenceTerms,
   CANONICAL_CATEGORIES,
-  CATEGORY_LIKE_ATTRIBUTES,
-  normalizeAttributeWord,
-  normalizeCategoryLikeAttribute,
   CANONICAL_OCCASIONS,
   CATEGORY_GROUPS,
   expandCategoryConstraint,
@@ -190,49 +185,5 @@ describe("vision vocabularies (YOY-121 AC-1)", () => {
     expect(normalizeVisionValue(VISION_NOT_APPLICABLE, VISION_SLEEVE_LENGTHS)).toBeNull();
     expect(normalizeVisionValue("paisley", VISION_PATTERNS)).toBeNull();
     expect(normalizeVisionValue("", VISION_MATERIAL_APPEARANCES)).toBeNull();
-  });
-});
-
-describe("attribute evidence lexicon (YOY-133)", () => {
-  it("every entry is lowercase, distinct, carries its own key, and names at least one Hebrew form", () => {
-    for (const [key, forms] of Object.entries(ATTRIBUTE_EVIDENCE_TERMS)) {
-      expect(key, key).toBe(key.toLowerCase());
-      expect(forms, key).toContain(key);
-      expect(new Set(forms).size, key).toBe(forms.length);
-      for (const form of forms) {
-        expect(form, `${key}: ${form}`).toBe(form.trim().toLowerCase());
-      }
-      expect(forms.some((form) => /[\u05D0-\u05EA]/.test(form)), `${key} has no Hebrew form`).toBe(true);
-    }
-    // The category-like set is a subset of the lexicon: every include has evidence terms.
-    for (const word of CATEGORY_LIKE_ATTRIBUTES) {
-      expect(ATTRIBUTE_EVIDENCE_TERMS[word], word).toBeDefined();
-    }
-  });
-
-  it("normalizeAttributeWord folds surface forms onto their key and keeps unlisted words", () => {
-    expect(normalizeAttributeWord("Wool")).toBe("wool");
-    expect(normalizeAttributeWord("woollen")).toBe("wool");
-    expect(normalizeAttributeWord("sleeve")).toBe("sleeves");
-    expect(normalizeAttributeWord(" Sleeves ")).toBe("sleeves");
-    expect(normalizeAttributeWord("צמר")).toBe("wool");
-    expect(normalizeAttributeWord("polyester")).toBe("polyester");
-    // Empty and multi-word values are not attribute words.
-    expect(normalizeAttributeWord("")).toBeNull();
-    expect(normalizeAttributeWord("long sleeve")).toBeNull();
-  });
-
-  it("attributeEvidenceTerms lists the lexicon forms, or the word with its singular/plural when unlisted", () => {
-    expect(attributeEvidenceTerms("sleeve")).toEqual(["sleeve", "sleeves", "שרוול", "שרוולים"]);
-    expect(attributeEvidenceTerms("viscose")).toEqual(["viscose", "viscoses"]);
-    expect(attributeEvidenceTerms("pleats")).toEqual(["pleats", "pleat"]);
-    expect(attributeEvidenceTerms("")).toEqual([]);
-  });
-
-  it("normalizeCategoryLikeAttribute admits only the closed set", () => {
-    expect(normalizeCategoryLikeAttribute("Bridal")).toBe("bridal");
-    expect(normalizeCategoryLikeAttribute("bride")).toBe("bridal");
-    expect(normalizeCategoryLikeAttribute("wool")).toBeNull();
-    expect(normalizeCategoryLikeAttribute("linen")).toBeNull();
   });
 });

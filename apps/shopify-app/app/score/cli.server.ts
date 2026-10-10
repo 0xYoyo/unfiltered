@@ -174,30 +174,8 @@ export async function runScoreCommand(
       // Passes over the set on one scratch database (YOY-149 AC-18): the
       // second pass meets the caches the first filled — warm.
       passes: { type: "string", default: "1" },
-      // The engine scored (YOY-149, decision 2026-10-03): v1 or v2. Without
-      // it ENGINE_V2 must be set, so a wrong-engine run fails before it spends.
-      engine: { type: "string" },
     },
   });
-  let engine: "v1" | "v2" | "synthetic";
-  if (values.synthetic) {
-    engine = "synthetic";
-  } else if (values.engine !== undefined) {
-    if (values.engine !== "v1" && values.engine !== "v2") {
-      err("score run: --engine must be v1 or v2");
-      return 2;
-    }
-    engine = values.engine;
-    // The orchestrator reads the switch at construction, like production.
-    process.env.ENGINE_V2 = engine === "v2" ? "1" : "0";
-  } else {
-    const switchValue = process.env.ENGINE_V2?.trim();
-    if (switchValue === undefined || switchValue === "") {
-      err("score run: ENGINE_V2 is not set — set ENGINE_V2=1 (or 0), or pass --engine v1|v2");
-      return 2;
-    }
-    engine = switchValue === "1" ? "v2" : "v1";
-  }
   const passes = Number(values.passes);
   if (!Number.isInteger(passes) || passes < 1 || passes > 3) {
     err("score run: --passes must be 1, 2 or 3");
@@ -232,7 +210,7 @@ export async function runScoreCommand(
       let grader: LlmClient;
       let flushLedger: (() => Promise<void>) | undefined;
       if (values.synthetic) {
-        orchestrator = createSyntheticOrchestrator(db, set);
+        orchestrator = createSyntheticOrchestrator(db);
         grader = await createSyntheticGrader(orchestrator, set);
       } else {
         const { createProxySearchOrchestrator } = await import("../search/proxy.server");
@@ -276,12 +254,10 @@ export async function runScoreCommand(
       }
       return results;
     });
-    // The engine first, so a wrong-engine run is visible on its first line.
     out(
-      `engine ${engine}\n` +
-        (reports.length === 1
-          ? formatScoreTable(reports[0]!)
-          : reports.map((report, index) => `pass ${index + 1}\n${formatScoreTable(report)}`).join("\n")),
+      reports.length === 1
+        ? formatScoreTable(reports[0]!)
+        : reports.map((report, index) => `pass ${index + 1}\n${formatScoreTable(report)}`).join("\n"),
     );
     return reports.some((report) => report.abortedAfter !== undefined) ? 1 : 0;
   } catch (error) {

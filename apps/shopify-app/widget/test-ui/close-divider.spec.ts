@@ -65,8 +65,13 @@ for (const locale of ["en", "he"] as const) {
     for (const index of [22, 23]) {
       await expect(overlayCards(page).nth(index).locator(".card-label")).toHaveCount(0);
     }
-    // The zero-hit section stays hidden on a page with matches.
-    await expect(page.getByTestId("unfiltered-widget-close-matches")).toBeHidden();
+    // The one heading is the divider's (YOY-155): no zero-hit
+    // close-matches section, no relaxed heading, no colour note.
+    await expect(page.getByTestId("unfiltered-widget-close-matches")).toHaveCount(0);
+    await expect(page.getByTestId("unfiltered-widget-overlay").locator("h2")).toHaveText([
+      HEADINGS[locale],
+    ]);
+    await expect(page.getByTestId("unfiltered-widget-color-note")).toHaveCount(0);
     // The divider spans the grid's full width.
     const [dividerBox, gridBox] = await Promise.all([
       overlayDividers(page).boundingBox(),
@@ -111,7 +116,13 @@ for (const locale of ["en", "he"] as const) {
         nativeItems(page).nth(index).locator(".unfiltered-native__label"),
       ).toHaveCount(0);
     }
-    await expect(page.getByTestId("unfiltered-native-close-matches")).toBeHidden();
+    // The one heading is the divider's (YOY-155): no zero-hit
+    // close-matches section, no relaxed heading, no colour note.
+    await expect(page.getByTestId("unfiltered-native-close-matches")).toHaveCount(0);
+    await expect(page.getByTestId("unfiltered-native-results").locator("h2")).toHaveText([
+      HEADINGS[locale],
+    ]);
+    await expect(page.getByTestId("unfiltered-widget-color-note")).toHaveCount(0);
     const [dividerBox, listBox] = await Promise.all([
       nativeDividers(page).boundingBox(),
       nativeList(page).boundingBox(),

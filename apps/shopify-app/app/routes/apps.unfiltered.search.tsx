@@ -6,11 +6,9 @@ import {
   getProxySearchOrchestrator,
   parseProxySearchBody,
   parseProxySearchParams,
-  removeChipFromIntent,
   serializeProxySearchResponse,
   type ProxySearchBody,
 } from "../search/proxy.server";
-import { normalizeReuseQuery } from "../search/events.server";
 import { getSessionThrottle } from "../search/throttle.server";
 import { authenticate } from "../shopify.server";
 
@@ -84,13 +82,6 @@ async function handleSearch(
     return emptyResponse(400);
   }
 
-  // Chip removal: pure intent surgery, then straight to retrieval — no
-  // classification and no extraction (YOY-46 AC-4).
-  const resolvedIntent =
-    body.removeChip !== undefined && body.previousIntent !== undefined
-      ? removeChipFromIntent(body.previousIntent, body.removeChip)
-      : undefined;
-
   // Keystroke preview (YOY-68): classic-only, zero LLM calls, outside the
   // throttle and outside the SearchEvent log — the submitted search is the
   // shopper's actual query; previews are typing noise.
@@ -102,35 +93,27 @@ async function handleSearch(
   const classic = body.mode === "classic";
 
   // Per-session AI throttle (YOY-47): a session past its sliding-window
-  // budget is forced onto the classic path with zero LLM calls. Chip
-  // removal is exempt — it makes no classification or intent call anyway —
-  // and previews and classic rescues never reach the AI path, so the
-  // throttle ignores them too.
+  // budget is served find order with no judge call (YOY-147 AC-7).
+  // Previews and classic rescues make no model call, so the throttle
+  // ignores them.
   const throttle = getSessionThrottle();
-  const throttled =
-    !preview &&
-    !classic &&
-    resolvedIntent === undefined &&
-    throttle.shouldThrottle(body.sessionId);
+  const throttled = !preview && !classic && throttle.shouldThrottle(body.sessionId);
 
   // Containment (YOY-52 AC-4): a failure below the orchestrator's own
   // fallback ladder — construction included — must never surface framework
   // error details to a shopper. Same empty-body style as the 401/400 above.
   try {
-    // Module singleton (YOY-67 AC-7): per-request construction emptied the
-    // classifier's decision cache on every search, so identical queries
-    // could take opposite routes across requests. Construction failures are
-    // not memoized, so this stays inside the containment try.
+    // Module singleton (YOY-67 AC-7). Construction failures are not
+    // memoized, so this stays inside the containment try.
     const orchestrator = getProxySearchOrchestrator(db);
     const startedAt = Date.now();
     // Page parameters ride every submitted shape (YOY-145 AC-4); the
-    // orchestrator ignores them on a preview (AC-9). No `engine` here: the
-    // storefront takes the env default, whatever the request says (AC-6).
+    // orchestrator ignores them on a preview (AC-9).
     const paging = body.paging !== undefined ? { paging: body.paging } : {};
-    // Chips removed from an Engine v2 response (YOY-149 AC-15).
+    // Chips removed from a previous response (YOY-149 AC-15).
     const removed =
       body.removedChips !== undefined ? { removedChips: body.removedChips } : {};
-    // The refinement chain (YOY-150 AC-1); Engine v2 reads it, v1 ignores it.
+    // The refinement chain (YOY-150 AC-1).
     const chain =
       body.previousQuery !== undefined ? { previousQuery: body.previousQuery } : {};
     const response = await orchestrator.runSearch(
@@ -144,20 +127,9 @@ async function handleSearch(
               forceClassicReason: "client-timeout-rescue",
               ...paging,
             }
-        : throttled
-        ? { query: body.query, shopDomain: shop, forceClassic: true, ...paging, ...removed, ...chain }
-        : resolvedIntent !== undefined
-          ? { query: body.query, shopDomain: shop, resolvedIntent, ...paging }
-          : {
-              query: body.query,
-              shopDomain: shop,
-              ...paging,
-              ...removed,
-              ...chain,
-              ...(body.previousIntent !== undefined
-                ? { previousIntent: body.previousIntent }
-                : {}),
-            },
+          : throttled
+            ? { query: body.query, shopDomain: shop, forceClassic: true, ...paging, ...removed, ...chain }
+            : { query: body.query, shopDomain: shop, ...paging, ...removed, ...chain },
     );
     const latencyMs = Date.now() - startedAt;
 
@@ -174,37 +146,17 @@ async function handleSearch(
           routeReason: response.routeReason,
           latencyMs,
           stages: response.stages,
-          // Which intent tier answered (YOY-116 AC-3); null when none ran.
-          intentTier: response.intentTier,
         }),
       );
     }
 
-    // Budget is consumed whenever the classifier decided the AI route (YOY-52
-    // AC-5) — an AI-classified search that degraded to classic after intent
-    // extraction or retrieval failed (route "classic", degraded, routeReason
-    // "model") spent real LLM calls and counts, and so does a classic
-    // zero-hit escalation that degraded after its intent call (YOY-67 AC-3
-    // — reason "classic-zero-hit"; the successful escalation lands route
-    // "ai" and counts through the first arm). Heuristic and model-decided
-    // classic searches ("short-query", "sku-pattern", non-degraded "model",
-    // "model-error") consume nothing; chip removal and throttled responses
-    // stay exempt (YOY-47 AC-4).
-    // An exact-query reuse (YOY-64 AC-4) made no LLM call and spends no
-    // budget, exactly like chip removal.
-    const aiDecided =
-      (response.route === "ai" && response.routeReason !== "intent-reuse") ||
-      (response.degraded &&
-        (response.routeReason === "model" ||
-          // A purpose phrase settles AI deterministically (YOY-133); its
-          // degraded fallback still spent the intent call, like "model".
-          response.routeReason === "purpose-phrase" ||
-          response.routeReason === "classic-zero-hit"));
-    // Only page 1 of a submitted search spends budget (YOY-157 AC-29): a
-    // later page is the same search scrolled, and on Engine v2 it answers
-    // `route: "ai"` (AC-23) even when it made no model call.
+    // Budget is consumed by every search the find step served (route
+    // "ai"); previews, classic rescues and throttled searches consume
+    // nothing (YOY-47 AC-4). Only page 1 spends budget (YOY-157 AC-29): a
+    // later page is the same search scrolled, and it answers `route: "ai"`
+    // (AC-23) even when it made no model call.
     const firstPage = (response.page ?? 1) === 1;
-    if (!preview && resolvedIntent === undefined && !throttled && aiDecided && firstPage) {
+    if (!preview && !throttled && response.route === "ai" && firstPage) {
       throttle.recordAiSearch(body.sessionId);
     }
 
@@ -214,8 +166,8 @@ async function handleSearch(
     // (YOY-68 AC-3): they would flood analytics with per-keystroke noise,
     // and the click beacon has nothing to attribute to a search the shopper
     // never submitted. The row keeps the orchestrator's routeReason (YOY-96
-    // AC-9) so a rescue is distinguishable from a throttled or heuristic
-    // classic in the ledger.
+    // AC-9) so a rescue is distinguishable from a throttled search in the
+    // ledger.
     if (!preview) {
       await writeSearchEvent(db, {
         searchId: response.searchId,
@@ -230,19 +182,6 @@ async function handleSearch(
         // One row per page request, with its page (YOY-145 AC-10); an
         // unpaged response is the first and only page.
         page: response.page ?? 1,
-        // The intent a later identical query may reuse (YOY-64 AC-4): only
-        // a served, non-degraded AI intent that was actually EXTRACTED here,
-        // keyed by the normalized query. A response served from an earlier
-        // row's intent ("intent-reuse") stores none (YOY-125 AC-3): re-storing
-        // it would re-anchor the window on the reuse, so a query searched at
-        // least once per window would never re-extract after a prompt or model
-        // change. The row still logs as a normal SearchEvent.
-        ...(response.route === "ai" &&
-        response.routeReason !== "intent-reuse" &&
-        !response.degraded &&
-        response.intent !== null
-          ? { intent: response.intent, normalizedQuery: normalizeReuseQuery(body.query) }
-          : {}),
       });
     }
 

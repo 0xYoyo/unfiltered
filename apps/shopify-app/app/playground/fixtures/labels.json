@@ -12,7 +12,6 @@
       "priceMax": 420,
       "currencyCode": "ILS",
       "available": true,
-      "colorUnknown": false,
       "label": {
         "template": "price-near",
         "values": [
@@ -30,7 +29,6 @@
       "priceMax": 640,
       "currencyCode": "ILS",
       "available": true,
-      "colorUnknown": false,
       "label": {
         "template": "price-far",
         "values": [
@@ -48,7 +46,6 @@
       "priceMax": 245,
       "currencyCode": "ILS",
       "available": true,
-      "colorUnknown": false,
       "label": {
         "template": "size-missing",
         "values": [
@@ -67,7 +64,6 @@
       "priceMax": 310,
       "currencyCode": "ILS",
       "available": true,
-      "colorUnknown": false,
       "label": {
         "template": "fact-differs",
         "values": [
@@ -85,7 +81,6 @@
       "priceMax": 290,
       "currencyCode": "ILS",
       "available": true,
-      "colorUnknown": false,
       "label": {
         "template": "close-match",
         "values": []
@@ -100,7 +95,6 @@
       "priceMax": 350,
       "currencyCode": "ILS",
       "available": true,
-      "colorUnknown": false,
       "label": null
     }
   ],
@@ -115,7 +109,6 @@
       "value": "M"
     }
   ],
-  "intent": null,
   "details": {
     "routeReason": "judged",
     "latencyMs": 912,
@@ -125,8 +118,6 @@
       "hydrate": 9,
       "judge": 702
     },
-    "intentTier": null,
-    "engine": "v2",
     "judge": null
   }
 }

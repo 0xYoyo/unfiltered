@@ -77,29 +77,17 @@
           },
         ],
         chips: [],
-        intent: null,
       };
 
-      // AI-path fixtures (YOY-49): an AI response with chips and an echoed
-      // intent, its zero-hit variant with close matches, and a degraded
-      // classic response — all contract-shaped.
-      const AI_INTENT = {
-        category: "dress",
-        priceMin: null,
-        priceMax: 400,
-        currency: "ILS",
-        colorsInclude: [],
-        colorsExclude: ["black"],
-        occasion: null,
-        size: null,
-        availabilityRequired: false,
-        softAttributes: ["elegant"],
-      };
-
+      // AI-path fixtures (YOY-49): an AI response with chips, its zero-hit
+      // variant, and a degraded classic response — all contract-shaped. The
+      // chips are three plain v2 ones: the size, a price cap with no
+      // currency of its own, and an exclusion (Hebrew under `locale=he`).
+      const AI_LOCALE = new URLSearchParams(window.location.search).get("locale");
       const AI_CHIPS = [
-        { field: "category", value: "dress" },
+        { field: "size", value: "M" },
         { field: "priceMax", value: "400" },
-        { field: "colorsExclude", value: "black" },
+        { field: "exclude", value: AI_LOCALE === "he" ? "שחור" : "black" },
       ];
 
       const AI_RESPONSE = {
@@ -129,113 +117,14 @@
           },
         ],
         chips: AI_CHIPS,
-        intent: AI_INTENT,
       };
 
-      // Localization fixture (YOY-50 AC-4): every chip field the display
-      // maps cover, plus a color outside the canonical list ("chartreuse")
-      // that must render exactly as extracted.
-      const AI_LOCALIZED_RESPONSE = {
-        ...AI_RESPONSE,
-        searchId: "harness-ai-localized-1",
-        chips: [
-          { field: "category", value: "dress" },
-          { field: "priceMax", value: "400" },
-          { field: "colorsExclude", value: "black" },
-          { field: "colorsInclude", value: "chartreuse" },
-          { field: "occasion", value: "evening" },
-          { field: "availability", value: "true" },
-        ],
-      };
-
-      // Color-filter fixture (YOY-67 AC-5): known-color matches first, then
-      // unknown-color products flagged by the server; the widget must render
-      // the flagged ones de-emphasized and labeled, after the known ones.
-      const AI_COLOR_RESPONSE = {
-        searchId: "harness-ai-color-1",
-        route: "ai",
-        degraded: false,
-        results: [
-          {
-            productId: "gid://shopify/Product/31",
-            title: "Blue Snowboard",
-            url: "/products/blue-snowboard",
-            imageUrl: PIXEL,
-            priceMin: 700,
-            priceMax: 700,
-            currencyCode: "ILS",
-            available: true,
-            colorUnknown: false,
-          },
-          {
-            productId: "gid://shopify/Product/32",
-            title: "Ocean Board",
-            url: "/products/ocean-board",
-            imageUrl: PIXEL,
-            priceMin: 800,
-            priceMax: 800,
-            currencyCode: "ILS",
-            available: true,
-            colorUnknown: false,
-          },
-          {
-            productId: "gid://shopify/Product/33",
-            title: "Mystery Board",
-            url: "/products/mystery-board",
-            imageUrl: null,
-            priceMin: 600,
-            priceMax: 600,
-            currencyCode: "ILS",
-            available: true,
-            colorUnknown: true,
-          },
-        ],
-        chips: [{ field: "colorsInclude", value: "blue" }],
-        intent: {
-          ...AI_INTENT,
-          colorsInclude: ["blue"],
-          colorsExclude: [],
-          category: null,
-          priceMax: null,
-        },
-      };
-
-      // Exclusion-only variant (YOY-67 AC-5 fix round 1): a "Not black x"
-      // chip is a color chip too — unknown-color hits must render flagged
-      // under it exactly as under an inclusion chip.
-      const AI_COLOR_EXCLUDE_RESPONSE = {
-        ...AI_COLOR_RESPONSE,
-        searchId: "harness-ai-color-exclude-1",
-        results: [
-          { ...AI_COLOR_RESPONSE.results[0], colorUnknown: false },
-          { ...AI_COLOR_RESPONSE.results[2], colorUnknown: true },
-        ],
-        chips: [{ field: "colorsExclude", value: "black" }],
-        intent: {
-          ...AI_COLOR_RESPONSE.intent,
-          colorsInclude: [],
-          colorsExclude: ["black"],
-        },
-      };
-
+      // An AI response with no results: the zero-hit message and its
+      // chips, and nothing under a "Close matches" heading.
       const AI_ZERO_HIT_RESPONSE = {
         ...AI_RESPONSE,
         searchId: "harness-ai-zero-1",
         results: [],
-        closeMatches: [
-          {
-            productId: "gid://shopify/Product/21",
-            title: "Black Evening Dress",
-            url: "/products/black-evening-dress",
-            imageUrl: PIXEL,
-            priceMin: 480,
-            priceMax: 480,
-            currencyCode: "ILS",
-            available: true,
-          },
-        ],
-        // The server relaxed the budget cap to find them (YOY-111).
-        closeMatchesRelaxed: ["priceMax"],
       };
 
       const DEGRADED_RESPONSE = {
@@ -244,11 +133,9 @@
         degraded: true,
         results: RESULTS_RESPONSE.results.slice(0, 1),
         chips: [],
-        intent: null,
       };
 
-      // Engine v2 fixtures (YOY-149): `intent: null`, chips of the v2
-      // fields only — a price chip carrying the shopper's number and its
+      // Engine v2 fixtures (YOY-149): chips of the v2 fields only — a price chip carrying the shopper's number and its
       // ISO currency, the size as typed, availability, and an exclusion
       // carrying the excluded term as typed (Hebrew under `locale=he`, as a
       // Hebrew shopper would type it). `?fixture=budget|exclude|size`
@@ -291,7 +178,6 @@
             ? results.filter((result) => result.priceMin <= 400)
             : results,
           chips,
-          intent: null,
           ...(name === "refine" || name === "two-meanings"
             ? {
                 carry:
@@ -336,7 +222,7 @@
       /**
        * A judged Engine v2 page with matches (YOY-166): the page's last two
        * products are close — labelled "close match" and served in
-       * `closeMatches` beside the matched ones, `closeMatchesRelaxed: []`.
+       * `closeMatches` beside the matched ones.
        * `?fixture=close-divider` selects it; every page splits the same way.
        */
       const closeDivider = (page) => {
@@ -356,7 +242,6 @@
             ...result,
             label: { template: "close-match", values: [] },
           })),
-          closeMatchesRelaxed: [],
         };
       };
 
@@ -376,7 +261,6 @@
           ...result,
           label: { template: "close-match", values: [] },
         })),
-        closeMatchesRelaxed: [],
       });
 
       const paged = (body, request) => {
@@ -392,20 +276,18 @@
         };
       };
 
-      // Contract-correct chip-removal echo: chips minus the removed one,
-      // the previousIntent echoed back, and a recomputed result set (a
-      // product the removed constraint had excluded appears).
+      // Contract-correct chip-removal answer: chips minus every removed one
+      // (`removedChips`), and a recomputed result set (a product the
+      // removed constraint had excluded appears).
       const chipRemovalResponse = (request) => ({
         ...AI_RESPONSE,
         searchId: "harness-ai-removal-1",
         chips: AI_CHIPS.filter(
           (chip) =>
-            !(
-              chip.field === request.removeChip.field &&
-              chip.value === request.removeChip.value
+            !request.removedChips.some(
+              (gone) => gone.field === chip.field && gone.value === chip.value,
             ),
         ),
-        intent: request.previousIntent,
         results: [
           ...AI_RESPONSE.results,
           {
@@ -446,7 +328,6 @@
         priceMax: price,
         currencyCode: "ILS",
         available: true,
-        colorUnknown: false,
         label,
       });
       const LABEL_RESULTS = [
@@ -466,7 +347,6 @@
           { field: "priceMax", value: "400", currency: "ILS" },
           { field: "size", value: "M" },
         ],
-        intent: null,
         ...extra,
       });
       const LABEL_FIXTURES = {
@@ -507,12 +387,6 @@
             query: params.get("query"),
             sessionId: params.get("sessionId"),
           };
-          if (params.has("previousIntent")) {
-            request.previousIntent = JSON.parse(params.get("previousIntent"));
-          }
-          if (params.has("removeChip")) {
-            request.removeChip = JSON.parse(params.get("removeChip"));
-          }
           if (params.has("removedChips")) {
             request.removedChips = JSON.parse(params.get("removedChips"));
           }
@@ -600,18 +474,16 @@
                 currencyCode: "ILS",
                 available: true,
               },
-            ], request);          } else if (request.removeChip !== undefined) {
+            ], request);
+          } else if (
+            request.removedChips !== undefined &&
+            (fixture === "ai" || fixture === "ai-delayed" || fixture === "ai-zero-hit")
+          ) {
             body = chipRemovalResponse(request);
           } else if (fixture in LABEL_FIXTURES) {
             body = LABEL_FIXTURES[fixture];
           } else if (fixture === "ai" || fixture === "ai-delayed") {
             body = AI_RESPONSE;
-          } else if (fixture === "ai-localized") {
-            body = AI_LOCALIZED_RESPONSE;
-          } else if (fixture === "ai-color") {
-            body = AI_COLOR_RESPONSE;
-          } else if (fixture === "ai-color-exclude") {
-            body = AI_COLOR_EXCLUDE_RESPONSE;
           } else if (fixture === "ai-zero-hit") {
             body = AI_ZERO_HIT_RESPONSE;
           } else if (fixture === "degraded") {
