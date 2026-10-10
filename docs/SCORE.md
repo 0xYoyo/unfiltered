@@ -264,6 +264,7 @@ line.
 | 4 | Engine v2 + stated wishes (YOY-149) + refinement and second reading (YOY-150) (`ENGINE_V2=1`, judge deadline 4,000 ms) | 0.671 | 0.407 | 0.500 | 0.657 | 0.500 | 0.421 | — (not deployed) | $0.2128 |
 | 5 (gemini judge) | Engine v2 as run 4, judge `JUDGE_PROVIDER=gemini` (YOY-152 branch) | 0.667 | 0.389 | 0.537 | 0.657 | 0.583 | 0.394 | — (not deployed) | $0.2054 |
 | 5 (jev judge) | Engine v2 as run 4, judge `JUDGE_PROVIDER=jev` (YOY-152 branch) | 0.634 | 0.407 | 0.574 | 0.657 | 0.542 | 0.398 | — (not deployed) | $0.1053 |
+| 6 | One engine after the delete (YOY-155 branch, judge `jev`) | 0.606 | 0.301 | 0.495 | 0.616 | 0.444 | 0.366 | — (not deployed) | $0.1043 |
 | 1b — v1 re-check | M5 engine on `main` before its deletion (YOY-155 AC-1) | 0.560 | 0.287 | 0.375 | 0.463 | 0.407 | 0.236 | — | $0.0552 |
 | 3 (first, superseded) | Engine v2 find step + judge reading the summary (`ENGINE_V2=1`, deadline 1,500 ms) | 0.597 | 0.292 | 0.556 | 0.648 | 0.542 | 0.403 | — (not deployed) | $0.0928 |
 | 1 (invalid: 18 failures) | M5 engine | 0.306 | 0.032 | 0.181 | 0.083 | 0.167 | 0.106 | — | $0.0391 |
@@ -357,6 +358,16 @@ Green, leak check clean (72 checked), **0 failed searches**, $0.0552 over
 M5 level before it was deleted: en 0.560 (+0.088 against run 1, band
 0.111) and he 0.287 (+0.018, band 0.090) both sit inside their bands. The
 latest v2 hidden score (run 5, Jev) is above run 1 in every language.
+
+Run 6 — after the delete (YOY-155 AC-8): [run 38063360614](https://github.com/0xYoyo/unfiltered/actions/runs/38063360614),
+2026-10-10, dispatched with `--ref YOY-155-delete-old-engine`,
+`ref=YOY-155-delete-old-engine` (`ce3bb15`) and `judge=jev`. Green, leak
+check clean (72 checked), **0 failed searches**, $0.1043 over 1,942 model
+calls, 72 extraction calls. Against run 5 (Jev), with each band
+`max(M5 band, 0.03)`: en −0.028 (band 0.111, holds), **he −0.106 (band
+0.090: a miss — 0.301 under the 0.317 floor)**, ar −0.079, ru −0.041,
+fr −0.098, es −0.032. The gate is **not met** on he; the delete is not
+opened for merge until the cause is known (see YOY-155).
 
 ### Judge comparison — Flash-Lite versus Jev (YOY-152, 2026-10-04)
 
