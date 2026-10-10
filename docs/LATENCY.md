@@ -120,6 +120,26 @@ rows below) against 13 ms / 22 ms on the unpooled rows of 2026-08-26 and
 still clears by 10×. Full probe output on
 [YOY-124](https://linear.app/0xyoyo/issue/YOY-124).
 
+### The extraction's grace (YOY-171 AC-6)
+
+Every Engine v2 search now books the wish extraction in its stage ledger:
+`extract` — the call's wall time from its start with the search to its
+settle; when it misses the 800 ms grace (`extractionGraceMs`), the time the
+page waited for it, a lower bound, since the call runs on to fill the
+extraction cache — and `extractLate`, `1` for a missed grace, `0` otherwise.
+The playground's details panel shows `extract` first, marked `late` on a miss.
+The probe reports `extract-late` (the share that missed the grace) and the
+extraction's p50/p95 per set, beside `no-extraction` (missed the grace or
+failed).
+
+**How often the grace is missed today:** at most **8 %** of AI searches — the
+`no-extraction` share of the 2026-10-06 bar run (50 searches, `main` at
+`bb9f80f`, the last full run on the deployment), which counts a missed grace
+and a failed call alike, so it bounds the late share from above. The
+`extract-late` share and the extraction's own p50/p95 come from the first
+probe after this slice deploys: the deployment answers without the `extract`
+stage until then. No grace change in this AC.
+
 ## Recorded measurements
 
 Every quoted row names the deployment region and the code it ran, and

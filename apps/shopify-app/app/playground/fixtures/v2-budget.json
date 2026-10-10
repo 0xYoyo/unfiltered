@@ -58,6 +58,8 @@
     "latencyMs": 912,
     "limited": null,
     "stages": {
+      "extract": 412,
+      "extractLate": 0,
       "find": 71,
       "hydrate": 9,
       "judgeRows": 14,

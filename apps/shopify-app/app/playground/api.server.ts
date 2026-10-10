@@ -159,6 +159,9 @@ function serializeStages(stages: SearchStages): SearchStages {
       ordered[stage] = ms;
     }
   }
+  if (stages.extractLate !== undefined) {
+    ordered.extractLate = stages.extractLate;
+  }
   return ordered;
 }
 

@@ -100,6 +100,8 @@ export interface PlaygroundStrings {
   detailsLatency: string;
   detailsDegraded: string;
   detailsLimited: string;
+  /** Marks the extraction row when it missed its grace (YOY-171 AC-6). */
+  detailsExtractLate: string;
   /** Heading of the per-stage timing rows (YOY-114). */
   detailsStages: string;
   /** Value shown for a detail the response left null. */
@@ -170,6 +172,7 @@ export const PLAYGROUND_STRING_CATALOG: Record<
     detailsDegraded: "Degraded",
     detailsLimited: "Limited",
     detailsStages: "Stages",
+    detailsExtractLate: "late",
     detailsNone: "none",
     detailsYes: "yes",
     detailsNo: "no",
@@ -224,6 +227,7 @@ export const PLAYGROUND_STRING_CATALOG: Record<
     detailsDegraded: "מצומצם",
     detailsLimited: "הוגבל",
     detailsStages: "שלבים",
+    detailsExtractLate: "באיחור",
     detailsNone: "אין",
     detailsYes: "כן",
     detailsNo: "לא",
