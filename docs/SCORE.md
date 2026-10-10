@@ -266,6 +266,7 @@ line.
 | 5 (jev judge) | Engine v2 as run 4, judge `JUDGE_PROVIDER=jev` (YOY-152 branch) | 0.634 | 0.407 | 0.574 | 0.657 | 0.542 | 0.398 | — (not deployed) | $0.1053 |
 | 6 control | Engine v2 on `main` at `9843486`, before the delete (YOY-155 AC-8 reference, judge `jev`) | 0.657 | 0.361 | 0.495 | 0.648 | 0.477 | 0.361 | — (not deployed) | $0.1038 |
 | 6 | One engine after the delete (YOY-155 branch, judge `jev`) | 0.606 | 0.301 | 0.495 | 0.616 | 0.444 | 0.366 | — (not deployed) | $0.1043 |
+| 5 replay | Run 5's code re-run on 2026-10-10 (`5c5adfe`, `engine=v2`, judge `jev`; YOY-171 AC-9) | 0.569 | 0.370 | 0.569 | 0.639 | 0.523 | 0.431 | — (not deployed) | $0.1055 |
 | 1b — v1 re-check | M5 engine on `main` before its deletion (YOY-155 AC-1) | 0.560 | 0.287 | 0.375 | 0.463 | 0.407 | 0.236 | — | $0.0552 |
 | 3 (first, superseded) | Engine v2 find step + judge reading the summary (`ENGINE_V2=1`, deadline 1,500 ms) | 0.597 | 0.292 | 0.556 | 0.648 | 0.542 | 0.403 | — (not deployed) | $0.0928 |
 | 1 (invalid: 18 failures) | M5 engine | 0.306 | 0.032 | 0.181 | 0.083 | 0.167 | 0.106 | — | $0.0391 |
@@ -378,6 +379,43 @@ inside the band, the gate is met**; ar 0.000, ru −0.032, fr −0.033,
 es +0.005. Engine v2 on `main` already sat below run 5 before the delete
 (he 0.361 against 0.407): the he drop against run 5 is tracked on YOY-171
 AC-9, not on the delete.
+
+Run 5 replay — the he drop explained (YOY-171 AC-9):
+[run 38071540704](https://github.com/0xYoyo/unfiltered/actions/runs/38071540704),
+2026-10-10. Run 5's own commit `5c5adfe` was scored again with that
+commit's workflow: a throwaway branch at `5c5adfe` was dispatched with
+`--ref`, because today's workflow has no `engine` input and the runner at
+`5c5adfe` needs `ENGINE_V2`. Green, leak check clean (72 checked), **0
+failed searches**, $0.1055 over 1,944 model calls. Two earlier dispatches
+failed before any model call, at $0: a short SHA the checkout cannot
+fetch, and today's workflow without `ENGINE_V2`.
+
+| he | Run 5 code (`5c5adfe`) | Run-6-era code (`main` `9843486`) |
+|---|---|---|
+| 2026-10-04 | 0.407 (run 5) | — |
+| 2026-10-10 | **0.370** (replay) | **0.361** (run 6 control) |
+
+The same code moves 0.037 between two days. The two code states re-run on
+the same day are **0.009 apart, inside 0.05**. Run 6 itself (0.301) sits
+0.060 below its control, on v2 code that the delete did not touch. So the
+he drop from run 5 to run 6 is **judge variance**, not a v2 change, and the
+grader rule stays as it is. By the AC's own rule, the numbers close it.
+The other languages agree. Between the replay and the control: en −0.088,
+ar −0.074, ru +0.009, fr −0.046, es −0.070. The replay's en moved −0.065
+against its own first run, so en's day-to-day spread is as wide as the
+gap.
+
+No per-search list is posted. The hidden run prints per-language
+aggregates only (the runner's design: the builder never sees a hidden query
+or its grades, and the leak check guards the output). So the ten Hebrew
+searches that lost the most cannot be read from any artifact. Producing
+them would need a runner change under `app/score/` (a sensitive path)
+printing per-entry grades by index. The variance result made that
+unnecessary.
+
+One side reading for the M7 speed chain: the replay's "no extraction"
+column (8–25 %) shows run 5's code missed the extraction grace on some
+searches on 2026-10-10, where today's code (0 %) did not.
 
 ### Judge comparison — Flash-Lite versus Jev (YOY-152, 2026-10-04)
 
