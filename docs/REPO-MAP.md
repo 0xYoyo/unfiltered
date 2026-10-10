@@ -166,6 +166,7 @@ apps/
           preview.json
           results.json
           shopify-public-products.ts
+          stand-in.json
           v2-budget.json
           v2-refine.json
           v2-two-meanings.json
@@ -216,6 +217,7 @@ apps/
           evidence-paging.spec.ts
           evidence-refinement.spec.ts
           evidence-site-copy.spec.ts
+          evidence-stand-in.spec.ts
           evidence-store.spec.ts
           evidence-v2-chips.spec.ts
           evidence.spec.ts
@@ -549,6 +551,7 @@ apps/
         evidence-negation-chips.spec.ts
         evidence-refinement.spec.ts
         evidence-server-pages.spec.ts
+        evidence-stand-in.spec.ts
         evidence-v2-chips.spec.ts
         labels.spec.ts
         labels.spec.ts-snapshots/
@@ -1287,49 +1290,61 @@ docs/
       playground-desktop-en-late-page.png
       playground-desktop-en-loading.png
       playground-desktop-en-pending-find-order.png
+      playground-desktop-en-stand-in.png
       playground-desktop-he-empty.png
       playground-desktop-he-error.png
       playground-desktop-he-late-page.png
       playground-desktop-he-loading.png
       playground-desktop-he-pending-find-order.png
+      playground-desktop-he-stand-in.png
       playground-mobile-en-empty.png
       playground-mobile-en-error.png
       playground-mobile-en-late-page.png
       playground-mobile-en-loading.png
       playground-mobile-en-pending-find-order.png
+      playground-mobile-en-stand-in.png
       playground-mobile-he-empty.png
       playground-mobile-he-error.png
       playground-mobile-he-late-page.png
       playground-mobile-he-loading.png
       playground-mobile-he-pending-find-order.png
+      playground-mobile-he-stand-in.png
       widget-native-desktop-en-late-page.png
       widget-native-desktop-en-pending-find-order.png
+      widget-native-desktop-en-stand-in.png
       widget-native-desktop-he-late-page.png
       widget-native-desktop-he-pending-find-order.png
+      widget-native-desktop-he-stand-in.png
       widget-native-mobile-en-late-page.png
       widget-native-mobile-en-pending-find-order.png
+      widget-native-mobile-en-stand-in.png
       widget-native-mobile-he-late-page.png
       widget-native-mobile-he-pending-find-order.png
+      widget-native-mobile-he-stand-in.png
       widget-overlay-desktop-en-empty.png
       widget-overlay-desktop-en-error.png
       widget-overlay-desktop-en-late-page.png
       widget-overlay-desktop-en-loading.png
       widget-overlay-desktop-en-pending-find-order.png
+      widget-overlay-desktop-en-stand-in.png
       widget-overlay-desktop-he-empty.png
       widget-overlay-desktop-he-error.png
       widget-overlay-desktop-he-late-page.png
       widget-overlay-desktop-he-loading.png
       widget-overlay-desktop-he-pending-find-order.png
+      widget-overlay-desktop-he-stand-in.png
       widget-overlay-mobile-en-empty.png
       widget-overlay-mobile-en-error.png
       widget-overlay-mobile-en-late-page.png
       widget-overlay-mobile-en-loading.png
       widget-overlay-mobile-en-pending-find-order.png
+      widget-overlay-mobile-en-stand-in.png
       widget-overlay-mobile-he-empty.png
       widget-overlay-mobile-he-error.png
       widget-overlay-mobile-he-late-page.png
       widget-overlay-mobile-he-loading.png
       widget-overlay-mobile-he-pending-find-order.png
+      widget-overlay-mobile-he-stand-in.png
     YOY-64/
       desktop-en-intent-reuse.png
       desktop-he-intent-reuse.png
@@ -1537,7 +1552,7 @@ vitest.setup.ts
 - **Env files (paths only — contents never read)**: .env (declared in .gitignore), .env.* (declared in .gitignore), .env.example, apps/shopify-app/.env (declared in .gitignore), apps/shopify-app/.env.example
 - **Entrypoints**: apps/shopify-app/app/routes/app.tsx, apps/shopify-app/widget/src/main.ts, packages/engine/src/index.ts, packages/provider-gemini/src/index.ts
 - **Scripts**: scripts/repo-map.mjs
-- **Fixtures**: apps/shopify-app/app/eval/fixtures/catalog.json, apps/shopify-app/app/eval/fixtures/constructor-floor.json, apps/shopify-app/app/eval/fixtures/constructor-goldens.json, apps/shopify-app/app/eval/fixtures/recorded/card.json, apps/shopify-app/app/eval/fixtures/recorded/embeddings-v2.json, apps/shopify-app/app/eval/fixtures/recorded/embeddings.json, apps/shopify-app/app/eval/fixtures/recorded/enrichment.json, apps/shopify-app/app/eval/fixtures/recorded/extract.json, apps/shopify-app/app/eval/fixtures/recorded/judge-jev.json, apps/shopify-app/app/eval/fixtures/recorded/vision.json, apps/shopify-app/app/eval/fixtures/vision-goldens.json, apps/shopify-app/app/eval/fixtures/vision/SOURCES.md, apps/shopify-app/app/eval/fixtures/vision/cases.json, apps/shopify-app/app/eval/fixtures/vision/p79-hoodie.jpg, apps/shopify-app/app/eval/fixtures/vision/p80-wrap-dress.jpg, apps/shopify-app/app/eval/fixtures/vision/p81-biker-jacket.jpg, apps/shopify-app/app/eval/fixtures/vision/p82-striped-tee.jpg, apps/shopify-app/app/eval/fixtures/vision/p83-sun-dress.jpg, apps/shopify-app/app/eval/fixtures/vision/p84-moto-jacket.jpg, apps/shopify-app/app/eval/fixtures/vision/p85-chinos.jpg, apps/shopify-app/app/eval/fixtures/vision/p86-denim-shirt.jpg, apps/shopify-app/app/eval/fixtures/vision/p87-puffer-jacket.jpg, apps/shopify-app/app/eval/fixtures/vision/p88-track-pants.jpg, apps/shopify-app/app/eval/fixtures/vision/p89-sandals.jpg, apps/shopify-app/app/eval/fixtures/vision/p90-tan-jacket.jpg, apps/shopify-app/app/eval/fixtures/vision/p91-party-dress.jpg, apps/shopify-app/app/eval/fixtures/vision/p92-day-dress.jpg, apps/shopify-app/app/playground/fixtures/ai.json, apps/shopify-app/app/playground/fixtures/crawl/about.html, apps/shopify-app/app/playground/fixtures/crawl/crawl-store.ts, apps/shopify-app/app/playground/fixtures/crawl/dupe-page.html, apps/shopify-app/app/playground/fixtures/crawl/group-sneaker.html, apps/shopify-app/app/playground/fixtures/crawl/magento-shirt.html, apps/shopify-app/app/playground/fixtures/crawl/priceless-scarf.html, apps/shopify-app/app/playground/fixtures/crawl/sitemap-index.xml, apps/shopify-app/app/playground/fixtures/crawl/sitemap-pages.xml, apps/shopify-app/app/playground/fixtures/crawl/sitemap-products.xml, apps/shopify-app/app/playground/fixtures/crawl/woo-dress.html, apps/shopify-app/app/playground/fixtures/degraded.json, apps/shopify-app/app/playground/fixtures/empty.json, apps/shopify-app/app/playground/fixtures/label-overflow.json, apps/shopify-app/app/playground/fixtures/label-too-long.json, apps/shopify-app/app/playground/fixtures/labels-pending.json, apps/shopify-app/app/playground/fixtures/labels.json, apps/shopify-app/app/playground/fixtures/preview.json, apps/shopify-app/app/playground/fixtures/results.json, apps/shopify-app/app/playground/fixtures/shopify-public-products.ts, apps/shopify-app/app/playground/fixtures/v2-budget.json, apps/shopify-app/app/playground/fixtures/v2-refine.json, apps/shopify-app/app/playground/fixtures/v2-two-meanings.json
+- **Fixtures**: apps/shopify-app/app/eval/fixtures/catalog.json, apps/shopify-app/app/eval/fixtures/constructor-floor.json, apps/shopify-app/app/eval/fixtures/constructor-goldens.json, apps/shopify-app/app/eval/fixtures/recorded/card.json, apps/shopify-app/app/eval/fixtures/recorded/embeddings-v2.json, apps/shopify-app/app/eval/fixtures/recorded/embeddings.json, apps/shopify-app/app/eval/fixtures/recorded/enrichment.json, apps/shopify-app/app/eval/fixtures/recorded/extract.json, apps/shopify-app/app/eval/fixtures/recorded/judge-jev.json, apps/shopify-app/app/eval/fixtures/recorded/vision.json, apps/shopify-app/app/eval/fixtures/vision-goldens.json, apps/shopify-app/app/eval/fixtures/vision/SOURCES.md, apps/shopify-app/app/eval/fixtures/vision/cases.json, apps/shopify-app/app/eval/fixtures/vision/p79-hoodie.jpg, apps/shopify-app/app/eval/fixtures/vision/p80-wrap-dress.jpg, apps/shopify-app/app/eval/fixtures/vision/p81-biker-jacket.jpg, apps/shopify-app/app/eval/fixtures/vision/p82-striped-tee.jpg, apps/shopify-app/app/eval/fixtures/vision/p83-sun-dress.jpg, apps/shopify-app/app/eval/fixtures/vision/p84-moto-jacket.jpg, apps/shopify-app/app/eval/fixtures/vision/p85-chinos.jpg, apps/shopify-app/app/eval/fixtures/vision/p86-denim-shirt.jpg, apps/shopify-app/app/eval/fixtures/vision/p87-puffer-jacket.jpg, apps/shopify-app/app/eval/fixtures/vision/p88-track-pants.jpg, apps/shopify-app/app/eval/fixtures/vision/p89-sandals.jpg, apps/shopify-app/app/eval/fixtures/vision/p90-tan-jacket.jpg, apps/shopify-app/app/eval/fixtures/vision/p91-party-dress.jpg, apps/shopify-app/app/eval/fixtures/vision/p92-day-dress.jpg, apps/shopify-app/app/playground/fixtures/ai.json, apps/shopify-app/app/playground/fixtures/crawl/about.html, apps/shopify-app/app/playground/fixtures/crawl/crawl-store.ts, apps/shopify-app/app/playground/fixtures/crawl/dupe-page.html, apps/shopify-app/app/playground/fixtures/crawl/group-sneaker.html, apps/shopify-app/app/playground/fixtures/crawl/magento-shirt.html, apps/shopify-app/app/playground/fixtures/crawl/priceless-scarf.html, apps/shopify-app/app/playground/fixtures/crawl/sitemap-index.xml, apps/shopify-app/app/playground/fixtures/crawl/sitemap-pages.xml, apps/shopify-app/app/playground/fixtures/crawl/sitemap-products.xml, apps/shopify-app/app/playground/fixtures/crawl/woo-dress.html, apps/shopify-app/app/playground/fixtures/degraded.json, apps/shopify-app/app/playground/fixtures/empty.json, apps/shopify-app/app/playground/fixtures/label-overflow.json, apps/shopify-app/app/playground/fixtures/label-too-long.json, apps/shopify-app/app/playground/fixtures/labels-pending.json, apps/shopify-app/app/playground/fixtures/labels.json, apps/shopify-app/app/playground/fixtures/preview.json, apps/shopify-app/app/playground/fixtures/results.json, apps/shopify-app/app/playground/fixtures/shopify-public-products.ts, apps/shopify-app/app/playground/fixtures/stand-in.json, apps/shopify-app/app/playground/fixtures/v2-budget.json, apps/shopify-app/app/playground/fixtures/v2-refine.json, apps/shopify-app/app/playground/fixtures/v2-two-meanings.json
 - **Migrations**: apps/shopify-app/prisma/migrations/20260803000000_init_postgres/migration.sql, apps/shopify-app/prisma/migrations/20260803134500_ai_call_ledger/migration.sql, apps/shopify-app/prisma/migrations/20260803150800_catalog_product/migration.sql, apps/shopify-app/prisma/migrations/20260804152800_product_enrichment/migration.sql, apps/shopify-app/prisma/migrations/20260805131800_product_embedding/migration.sql, apps/shopify-app/prisma/migrations/20260808160000_pg_trgm_classic_search/migration.sql, apps/shopify-app/prisma/migrations/20260808170000_product_display_snapshot/migration.sql, apps/shopify-app/prisma/migrations/20260808190000_search_click_events/migration.sql, apps/shopify-app/prisma/migrations/20260809190000_catalog_product_status/migration.sql, apps/shopify-app/prisma/migrations/20260810210000_catalog_product_published_at/migration.sql, apps/shopify-app/prisma/migrations/20260816200000_catalog_product_url/migration.sql, apps/shopify-app/prisma/migrations/20260817130000_playground_catalog/migration.sql, apps/shopify-app/prisma/migrations/20260824190000_search_event_route_reason/migration.sql, apps/shopify-app/prisma/migrations/20260826150000_search_event_intent_reuse/migration.sql, apps/shopify-app/prisma/migrations/20260827100000_product_enrichment_primary_color/migration.sql, apps/shopify-app/prisma/migrations/20260827120000_catalog_product_family_key/migration.sql, apps/shopify-app/prisma/migrations/20260827140000_product_image/migration.sql, apps/shopify-app/prisma/migrations/20260827160000_product_enrichment_vision/migration.sql, apps/shopify-app/prisma/migrations/20261001120000_product_variant/migration.sql, apps/shopify-app/prisma/migrations/20261001200000_product_card/migration.sql, apps/shopify-app/prisma/migrations/20261002100000_card_embedding/migration.sql, apps/shopify-app/prisma/migrations/20261002120000_search_event_page/migration.sql, apps/shopify-app/prisma/migrations/20261003100000_judge_cache/migration.sql, apps/shopify-app/prisma/migrations/20261003120000_extraction_cache/migration.sql, apps/shopify-app/prisma/migrations/migration_lock.toml
 
 ## Module dependency map
@@ -1593,7 +1608,7 @@ vitest.setup.ts
 - apps/shopify-app/app/playground/components/ResultsGrid.tsx → apps/shopify-app/app/playground/components/Card.tsx, apps/shopify-app/app/playground/strings.ts
 - apps/shopify-app/app/playground/components/SearchBar.tsx → apps/shopify-app/app/playground/strings.ts
 - apps/shopify-app/app/playground/components/StoreLine.tsx → apps/shopify-app/app/playground/strings.ts
-- apps/shopify-app/app/playground/fixture-mode.server.ts → apps/shopify-app/app/playground/api.server.ts, apps/shopify-app/app/playground/fixtures/ai.json (unresolved), apps/shopify-app/app/playground/fixtures/degraded.json (unresolved), apps/shopify-app/app/playground/fixtures/empty.json (unresolved), apps/shopify-app/app/playground/fixtures/label-overflow.json (unresolved), apps/shopify-app/app/playground/fixtures/label-too-long.json (unresolved), apps/shopify-app/app/playground/fixtures/labels-pending.json (unresolved), apps/shopify-app/app/playground/fixtures/labels.json (unresolved), apps/shopify-app/app/playground/fixtures/preview.json (unresolved), apps/shopify-app/app/playground/fixtures/results.json (unresolved), apps/shopify-app/app/playground/fixtures/v2-budget.json (unresolved), apps/shopify-app/app/playground/fixtures/v2-refine.json (unresolved), apps/shopify-app/app/playground/fixtures/v2-two-meanings.json (unresolved), apps/shopify-app/app/search/proxy.server.ts
+- apps/shopify-app/app/playground/fixture-mode.server.ts → apps/shopify-app/app/playground/api.server.ts, apps/shopify-app/app/playground/fixtures/ai.json (unresolved), apps/shopify-app/app/playground/fixtures/degraded.json (unresolved), apps/shopify-app/app/playground/fixtures/empty.json (unresolved), apps/shopify-app/app/playground/fixtures/label-overflow.json (unresolved), apps/shopify-app/app/playground/fixtures/label-too-long.json (unresolved), apps/shopify-app/app/playground/fixtures/labels-pending.json (unresolved), apps/shopify-app/app/playground/fixtures/labels.json (unresolved), apps/shopify-app/app/playground/fixtures/preview.json (unresolved), apps/shopify-app/app/playground/fixtures/results.json (unresolved), apps/shopify-app/app/playground/fixtures/stand-in.json (unresolved), apps/shopify-app/app/playground/fixtures/v2-budget.json (unresolved), apps/shopify-app/app/playground/fixtures/v2-refine.json (unresolved), apps/shopify-app/app/playground/fixtures/v2-two-meanings.json (unresolved), apps/shopify-app/app/search/proxy.server.ts
 - apps/shopify-app/app/playground/fixture-mode.test.ts → apps/shopify-app/app/playground/fixture-mode.server.ts
 - apps/shopify-app/app/playground/fixtures/crawl/crawl-store.ts → apps/shopify-app/app/testing/fake-store.server.ts
 - apps/shopify-app/app/playground/fixtures/shopify-public-products.ts → apps/shopify-app/app/playground/shopify-public-source.server.ts

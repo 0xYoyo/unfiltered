@@ -202,6 +202,23 @@ test.describe("overlay path", () => {
     ]);
   });
 
+  for (const locale of ["en", "he"] as const) {
+    test(`YOY-171 AC-2: a stand-in sits after the judged cards and before the heading, saying it is not checked yet (${locale})`, async ({
+      page,
+    }) => {
+      await openOverlay(page, "stand-in", locale);
+      await expect(overlayCards(page)).toHaveCount(4);
+      expect(await productOrder(overlayCards(page))).toEqual([6, 2, 3, 4].map(labelId));
+      await expect(overlayCard(page, 3).getByTestId("unfiltered-widget-label")).toHaveText(
+        STRING_CATALOG[locale].labelUnchecked,
+      );
+      const divider = page.getByTestId("unfiltered-widget-close-matches-divider");
+      expect(
+        await divider.evaluate((element) => element.previousElementSibling?.getAttribute("data-product-id")),
+      ).toBe(labelId(3));
+    });
+  }
+
   test("verify 7: a storefront locale with no templates shows no label", async ({
     page,
   }) => {
@@ -411,6 +428,21 @@ test.describe("theme-native path", () => {
     expect(await labelsRequests(page)).toEqual([
       { searchId: "harness-labels-pending-1", page: 1 },
     ]);
+  });
+
+  test("YOY-171 AC-2: a stand-in sits after the judged items and before the heading, saying it is not checked yet", async ({
+    page,
+  }) => {
+    await openNative(page, "stand-in", "he");
+    await expect(nativeItems(page)).toHaveCount(4);
+    expect(await productOrder(nativeItems(page))).toEqual([6, 2, 3, 4].map(labelId));
+    await expect(nativeItem(page, 3).getByTestId("unfiltered-widget-label")).toHaveText(
+      STRING_CATALOG.he.labelUnchecked,
+    );
+    const divider = page.getByTestId("unfiltered-native-close-matches-divider");
+    expect(
+      await divider.evaluate((element) => element.previousElementSibling?.getAttribute("data-product-id")),
+    ).toBe(labelId(3));
   });
 
   test("a storefront locale with no templates shows no label", async ({

@@ -430,30 +430,32 @@ describe("verdict order (AC-5, AC-8)", () => {
     expect(ordered.every((entry) => entry.verdict === "exact" && entry.label === null)).toBe(true);
   });
 
-  it("keeps a stand-in verdict on the page, last and unlabelled, and drops only judged not-relevant products (YOY-159)", () => {
+  it("keeps a stand-in verdict on the page, after every judged product, labelled unchecked, and drops only judged not-relevant products (YOY-159; YOY-171 AC-2)", () => {
     const standIn = (id: string) => ({ ...verdict(id, "not-relevant"), standIn: true as const });
     const ordered = orderByVerdict(
-      ["a", "b", "c", "d"],
-      [standIn("a"), verdict("b", "not-relevant"), verdict("c", "exact"), verdict("d", "close")],
+      ["a", "b", "c", "d", "e"],
+      [standIn("a"), verdict("b", "not-relevant"), verdict("c", "exact"), standIn("d"), verdict("e", "close")],
     );
     expect(ordered.map((entry) => [entry.item, entry.verdict, entry.label?.template ?? null, entry.standIn ?? false])).toEqual([
       ["c", "exact", null, false],
-      ["d", "close", null, false],
-      ["a", "not-relevant", null, true],
+      ["e", "close", null, false],
+      // The stand-ins, in find order, after the last judged product.
+      ["a", "not-relevant", "unchecked", true],
+      ["d", "not-relevant", "unchecked", true],
     ]);
   });
 
-  it("serves a page of only stand-ins in find order with no labels, and never counts stand-ins toward reject-all (YOY-159)", () => {
+  it("serves a page of only stand-ins in find order, each unchecked, and never counts stand-ins toward reject-all (YOY-159; YOY-171 AC-2)", () => {
     const standIn = (id: string) => ({ ...verdict(id, "not-relevant"), standIn: true as const });
     const allStandIns = orderByVerdict(["a", "b", "c"], [standIn("a"), standIn("b"), standIn("c")]);
     expect(allStandIns.map((entry) => entry.item)).toEqual(["a", "b", "c"]);
-    expect(allStandIns.every((entry) => entry.label === null && entry.standIn === true)).toBe(true);
-    // Every real verdict not relevant: the reject-all page, the stand-in kept unlabelled.
+    expect(allStandIns.every((entry) => entry.label?.template === "unchecked" && entry.standIn === true)).toBe(true);
+    // Every real verdict not relevant: the reject-all page, the stand-in after it, unchecked.
     const rejectAll = orderByVerdict(["a", "b", "c"], [verdict("a", "not-relevant"), standIn("b"), verdict("c", "not-relevant")]);
     expect(rejectAll.map((entry) => [entry.item, entry.label?.template ?? null])).toEqual([
       ["a", "close-match"],
-      ["b", null],
       ["c", "close-match"],
+      ["b", "unchecked"],
     ]);
   });
 
@@ -610,6 +612,34 @@ describe.each(IMPLEMENTATIONS)("the shared judge suite: $name (YOY-152 AC-4)", (
       { template: "close-match", values: [] },
     ]);
   });
+
+  // Only the decision judge answers per product, so only it can stand in
+  // for one product; the Flash-Lite judge answers the page whole or fails.
+  it.runIf(implementation.name.startsWith("jev"))(
+    "puts a stand-in after the last judged product, labelled unchecked (YOY-171 AC-2)",
+    async () => {
+      const decisions = scriptedDecisions({
+        a: new Error("one call failed"),
+        b: { verdict: "close" },
+        c: { verdict: "exact" },
+      });
+      const answered = await createDecisionJudge({ decisions }).judge({
+        sentence: "dress",
+        candidates: page.slice(0, 3),
+      });
+      expect(
+        orderByVerdict(page.slice(0, 3), answered.verdicts).map((entry) => [
+          entry.item.id,
+          entry.label?.template ?? null,
+          entry.standIn ?? false,
+        ]),
+      ).toEqual([
+        ["c", null, false],
+        ["b", "close-match", false],
+        ["a", "unchecked", true],
+      ]);
+    },
+  );
 
   it("rejects when the port fails, so the page is served in find order", async () => {
     await expect(
@@ -1685,8 +1715,8 @@ describe("the judge on Engine v2 (on the database)", () => {
     const first = await search(engine);
     expect(first).toMatchObject({ route: "ai", routeReason: "judged" });
     // The failed product's stand-in verdict keeps it on the page, last and
-    // unlabelled (YOY-159); the products judged not relevant are dropped.
-    expect(first.hits.at(-1)).toMatchObject({ productId: "p2", verdict: "not-relevant", standIn: true, label: null });
+    // unchecked (YOY-159; YOY-171 AC-2); the products judged not relevant are dropped.
+    expect(first.hits.at(-1)).toMatchObject({ productId: "p2", verdict: "not-relevant", standIn: true, label: { template: "unchecked", values: [] } });
     expect(first.hits[0]!.productId).toBe("p3");
     expect(await db.judgeAnswer.count()).toBe(0);
 
@@ -2123,10 +2153,10 @@ describe("the judge on Engine v2 (on the database)", () => {
       const response = await search(orchestrator(undefined, { judge, deadlineMs: 200, giveUpMs: 2_000 }));
       expect(response.routeReason).toBe("judged");
       expect(response).not.toHaveProperty("labelsPending");
-      // The straggler's stand-in keeps it on the page, last and unlabelled
-      // (YOY-159): a slow call never removes a product.
+      // The straggler's stand-in keeps it on the page, last and unchecked
+      // (YOY-159; YOY-171 AC-2): a slow call never removes a product.
       expect(response.hits).toHaveLength(4);
-      expect(response.hits.at(-1)).toMatchObject({ productId: "p4", verdict: "not-relevant", standIn: true, label: null });
+      expect(response.hits.at(-1)).toMatchObject({ productId: "p4", verdict: "not-relevant", standIn: true, label: { template: "unchecked", values: [] } });
       const details = playgroundOf(response).details.judge!.verdicts;
       expect(details.at(-1)).toEqual({ productId: "p4", verdict: "not-relevant", standIn: true });
       expect(JSON.stringify(serializeProxySearchResponse(response))).not.toContain("standIn");

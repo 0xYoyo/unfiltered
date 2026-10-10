@@ -228,6 +228,30 @@ test("YOY-171 AC-1: the late judged page replaces the find-order grid after one 
   expect(requests[0]!.searchParams.get("page")).toBe("1");
 });
 
+for (const locale of ["en", "he"] as const) {
+  test(`YOY-171 AC-2: a stand-in sits after the judged cards and before the heading, saying it is not checked yet (${locale})`, async ({
+    page,
+  }) => {
+    await open(page, locale);
+    await submit(page, "unchecked dress");
+    await expect(cards(page)).toHaveCount(5);
+    expect(await cards(page).locator(".cardTitle").allTextContents()).toEqual([
+      "Crepe Shift Dress",
+      "Silk Evening Dress",
+      "Jersey Midi Dress",
+      "Linen Wrap Dress",
+      "Cotton Shirt Dress",
+    ]);
+    await expect(card(page, "Jersey Midi Dress").getByTestId("playground-card-label")).toHaveText(
+      PLAYGROUND_STRING_CATALOG[locale].labelUnchecked,
+    );
+    // The stand-in is the last card before the heading.
+    await expect(
+      page.locator("[data-testid='playground-card']:has(+ [data-testid='playground-close-matches-divider'])"),
+    ).toContainText("Jersey Midi Dress");
+  });
+}
+
 test.describe("visual baselines", () => {
   for (const locale of ["en", "he"] as const) {
     test(`the labelled grid (${locale})`, async ({ page }) => {

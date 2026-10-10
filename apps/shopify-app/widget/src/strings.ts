@@ -64,6 +64,8 @@ export interface WidgetStrings {
   labelSizeMissing: string;
   labelFactDiffers: string;
   labelCloseMatch: string;
+  /** A product the judge never answered for (YOY-171 AC-2). */
+  labelUnchecked: string;
 }
 
 export const STRING_CATALOG: Record<WidgetLocale, WidgetStrings> = {
@@ -92,6 +94,7 @@ export const STRING_CATALOG: Record<WidgetLocale, WidgetStrings> = {
     labelSizeMissing: "size {size} not in stock",
     labelFactDiffers: "in {have}, not {asked}",
     labelCloseMatch: "close match",
+    labelUnchecked: "not checked yet",
   },
   he: {
     inputPlaceholder: "חיפוש",
@@ -118,6 +121,7 @@ export const STRING_CATALOG: Record<WidgetLocale, WidgetStrings> = {
     labelSizeMissing: "מידה {size} לא במלאי",
     labelFactDiffers: "ב{have}, לא {asked}",
     labelCloseMatch: "התאמה קרובה",
+    labelUnchecked: "עוד לא נבדק",
   },
 };
 

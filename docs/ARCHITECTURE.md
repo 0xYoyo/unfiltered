@@ -746,10 +746,13 @@ runs one page.
   is still written, at `position: -1`. When every product left is "not
   relevant" the page stays in find order and every card carries
   `close-match`. A stand-in verdict (a call that failed, timed out or
-  answered invalidly; YOY-159) is never dropped: the product sorts where
-  "not relevant" does, with no label, and never counts toward the
-  all-not-relevant case — a page of only stand-ins is served in find order
-  without labels. Playground `details.judge.verdicts` mark it `standIn`. A fact-differs value longer than three words, or a missing
+  answered invalidly; YOY-159) is never dropped: the product follows every
+  judged product of the page, in find order — so on the wire it sits after
+  the matches and before "Close matches" — labelled `unchecked` ("not
+  checked yet", YOY-171 AC-2; it wins over a code label, since the judge
+  never saw the card), and never counts toward the all-not-relevant case —
+  a page of only stand-ins is served in find order, each `unchecked`. A
+  late page (AC-1) replaces them. Playground `details.judge.verdicts` mark it `standIn`. A fact-differs value longer than three words, or a missing
   value, drops that label. Every submitted-search result on the wire carries
   `label` (`{ template, values }` or null); a classic result has no `label`
   key.
@@ -783,7 +786,8 @@ runs one page.
   product gets a stand-in "not relevant" verdict (`standIn: true`) and the
   answer is `partial` — served, never cached — so one straggler no longer
   turns the page into a deadline miss. A stand-in is no judgment: the
-  product stays on the page, last and unlabelled (see Order and labels).
+  product stays on the page, after the judged ones and `unchecked` (see
+  Order and labels).
   The probe that chose this (one slow call per page, median call fast,
   database work under 340 ms at p95) is on the issue.
 - **Diagnostics.** The step is split in two stages (YOY-159): `judgeRows`
