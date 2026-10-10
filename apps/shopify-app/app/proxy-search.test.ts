@@ -9,7 +9,9 @@ import {
   type EmbeddingClient,
   type Judge,
   type LlmClient,
+  NO_WISHES,
   type StructuredCompletionRequest,
+  type WishExtractor,
 } from "@unfiltered/engine";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -78,6 +80,13 @@ const throttleSeam = vi.hoisted(() => ({
   instance: undefined as
     | import("./search/throttle.server").SessionThrottle
     | undefined,
+  // The per-shop buckets (YOY-171 AC-15); permissive when unset.
+  shopSearch: undefined as
+    | import("./search/throttle.server").SessionThrottle
+    | undefined,
+  shopPreview: undefined as
+    | import("./search/throttle.server").SessionThrottle
+    | undefined,
 }));
 vi.mock("./search/throttle.server", async (importOriginal) => {
   const original =
@@ -86,6 +95,10 @@ vi.mock("./search/throttle.server", async (importOriginal) => {
     ...original,
     getSessionThrottle: () =>
       throttleSeam.instance ?? original.createSessionThrottle(),
+    getShopSearchThrottle: () =>
+      throttleSeam.shopSearch ?? original.createSessionThrottle(),
+    getShopPreviewThrottle: () =>
+      throttleSeam.shopPreview ?? original.createSessionThrottle(),
   };
 });
 
@@ -97,7 +110,7 @@ import { writeClickEvent } from "./search/events.server";
 import { createFindStep } from "./search/find.server";
 import { createSearchOrchestrator } from "./search/orchestrator.server";
 import { resetProxySearchOrchestrator } from "./search/proxy.server";
-import { createSessionThrottle } from "./search/throttle.server";
+import { createSessionThrottle, proxyShopLimitFromEnv } from "./search/throttle.server";
 
 // Route tests for the app-proxy search endpoint (YOY-46): signed requests
 // built exactly the way Shopify signs proxy requests (HMAC-SHA256 over the
@@ -318,6 +331,8 @@ function installOrchestrator(
     judgeLlm?: LlmClient;
     /** A judge wired as is, in place of `judgeLlm` (YOY-171 AC-2). */
     judge?: Judge;
+    /** The wish extraction (YOY-171 AC-15). */
+    wishExtractor?: WishExtractor;
   } = {},
 ): void {
   resetProxySearchOrchestrator();
@@ -333,6 +348,7 @@ function installOrchestrator(
         embeddings: options.embeddings ?? fakeEmbeddings(),
         classicStore,
       }),
+      ...(options.wishExtractor !== undefined ? { wishExtractor: options.wishExtractor } : {}),
       ...(options.judge !== undefined
         ? { judge: options.judge }
         : options.judgeLlm !== undefined
@@ -348,6 +364,8 @@ beforeEach(async () => {
     throw new Error("search ran before authentication");
   };
   throttleSeam.instance = undefined;
+  throttleSeam.shopSearch = undefined;
+  throttleSeam.shopPreview = undefined;
   await db.aiCall.deleteMany();
   await db.searchEvent.deleteMany();
   await db.clickEvent.deleteMany();
@@ -1140,5 +1158,53 @@ describe("orchestrator module singleton (YOY-67 AC-7)", () => {
     expect(second.route).toBe("ai");
     expect(preview.route).toBe("classic");
     expect(orchestratorBuilds).toBe(1);
+  });
+});
+
+describe("per-shop AI budgets (YOY-171 AC-15)", () => {
+  it("holds the shop's budget against a rotated sessionId, for previews and for searches", async () => {
+    await seed([
+      { productId: "wrap-dress", title: "Wrap Dress", y: 0.1 },
+      { productId: "linen-shirt", title: "Linen Shirt", y: 0.2 },
+    ]);
+    throttleSeam.shopSearch = createSessionThrottle({ limit: 2, now: () => 0 });
+    throttleSeam.shopPreview = createSessionThrottle({ limit: 2, now: () => 0 });
+    let extractions = 0;
+    installOrchestrator({
+      judgeLlm: scriptedJudgeLlm({ c: ["E-X", "E-X"], d: [] }),
+      wishExtractor: {
+        modelId: "fake-extract",
+        extract: async () => {
+          extractions += 1;
+          return NO_WISHES;
+        },
+      },
+    });
+
+    // Three previews of distinct sentences, each under its own sessionId:
+    // the shop allows two extraction calls.
+    for (const [index, query] of ["red wrap dress", "linen shirt", "silk scarf"].entries()) {
+      const preview = await search({ query, sessionId: `p${index}`, mode: "preview" });
+      expect(preview.route).toBe("classic");
+    }
+    await vi.waitFor(() => expect(extractions).toBe(2));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(extractions).toBe(2);
+
+    // Three submitted searches under three sessionIds: the third is over the
+    // shop's budget and served capped, find order, no judge call.
+    const routes: string[] = [];
+    for (const [index, query] of [QUERY, "a dress for dinner", "a shirt for dinner"].entries()) {
+      routes.push((await search({ query, sessionId: `s${index}` })).route);
+    }
+    expect(routes).toEqual(["ai", "ai", "classic"]);
+    const capped = await db.searchEvent.findMany({ where: { sessionId: "s2" } });
+    expect(capped.map((event) => event.routeReason)).toEqual(["capped"]);
+  });
+
+  it("reads the shop limit from PROXY_SHOP_AI_PER_MINUTE, 120 by default", () => {
+    expect(proxyShopLimitFromEnv({})).toBe(120);
+    expect(proxyShopLimitFromEnv({ PROXY_SHOP_AI_PER_MINUTE: "40" })).toBe(40);
+    expect(proxyShopLimitFromEnv({ PROXY_SHOP_AI_PER_MINUTE: "-1" })).toBe(120);
   });
 });

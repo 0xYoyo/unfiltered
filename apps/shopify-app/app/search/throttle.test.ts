@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  allowanceAcross,
   createSessionThrottle,
   previewExtractionAllowance,
   previewExtractionLimitFromEnv,
@@ -132,5 +133,21 @@ describe("the preview-extraction allowance (YOY-171 AC-13)", () => {
     const allow = previewExtractionAllowance(throttle, "ip-a");
     expect([allow(), allow(), allow()]).toEqual([true, true, false]);
     expect(previewExtractionAllowance(throttle, "ip-b")()).toBe(true);
+  });
+});
+
+describe("an allowance across buckets (YOY-171 AC-15)", () => {
+  it("is refused when any bucket is spent, and spends one slot in every bucket when granted", () => {
+    const session = createSessionThrottle({ limit: 5 });
+    const shop = createSessionThrottle({ limit: 2 });
+    const allow = (sessionId: string) =>
+      allowanceAcross([
+        [session, sessionId],
+        [shop, "shop.myshopify.com"],
+      ])();
+    // Rotating the session does not reset the shop's bucket.
+    expect([allow("a"), allow("b"), allow("c")]).toEqual([true, true, false]);
+    // The refused call spent nothing in the session bucket.
+    expect(session.shouldThrottle("c")).toBe(false);
   });
 });

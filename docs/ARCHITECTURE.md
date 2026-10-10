@@ -1127,6 +1127,15 @@ scaling multiplies the effective ceiling, and a restart clears the
 windows — accepted for now; a distributed store is a later milestone's
 concern.
 
+**Per-shop budgets on the proxy (YOY-171 AC-15).** The `sessionId` is the
+client's to choose, so the proxy also keeps a bucket per signature-verified
+shop: `PROXY_SHOP_AI_PER_MINUTE` (default 120) AI searches a minute, and the
+same number of preview wish extractions in a bucket of their own. A search
+must pass both its session's bucket and its shop's, and spends a slot in
+each. Over either it is served capped, exactly as over the session's. A
+preview's extraction must pass both its session's allowance and the shop's,
+and over either it does not warm. In-process, like the session buckets.
+
 ## AI cost metering
 
 Every AI call must be metered before any code capable of live LLM calls
