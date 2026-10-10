@@ -14,6 +14,7 @@ import {
 import {
   clientIp,
   getPlaygroundIpThrottle,
+  getPlaygroundPreviewThrottle,
   playgroundLimitsFromEnv,
   PLAYGROUND_RESPONSE_HEADERS,
   remoteAddressFromContext,
@@ -24,6 +25,7 @@ import {
 import { writeSearchEvent } from "../search/events.server";
 import { runPlaygroundSearch } from "../search/playground-search.server";
 import { getProxySearchOrchestrator, parseProxySearchParams } from "../search/proxy.server";
+import { previewExtractionAllowance } from "../search/throttle.server";
 
 /**
  * The playground's search endpoint (YOY-90): `GET /api/playground/search` on
@@ -109,8 +111,8 @@ export const loader = async ({
   // Guards apply only where AI spend is possible. A preview and a classic
   // rescue are classic-only by contract, so neither can burn budget and
   // neither is counted or limited (AC-3). A preview's one spend is the wish
-  // extraction it starts for the submit (YOY-171 AC-7), which a capped
-  // search makes too.
+  // extraction it starts for the submit (YOY-171 AC-7), bounded by its own
+  // per-IP allowance (AC-13).
   const guarded = !preview && !classic;
   const throttle = getPlaygroundIpThrottle();
   // Keyed by the last trusted X-Forwarded-For hop; the connection address is
@@ -135,6 +137,11 @@ export const loader = async ({
       preview,
       classic,
       limited: limited !== null,
+      // A preview's wish extraction has its own per-IP allowance (YOY-171
+      // AC-13); a limited search makes no new extraction call at all.
+      ...(preview
+        ? { extractionAllowance: previewExtractionAllowance(getPlaygroundPreviewThrottle(), ip) }
+        : {}),
       ...(body.removedChips !== undefined ? { removedChips: body.removedChips } : {}),
       ...(body.previousQuery !== undefined ? { previousQuery: body.previousQuery } : {}),
       ...(body.paging !== undefined ? { paging: body.paging } : {}),

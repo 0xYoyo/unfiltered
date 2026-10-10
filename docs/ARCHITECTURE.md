@@ -583,7 +583,9 @@ engine that preceded it is preserved at the `engine-v1-last` tag.)
    inside the find set (YOY-147). The sections below describe each step.
    A throttled session or a playground cap (`forceClassic`, YOY-47) runs
    the same steps but never calls the judge: the page is served in composed
-   find order, route `classic`, reason `capped`.
+   find order, route `classic`, reason `capped`. It makes no new extraction
+   call either (YOY-171 AC-13): its wishes come from the extraction cache
+   or a call already running, else the page composes without them.
 2. **A keystroke preview** (`preview`, YOY-68) and **the widget's
    client-timeout rescue** (`forceClassicReason: "client-timeout-rescue"`,
    YOY-96 AC-9) are classic keyword search on the raw query — zero model
@@ -597,7 +599,11 @@ engine that preceded it is preserved at the `engine-v1-last` tag.)
    runs joins that call (`extractionCached: true`, the `extract` stage the
    rest of its wait) instead of calling again. A refinement's submit
    carries its chain, which a preview never does, so it does not share the
-   preview's key.
+   preview's key. A preview makes a new extraction call only within its own
+   allowance (YOY-171 AC-13): `PREVIEW_EXTRACTIONS_PER_MINUTE` (default 30)
+   per sliding minute, per visitor IP on the playground and per session on
+   the proxy, spent only when a call is made — a cached sentence costs
+   nothing. Over it the preview does not warm; its response is the same.
 
 No model failure reaches the caller. A failed embedding or card-index query
 serves the keyword order with `degraded: true` and nothing judged; a late or
@@ -1125,7 +1131,8 @@ answered from the extraction cache on a repeated sentence) and one judge
 call per page inside the find set (`judge`, answered from the answer cache
 on a repeated page); the rescue spends nothing, and a preview spends only
 the extraction it starts for its sentence (YOY-171 AC-7), which the submit
-of that sentence then does not make. Ingestion's
+of that sentence then does not make, within its own allowance (AC-13). A
+capped or throttled search makes no new extraction call. Ingestion's
 spend is the `enrichment`, `vision`, `card` and `embedding` operations.
 
 Embedding calls are the one estimated entry in the ledger: Gemini
@@ -1431,6 +1438,7 @@ trips a ceiling still gets a working search, told honestly through
 | Trusted `X-Forwarded-For` hops (how the IP is read) | `PLAYGROUND_TRUSTED_PROXY_HOPS` | 1 | — |
 | Daily AI searches, all playground tenants | `PLAYGROUND_DAILY_AI_CAP` | 2000 | `"daily-global"` |
 | Daily AI searches, one catalog | `PLAYGROUND_CATALOG_DAILY_AI_CAP` | 500 | `"daily-catalog"` |
+| Preview wish extractions per IP per minute (YOY-171 AC-13) | `PREVIEW_EXTRACTIONS_PER_MINUTE` | 30 | — (the preview just does not warm) |
 
 The per-IP guard keys the proxy's sliding-window throttle by the visitor's IP
 — the **last trusted `X-Forwarded-For` hop**, then the connection address the

@@ -124,6 +124,7 @@ All of these live in the `unfiltered-prod` group (see above).
 | `PLAYGROUND_TRUSTED_PROXY_HOPS` | optional | Default `1`: the visitor IP is the last `X-Forwarded-For` entry — the one Render's edge appended. Set `2` if a CDN sits in front of Render. |
 | `PLAYGROUND_DAILY_AI_CAP` | optional | Default `2000` AI searches/day across all playground catalogs. |
 | `PLAYGROUND_CATALOG_DAILY_AI_CAP` | optional | Default `500` AI searches/day per catalog. |
+| `PREVIEW_EXTRACTIONS_PER_MINUTE` | optional | Default `30` wish extractions a keystroke preview may start per visitor IP (playground) or session (storefront) per minute. |
 | `GEMINI_*_MODEL`, `GEMINI_EMBEDDING_DIMENSION` | optional | Pin a model instead of the documented defaults in `packages/provider-gemini`. |
 | `ENGINE_V2` | optional | Which engine a submitted search runs (YOY-153): unset or anything but `0` is Engine v2 — find, wish extraction, the judge; `0` serves the old engine. The playground's per-request `engine=v1` reaches the old engine either way; keystroke previews are the keyword path on both. |
 | `JUDGE_PROVIDER` | optional | Which provider answers Engine v2's judge call (YOY-147); default `jev` — TypeSafe's Jev via OpenRouter, one typed question set per product in parallel, the founder's pick of the M6 judge comparison (YOY-152, docs/SCORE.md) — or `gemini`, the selectable Flash-Lite fallback. An unknown name fails loudly when the orchestrator is built. The judge model is the provider's own: `GEMINI_JUDGE_MODEL` (default `gemini-3.5-flash-lite`) or `OPENROUTER_JUDGE_MODEL`. |

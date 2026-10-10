@@ -26,6 +26,7 @@ import { createFindStep } from "./find.server";
 import { extractionCacheKey, sentenceLanguage } from "./extraction-cache.server";
 import { awaitPendingLabels, resetPendingLabels } from "./judge-step.server";
 import { createSearchOrchestrator, type SearchRequest } from "./orchestrator.server";
+import { createSessionThrottle, previewExtractionAllowance } from "./throttle.server";
 import {
   parseProxySearchBody,
   parseProxySearchParams,
@@ -866,6 +867,79 @@ describe("wishes on Engine v2 (on the database)", () => {
     expect(extractor.calls).toBe(1);
     const none = await search(orchestrator({}), { query: "dress under 120", preview: true });
     expect(none.routeReason).toBe("preview");
+  });
+
+  it("bounds preview extractions by their own allowance, spent only on a new call (YOY-171 AC-13)", async () => {
+    await seed(db, FOUR);
+    const extractor = fixedExtractor(STATED);
+    const engine = orchestrator({ extractor });
+    const bucket = createSessionThrottle({ limit: 2 });
+    const preview = (query: string) =>
+      search(engine, {
+        query,
+        preview: true,
+        extractionAllowance: previewExtractionAllowance(bucket, "203.0.113.7"),
+      });
+    const settle = () => new Promise((resolve) => setTimeout(resolve, 30));
+
+    const first = await preview("first sentence typed");
+    await settle();
+    await preview("second sentence typed");
+    await settle();
+    const third = await preview("third sentence typed");
+    await settle();
+    // Three distinct sentences from one IP, an allowance of 2: two calls.
+    expect(extractor.calls).toBe(2);
+    // The preview responses are unchanged, allowed or not.
+    for (const response of [first, third]) {
+      expect(response).toMatchObject({ route: "classic", routeReason: "preview", chips: [] });
+      expect(Object.keys(response.stages)).toEqual(["classic"]);
+    }
+    // A cached sentence spends nothing: the bucket is spent, yet the first
+    // sentence's submit still finds its extraction.
+    const submitted = await search(engine, { query: "first sentence typed" });
+    expect(extractor.calls).toBe(2);
+    expect(submitted.extractionCached).toBe(true);
+    // Another IP has its own allowance.
+    await search(engine, {
+      query: "third sentence typed",
+      preview: true,
+      extractionAllowance: previewExtractionAllowance(bucket, "198.51.100.9"),
+    });
+    await settle();
+    expect(extractor.calls).toBe(3);
+  });
+
+  it("makes no new extraction call on a capped search, but serves a cached one (YOY-171 AC-13)", async () => {
+    await seed(db, FOUR);
+    const extractor = fixedExtractor(STATED);
+    const engine = orchestrator({ extractor });
+    const capped = await search(engine, { query: "a capped new sentence", forceClassic: true });
+    expect(extractor.calls).toBe(0);
+    expect(capped).toMatchObject({ routeReason: "capped", chips: [], extractionInTime: false });
+
+    // Once a guarded search has extracted the sentence, a capped one reads it.
+    await search(engine, { query: "a sentence searched before" });
+    expect(extractor.calls).toBe(1);
+    const cachedCapped = await search(engine, { query: "a sentence searched before", forceClassic: true });
+    expect(extractor.calls).toBe(1);
+    expect(cachedCapped.routeReason).toBe("capped");
+    expect(cachedCapped.extractionCached).toBe(true);
+    expect(cachedCapped.chips).not.toEqual([]);
+  });
+
+  it("lets a search run its own extraction when the call it joined was refused (YOY-171 AC-13)", async () => {
+    await seed(db, FOUR);
+    const extractor = fixedExtractor(STATED, 20);
+    const engine = orchestrator({ extractor, graceMs: 500 });
+    const [capped, guarded] = await Promise.all([
+      search(engine, { query: "two at once", forceClassic: true }),
+      search(engine, { query: "two at once" }),
+    ]);
+    expect(capped.chips).toEqual([]);
+    expect(guarded.extractionInTime).toBe(true);
+    expect(guarded.chips).not.toEqual([]);
+    expect(extractor.calls).toBe(1);
   });
 
   it("logs a failed preview extraction and leaves the preview whole (YOY-171 AC-7)", async () => {

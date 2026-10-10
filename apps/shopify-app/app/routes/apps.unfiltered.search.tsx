@@ -9,7 +9,11 @@ import {
   serializeProxySearchResponse,
   type ProxySearchBody,
 } from "../search/proxy.server";
-import { getSessionThrottle } from "../search/throttle.server";
+import {
+  getPreviewExtractionThrottle,
+  getSessionThrottle,
+  previewExtractionAllowance,
+} from "../search/throttle.server";
 import { authenticate } from "../shopify.server";
 
 /**
@@ -86,7 +90,8 @@ async function handleSearch(
   // outside the SearchEvent log — the submitted search is the shopper's
   // actual query; previews are typing noise. Its only model call is the
   // wish extraction it starts for the submit (YOY-171 AC-7), once per
-  // sentence through the extraction cache.
+  // sentence through the extraction cache and within its own per-session
+  // allowance (AC-13).
   const preview = body.mode === "preview";
   // The classic rescue (YOY-96 AC-9): the widget's SUBMITTED search timed
   // out on its side and it re-asks the same query down the classic path —
@@ -120,7 +125,16 @@ async function handleSearch(
       body.previousQuery !== undefined ? { previousQuery: body.previousQuery } : {};
     const response = await orchestrator.runSearch(
       preview
-        ? { query: body.query, shopDomain: shop, preview: true }
+        ? {
+            query: body.query,
+            shopDomain: shop,
+            preview: true,
+            // Its wish extraction has its own per-session allowance (YOY-171 AC-13).
+            extractionAllowance: previewExtractionAllowance(
+              getPreviewExtractionThrottle(),
+              body.sessionId,
+            ),
+          }
         : classic
           ? {
               query: body.query,

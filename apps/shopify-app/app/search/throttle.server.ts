@@ -128,3 +128,48 @@ export function getSessionThrottle(): SessionThrottle {
   singleton ??= createSessionThrottle({ limit: throttleLimitFromEnv() });
   return singleton;
 }
+
+/** Preview extractions allowed per key and sliding minute (YOY-171 AC-13). */
+const DEFAULT_PREVIEW_EXTRACTIONS_PER_MINUTE = 30;
+
+/**
+ * The preview-extraction allowance from the environment
+ * (`PREVIEW_EXTRACTIONS_PER_MINUTE`); invalid or absent values mean 30.
+ */
+export function previewExtractionLimitFromEnv(
+  env: Record<string, string | undefined> = process.env,
+): number {
+  const parsed = Number.parseInt(env.PREVIEW_EXTRACTIONS_PER_MINUTE ?? "", 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : DEFAULT_PREVIEW_EXTRACTIONS_PER_MINUTE;
+}
+
+/**
+ * The allowance a keystroke preview's wish extraction is consulted with
+ * (YOY-171 AC-13): its own bucket in `throttle`, keyed by the visitor (an
+ * IP on the playground, a session on the proxy), spent only when a new
+ * extraction call is about to be made — a cache hit costs nothing.
+ */
+export function previewExtractionAllowance(
+  throttle: SessionThrottle,
+  key: string,
+): () => boolean {
+  return () => {
+    if (throttle.shouldThrottle(key)) {
+      return false;
+    }
+    throttle.recordAiSearch(key);
+    return true;
+  };
+}
+
+let previewThrottle: SessionThrottle | undefined;
+
+/**
+ * The proxy's preview-extraction bucket, per shopper session (YOY-171
+ * AC-13). Separate from the AI search throttle: the two count different
+ * things and must not share a budget.
+ */
+export function getPreviewExtractionThrottle(): SessionThrottle {
+  previewThrottle ??= createSessionThrottle({ limit: previewExtractionLimitFromEnv() });
+  return previewThrottle;
+}

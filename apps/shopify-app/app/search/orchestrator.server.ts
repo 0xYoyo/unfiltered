@@ -13,6 +13,7 @@ import type {
 import type { ClassicCardHit } from "./classic-store.server";
 import {
   extractionCacheKey,
+  ExtractionNotAllowedError,
   extractThroughCache,
   type CachedExtraction,
 } from "./extraction-cache.server";
@@ -151,6 +152,14 @@ export interface SearchRequest {
    * background (YOY-171 AC-7), so the submit finds it cached or running.
    */
   preview?: boolean;
+  /**
+   * Consulted just before a NEW wish-extraction call — a cache miss that
+   * joins no running call (YOY-171 AC-13); false means this request goes
+   * without the extraction. The route passes the preview's own allowance.
+   * Absent means allowed, except on a forced-classic search, which never
+   * makes a new call: it is served from the cache or a running call only.
+   */
+  extractionAllowance?: () => boolean;
   /** Correlation ID to thread through every AI call; generated when absent. */
   searchId?: string;
   /**
@@ -443,7 +452,12 @@ export function createSearchOrchestrator(
         // The extraction for the sentence as typed starts behind it (YOY-171
         // AC-7); the preview neither waits for it nor reports it.
         const searchId = request.searchId ?? randomUUID();
-        warmExtraction(request.query, request.shopDomain, searchId);
+        warmExtraction(
+          request.query,
+          request.shopDomain,
+          searchId,
+          request.extractionAllowance ?? (() => true),
+        );
         response = await classicSearch({ ...request, searchId }, "preview", false, stages);
       } else if (request.forceClassicReason === "client-timeout-rescue") {
         // The client-timeout rescue (YOY-96 AC-9): the widget's submitted
@@ -544,7 +558,8 @@ export function createSearchOrchestrator(
     const { page, pageSize } = request.paging ?? { page: 1, pageSize: DEFAULT_PAGE_SIZE };
     // The extraction starts with the search, in parallel with find (YOY-149
     // AC-1) — under a throttle or cap too, so the code's labels still hold
-    // there (AC-13).
+    // there (AC-13), but there only from the cache or a running call: a
+    // capped search makes no new extraction call (YOY-171 AC-13).
     const previousQuery =
       request.previousQuery !== undefined && request.previousQuery.trim() !== ""
         ? request.previousQuery
@@ -709,7 +724,11 @@ export function createSearchOrchestrator(
    * extraction cache. A search joining a running call makes no call of its
    * own, so it reads as cached.
    */
-  function extractShared(extractor: WishExtractor, request: ExtractRequest): Promise<CachedExtraction> {
+  function extractShared(
+    extractor: WishExtractor,
+    request: ExtractRequest,
+    mayCall: () => boolean,
+  ): Promise<CachedExtraction> {
     const key = extractionCacheKey({
       sentence: request.sentence,
       ...(request.previousSentence !== undefined ? { previousSentence: request.previousSentence } : {}),
@@ -717,9 +736,17 @@ export function createSearchOrchestrator(
     });
     const running = extractionsInFlight.get(key);
     if (running !== undefined) {
-      return running.then(({ wishes }) => ({ wishes, cached: true }));
+      return running.then(
+        ({ wishes }) => ({ wishes, cached: true }),
+        // The running request was refused a call (AC-13); this one may
+        // still be allowed its own. The refused entry has left the map.
+        (error: unknown) =>
+          error instanceof ExtractionNotAllowedError
+            ? extractShared(extractor, request, mayCall)
+            : Promise.reject(error),
+      );
     }
-    const call = extractThroughCache(db, extractor, request).finally(() => {
+    const call = extractThroughCache(db, extractor, request, mayCall).finally(() => {
       extractionsInFlight.delete(key);
     });
     extractionsInFlight.set(key, call);
@@ -729,16 +756,25 @@ export function createSearchOrchestrator(
   /**
    * Start the extraction a keystroke preview's sentence will need once it
    * is submitted (YOY-171 AC-7): the sentence as typed, no refinement chain
-   * (a preview carries none), nothing for under 3 characters. Never awaited;
-   * a failure is only logged.
+   * (a preview carries none), nothing for under 3 characters, and a new call
+   * only while the preview's allowance permits it (AC-13). Never awaited; a
+   * failure is only logged, and a refused call not even that.
    */
-  function warmExtraction(query: string, shopDomain: string, searchId: string): void {
+  function warmExtraction(
+    query: string,
+    shopDomain: string,
+    searchId: string,
+    allowance: () => boolean,
+  ): void {
     const sentence = query.trim();
     if (wishExtractor === undefined || [...sentence].length < MIN_WARM_EXTRACTION_CHARS) {
       return;
     }
-    extractShared(wishExtractor, { sentence: query, storeId: shopDomain, searchId }).catch(
+    extractShared(wishExtractor, { sentence: query, storeId: shopDomain, searchId }, allowance).catch(
       (error: unknown) => {
+        if (error instanceof ExtractionNotAllowedError) {
+          return;
+        }
         console.warn(
           "[search] preview wish extraction failed",
           JSON.stringify({ searchId, error: error instanceof Error ? error.name : String(error) }),
@@ -770,15 +806,25 @@ export function createSearchOrchestrator(
     let settledAt: number | null = null;
     let missedGrace = false;
     let failed = false;
-    const answer = extractShared(wishExtractor, {
-      sentence: request.query,
-      ...(previousQuery !== undefined ? { previousSentence: previousQuery } : {}),
-      storeId: request.shopDomain,
-      searchId,
-    })
+    const mayCall =
+      request.forceClassic === true ? () => false : (request.extractionAllowance ?? (() => true));
+    const answer = extractShared(
+      wishExtractor,
+      {
+        sentence: request.query,
+        ...(previousQuery !== undefined ? { previousSentence: previousQuery } : {}),
+        storeId: request.shopDomain,
+        searchId,
+      },
+      mayCall,
+    )
       .then(
         (extraction): CachedExtraction | null => extraction,
         (error: unknown) => {
+          if (error instanceof ExtractionNotAllowedError) {
+            // Refused a new call on a cache miss (AC-13): no wishes, no failure.
+            return null;
+          }
           failed = true;
           console.warn(
             "[search] wish extraction failed; composing without it",

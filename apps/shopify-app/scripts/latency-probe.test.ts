@@ -375,7 +375,7 @@ describe("pacing every set (YOY-171 AC-12)", () => {
     vi.restoreAllMocks();
   });
 
-  it("paces the classic set's requests too, because they take the AI path", async () => {
+  it("paces and marks the classic set's requests too, because they take the AI path (AC-12, AC-14)", async () => {
     vi.spyOn(console, "log").mockImplementation(() => {});
     const queries = loadQueries();
     const asked: string[] = [];
@@ -405,20 +405,25 @@ describe("pacing every set (YOY-171 AC-12)", () => {
       },
     };
 
-    const code = await main(["--url", "https://probe.test", "--set", "all", "--runs", "1"], { pacer });
+    const code = await main(["--url", "https://probe.test", "--set", "all", "--runs", "2"], { pacer });
 
     expect(code).toBe(0);
     const classic = queries.classic.length;
-    const total = 1 + classic + queries["ai-en"].length + queries["ai-he"].length;
+    const total = 1 + 2 * (classic + queries["ai-en"].length + queries["ai-he"].length);
     expect(asked).toHaveLength(total);
     // One wait and one record per request: the warm-up and every query of
     // every set, the classic set's included.
     expect(order.filter((step) => step === "wait")).toHaveLength(total);
     expect(order.filter((step) => step === "record")).toHaveLength(total);
-    expect(order.slice(0, 2 * (1 + classic))).toEqual(
-      Array.from({ length: 1 + classic }, () => ["wait", "record"]).flat(),
+    expect(order.slice(0, 2 * (1 + 2 * classic))).toEqual(
+      Array.from({ length: 1 + 2 * classic }, () => ["wait", "record"]).flat(),
     );
-    // The classic set still sends its committed text unchanged.
-    expect(asked.slice(1, 1 + classic)).toEqual(queries.classic);
+
+    // The classic set is marked like the AI sets (AC-14): every run sends a
+    // distinct text, which reads back as the committed query.
+    const classicSent = asked.slice(1, 1 + 2 * classic);
+    expect(new Set(classicSent).size).toBe(2 * classic);
+    expect(classicSent.some((text) => queries.classic.includes(text))).toBe(false);
+    expect(classicSent.map(visibleQueryText)).toEqual([...queries.classic, ...queries.classic]);
   });
 });

@@ -16,6 +16,7 @@ import {
 } from "../search/proxy.server";
 import {
   createSessionThrottle,
+  previewExtractionLimitFromEnv,
   type SessionThrottle,
 } from "../search/throttle.server";
 
@@ -431,6 +432,19 @@ export function getPlaygroundIpThrottle(): SessionThrottle {
 /** Drop the memoized throttle so tests can install their own clock/limit. */
 export function resetPlaygroundIpThrottle(): void {
   ipThrottle = undefined;
+}
+
+let previewThrottle: SessionThrottle | undefined;
+
+/**
+ * The playground's preview-extraction bucket, per visitor IP (YOY-171
+ * AC-13): a keystroke preview starts a new wish-extraction call only while
+ * this allows it. Separate from the AI search throttle, which counts
+ * submitted searches.
+ */
+export function getPlaygroundPreviewThrottle(): SessionThrottle {
+  previewThrottle ??= createSessionThrottle({ limit: previewExtractionLimitFromEnv() });
+  return previewThrottle;
 }
 
 /** True when the tenant key names a registry catalog rather than the seed. */

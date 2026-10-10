@@ -27,6 +27,8 @@ export interface PlaygroundSearchInput {
   removedChips?: RemovedChip[];
   /** The previous response's `carry` (YOY-150 AC-1). */
   previousQuery?: string;
+  /** A preview's wish-extraction allowance (YOY-171 AC-13). */
+  extractionAllowance?: () => boolean;
 }
 
 export interface PlaygroundSearchResult {
@@ -51,7 +53,12 @@ export async function runPlaygroundSearch(
       ? { previousQuery: input.previousQuery }
       : {}),
     ...(input.preview === true
-      ? { preview: true }
+      ? {
+          preview: true,
+          ...(input.extractionAllowance !== undefined
+            ? { extractionAllowance: input.extractionAllowance }
+            : {}),
+        }
       : input.classic === true
         ? { forceClassic: true, forceClassicReason: "client-timeout-rescue" }
         : input.limited === true
