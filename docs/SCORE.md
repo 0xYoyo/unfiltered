@@ -443,6 +443,68 @@ keeps both for the Flash-Lite judge; the follow-up is YOY-158.
 `score.yml`'s `judge` input defaulted to `gemini` at the time (a sensitive
 path, unchanged by this slice); it defaults to `jev` since YOY-157 AC-19.
 
+### Jev's merchant-fact label from closed-list picks (YOY-158, 2026-10-10)
+
+**Measured first (AC-1, $0).** `npx tsx scripts/evidence.mts facts
+2026-10-04T19:16:31Z` — the deployment's `JudgeVerdict` rows since Engine v2
+became the default, every store, each product once per search: the `fact`
+missed-wish flag is up on **75.2 %** of judged products (7,433 of 9,884,
+419 judged searches; he 92.1 %, Latin-script 68.8 % — the log keeps no
+language, so en, fr and es share one bucket; no ar or ru searches). Far over
+the 5 % stop line, so the label was built. The flag barely discriminates under
+Jev: it is up on 2,515 of 2,541 close verdicts, but also on 1,681 of 4,023
+exact ones. So the label rests on the two picks below, not on the flag.
+
+**Built (AC-2, AC-3).** Per product, in the same Jev request as the verdict,
+two pick-one questions over closed lists, each with `none`:
+- which of the product's option names the asked fact concerns;
+- which word or adjacent word pair of the sentence names the asked value.
+
+When the verdict is labelled, the flag is up and both picks land, the label
+is `fact-differs`: the picked option's values from the variants table, and
+the shopper's own words. Otherwise it is `close-match` as before (details:
+`docs/ARCHITECTURE.md`, "Jev's fact picks"). Labels never move a card, so
+the served order is unchanged and no hidden run was spent.
+
+**Cost re-measured (AC-5).** `npx tsx scripts/judge-compare.mts --judge jev`
+on the branch, same method as the table above (public half, 78 searches,
+seed fixture, local run from Israel):
+
+| | Jev at YOY-152 (2026-10-04) | Jev with fact picks (2026-10-10) |
+|---|---|---|
+| Cost per 1,000 uncached searches (judge only) | $0.815 | **$1.141** |
+| Judge median latency | 469 ms | 557 ms |
+| Stability (5 searches × 5 runs, identical verdicts) | 95.8 % (113/118) | 95.0 % (113/119) |
+
+The increase is **+$0.326 per 1,000 uncached searches (+40 %)**: Jev bills
+input only, and each product's request now carries the two lists. The
+sentence's words and pairs, and the product's option names, each come with a
+one-line criterion. The run's judge spend was $0.088 over 1,780 calls; one
+of 78 searches timed out into find order (`judge-error`). Still under half
+of Flash-Lite's $2.266.
+
+**Second reading — design note, not built (AC-6).** Could a pick-one over the
+page's distinct product types stand in for the second-reading phrase that Jev
+cannot write ("Bridal gowns instead?")? The chip would show the picked type.
+
+- **On the seed catalog, no.** It has 21 product types, all of the form
+  `women's dresses` or `men's coats & jackets`. PRD §3's own example, "dress
+  for a wedding" against "wedding dress", sits inside one type: the
+  catalog's one gown ("Rhesus Gown") is typed `women's dresses`, like every
+  guest dress. A type pick has no choice that names the other meaning.
+- **Where it would work:** readings that cross types, such as gender or
+  garment. "shirt" pulls `men's button-ups` (11 seed titles), `women's
+  button-ups` (9), `women's dresses` (5, shirt dresses) and `men's t-shirts`
+  (4); a type pick could offer "Men's button-ups instead?". That is a
+  department switch, not the two-meanings chip the PRD describes.
+- **What it would cost:** about one more choice question per product, the
+  order of one fact pick.
+
+Open for the founder at the M7 spec session: build the type pick for the
+cross-type case, or look for a closed list that does separate meanings
+within a type (the page's vision attributes, or the distinguishing words
+of its titles).
+
 ### The public half at the Engine v2 default (YOY-153 AC-8, 2026-10-04)
 
 At the ship of YOY-153 (Engine v2 on by default), on its branch, `npm run

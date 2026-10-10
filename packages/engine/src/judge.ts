@@ -32,10 +32,11 @@ export const DEFAULT_JUDGE_PROVIDER: JudgeProvider = "jev";
 /**
  * The judge prompt's version (YOY-148 AC-1): part of the answer-cache key,
  * so a stored answer is never served for a prompt that has since changed.
- * Bump it with every change to `buildJudgePrompt`, `judgeRow` or the
- * answer schema.
+ * Bump it with every change to `buildJudgePrompt`, `judgeRow`, the
+ * answer schema or the decision judge's questions (4: YOY-158's two
+ * fact picks).
  */
-export const JUDGE_PROMPT_VERSION = 3;
+export const JUDGE_PROMPT_VERSION = 4;
 
 /** Characters one candidate row is cut to (AC-2; raised to 480 by AC-17). */
 export const DEFAULT_JUDGE_ROW_CHARS = 480;
@@ -562,10 +563,12 @@ export function createLlmJudge(options: LlmJudgeOptions): Judge {
 }
 
 /**
- * The questions the decision judge asks about each product (YOY-152 AC-2):
+ * The questions the decision judge asks about every product (YOY-152 AC-2):
  * the verdict as pick-one, each missed-wish flag and the exclusion as
- * yes/no. A decision model writes no text, so there is no label question:
- * the label follows the verdict (AC-3), and no second reading is asked.
+ * yes/no. A decision model writes no text, so the label follows the verdict
+ * (AC-3) — `close-match`, or `fact-differs` when the two closed-list fact
+ * picks of `decisionFactQuestions` land (YOY-158) — and no second reading
+ * is asked.
  */
 export const DECISION_JUDGE_QUESTIONS: Record<
   "verdict" | "fact" | "description" | "excluded",
@@ -611,6 +614,126 @@ export const DECISION_JUDGE_QUESTIONS: Record<
   },
 };
 
+/** The fact picks' answer for "nothing" (YOY-158 AC-2). */
+export const DECISION_NONE = "none";
+
+/** Shopify's option for a product without options: no merchant fact (YOY-158 AC-2). */
+const DEFAULT_OPTION = { name: "title", value: "default title" };
+
+/** A word of the sentence without the punctuation around it. */
+function bareWord(word: string): string {
+  return word.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "");
+}
+
+/**
+ * The sentence's words and adjacent word pairs, as typed and in order, each
+ * once (YOY-158 AC-2): the closed list the asked value is picked from, so
+ * a Hebrew asked value is the shopper's own word.
+ */
+export function sentencePhrases(sentence: string): string[] {
+  const words = oneLine(sentence).split(" ").map(bareWord).filter((word) => word !== "");
+  const pairs = words.slice(1).map((word, index) => `${words[index]} ${word}`);
+  return [...new Set([...words, ...pairs])].filter(
+    (phrase) => phrase.toLowerCase() !== DECISION_NONE,
+  );
+}
+
+/** The options a candidate's fact can concern: named, with values, and not Shopify's default. */
+function factOptions(candidate: JudgeCandidate): JudgeCandidateOption[] {
+  const seen = new Set<string>();
+  return candidate.options.filter((option) => {
+    const name = option.name.trim();
+    const key = name.toLowerCase();
+    const isDefault =
+      key === DEFAULT_OPTION.name &&
+      option.values.every((value) => value.toLowerCase() === DEFAULT_OPTION.value);
+    if (name === "" || option.values.length === 0 || key === DECISION_NONE || isDefault || seen.has(name)) {
+      return false;
+    }
+    seen.add(name);
+    return true;
+  });
+}
+
+/**
+ * The two fact picks asked about one product (YOY-158 AC-2), in the same
+ * request as its verdict: which of the product's option names the asked
+ * fact concerns, and which word or two-word phrase of the sentence names
+ * the asked value — each a pick-one over a closed list plus "none". No
+ * text is written: the product's value is read from its options, the asked
+ * value is the shopper's own words. None when either list is empty.
+ */
+export function decisionFactQuestions(
+  candidate: JudgeCandidate,
+  sentence: string,
+): Record<string, DecisionQuestion> {
+  const options = factOptions(candidate);
+  const phrases = sentencePhrases(sentence);
+  if (options.length === 0 || phrases.length === 0) {
+    return {};
+  }
+  return {
+    factOption: {
+      type: "choice",
+      instructions:
+        "Which of the product's options does the merchant fact the shopper asked for concern (colour, size, material, an option)?",
+      criteria: {
+        ...Object.fromEntries(
+          options.map((option) => [option.name, `The shopper asked about the product's ${option.name}.`]),
+        ),
+        [DECISION_NONE]: "The shopper asked about none of these options.",
+      },
+    },
+    askedValue: {
+      type: "choice",
+      instructions:
+        "Which word or two-word phrase of the shopper's search names the value they asked for (\"grey\" in \"grey wool coat\")?",
+      criteria: {
+        ...Object.fromEntries(phrases.map((phrase) => [phrase, `The search asks for "${phrase}".`])),
+        [DECISION_NONE]: "The search names no value for an option.",
+      },
+    },
+  };
+}
+
+/** A pick-one answer's choice when it is one of the offered keys and not "none". */
+function picked(answer: unknown, offered: readonly string[]): string | null {
+  const { type, choice } = (answer ?? {}) as { type?: unknown; choice?: unknown };
+  return type === "choice" && typeof choice === "string" && choice !== DECISION_NONE && offered.includes(choice)
+    ? choice
+    : null;
+}
+
+/**
+ * The `fact-differs` label the fact picks give (YOY-158 AC-3): the
+ * product's value of the picked option, read from its options, and the
+ * picked words of the sentence. Null — the caller keeps `close-match` —
+ * when a pick is "none", missing or off the list, when a value runs past
+ * three words, or when the product offers the asked value after all.
+ */
+function factLabel(
+  candidate: JudgeCandidate,
+  sentence: string,
+  answers: Record<string, unknown>,
+): JudgeLabel | null {
+  const options = factOptions(candidate);
+  const name = picked(answers.factOption, options.map((option) => option.name));
+  const asked = picked(answers.askedValue, sentencePhrases(sentence));
+  const option = options.find((entry) => entry.name === name);
+  if (option === undefined || asked === null) {
+    return null;
+  }
+  const product = option.values.join(", ");
+  if (
+    wordCount(product) > JUDGE_LABEL_MAX_WORDS ||
+    wordCount(asked) > JUDGE_LABEL_MAX_WORDS ||
+    option.values.some((value) => value.toLowerCase() === asked.toLowerCase())
+  ) {
+    return null;
+  }
+  return { template: "fact-differs", values: [product, asked] };
+}
+
 /** The note the decision judge adds to each question when a previous search is sent. */
 const DECISION_PREVIOUS_NOTE =
   "The search may refine the previous search (keep its wishes and add or change some) or replace it with a different search. Judge against what the shopper wants now. ";
@@ -621,6 +744,7 @@ const DECISION_YES_AT = 0.5;
 /** One product's typed answers as a verdict, or null when an answer is missing or unknown. */
 function decisionVerdict(
   candidate: JudgeCandidate,
+  sentence: string,
   answers: Record<string, unknown>,
 ): JudgeVerdict | null {
   const verdictAnswer = answers.verdict as { type?: unknown; choice?: unknown } | undefined;
@@ -638,16 +762,15 @@ function decisionVerdict(
   }
   const verdict = choice as JudgeVerdictCode;
   const excluded = flags.excluded === true;
+  const labelled = !excluded && (verdict === "other-variant" || verdict === "close");
+  // A product off the ask carries `close-match`, unless the fact flag is
+  // up and both fact picks land: then `fact-differs` (YOY-158 AC-3).
+  const differs = labelled && flags.fact === true ? factLabel(candidate, sentence, answers) : null;
   return {
     id: candidate.id,
     verdict,
     missed: JUDGE_MISSED_WISHES.filter((wish) => flags[wish] === true),
-    // No text, so no `fact-differs` values (AC-3): a product off the ask
-    // in any way carries `close-match`, the label a `fact-differs` becomes.
-    label:
-      !excluded && (verdict === "other-variant" || verdict === "close")
-        ? { template: "close-match", values: [] }
-        : null,
+    label: labelled ? (differs ?? { template: "close-match", values: [] }) : null,
     excluded,
   };
 }
@@ -698,14 +821,16 @@ export function createDecisionJudge(options: DecisionJudgeOptions): Judge {
         request.previousSentence === undefined || request.previousSentence.trim() === ""
           ? undefined
           : previousChainLine(request.previousSentence);
-      const questions = Object.fromEntries(
-        Object.entries(DECISION_JUDGE_QUESTIONS).map(([key, question]) => [
-          key,
-          previous === undefined
-            ? question
-            : { ...question, instructions: `${DECISION_PREVIOUS_NOTE}${question.instructions}` },
-        ]),
-      );
+      const withNote = (questions: Record<string, DecisionQuestion>) =>
+        Object.fromEntries(
+          Object.entries(questions).map(([key, question]) => [
+            key,
+            previous === undefined
+              ? question
+              : { ...question, instructions: `${DECISION_PREVIOUS_NOTE}${question.instructions}` },
+          ]),
+        );
+      const questions = withNote(DECISION_JUDGE_QUESTIONS);
       const settled = await Promise.allSettled(
         request.candidates.map((candidate) => {
           const startedAt = performance.now();
@@ -722,7 +847,7 @@ export function createDecisionJudge(options: DecisionJudgeOptions): Judge {
               search: oneLine(request.sentence),
               product: judgeRow(candidate, maxRowChars),
             },
-            questions,
+            questions: { ...questions, ...withNote(decisionFactQuestions(candidate, request.sentence)) },
             operation: "judge",
             storeId: request.storeId,
             searchId: request.searchId,
@@ -736,7 +861,7 @@ export function createDecisionJudge(options: DecisionJudgeOptions): Judge {
       const verdicts = request.candidates.map((candidate, index) => {
         const outcome = settled[index]!;
         return outcome.status === "fulfilled"
-          ? decisionVerdict(candidate, outcome.value as Record<string, unknown>)
+          ? decisionVerdict(candidate, request.sentence, outcome.value as Record<string, unknown>)
           : null;
       });
       if (request.candidates.length > 0 && verdicts.every((verdict) => verdict === null)) {

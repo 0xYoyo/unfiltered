@@ -7,6 +7,8 @@ import {
   createJudge,
   createLlmJudge,
   DECISION_JUDGE_QUESTIONS,
+  DECISION_NONE,
+  decisionFactQuestions,
   DEFAULT_JUDGE_ROW_CHARS,
   JUDGE_ANSWER_CODES,
   JUDGE_SCHEMA,
@@ -26,6 +28,7 @@ import {
   type JudgeCandidate,
   type LlmClient,
   type StructuredCompletionRequest,
+  sentencePhrases,
 } from "@unfiltered/engine";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -122,6 +125,9 @@ interface ScriptedDecision {
   fact?: number;
   description?: number;
   excluded?: number;
+  /** The fact picks (YOY-158 AC-2), answered only when asked; "none" by default. */
+  factOption?: string;
+  askedValue?: string;
 }
 
 /**
@@ -147,6 +153,12 @@ function scriptedDecisions(
         fact: { type: "yes-no", yes: scripted?.fact ?? 0.02 },
         description: { type: "yes-no", yes: scripted?.description ?? 0.02 },
         excluded: { type: "yes-no", yes: scripted?.excluded ?? 0.01 },
+        ...("factOption" in request.questions
+          ? { factOption: { type: "choice" as const, choice: scripted?.factOption ?? DECISION_NONE } }
+          : {}),
+        ...("askedValue" in request.questions
+          ? { askedValue: { type: "choice" as const, choice: scripted?.askedValue ?? DECISION_NONE } }
+          : {}),
       };
     },
   };
@@ -467,6 +479,12 @@ interface PlannedVerdict {
   fact?: boolean;
   description?: boolean;
   excluded?: boolean;
+  /**
+   * A merchant fact that differs (YOY-158 AC-4): Flash-Lite writes the two
+   * values; Jev picks the option and the asked words, and the product's
+   * value comes from its options.
+   */
+  differs?: { option: string; product: string; asked: string };
 }
 
 const VERDICT_LETTER = { exact: "E", "other-variant": "V", close: "C", "not-relevant": "N" } as const;
@@ -486,11 +504,15 @@ const IMPLEMENTATIONS: JudgeImplementation[] = [
       // both judges can write; an excluded one is listed in x.
       const codes = plan.map((entry) => {
         const missed = entry.fact && entry.description ? "B" : entry.fact ? "F" : entry.description ? "D" : "-";
-        const label = entry.verdict === "close" || entry.verdict === "other-variant" ? "C" : "X";
+        const label =
+          entry.differs !== undefined ? "F" : entry.verdict === "close" || entry.verdict === "other-variant" ? "C" : "X";
         return `${VERDICT_LETTER[entry.verdict]}${missed}${label}`;
       });
       const x = plan.flatMap((entry, index) => (entry.excluded ? [index + 1] : []));
-      const llm = scriptedLlm([{ c: codes, d: [], x, r: "", rn: [] }]);
+      const d = plan.flatMap((entry, index) =>
+        entry.differs !== undefined ? [{ n: index + 1, p: entry.differs.product, a: entry.differs.asked }] : [],
+      );
+      const llm = scriptedLlm([{ c: codes, d, x, r: "", rn: [] }]);
       return { judge: createLlmJudge({ llm }), requests: () => llm.requests };
     },
     failing(error) {
@@ -509,6 +531,9 @@ const IMPLEMENTATIONS: JudgeImplementation[] = [
               fact: entry.fact ? 0.9 : 0.1,
               description: entry.description ? 0.8 : 0.2,
               excluded: entry.excluded ? 0.95 : 0.05,
+              ...(entry.differs !== undefined
+                ? { factOption: entry.differs.option, askedValue: entry.differs.asked }
+                : {}),
             },
           ]),
         ),
@@ -568,6 +593,21 @@ describe.each(IMPLEMENTATIONS)("the shared judge suite: $name (YOY-152 AC-4)", (
     for (const request of requests()) {
       expect(request).toMatchObject({ operation: "judge", storeId: SHOP, searchId: "s-1", signal });
     }
+  });
+
+  it("labels a differing merchant fact with the product's value and the asked one, and a product with no asked fact close-match (YOY-158 AC-4)", async () => {
+    const coloured = ["a", "b"].map((id) =>
+      candidate(id, { options: [{ name: "Color", values: ["black"] }, { name: "Size", values: ["S", "M"] }] }),
+    );
+    const { judge } = implementation.answering([
+      { id: "a", verdict: "other-variant", fact: true, differs: { option: "Color", product: "black", asked: "grey" } },
+      { id: "b", verdict: "close", description: true },
+    ]);
+    const answered = await judge.judge({ sentence: "grey wool coat", candidates: coloured });
+    expect(answered.verdicts.map((verdict) => verdict.label)).toEqual([
+      { template: "fact-differs", values: ["black", "grey"] },
+      { template: "close-match", values: [] },
+    ]);
   });
 
   it("rejects when the port fails, so the page is served in find order", async () => {
@@ -639,16 +679,66 @@ describe("the decision judge (YOY-152 AC-2, AC-3)", () => {
     expect(answered.verdicts[1]).toEqual({ id: "b", verdict: "not-relevant", missed: [], label: null, excluded: false, standIn: true });
   });
 
-  it("returns close-match where Flash-Lite writes fact-differs, which Jev cannot write (AC-3)", async () => {
-    const page = [candidate("a")];
+  it("asks the two fact picks per product over closed lists: its option names and the sentence's words and word pairs, each plus none (YOY-158 AC-2)", async () => {
+    const decisions = scriptedDecisions({ a: { verdict: "exact" } });
+    const coat = candidate("a", {
+      options: [
+        { name: "Color", values: ["black"] },
+        { name: "Size", values: ["S", "M"] },
+        { name: "Fit", values: [] },
+      ],
+    });
+    await createDecisionJudge({ decisions }).judge({ sentence: "grey, wool coat!", candidates: [coat, candidate("b")] });
+    const [asked, bare] = decisions.requests;
+    expect(Object.keys(asked!.questions)).toEqual(["verdict", "fact", "description", "excluded", "factOption", "askedValue"]);
+    const criteria = (key: string) => Object.keys((asked!.questions[key] as { criteria: Record<string, string> }).criteria);
+    expect(asked!.questions.factOption!.type).toBe("choice");
+    expect(criteria("factOption")).toEqual(["Color", "Size", DECISION_NONE]);
+    expect(criteria("askedValue")).toEqual(["grey", "wool", "coat", "grey wool", "wool coat", DECISION_NONE]);
+    // A product with no options has no fact to pick: the questions are not asked.
+    expect(bare!.questions).toEqual(DECISION_JUDGE_QUESTIONS);
+    // Shopify's default option is no merchant fact.
+    expect(
+      decisionFactQuestions(candidate("c", { options: [{ name: "Title", values: ["Default Title"] }] }), "grey coat"),
+    ).toEqual({});
+    expect(sentencePhrases("  שמלה   אפורה ")).toEqual(["שמלה", "אפורה", "שמלה אפורה"]);
+  });
+
+  it("writes fact-differs from the picks only when the fact flag is up and both land; close-match otherwise (YOY-158 AC-3)", async () => {
+    const coloured = (id: string, values = ["black"]) => candidate(id, { options: [{ name: "Color", values }] });
+    const judged = async (scripted: ScriptedDecision, product = coloured("a"), sentence = "grey dress") =>
+      (await createDecisionJudge({ decisions: scriptedDecisions({ a: scripted }) }).judge({ sentence, candidates: [product] }))
+        .verdicts[0]!;
+    const differs = { verdict: "other-variant", fact: 0.9, factOption: "Color", askedValue: "grey" };
+    expect((await judged(differs)).label).toEqual({ template: "fact-differs", values: ["black", "grey"] });
+    expect((await judged({ ...differs, verdict: "close" })).label).toEqual({ template: "fact-differs", values: ["black", "grey"] });
+    // Hebrew: the asked value is the shopper's word as typed.
+    expect((await judged({ ...differs, askedValue: "אפורה" }, coloured("a"), "שמלה אפורה")).label).toEqual({
+      template: "fact-differs",
+      values: ["black", "אפורה"],
+    });
+    const closeMatch = { template: "close-match", values: [] };
+    for (const [why, scripted, product] of [
+      ["fact flag down", { ...differs, fact: 0.2 }, coloured("a")],
+      ["option none", { ...differs, factOption: DECISION_NONE }, coloured("a")],
+      ["asked none", { ...differs, askedValue: DECISION_NONE }, coloured("a")],
+      ["option off the list", { ...differs, factOption: "Material" }, coloured("a")],
+      ["asked words not in the sentence", { ...differs, askedValue: "blue" }, coloured("a")],
+      ["the product offers the asked value", differs, coloured("a", ["black", "Grey"])],
+      ["the product's value runs past three words", differs, coloured("a", ["black", "navy", "olive", "sand"])],
+    ] as const) {
+      expect((await judged(scripted, product)).label, why).toEqual(closeMatch);
+    }
+    // An exact or excluded product carries no label, picks or not.
+    expect((await judged({ ...differs, verdict: "exact" })).label).toBeNull();
+    expect((await judged({ ...differs, excluded: 0.9 })).label).toBeNull();
+  });
+
+  it("leaves the Flash-Lite judge's fact-differs as it was (YOY-158 AC-4, NG-1)", async () => {
     const gemini = await createLlmJudge({
       llm: scriptedLlm([answer(["VFF"], [{ n: 1, p: "grey", a: "black" }])]),
-    }).judge({ sentence: "black dress", candidates: page });
-    const jev = await createDecisionJudge({
-      decisions: scriptedDecisions({ a: { verdict: "other-variant", fact: 0.9 } }),
-    }).judge({ sentence: "black dress", candidates: page });
+    }).judge({ sentence: "black dress", candidates: [candidate("a")] });
     expect(gemini.verdicts[0]!.label).toEqual({ template: "fact-differs", values: ["grey", "black"] });
-    expect(jev.verdicts[0]).toEqual({ ...gemini.verdicts[0], label: { template: "close-match", values: [] } });
   });
 
   it("sends the previous search with the refine-or-replace note, and never a second reading", async () => {
