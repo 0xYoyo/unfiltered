@@ -303,15 +303,15 @@ test.describe("theme-native path", () => {
 /**
  * The colour wish on both widget paths (YOY-171 AC-5): `?fixture=color`.
  * While the colour chip stands the asked colour leads and the others carry
- * `color-differs`; removing it re-asks with it in `removedChips`, and find
- * order comes back with no colour label.
+ * `color-differs`; removing it re-asks with it in `removedChips`, and the
+ * judged order comes back with no colour label.
  */
 test.describe("the colour chip (YOY-171 AC-5)", () => {
   const labels = (page: Page) => page.getByTestId("unfiltered-widget-label");
   const differs = (locale: "en" | "he", have: string, asked: string) =>
     STRING_CATALOG[locale].labelColorDiffers.replace("{have}", have).replace("{asked}", asked);
 
-  test("overlay: the asked colour leads, the chip reads it as typed, removal restores find order", async ({
+  test("overlay: the asked colour leads, the chip reads it as typed, removal restores the judged order", async ({
     page,
   }) => {
     await page.goto("/?fixture=color&debounce=30000");

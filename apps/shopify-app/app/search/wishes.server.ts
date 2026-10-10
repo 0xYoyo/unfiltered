@@ -403,7 +403,10 @@ interface Standing {
   label: CodeLabel | null;
   /** The price is beyond the near band over the cap (YOY-171 AC-4). */
   farOverCap: boolean;
-  /** The primary colour is the asked one (YOY-171 AC-5): front of its tier. */
+  /**
+   * The primary colour is the asked one (YOY-171 AC-5). Never an order here:
+   * the judged page orders by it, within its groups, after the judge.
+   */
   colorMatch: boolean;
 }
 
@@ -479,6 +482,12 @@ export interface ComposedResults {
   findSetCount: number;
   /** The code label of each served product that carries one (AC-12). */
   labels: Map<string, CodeLabel>;
+  /**
+   * The products whose primary colour is the asked one (YOY-171 AC-5). The
+   * colour moves nothing here — not the find front, not what reaches a
+   * page or the judge; the judged page orders by it within its groups.
+   */
+  colorMatches: Set<string>;
 }
 
 /**
@@ -487,8 +496,7 @@ export interface ComposedResults {
  * front — the first `tierFront` surviving candidates in find order — is
  * sorted into number tiers before pages are cut, each tier in find order —
  * except the far-over-budget products, which take their tier's places in
- * price order, cheapest first (YOY-171 AC-4), and the asked colour leads
- * its tier (YOY-171 AC-5); the rest of the find set and
+ * price order, cheapest first (YOY-171 AC-4); the rest of the find set and
  * the keyword tail keep their order after it.
  * Within a page the judge then orders by verdict, ties in this order
  * (verdict, then tier, then find order). A product with no catalog row is
@@ -507,11 +515,12 @@ export function composeWishes(
     tierFront: options.tierFront ?? DEFAULT_TIER_FRONT_SIZE,
   };
   const labels = new Map<string, CodeLabel>();
+  const colorMatches = new Set<string>();
   const rank = (ids: readonly string[]) =>
     ids.flatMap((productId, index) => {
       const product = products.get(productId);
       if (product === undefined) {
-        return [{ productId, tier: 0, index, far: false, price: 0, color: false }];
+        return [{ productId, tier: 0, index, far: false, price: 0 }];
       }
       const standing = standingOf(product, wishes, resolved);
       if (standing.removed) {
@@ -520,30 +529,23 @@ export function composeWishes(
       if (standing.label !== null) {
         labels.set(productId, standing.label);
       }
+      if (standing.colorMatch) {
+        colorMatches.add(productId);
+      }
       return [
-        {
-          productId,
-          tier: standing.tier,
-          index,
-          far: standing.farOverCap,
-          price: product.priceMin,
-          color: standing.colorMatch,
-        },
+        { productId, tier: standing.tier, index, far: standing.farOverCap, price: product.priceMin },
       ];
     });
   const findSet = rank(productIds.slice(0, findSetCount));
-  // The asked colour leads its tier (YOY-171 AC-5).
-  const colorFirst = (a: { color: boolean }, b: { color: boolean }) => Number(b.color) - Number(a.color);
   const front = findSet
     .slice(0, resolved.tierFront)
-    .sort((a, b) => a.tier - b.tier || colorFirst(a, b) || a.index - b.index);
+    .sort((a, b) => a.tier - b.tier || a.index - b.index);
   // The far-over-budget products, cheapest first, in the places they hold
-  // (YOY-171 AC-4) — the asked colour still first among them (AC-5): every
-  // other product stays where its tier put it.
+  // (YOY-171 AC-4): every other product stays where its tier put it.
   const farSlots = front.flatMap((entry, slot) => (entry.far ? [slot] : []));
   const farByPrice = farSlots
     .map((slot) => front[slot]!)
-    .sort((a, b) => colorFirst(a, b) || a.price - b.price || a.index - b.index);
+    .sort((a, b) => a.price - b.price || a.index - b.index);
   farSlots.forEach((slot, order) => {
     front[slot] = farByPrice[order]!;
   });
@@ -554,5 +556,6 @@ export function composeWishes(
     ),
     findSetCount: findSet.length,
     labels,
+    colorMatches,
   };
 }

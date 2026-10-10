@@ -914,16 +914,23 @@ The three kinds of wishes (docs/PRD.md §3) applied by code. Packages:
     the price within `PRICE_NEAR_PERCENT` (10) over the cap with the rest
     met, then other misses, each tier in find order — except the products
     far over the cap, which take their places in the last tier cheapest
-    first (YOY-171 AC-4). A stated colour (YOY-171 AC-5) moves the products
-    whose enrichment `primaryColor` holds it — the English or typed form, a
-    whole word, ignoring case; no colour family list exists, so "crimson"
-    is not "red" — to the front of their tier (first among the far ones
-    too). Colour is never a wall and never a store predicate: it is read
-    from `ProductEnrichment`, never filtered on. Candidates past the
+    first (YOY-171 AC-4). A stated colour (YOY-171 AC-5) moves nothing
+    here: the find front, the pages and what the judge sees are as without
+    it. It is never a wall and never a store predicate: `primaryColor` is
+    read from `ProductEnrichment`, never filtered on. Candidates past the
     front and the keyword tail keep their order and never jump ahead
     (2026-10-03: a soft budget never outranks relevance). Within a page the
     judge orders by verdict, then tier, then find order; on a judge
-    timeout, error or cap the page keeps tier-then-find order.
+    timeout, error or cap the page keeps tier-then-find order. After the
+    judge (in time, cached or late), a stable sort moves the cards whose
+    `primaryColor` holds the asked colour — the English or typed form, a
+    whole word, ignoring case; no colour family list exists, so "crimson"
+    is not "red" — to the front of their own group: the matches, the
+    "Close matches" group, or the whole judged part when the page has no
+    match (`colorFirstInGroups`, grouped as `splitCloseVerdicts` groups the
+    wire). Never across groups, never past a stand-in, never on a page the
+    judge did not order, so the page's products are the same as without
+    the colour (YOY-171 AC-5, amended 2026-10-11 after run 7).
   - A size matches a variant option value, ignoring case: offered and in
     stock is met, offered and sold out a miss, not offered met.
   - A cap in a currency other than the product's converts through USD with

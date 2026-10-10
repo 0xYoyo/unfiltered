@@ -1,13 +1,15 @@
 import { randomUUID } from "node:crypto";
 
 import type { PrismaClient } from "@prisma/client";
-import type {
-  ClassicSearchStore,
-  ExtractRequest,
-  Judge,
-  JudgeLabel,
-  JudgeVerdictCode,
-  WishExtractor,
+import {
+  judgeProviderFromEnv,
+  type ClassicSearchStore,
+  type ExtractRequest,
+  type Judge,
+  type JudgeProvider,
+  type JudgeLabel,
+  type JudgeVerdictCode,
+  type WishExtractor,
 } from "@unfiltered/engine";
 
 import type { ClassicCardHit } from "./classic-store.server";
@@ -23,6 +25,7 @@ import {
   DEFAULT_JUDGE_GIVE_UP_MS,
   parkLatePage,
   runJudgeStep,
+  splitCloseVerdicts,
   type JudgeCallTimes,
   type JudgeStepItem,
 } from "./judge-step.server";
@@ -358,6 +361,11 @@ export interface SearchOrchestratorOptions {
   find: FindStep;
   /** The judge (YOY-147). Absent means pages are served in find order with reason "find-only". */
   judge?: Judge;
+  /**
+   * The judge's provider, which decides the page's close group (YOY-157
+   * AC-27) the colour order keeps to (YOY-171 AC-5); `JUDGE_PROVIDER` by default.
+   */
+  judgeProvider?: JudgeProvider;
   /** How long the judge may take after its call started; 1,500 ms by default (AC-6). */
   judgeDeadlineMs?: number;
   /**
@@ -383,6 +391,7 @@ export function createSearchOrchestrator(
     classicStore,
     find,
     judge,
+    judgeProvider = judgeProviderFromEnv(process.env),
     judgeDeadlineMs = DEFAULT_JUDGE_DEADLINE_MS,
     judgeGiveUpMs = DEFAULT_JUDGE_GIVE_UP_MS,
     wishExtractor,
@@ -587,6 +596,7 @@ export function createSearchOrchestrator(
     const wishes = extracted === null ? null : keepUnremoved(extracted, removedChips);
     let ordered = { productIds: found.productIds, findSetCount: found.findSetCount };
     let codeLabels = new Map<string, CodeLabel>();
+    let colorMatches = new Set<string>();
     if (wishes !== null && hasAppliedWishes(wishes)) {
       const composed = await stages.time("compose", async () =>
         composeWishes(
@@ -599,6 +609,7 @@ export function createSearchOrchestrator(
       );
       ordered = composed;
       codeLabels = composed.labels;
+      colorMatches = composed.colorMatches;
     }
     const pageStart = (page - 1) * pageSize;
     const pageIds = ordered.productIds.slice(pageStart, pageStart + pageSize);
@@ -622,12 +633,16 @@ export function createSearchOrchestrator(
         ...(judgedItems === null
           ? cards
           : [
-              ...judgedItems.map(({ item, verdict, label, standIn }) => ({
-                ...item,
-                label,
-                ...(verdict !== null ? { verdict } : {}),
-                ...(standIn === true ? { standIn } : {}),
-              })),
+              ...colorFirstInGroups(
+                judgedItems.map(({ item, verdict, label, standIn }) => ({
+                  ...item,
+                  label,
+                  ...(verdict !== null ? { verdict } : {}),
+                  ...(standIn === true ? { standIn } : {}),
+                })),
+                colorMatches,
+                judgeProvider,
+              ),
               ...tail,
             ]),
       ].map((card) => {
@@ -865,4 +880,45 @@ export function createSearchOrchestrator(
       },
     };
   }
+}
+
+/**
+ * The asked colour first within each group of a judged page (YOY-171 AC-5
+ * (c)): a stable sort, after the judge, that moves the cards whose primary
+ * colour is the asked one to the front of their own group — the matches,
+ * the "Close matches" group, or the whole judged part when the page has no
+ * match (as `splitCloseVerdicts` groups them). A card never crosses into
+ * another group, never moves past a stand-in (which keeps its place), and
+ * a card with no verdict (a judge timeout's find order) is never moved, so
+ * the colour never changes which products are on the page.
+ */
+export function colorFirstInGroups<
+  T extends { productId: string; verdict?: string; standIn?: true },
+>(cards: readonly T[], colorMatches: ReadonlySet<string>, provider: JudgeProvider): T[] {
+  if (colorMatches.size === 0) {
+    return [...cards];
+  }
+  const split = splitCloseVerdicts(cards, provider);
+  const close = new Set(split?.close ?? []);
+  const groupOf = (card: T): string | null =>
+    card.standIn === true || card.verdict === undefined ? null : close.has(card) ? "close" : "match";
+  const out = [...cards];
+  for (let start = 0; start < out.length; ) {
+    const group = groupOf(out[start]!);
+    let end = start + 1;
+    while (group !== null && end < out.length && groupOf(out[end]!) === group) {
+      end += 1;
+    }
+    if (group !== null) {
+      const run = out.slice(start, end);
+      out.splice(
+        start,
+        run.length,
+        ...run.filter((card) => colorMatches.has(card.productId)),
+        ...run.filter((card) => !colorMatches.has(card.productId)),
+      );
+    }
+    start = end;
+  }
+  return out;
 }

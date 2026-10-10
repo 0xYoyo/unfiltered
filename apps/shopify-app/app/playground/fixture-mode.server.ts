@@ -531,7 +531,7 @@ export function withoutRemovedChips(
   const capped: typeof outcome.body.results = capRemoved
     ? [...outcome.body.results, OVER_BUDGET_CARD]
     : outcome.body.results;
-  // The colour chip removed (YOY-171 AC-5): find order back — the asked
+  // The colour chip removed (YOY-171 AC-5): the judged order back — the asked
   // colour, which led, returns to its place after the others — and no
   // `color-differs` label.
   const results = colorRemoved

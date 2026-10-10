@@ -159,7 +159,7 @@ test("verify 6: under ?lang=he the chips come from the HE catalog and the row is
  * The colour wish (YOY-171 AC-5), against the `v2-color` fixture: a colour
  * chip as typed, the asked colour's card first, the others labelled
  * `color-differs`; removing the chip re-asks with it in `removedChips` and
- * the cards return to find order with no colour label.
+ * the cards return to the judged order with no colour label.
  */
 test.describe("the colour chip (YOY-171 AC-5)", () => {
   const COLOR_QUERY = "red evening gown colour";
@@ -181,7 +181,7 @@ test.describe("the colour chip (YOY-171 AC-5)", () => {
     ]);
   });
 
-  test("verify 4: removing the colour chip restores find order and drops the colour labels", async ({
+  test("verify 4: removing the colour chip restores the judged order and drops the colour labels", async ({
     page,
   }) => {
     const urls = recordSearchRequests(page);

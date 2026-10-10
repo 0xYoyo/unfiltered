@@ -4,7 +4,7 @@ import { mkdirSync } from "node:fs";
 /**
  * Design evidence for the colour wish (YOY-171 AC-5; verify 4): the colour
  * chip, the asked colour first and the others labelled `color-differs`,
- * then the chip removed — find order back, no colour label — on the overlay
+ * then the chip removed — the judged order back, no colour label — on the overlay
  * and the theme-native grid, desktop + mobile, EN + HE (RTL), plus the
  * overlay's loading, empty and error states, which this change leaves as
  * they were. Skipped on the default lane and captured with

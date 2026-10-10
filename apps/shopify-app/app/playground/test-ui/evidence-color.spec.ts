@@ -4,7 +4,7 @@ import { mkdirSync } from "node:fs";
 /**
  * Design evidence for the colour wish (YOY-171 AC-5; verify 4): "red evening
  * gown" with its colour chip, the red Lace Dress first and the others
- * labelled `color-differs`, then the chip removed — find order back, no
+ * labelled `color-differs`, then the chip removed — the judged order back, no
  * colour label — desktop and mobile, EN and HE (RTL), plus the loading,
  * empty and error states, which this change leaves as they were. Tagged
  * @evidence — off the default lane, captured with

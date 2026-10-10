@@ -25,7 +25,7 @@ import { createPgTrgmClassicStore } from "./classic-store.server";
 import { createFindStep } from "./find.server";
 import { extractionCacheKey, sentenceLanguage } from "./extraction-cache.server";
 import { awaitPendingLabels, resetPendingLabels } from "./judge-step.server";
-import { createSearchOrchestrator, type SearchRequest } from "./orchestrator.server";
+import { colorFirstInGroups, createSearchOrchestrator, type SearchRequest } from "./orchestrator.server";
 import { createSessionThrottle, previewExtractionAllowance } from "./throttle.server";
 import {
   parseProxySearchBody,
@@ -289,35 +289,26 @@ describe("colour as a code-checked wish (YOY-171 AC-5)", () => {
 
   const red = wishes({ color: { typed: "red", en: "red" } });
 
-  it("moves the asked colour to the front of its tier, find order kept within", () => {
+  it("moves nothing for colour before the judge: the find front and the far tier keep their order", () => {
     const products = new Map([
       ["blue", product("blue", 80, { primaryColor: "blue" })],
       ["black", product("black", 80, { primaryColor: "black" })],
-      ["dark-red", product("dark-red", 80, { primaryColor: "dark red" })],
       ["unknown", product("unknown", 80)],
       ["red", product("red", 80, { primaryColor: "red" })],
     ]);
-    const ids = ["blue", "black", "dark-red", "unknown", "red"];
+    const ids = ["blue", "black", "unknown", "red"];
     const composed = composeWishes(ids, ids.length, products, red);
-    expect(composed.productIds).toEqual(["dark-red", "red", "blue", "black", "unknown"]);
-  });
+    expect(composed.productIds).toEqual(ids);
+    // The match is reported for the judged page to order by (AC-5 (c)).
+    expect([...composed.colorMatches]).toEqual(["red"]);
 
-  it("keeps the price tiers above the colour: a matching colour leads its own tier only", () => {
     const capped = wishes({ priceMax: { amount: 100, raw: "100" }, color: { typed: "red", en: "red" } });
-    const products = new Map([
-      ["blue-in", product("blue-in", 80, { primaryColor: "blue" })],
-      ["red-far", product("red-far", 300, { primaryColor: "red" })],
+    const far = new Map([
       ["blue-far", product("blue-far", 200, { primaryColor: "blue" })],
-      ["red-in", product("red-in", 90, { primaryColor: "red" })],
+      ["red-far", product("red-far", 300, { primaryColor: "red" })],
     ]);
-    const ids = ["blue-in", "red-far", "blue-far", "red-in"];
-    expect(composeWishes(ids, ids.length, products, capped).productIds).toEqual([
-      "red-in",
-      "blue-in",
-      // The far tier: the asked colour first, then cheapest first (YOY-171 AC-4).
-      "red-far",
-      "blue-far",
-    ]);
+    // The far tier is cheapest first (AC-4), the colour aside.
+    expect(composeWishes(["red-far", "blue-far"], 2, far, capped).productIds).toEqual(["blue-far", "red-far"]);
   });
 
   it("labels a card of another known colour color-differs, only when no other code label applies", () => {
@@ -1145,42 +1136,74 @@ describe("wishes on Engine v2 (on the database)", () => {
     expect(capped.chips).toEqual([{ field: "priceMax", value: "100" }]);
   });
 
-  it("leads with the asked colour, chips it, and says color-differs only where the judge gave no label (YOY-171 AC-5)", async () => {
+  it("orders the asked colour first in its own group after the judge, the page's product set unchanged (YOY-171 AC-5)", async () => {
+    // 3 matches, then 4 close with the only red card 3rd among them.
     await seed(db, [
-      { productId: "blue1", title: "Blue Gown", y: 0.1, color: "blue" },
-      { productId: "blue2", title: "Blue Dress", y: 0.2, color: "blue" },
-      { productId: "red", title: "Lace Dress", y: 0.3, color: "red" },
-      { productId: "plain", title: "Plain Dress", y: 0.4 },
+      { productId: "e1", title: "Evening Gown One", y: 0.1, color: "blue" },
+      { productId: "e2", title: "Evening Gown Two", y: 0.2, color: "black" },
+      { productId: "e3", title: "Evening Gown Three", y: 0.3 },
+      { productId: "c1", title: "Cocktail Dress One", y: 0.4, color: "blue" },
+      { productId: "c2", title: "Cocktail Dress Two", y: 0.5, color: "green" },
+      { productId: "red", title: "Lace Dress", y: 0.6, color: "red" },
+      { productId: "c4", title: "Cocktail Dress Four", y: 0.7, color: "navy" },
     ]);
     const asked = wishes({ color: { typed: "red", en: "red" } });
-    // The judge sees the composed page: red (front of its tier), blue1, blue2, plain.
-    const response = await search(
-      orchestrator({ extractor: fixedExtractor(asked), judge: judgeLlm(["E-X", "E-X", "CDC", "E-X"]) }),
-      { query: "red evening gown" },
-    );
-    expect(response.hits[0]!.productId).toBe("red");
+    const codes = ["E-X", "E-X", "E-X", "CDC", "CDC", "CDC", "CDC"];
+    const response = await search(orchestrator({ extractor: fixedExtractor(asked), judge: judgeLlm(codes) }), {
+      query: "red evening gown",
+    });
+    const ids = response.hits.map((hit) => hit.productId);
+    // The matches unchanged; the red card first among the close.
+    expect(ids).toEqual(["e1", "e2", "e3", "red", "c1", "c2", "c4"]);
     expect(response.chips).toEqual([{ field: "color", value: "red" }]);
     const label = (id: string) => response.hits.find((hit) => hit.productId === id)?.label ?? null;
-    expect(label("red")).toBeNull();
-    // No judge label: the code says the colour differs.
-    expect(label("blue1")).toEqual({ template: "color-differs", values: ["blue", "red"] });
-    // The judge's own label stands.
-    expect(label("blue2")?.template).toBe("close-match");
-    // No known colour: nothing said.
-    expect(label("plain")).toBeNull();
+    // No judge label: the code says the colour differs; a known colour only.
+    expect(label("e1")).toEqual({ template: "color-differs", values: ["blue", "red"] });
+    expect(label("e3")).toBeNull();
+    // The judge's own label stands on the close cards.
+    expect(label("c1")?.template).toBe("close-match");
+    expect(label("red")?.template).toBe("close-match");
 
-    // The chip removed: find order back, no colour label.
-    const removed = await search(orchestrator({ extractor: fixedExtractor(asked) }), {
+    // The chip removed: the judged order back, the same products, no colour label.
+    await db.judgeAnswer.deleteMany();
+    const removed = await search(orchestrator({ extractor: fixedExtractor(asked), judge: judgeLlm(codes) }), {
       query: "red evening gown",
       removedChips: [{ field: "color", value: "red" }],
     });
-    expect(removed.hits.map((hit) => hit.productId)).toEqual(["blue1", "blue2", "red", "plain"]);
+    expect(removed.hits.map((hit) => hit.productId)).toEqual(["e1", "e2", "e3", "c1", "c2", "red", "c4"]);
+    expect(new Set(removed.hits.map((hit) => hit.productId))).toEqual(new Set(ids));
     expect(removed.chips).toEqual([]);
-    expect(removed.hits.every((hit) => hit.label === null)).toBe(true);
+    expect(removed.hits.some((hit) => hit.label?.template === "color-differs")).toBe(false);
     expect(
       parseProxySearchBody({ query: "q", sessionId: "s", removedChips: [{ field: "color", value: "red" }] })!
         .removedChips,
     ).toEqual([{ field: "color", value: "red" }]);
+  });
+
+  it("never moves a colour card past a stand-in, across groups, or on a page the judge did not order (YOY-171 AC-5)", () => {
+    const card = (productId: string, verdict?: string, standIn?: true) => ({
+      productId,
+      ...(verdict !== undefined ? { verdict } : {}),
+      ...(standIn === true ? { standIn } : {}),
+    });
+    const red = new Set(["r1", "r2", "r3"]);
+    const order = (cards: ReturnType<typeof card>[]) =>
+      colorFirstInGroups(cards, red, "jev").map((entry) => entry.productId);
+    // Matches, a stand-in, then the close group: each moves within itself.
+    expect(
+      order([
+        card("e1", "exact"),
+        card("r1", "exact"),
+        card("s1", "close", true),
+        card("r2", "close", true),
+        card("c1", "close"),
+        card("r3", "close"),
+      ]),
+    ).toEqual(["r1", "e1", "s1", "r2", "r3", "c1"]);
+    // No match on the page: the whole judged grid is one group.
+    expect(order([card("c1", "close"), card("v1", "other-variant"), card("r1", "close")])).toEqual(["r1", "c1", "v1"]);
+    // No verdicts (a judge timeout's find order): nothing moves.
+    expect(order([card("a"), card("r1")])).toEqual(["a", "r1"]);
   });
 
   it("keeps a code label in the late labels after a judge timeout, the judge's label on the rest (YOY-160 AC-1, AC-2)", async () => {
