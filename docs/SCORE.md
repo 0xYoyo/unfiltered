@@ -264,6 +264,7 @@ line.
 | 4 | Engine v2 + stated wishes (YOY-149) + refinement and second reading (YOY-150) (`ENGINE_V2=1`, judge deadline 4,000 ms) | 0.671 | 0.407 | 0.500 | 0.657 | 0.500 | 0.421 | — (not deployed) | $0.2128 |
 | 5 (gemini judge) | Engine v2 as run 4, judge `JUDGE_PROVIDER=gemini` (YOY-152 branch) | 0.667 | 0.389 | 0.537 | 0.657 | 0.583 | 0.394 | — (not deployed) | $0.2054 |
 | 5 (jev judge) | Engine v2 as run 4, judge `JUDGE_PROVIDER=jev` (YOY-152 branch) | 0.634 | 0.407 | 0.574 | 0.657 | 0.542 | 0.398 | — (not deployed) | $0.1053 |
+| 6 control | Engine v2 on `main` at `9843486`, before the delete (YOY-155 AC-8 reference, judge `jev`) | 0.657 | 0.361 | 0.495 | 0.648 | 0.477 | 0.361 | — (not deployed) | $0.1038 |
 | 6 | One engine after the delete (YOY-155 branch, judge `jev`) | 0.606 | 0.301 | 0.495 | 0.616 | 0.444 | 0.366 | — (not deployed) | $0.1043 |
 | 1b — v1 re-check | M5 engine on `main` before its deletion (YOY-155 AC-1) | 0.560 | 0.287 | 0.375 | 0.463 | 0.407 | 0.236 | — | $0.0552 |
 | 3 (first, superseded) | Engine v2 find step + judge reading the summary (`ENGINE_V2=1`, deadline 1,500 ms) | 0.597 | 0.292 | 0.556 | 0.648 | 0.542 | 0.403 | — (not deployed) | $0.0928 |
@@ -364,10 +365,19 @@ Run 6 — after the delete (YOY-155 AC-8): [run 38063360614](https://github.com/
 `ref=YOY-155-delete-old-engine` (`ce3bb15`) and `judge=jev`. Green, leak
 check clean (72 checked), **0 failed searches**, $0.1043 over 1,942 model
 calls, 72 extraction calls. Against run 5 (Jev), with each band
-`max(M5 band, 0.03)`: en −0.028 (band 0.111, holds), **he −0.106 (band
-0.090: a miss — 0.301 under the 0.317 floor)**, ar −0.079, ru −0.041,
-fr −0.098, es −0.032. The gate is **not met** on he; the delete is not
-opened for merge until the cause is known (see YOY-155).
+`max(M5 band, 0.03)`: en −0.028 (band 0.111), **he −0.106 (band 0.090:
+outside)**, ar −0.079, ru −0.041, fr −0.098, es −0.032.
+
+Run 6 control — the reference (YOY-155 AC-8, re-based 2026-10-10):
+[run 38065068705](https://github.com/0xYoyo/unfiltered/actions/runs/38065068705),
+2026-10-10, dispatched on `main` at `9843486` (the commit the delete branch
+started from) with `engine=v2` and `judge=jev`. Green, leak check clean (72
+checked), **0 failed searches**, $0.1038 over 1,918 model calls. Run 6
+against it: en −0.051 (band 0.111) and he −0.060 (band 0.090) — **both
+inside the band, the gate is met**; ar 0.000, ru −0.032, fr −0.033,
+es +0.005. Engine v2 on `main` already sat below run 5 before the delete
+(he 0.361 against 0.407): the he drop against run 5 is tracked on YOY-171
+AC-9, not on the delete.
 
 ### Judge comparison — Flash-Lite versus Jev (YOY-152, 2026-10-04)
 
