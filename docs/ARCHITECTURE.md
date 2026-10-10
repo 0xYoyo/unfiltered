@@ -914,17 +914,23 @@ The three kinds of wishes (docs/PRD.md §3) applied by code. Packages:
     the price within `PRICE_NEAR_PERCENT` (10) over the cap with the rest
     met, then other misses, each tier in find order — except the products
     far over the cap, which take their places in the last tier cheapest
-    first (YOY-171 AC-4). A stated colour (YOY-171 AC-5) orders nothing,
-    here or after the judge: the find front, the pages, what the judge sees
-    and the served order are as without it (the in-page colour order was
-    dropped after hidden run 8, by the AC's fallback). It is never a wall
-    and never a store predicate: `primaryColor` is read from
-    `ProductEnrichment`, never filtered on, and only writes the
-    `color-differs` label. Candidates past the
+    first (YOY-171 AC-4). A stated colour (YOY-171 AC-5) moves nothing
+    here: the find front, the pages and what the judge sees are as without
+    it. It is never a wall and never a store predicate: `primaryColor` is
+    read from `ProductEnrichment`, never filtered on. Candidates past the
     front and the keyword tail keep their order and never jump ahead
     (2026-10-03: a soft budget never outranks relevance). Within a page the
     judge orders by verdict, then tier, then find order; on a judge
-    timeout, error or cap the page keeps tier-then-find order.
+    timeout, error or cap the page keeps tier-then-find order. After the
+    judge (in time, cached or late), a stable sort moves the cards whose
+    `primaryColor` holds the asked colour — the English or typed form, a
+    whole word, ignoring case; no colour family list exists, so "crimson"
+    is not "red" — to the front of their own group: the matches, the
+    "Close matches" group, or the whole judged part when the page has no
+    match (`colorFirstInGroups`, grouped as `splitCloseVerdicts` groups the
+    wire). Never across groups, never past a stand-in, never on a page the
+    judge did not order, so the page's products are the same as without
+    the colour (YOY-171 AC-5, amended 2026-10-11 after run 7).
   - A size matches a variant option value, ignoring case: offered and in
     stock is met, offered and sold out a miss, not offered met.
   - A cap in a currency other than the product's converts through USD with
@@ -935,10 +941,7 @@ The three kinds of wishes (docs/PRD.md §3) applied by code. Packages:
   `size-missing` carries the size and up to two in-stock values nearest it
   in the merchant's option order. A code label replaces the judge's on the
   same card and holds after a judge timeout, error or cap — except
-  `color-differs` (YOY-171 AC-5), `[primaryColor, colour as typed]` — a
-  product's `primaryColor` matches when it holds the asked colour's English
-  or typed form as a whole word, ignoring case (no colour family list
-  exists, so "crimson" is not "red") — which
+  `color-differs` (YOY-171 AC-5), `[primaryColor, colour as typed]`, which
   a product of another known colour carries only when no other code label
   applies and the judge gave it none; a product with no known colour is
   never said to differ.
@@ -949,7 +952,7 @@ The three kinds of wishes (docs/PRD.md §3) applied by code. Packages:
   `color`, `availability`, `exclude`. A price chip's value is the shopper's
   own number with `currency` when they stated one; an exclude chip's value
   is the term as typed, and a colour chip's the colour as typed (YOY-171
-  AC-5). A removed colour chip drops its `color-differs` labels.
+  AC-5). A removed colour chip drops the colour's order and its labels.
 - **Colour extraction** (YOY-171 AC-5). The extraction answers `color`
   (as typed) and `colorEnglish`; the parse keeps `{ typed, en }` only when
   the colour is a whole token of the sentence, not negated and not

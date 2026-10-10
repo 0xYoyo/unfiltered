@@ -302,16 +302,16 @@ test.describe("theme-native path", () => {
 
 /**
  * The colour wish on both widget paths (YOY-171 AC-5): `?fixture=color`.
- * While the colour chip stands the cards of another colour carry
+ * While the colour chip stands the asked colour leads and the others carry
  * `color-differs`; removing it re-asks with it in `removedChips`, and the
- * same order comes back with no colour label — the colour orders nothing.
+ * judged order comes back with no colour label.
  */
 test.describe("the colour chip (YOY-171 AC-5)", () => {
   const labels = (page: Page) => page.getByTestId("unfiltered-widget-label");
   const differs = (locale: "en" | "he", have: string, asked: string) =>
     STRING_CATALOG[locale].labelColorDiffers.replace("{have}", have).replace("{asked}", asked);
 
-  test("overlay: the chip reads the colour as typed, removal keeps the order and drops the labels", async ({
+  test("overlay: the asked colour leads, the chip reads it as typed, removal restores the judged order", async ({
     page,
   }) => {
     await page.goto("/?fixture=color&debounce=30000");
@@ -320,7 +320,7 @@ test.describe("the colour chip (YOY-171 AC-5)", () => {
     await expect(color).toHaveCount(1);
     await expect(color).toContainText("red");
     await expect(color).not.toHaveAttribute("data-chip-negated", "true");
-    await expect(overlayCards(page).last()).toContainText("Lace Dress");
+    await expect(overlayCards(page).first()).toContainText("Lace Dress");
     await expect(labels(page)).toHaveText([differs("en", "blue", "red"), differs("en", "black", "red")]);
 
     await color.click();
@@ -338,7 +338,7 @@ test.describe("the colour chip (YOY-171 AC-5)", () => {
     await expect(labels(page).first()).toHaveText(differs("he", "blue", "אדומה"));
   });
 
-  test("theme-native: the colour chip in the owned row, labels on the other colours", async ({
+  test("theme-native: the colour chip in the owned row, the asked colour first, labels on the others", async ({
     page,
   }) => {
     await page.goto("/theme-native.html?native=A&fixture=color&debounce=30000");
@@ -346,7 +346,7 @@ test.describe("the colour chip (YOY-171 AC-5)", () => {
     const color = page.locator("[data-testid='unfiltered-native-chips'] > [data-field='color']");
     await expect(color).toHaveCount(1);
     await expect(color).toContainText("red");
-    await expect(nativeItems(page).last()).toContainText("Lace Dress");
+    await expect(nativeItems(page).first()).toContainText("Lace Dress");
     await expect(labels(page)).toHaveText([differs("en", "blue", "red"), differs("en", "black", "red")]);
 
     await color.click();

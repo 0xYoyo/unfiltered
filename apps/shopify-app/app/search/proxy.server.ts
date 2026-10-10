@@ -28,7 +28,12 @@ import {
   judgeDeadlineMsFromEnv,
   judgeGiveUpMsFromEnv,
   judgeRowCharsFromEnv,
+  splitCloseVerdicts,
 } from "./judge-step.server";
+
+// The close split moved to the judge step (YOY-171 AC-5), where the
+// orchestrator reads it too; its callers keep importing it from here.
+export { judgeWritesFactLabel, splitCloseVerdicts } from "./judge-step.server";
 import {
   createSearchOrchestrator,
   DEFAULT_PAGE_SIZE,
@@ -494,46 +499,6 @@ function serializeCard(card: {
 }
 
 /**
- * Whether a judge provider writes the merchant-fact label ("in grey, not
- * black") on an `other-variant` product (YOY-157 AC-27). The Flash-Lite
- * judge does. The Jev decision judge writes it only when its two fact picks
- * land (YOY-158 AC-3) and otherwise the generic `close-match` (PRD v3.4 §3),
- * so its `other-variant` card still reads to a shopper like a `close` one.
- */
-export function judgeWritesFactLabel(provider: JudgeProvider): boolean {
-  return provider === "gemini";
-}
-
-/**
- * A judged page's close products, apart from its matches (YOY-166 AC-1):
- * when the page holds at least one match, its close products go under the
- * "Close matches" divider, each group in the order it was served. A match
- * is `exact`, and `other-variant` too when the judge writes its fact label;
- * under a judge that writes none (Jev), an `other-variant` card is a close
- * one (YOY-157 AC-27). Null — every card stays inline — on any other page:
- * one with no match (the reject-all rule, YOY-147 AC-8), one with no close
- * product, or one served without verdicts (find order, a judge timeout).
- * A stand-in verdict (YOY-159) is no judgment and never moves a card.
- */
-export function splitCloseVerdicts<
-  T extends { verdict?: string; standIn?: true },
->(hits: readonly T[], provider: JudgeProvider): { matched: T[]; close: T[] } | null {
-  const variantMatches = judgeWritesFactLabel(provider);
-  const judged = (hit: T) => hit.standIn !== true;
-  const isMatch = (hit: T) =>
-    judged(hit) && (hit.verdict === "exact" || (variantMatches && hit.verdict === "other-variant"));
-  const isClose = (hit: T) =>
-    judged(hit) && (hit.verdict === "close" || (!variantMatches && hit.verdict === "other-variant"));
-  if (!hits.some(isMatch) || !hits.some(isClose)) {
-    return null;
-  }
-  return {
-    matched: hits.filter((hit) => !isClose(hit)),
-    close: hits.filter(isClose),
-  };
-}
-
-/**
  * Map an orchestrator response onto the wire contract. Explicit re-mapping
  * is the AC-5 guarantee: fields the contract does not name (routeReason and
  * anything added later) cannot reach a shopper.
@@ -620,6 +585,9 @@ export function createProxySearchOrchestrator(
     // model is the provider's own config (AC-1). Built only for the
     // selected provider; `jev` is the decision-model challenger over
     // OpenRouter (YOY-152 AC-1).
+    // The judge's provider also decides which verdicts form the close group
+    // the colour order keeps to (YOY-171 AC-5).
+    judgeProvider: judgeProviderFromEnv(process.env),
     judge: createJudge({
       provider: judgeProviderFromEnv(process.env),
       clients: {

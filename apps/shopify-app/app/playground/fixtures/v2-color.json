@@ -4,6 +4,17 @@
   "degraded": false,
   "results": [
     {
+      "productId": "p-color-red",
+      "title": "Lace Dress",
+      "url": "https://example.test/products/p-color-red",
+      "imageUrl": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 4'><rect width='4' height='4' fill='%23b23a3a'/></svg>",
+      "priceMin": 140,
+      "priceMax": 140,
+      "currencyCode": "USD",
+      "available": true,
+      "label": null
+    },
+    {
       "productId": "p-color-blue",
       "title": "Satin Evening Gown",
       "url": "https://example.test/products/p-color-blue",
@@ -36,17 +47,6 @@
           "red"
         ]
       }
-    },
-    {
-      "productId": "p-color-red",
-      "title": "Lace Dress",
-      "url": "https://example.test/products/p-color-red",
-      "imageUrl": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 4'><rect width='4' height='4' fill='%23b23a3a'/></svg>",
-      "priceMin": 140,
-      "priceMax": 140,
-      "currencyCode": "USD",
-      "available": true,
-      "label": null
     }
   ],
   "chips": [

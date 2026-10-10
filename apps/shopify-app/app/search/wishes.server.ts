@@ -403,6 +403,11 @@ interface Standing {
   label: CodeLabel | null;
   /** The price is beyond the near band over the cap (YOY-171 AC-4). */
   farOverCap: boolean;
+  /**
+   * The primary colour is the asked one (YOY-171 AC-5). Never an order here:
+   * the judged page orders by it, within its groups, after the judge.
+   */
+  colorMatch: boolean;
 }
 
 /**
@@ -467,7 +472,7 @@ function standingOf(
   if (label === null && colorMatch === false && wishes.color !== null && product.primaryColor !== null) {
     label = { template: "color-differs", values: [product.primaryColor, wishes.color.typed] };
   }
-  return { removed, tier, label, farOverCap: overCap && !nearCap };
+  return { removed, tier, label, farOverCap: overCap && !nearCap, colorMatch: colorMatch === true };
 }
 
 export interface ComposedResults {
@@ -477,6 +482,12 @@ export interface ComposedResults {
   findSetCount: number;
   /** The code label of each served product that carries one (AC-12). */
   labels: Map<string, CodeLabel>;
+  /**
+   * The products whose primary colour is the asked one (YOY-171 AC-5). The
+   * colour moves nothing here — not the find front, not what reaches a
+   * page or the judge; the judged page orders by it within its groups.
+   */
+  colorMatches: Set<string>;
 }
 
 /**
@@ -504,6 +515,7 @@ export function composeWishes(
     tierFront: options.tierFront ?? DEFAULT_TIER_FRONT_SIZE,
   };
   const labels = new Map<string, CodeLabel>();
+  const colorMatches = new Set<string>();
   const rank = (ids: readonly string[]) =>
     ids.flatMap((productId, index) => {
       const product = products.get(productId);
@@ -516,6 +528,9 @@ export function composeWishes(
       }
       if (standing.label !== null) {
         labels.set(productId, standing.label);
+      }
+      if (standing.colorMatch) {
+        colorMatches.add(productId);
       }
       return [
         { productId, tier: standing.tier, index, far: standing.farOverCap, price: product.priceMin },
@@ -541,5 +556,6 @@ export function composeWishes(
     ),
     findSetCount: findSet.length,
     labels,
+    colorMatches,
   };
 }

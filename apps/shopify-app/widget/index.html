@@ -174,9 +174,9 @@
         // products come back.
         const capped = chips.some((chip) => chip.field === "priceMax");
         if (name === "color") {
-          // While the colour chip stands the cards of another colour say
-          // `color-differs`; removed, the same order with no colour label —
-          // the colour orders nothing (YOY-171 AC-5).
+          // While the colour chip stands the asked colour leads and the
+          // others say `color-differs`; removed, the judged order is back with no
+          // colour label (YOY-171 AC-5).
           const asked = chips.length > 0;
           const card = (id, title, color) => ({
             productId: `gid://shopify/Product/${id}`,
@@ -195,7 +195,7 @@
           const red = card(31, "Lace Dress", "red");
           const blue = card(32, "Satin Evening Gown", "blue");
           const black = card(33, "Velvet Evening Gown", "black");
-          results = [blue, black, red];
+          results = asked ? [red, blue, black] : [blue, black, red];
         }
         return {
           searchId: `harness-v2-${name}-${removed.length}`,
