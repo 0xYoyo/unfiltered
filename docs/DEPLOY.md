@@ -124,6 +124,7 @@ All of these live in the `unfiltered-prod` group (see above).
 | `PLAYGROUND_TRUSTED_PROXY_HOPS` | optional | Default `1`: the visitor IP is the last `X-Forwarded-For` entry — the one Render's edge appended. Set `2` if a CDN sits in front of Render. |
 | `PLAYGROUND_DAILY_AI_CAP` | optional | Default `2000` AI searches/day across all playground catalogs. |
 | `PLAYGROUND_CATALOG_DAILY_AI_CAP` | optional | Default `500` AI searches/day per catalog. |
+| `PROXY_SHOP_AI_PER_MINUTE` | optional | Default `120`: per shop and minute, the storefront proxy's AI searches and, separately, its preview wish extractions, on top of each session's own budget (YOY-171 AC-15), so a client rotating `sessionId` cannot spend without a ceiling. |
 | `PREVIEW_EXTRACTIONS_PER_MINUTE` | optional | Default `30` wish extractions a keystroke preview may start per visitor IP (playground) or session (storefront) per minute. |
 | `GEMINI_*_MODEL`, `GEMINI_EMBEDDING_DIMENSION` | optional | Pin a model instead of the documented defaults in `packages/provider-gemini`. |
 | `ENGINE_V2` | optional | Which engine a submitted search runs (YOY-153): unset or anything but `0` is Engine v2 — find, wish extraction, the judge; `0` serves the old engine. The playground's per-request `engine=v1` reaches the old engine either way; keystroke previews are the keyword path on both. |
