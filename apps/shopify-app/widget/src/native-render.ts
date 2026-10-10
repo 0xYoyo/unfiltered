@@ -27,6 +27,7 @@ import {
   type Overlay,
   type ResponseHandlers,
 } from "./overlay";
+import { FIRST_ROW_CARDS, markFirstRowImage } from "./image-url";
 import type {
   ProxyChip,
   ProxyResult,
@@ -799,7 +800,16 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
               return;
             }
             const wasLast = shown.elements.includes(list.lastElementChild as HTMLElement);
+            const wasFirst = first === list.firstElementChild;
             const scrolled = window.scrollY;
+            if (wasFirst) {
+              // The late page keeps the first row's image priority (AC-8).
+              for (const item of replaced.items.slice(0, FIRST_ROW_CARDS)) {
+                for (const image of item.querySelectorAll("img")) {
+                  markFirstRowImage(image);
+                }
+              }
+            }
             first.before(...replaced.elements);
             for (const element of shown.elements) {
               element.remove();
@@ -1218,6 +1228,14 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
     );
     chipsRow.hidden = chips.length === 0 && reading === null;
     list.replaceChildren(...built.elements);
+    // The page's first row — its own first four items, whichever page of
+    // the theme's pagination is shown — loads its images first, the
+    // theme's card images included (YOY-171 AC-8).
+    for (const item of built.items.slice(0, FIRST_ROW_CARDS)) {
+      for (const image of item.querySelectorAll("img")) {
+        markFirstRowImage(image);
+      }
+    }
     settleLabels(built.items);
     refreshPageLabel();
     fillLateLabels(held, target, built, token, () =>

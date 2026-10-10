@@ -208,6 +208,7 @@ apps/
           evidence-design.spec.ts
           evidence-examples.spec.ts
           evidence-extract-time.spec.ts
+          evidence-first-row.spec.ts
           evidence-hardening.spec.ts
           evidence-judge-split.spec.ts
           evidence-label-line.spec.ts
@@ -546,6 +547,7 @@ apps/
         evidence-card-images.spec.ts
         evidence-close-divider-jev.spec.ts
         evidence-close-divider.spec.ts
+        evidence-first-row.spec.ts
         evidence-hardening.spec.ts
         evidence-label-line.spec.ts
         evidence-labels.spec.ts
@@ -1292,6 +1294,7 @@ docs/
       playground-desktop-en-error.png
       playground-desktop-en-extract-in-time.png
       playground-desktop-en-extract-late.png
+      playground-desktop-en-first-row.png
       playground-desktop-en-late-page.png
       playground-desktop-en-loading.png
       playground-desktop-en-one-label-mixed.png
@@ -1302,6 +1305,7 @@ docs/
       playground-desktop-he-error.png
       playground-desktop-he-extract-in-time.png
       playground-desktop-he-extract-late.png
+      playground-desktop-he-first-row.png
       playground-desktop-he-late-page.png
       playground-desktop-he-loading.png
       playground-desktop-he-one-label-mixed.png
@@ -1312,6 +1316,7 @@ docs/
       playground-mobile-en-error.png
       playground-mobile-en-extract-in-time.png
       playground-mobile-en-extract-late.png
+      playground-mobile-en-first-row.png
       playground-mobile-en-late-page.png
       playground-mobile-en-loading.png
       playground-mobile-en-one-label-mixed.png
@@ -1322,30 +1327,36 @@ docs/
       playground-mobile-he-error.png
       playground-mobile-he-extract-in-time.png
       playground-mobile-he-extract-late.png
+      playground-mobile-he-first-row.png
       playground-mobile-he-late-page.png
       playground-mobile-he-loading.png
       playground-mobile-he-one-label-mixed.png
       playground-mobile-he-one-label.png
       playground-mobile-he-pending-find-order.png
       playground-mobile-he-stand-in.png
+      widget-native-desktop-en-first-row.png
       widget-native-desktop-en-late-page.png
       widget-native-desktop-en-one-label.png
       widget-native-desktop-en-pending-find-order.png
       widget-native-desktop-en-stand-in.png
+      widget-native-desktop-he-first-row.png
       widget-native-desktop-he-late-page.png
       widget-native-desktop-he-one-label.png
       widget-native-desktop-he-pending-find-order.png
       widget-native-desktop-he-stand-in.png
+      widget-native-mobile-en-first-row.png
       widget-native-mobile-en-late-page.png
       widget-native-mobile-en-one-label.png
       widget-native-mobile-en-pending-find-order.png
       widget-native-mobile-en-stand-in.png
+      widget-native-mobile-he-first-row.png
       widget-native-mobile-he-late-page.png
       widget-native-mobile-he-one-label.png
       widget-native-mobile-he-pending-find-order.png
       widget-native-mobile-he-stand-in.png
       widget-overlay-desktop-en-empty.png
       widget-overlay-desktop-en-error.png
+      widget-overlay-desktop-en-first-row.png
       widget-overlay-desktop-en-late-page.png
       widget-overlay-desktop-en-loading.png
       widget-overlay-desktop-en-one-label-mixed.png
@@ -1354,6 +1365,7 @@ docs/
       widget-overlay-desktop-en-stand-in.png
       widget-overlay-desktop-he-empty.png
       widget-overlay-desktop-he-error.png
+      widget-overlay-desktop-he-first-row.png
       widget-overlay-desktop-he-late-page.png
       widget-overlay-desktop-he-loading.png
       widget-overlay-desktop-he-one-label-mixed.png
@@ -1362,6 +1374,7 @@ docs/
       widget-overlay-desktop-he-stand-in.png
       widget-overlay-mobile-en-empty.png
       widget-overlay-mobile-en-error.png
+      widget-overlay-mobile-en-first-row.png
       widget-overlay-mobile-en-late-page.png
       widget-overlay-mobile-en-loading.png
       widget-overlay-mobile-en-one-label-mixed.png
@@ -1370,6 +1383,7 @@ docs/
       widget-overlay-mobile-en-stand-in.png
       widget-overlay-mobile-he-empty.png
       widget-overlay-mobile-he-error.png
+      widget-overlay-mobile-he-first-row.png
       widget-overlay-mobile-he-late-page.png
       widget-overlay-mobile-he-loading.png
       widget-overlay-mobile-he-one-label-mixed.png
@@ -1767,7 +1781,7 @@ vitest.setup.ts
 - apps/shopify-app/widget/src/format.ts → apps/shopify-app/widget/src/strings.ts
 - apps/shopify-app/widget/src/main.ts → apps/shopify-app/widget/src/native-page.ts, apps/shopify-app/widget/src/native-render.config.ts, apps/shopify-app/widget/src/native-render.ts, apps/shopify-app/widget/src/overlay.ts, apps/shopify-app/widget/src/search-client.ts, apps/shopify-app/widget/src/session.ts, apps/shopify-app/widget/src/strings.ts
 - apps/shopify-app/widget/src/native-page.ts → apps/shopify-app/widget/src/native-render.config.ts
-- apps/shopify-app/widget/src/native-render.ts → apps/shopify-app/widget/src/format.ts, apps/shopify-app/widget/src/labels.ts, apps/shopify-app/widget/src/native-page.ts, apps/shopify-app/widget/src/native-render.config.ts, apps/shopify-app/widget/src/native-render.css?inline (unresolved), apps/shopify-app/widget/src/overlay.ts, apps/shopify-app/widget/src/search-client.ts, apps/shopify-app/widget/src/strings.ts
+- apps/shopify-app/widget/src/native-render.ts → apps/shopify-app/widget/src/format.ts, apps/shopify-app/widget/src/image-url.ts, apps/shopify-app/widget/src/labels.ts, apps/shopify-app/widget/src/native-page.ts, apps/shopify-app/widget/src/native-render.config.ts, apps/shopify-app/widget/src/native-render.css?inline (unresolved), apps/shopify-app/widget/src/overlay.ts, apps/shopify-app/widget/src/search-client.ts, apps/shopify-app/widget/src/strings.ts
 - apps/shopify-app/widget/src/overlay.ts → apps/shopify-app/widget/src/format.ts, apps/shopify-app/widget/src/image-url.ts, apps/shopify-app/widget/src/labels.ts, apps/shopify-app/widget/src/search-client.ts, apps/shopify-app/widget/src/strings.ts, apps/shopify-app/widget/src/widget.css?inline (unresolved)
 - apps/shopify-app/widget/test-ui/labels.spec.ts → apps/shopify-app/widget/src/strings.ts
 - apps/shopify-app/widget/test-ui/localization.spec.ts → apps/shopify-app/widget/src/strings.ts

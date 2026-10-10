@@ -69,12 +69,21 @@ for (const viewport of [
   });
 }
 
-test("cards after the first row load lazily", async ({ page }) => {
+test("cards 1–4 load eagerly at high priority; card 5 on load lazily with no priority (YOY-171 AC-8)", async ({ page }) => {
+  const warnings: string[] = [];
+  page.on("console", (message) => warnings.push(message.text()));
   await page.goto("/try");
   await page.getByTestId("playground-input").fill("paged dress");
   await page.getByTestId("playground-input").press("Enter");
   const images = page.getByTestId("playground-card").locator("img");
   await expect(images).toHaveCount(24);
-  await expect(images.nth(3)).toHaveAttribute("loading", "eager");
-  await expect(images.nth(4)).toHaveAttribute("loading", "lazy");
+  for (const index of [0, 1, 2, 3]) {
+    await expect(images.nth(index)).toHaveAttribute("loading", "eager");
+    await expect(images.nth(index)).toHaveAttribute("fetchpriority", "high");
+  }
+  for (const index of [4, 23]) {
+    await expect(images.nth(index)).toHaveAttribute("loading", "lazy");
+    await expect(images.nth(index)).not.toHaveAttribute("fetchpriority", /.*/);
+  }
+  expect(warnings.filter((text) => /fetchpriority/i.test(text))).toEqual([]);
 });

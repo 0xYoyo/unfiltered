@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   CARD_IMAGE_WIDTHS,
+  cardImageFetchPriority,
   cardImageLoading,
   cardImageSources,
   FIRST_ROW_CARDS,
@@ -72,5 +73,11 @@ describe("cardImageSources and loading (AC-2)", () => {
     expect(cardImageLoading(FIRST_ROW_CARDS - 1)).toBe("eager");
     expect(cardImageLoading(FIRST_ROW_CARDS)).toBe("lazy");
     expect(cardImageLoading(30)).toBe("lazy");
+  });
+
+  it("fetches the first row's images first, and only the first row's (YOY-171 AC-8)", () => {
+    expect(cardImageFetchPriority(0)).toBe("high");
+    expect(cardImageFetchPriority(FIRST_ROW_CARDS - 1)).toBe("high");
+    expect(cardImageFetchPriority(FIRST_ROW_CARDS)).toBeUndefined();
   });
 });

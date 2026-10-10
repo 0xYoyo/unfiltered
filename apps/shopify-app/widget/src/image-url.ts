@@ -65,3 +65,18 @@ export function cardImageSources(url: string): CardImageSources {
 export function cardImageLoading(position: number): "eager" | "lazy" {
   return position < FIRST_ROW_CARDS ? "eager" : "lazy";
 }
+
+/**
+ * `fetchpriority` for the card at `position` (YOY-171 AC-8): `high` for the
+ * first row, so its images are fetched before everything else on the page;
+ * none for the rest, which keep the browser's default.
+ */
+export function cardImageFetchPriority(position: number): "high" | undefined {
+  return position < FIRST_ROW_CARDS ? "high" : undefined;
+}
+
+/** Give one image the first-row treatment (YOY-171 AC-8): eager, high priority. */
+export function markFirstRowImage(image: HTMLImageElement): void {
+  image.loading = "eager";
+  image.setAttribute("fetchpriority", "high");
+}
