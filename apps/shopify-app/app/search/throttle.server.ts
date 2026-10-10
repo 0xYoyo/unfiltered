@@ -153,11 +153,23 @@ export function previewExtractionAllowance(
   throttle: SessionThrottle,
   key: string,
 ): () => boolean {
+  return allowanceAcross([[throttle, key]]);
+}
+
+/**
+ * An allowance that every bucket must grant (YOY-171 AC-15): refused when
+ * any bucket's window is spent; when granted, one slot is spent in each.
+ */
+export function allowanceAcross(
+  buckets: ReadonlyArray<readonly [SessionThrottle, string]>,
+): () => boolean {
   return () => {
-    if (throttle.shouldThrottle(key)) {
+    if (buckets.some(([throttle, key]) => throttle.shouldThrottle(key))) {
       return false;
     }
-    throttle.recordAiSearch(key);
+    for (const [throttle, key] of buckets) {
+      throttle.recordAiSearch(key);
+    }
     return true;
   };
 }
@@ -172,4 +184,38 @@ let previewThrottle: SessionThrottle | undefined;
 export function getPreviewExtractionThrottle(): SessionThrottle {
   previewThrottle ??= createSessionThrottle({ limit: previewExtractionLimitFromEnv() });
   return previewThrottle;
+}
+
+/** Proxy AI searches and preview extractions per shop and minute (YOY-171 AC-15). */
+const DEFAULT_PROXY_SHOP_PER_MINUTE = 120;
+
+/**
+ * The per-shop proxy budget from the environment
+ * (`PROXY_SHOP_AI_PER_MINUTE`); invalid or absent values mean 120. One
+ * value bounds both shop buckets: AI searches, and preview extractions.
+ */
+export function proxyShopLimitFromEnv(
+  env: Record<string, string | undefined> = process.env,
+): number {
+  const parsed = Number.parseInt(env.PROXY_SHOP_AI_PER_MINUTE ?? "", 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : DEFAULT_PROXY_SHOP_PER_MINUTE;
+}
+
+let shopSearchThrottle: SessionThrottle | undefined;
+let shopPreviewThrottle: SessionThrottle | undefined;
+
+/**
+ * The proxy's per-shop AI search bucket (YOY-171 AC-15), keyed by the
+ * signature-verified shop: a search must pass it as well as its session's,
+ * so a client rotating `sessionId` cannot buy unbounded judge spend.
+ */
+export function getShopSearchThrottle(): SessionThrottle {
+  shopSearchThrottle ??= createSessionThrottle({ limit: proxyShopLimitFromEnv() });
+  return shopSearchThrottle;
+}
+
+/** The proxy's per-shop preview-extraction bucket (YOY-171 AC-15). */
+export function getShopPreviewThrottle(): SessionThrottle {
+  shopPreviewThrottle ??= createSessionThrottle({ limit: proxyShopLimitFromEnv() });
+  return shopPreviewThrottle;
 }

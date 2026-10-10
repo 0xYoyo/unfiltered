@@ -10,9 +10,11 @@ import {
   type ProxySearchBody,
 } from "../search/proxy.server";
 import {
+  allowanceAcross,
   getPreviewExtractionThrottle,
   getSessionThrottle,
-  previewExtractionAllowance,
+  getShopPreviewThrottle,
+  getShopSearchThrottle,
 } from "../search/throttle.server";
 import { authenticate } from "../shopify.server";
 
@@ -91,7 +93,7 @@ async function handleSearch(
   // actual query; previews are typing noise. Its only model call is the
   // wish extraction it starts for the submit (YOY-171 AC-7), once per
   // sentence through the extraction cache and within its own per-session
-  // allowance (AC-13).
+  // and per-shop allowances (AC-13, AC-15).
   const preview = body.mode === "preview";
   // The classic rescue (YOY-96 AC-9): the widget's SUBMITTED search timed
   // out on its side and it re-asks the same query down the classic path —
@@ -102,9 +104,14 @@ async function handleSearch(
   // Per-session AI throttle (YOY-47): a session past its sliding-window
   // budget is served find order with no judge call (YOY-147 AC-7).
   // Previews and classic rescues make no model call, so the throttle
-  // ignores them.
+  // ignores them. The shop's own bucket holds too (YOY-171 AC-15): the
+  // sessionId is the client's to choose, the signed shop is not.
   const throttle = getSessionThrottle();
-  const throttled = !preview && !classic && throttle.shouldThrottle(body.sessionId);
+  const shopThrottle = getShopSearchThrottle();
+  const throttled =
+    !preview &&
+    !classic &&
+    (throttle.shouldThrottle(body.sessionId) || shopThrottle.shouldThrottle(shop));
 
   // Containment (YOY-52 AC-4): a failure below the orchestrator's own
   // fallback ladder — construction included — must never surface framework
@@ -129,11 +136,12 @@ async function handleSearch(
             query: body.query,
             shopDomain: shop,
             preview: true,
-            // Its wish extraction has its own per-session allowance (YOY-171 AC-13).
-            extractionAllowance: previewExtractionAllowance(
-              getPreviewExtractionThrottle(),
-              body.sessionId,
-            ),
+            // Its wish extraction has its own per-session allowance (YOY-171
+            // AC-13), and the shop's on top (AC-15).
+            extractionAllowance: allowanceAcross([
+              [getPreviewExtractionThrottle(), body.sessionId],
+              [getShopPreviewThrottle(), shop],
+            ]),
           }
         : classic
           ? {
@@ -174,6 +182,7 @@ async function handleSearch(
     const firstPage = (response.page ?? 1) === 1;
     if (!preview && !throttled && response.route === "ai" && firstPage) {
       throttle.recordAiSearch(body.sessionId);
+      shopThrottle.recordAiSearch(shop);
     }
 
     // Exactly one SearchEvent per SUBMITTED search — degraded, zero-hit,
