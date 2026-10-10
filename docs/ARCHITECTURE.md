@@ -587,9 +587,17 @@ engine that preceded it is preserved at the `engine-v1-last` tag.)
 2. **A keystroke preview** (`preview`, YOY-68) and **the widget's
    client-timeout rescue** (`forceClassicReason: "client-timeout-rescue"`,
    YOY-96 AC-9) are classic keyword search on the raw query — zero model
-   and zero embedding calls, route `classic`, no chips, no labels. The
-   rescue is `degraded: true` and pages by slicing its full result; a
-   preview is never paged.
+   and zero embedding calls on their path, route `classic`, no chips, no
+   labels. The rescue is `degraded: true` and pages by slicing its full
+   result; a preview is never paged. A preview of 3 or more characters
+   also starts the wish extraction for the sentence as typed (YOY-171
+   AC-7), through the extraction cache and without waiting for it, so the
+   submit of the same sentence finds it cached. One extraction runs per
+   cache key at a time: a search submitted while its preview's call still
+   runs joins that call (`extractionCached: true`, the `extract` stage the
+   rest of its wait) instead of calling again. A refinement's submit
+   carries its chain, which a preview never does, so it does not share the
+   preview's key.
 
 No model failure reaches the caller. A failed embedding or card-index query
 serves the keyword order with `degraded: true` and nothing judged; a late or
@@ -1115,7 +1123,9 @@ A submitted search's model spend is one query embedding (cached per find
 step, so later pages re-embed nothing), one wish extraction (`extract`,
 answered from the extraction cache on a repeated sentence) and one judge
 call per page inside the find set (`judge`, answered from the answer cache
-on a repeated page); previews and the rescue spend nothing. Ingestion's
+on a repeated page); the rescue spends nothing, and a preview spends only
+the extraction it starts for its sentence (YOY-171 AC-7), which the submit
+of that sentence then does not make. Ingestion's
 spend is the `enrichment`, `vision`, `card` and `embedding` operations.
 
 Embedding calls are the one estimated entry in the ledger: Gemini

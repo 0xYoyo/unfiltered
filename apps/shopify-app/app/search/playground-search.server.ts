@@ -15,7 +15,7 @@ export interface PlaygroundSearchInput {
   storeKey: string;
   /** Primary-hit cap; the playground's own cap when absent. */
   limit?: number;
-  /** Keystroke preview: classic-only, zero LLM calls. */
+  /** Keystroke preview: classic-only; starts the submit's wish extraction (YOY-171 AC-7). */
   preview?: boolean;
   /** Classic rescue of a search that timed out client-side. */
   classic?: boolean;
