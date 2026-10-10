@@ -181,6 +181,25 @@ export function labelSegments(
   return length > LABEL_MAX_CHARS[label.template] ? null : segments;
 }
 
+/**
+ * The label every card above the "Close matches" heading carries (YOY-171
+ * AC-3): the same template and the same values on each, so the page says
+ * it once, above the grid, instead of under every card. Null when there is
+ * no card, when any card has no label, or when two differ.
+ */
+export function sharedLabel(labels: ReadonlyArray<LabelLike | null | undefined>): LabelLike | null {
+  const [first] = labels;
+  if (first === null || first === undefined) {
+    return null;
+  }
+  const key = JSON.stringify([first.template, first.values]);
+  return labels.every(
+    (label) => label !== null && label !== undefined && JSON.stringify([label.template, label.values]) === key,
+  )
+    ? first
+    : null;
+}
+
 /** The filled label as plain text, or null when it must not be shown. */
 export function labelText(
   strings: LabelStrings,

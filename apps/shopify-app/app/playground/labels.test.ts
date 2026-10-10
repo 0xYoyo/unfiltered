@@ -7,6 +7,7 @@ import {
   labelLocale,
   labelSegments,
   labelText,
+  sharedLabel,
   underCloseHeading,
 } from "../../widget/src/labels";
 import { STRING_CATALOG } from "../../widget/src/strings";
@@ -192,5 +193,18 @@ describe("no close-match label under the heading (YOY-168 AC-3)", () => {
   it("keeps any other label, and a card with none", () => {
     expect(underCloseHeading(card("price-far")).label).toEqual({ template: "price-far", values: [] });
     expect(underCloseHeading(card(null)).label).toBeNull();
+  });
+});
+
+describe("one label for the whole page (YOY-171 AC-3)", () => {
+  const far = { template: "price-far", values: ["640 ILS", "400 ILS"] };
+  it("is the label when every card carries the same template and values", () => {
+    expect(sharedLabel(Array.from({ length: 24 }, () => ({ ...far, values: [...far.values] })))).toEqual(far);
+  });
+  it("is none when one card differs, carries none, or there is no card", () => {
+    expect(sharedLabel([...Array.from({ length: 23 }, () => far), null])).toBeNull();
+    expect(sharedLabel([far, { template: "price-far", values: ["700 ILS", "400 ILS"] }])).toBeNull();
+    expect(sharedLabel([far, { template: "price-near", values: far.values }])).toBeNull();
+    expect(sharedLabel([])).toBeNull();
   });
 });

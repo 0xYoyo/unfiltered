@@ -64,6 +64,10 @@ export type PlaygroundFixtureName =
   | "labels-pending"
   // YOY-171 AC-2: a stand-in after the judged cards, before the divider.
   | "stand-in"
+  // YOY-171 AC-3: 24 cards with one and the same label, and 23 of them
+  // with one card that carries none.
+  | "same-label"
+  | "same-label-mixed"
   // YOY-166: a judged order whose pages each hold matches and close
   // products, the close ones under the page's "Close matches" divider.
   | "v2-close"
@@ -118,6 +122,11 @@ export function selectFixture(
     if (has("meanings")) {
       // The second reading (YOY-150): "two meanings wedding dress".
       return "v2-two-meanings";
+    }
+    if (has("same")) {
+      // One label for the whole page (YOY-171 AC-3): "jacket under 30 same",
+      // "jacket under 30 same mixed".
+      return has("mixed") ? "same-label-mixed" : "same-label";
     }
     if (has("unchecked")) {
       // A stand-in (YOY-171 AC-2): "unchecked dress".
@@ -210,6 +219,31 @@ function imagesFixture(): PlaygroundSearchResponse {
       { ...first!, productId: "images-shopify", imageUrl: IMAGES_FIXTURE_SHOPIFY_URL },
       { ...second!, productId: "images-crawl", imageUrl: IMAGES_FIXTURE_CRAWL_URL },
     ],
+  };
+}
+
+/**
+ * "jacket under 30" as the live check saw it (YOY-171 AC-3): 24 jackets,
+ * every one over budget. `mixed` gives the last card no label, so the
+ * cards differ and every card keeps its own line.
+ */
+function sameLabelPage(mixed: boolean): PlaygroundSearchResponse {
+  const base = asResponse(labelsFixture);
+  const template = base.results[0]!;
+  const far = { template: "price-far" as const, values: ["45 USD", "30 USD"] };
+  return {
+    ...base,
+    searchId: mixed ? "fixture-same-label-mixed" : "fixture-same-label",
+    chips: [{ field: "priceMax", value: "30", currency: "USD" }],
+    results: Array.from({ length: 24 }, (_, index) => ({
+      ...template,
+      productId: `same-label-${index + 1}`,
+      title: `Jacket ${index + 1}`,
+      priceMin: 45 + index,
+      priceMax: 45 + index,
+      currencyCode: "USD",
+      label: mixed && index === 23 ? null : far,
+    })),
   };
 }
 
@@ -388,6 +422,10 @@ export function fixtureOutcome(
       return { delayMs: 0, status: 200, body: asResponse(labelTooLongFixture) };
     case "label-overflow":
       return { delayMs: 0, status: 200, body: asResponse(labelOverflowFixture) };
+    case "same-label":
+      return { delayMs: 0, status: 200, body: sameLabelPage(false) };
+    case "same-label-mixed":
+      return { delayMs: 0, status: 200, body: sameLabelPage(true) };
     case "stand-in":
       return { delayMs: 0, status: 200, body: asResponse(standInFixture) };
     case "labels-pending": {

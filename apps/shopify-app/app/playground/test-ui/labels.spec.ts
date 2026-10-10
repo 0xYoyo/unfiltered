@@ -252,6 +252,34 @@ for (const locale of ["en", "he"] as const) {
   });
 }
 
+for (const locale of ["en", "he"] as const) {
+  test(`YOY-171 AC-3: 24 cards with one label say it once above the grid, no card line; one card without it keeps every line (${locale})`, async ({
+    page,
+  }) => {
+    await open(page, locale);
+    const pageLabel = page.getByTestId("playground-page-label");
+    await submit(page, "jacket under 30 same");
+    await expect(cards(page)).toHaveCount(24);
+    await expect(pageLabel).toHaveText(PLAYGROUND_STRING_CATALOG[locale].labelPriceFar);
+    await expect(labels(page)).toHaveCount(0);
+    // The line sits above the grid, in the page's direction.
+    expect(
+      await pageLabel.evaluate((element) => {
+        const grid = document.querySelector('[data-testid="playground-grid"]')!;
+        return {
+          above: element.getBoundingClientRect().bottom <= grid.getBoundingClientRect().top,
+          direction: getComputedStyle(element).direction,
+        };
+      }),
+    ).toEqual({ above: true, direction: locale === "he" ? "rtl" : "ltr" });
+
+    await submit(page, "jacket under 30 same mixed");
+    await expect(cards(page)).toHaveCount(24);
+    await expect(pageLabel).toHaveCount(0);
+    await expect(labels(page)).toHaveCount(23);
+  });
+}
+
 test.describe("visual baselines", () => {
   for (const locale of ["en", "he"] as const) {
     test(`the labelled grid (${locale})`, async ({ page }) => {
