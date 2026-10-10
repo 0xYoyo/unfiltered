@@ -37,17 +37,9 @@ test.describe("@evidence", () => {
         await page.getByTestId("playground-chip").first().waitFor();
         await shot(page, `${device}-${locale}-2-ai-chips`);
 
-        await submit(page, "ai zero hit");
-        await page.getByTestId("playground-chips").waitFor();
-        await shot(page, `${device}-${locale}-3-zero-hit`);
-
         await submit(page, "degraded");
         await page.getByTestId("playground-card").first().waitFor();
         await shot(page, `${device}-${locale}-4-degraded`);
-
-        await submit(page, "ai color beige");
-        await page.getByTestId("playground-card-color-unknown").first().waitFor();
-        await shot(page, `${device}-${locale}-5-color-unknown`);
       });
     }
   }

@@ -100,7 +100,7 @@ test.describe("@evidence", () => {
         await items(page).nth(2).waitFor();
         await page
           .getByTestId("unfiltered-native-chip")
-          .filter({ hasText: locale === "he" ? "כחול" : "blue" })
+          .filter({ hasText: locale === "he" ? "שחור" : "black" })
           .first()
           .click();
         await page

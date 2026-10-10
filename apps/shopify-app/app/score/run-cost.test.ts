@@ -23,9 +23,9 @@ vi.mock("./synthetic.server", async (importOriginal) => {
   const original = await importOriginal<typeof import("./synthetic.server")>();
   return {
     ...original,
-    createSyntheticOrchestrator: (db: PrismaClient, set: readonly ScoreSetEntry[]) => {
+    createSyntheticOrchestrator: (db: PrismaClient) => {
       spend.db = db;
-      return original.createSyntheticOrchestrator(db, set);
+      return original.createSyntheticOrchestrator(db);
     },
     createSyntheticGrader: async (
       ...args: Parameters<typeof original.createSyntheticGrader>

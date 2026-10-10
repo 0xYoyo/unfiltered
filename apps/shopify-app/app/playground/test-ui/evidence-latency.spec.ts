@@ -3,9 +3,9 @@ import { mkdirSync } from "node:fs";
 
 /**
  * Design evidence for the per-stage latency rows in the engine-details panel
- * (YOY-114 AC-2): the panel open on an AI response (five stage rows), on a
- * classic response (three rows — the missing LLM rows are the point), and on
- * a zero-hit response (the closeMatches row), desktop and mobile, EN and HE.
+ * (YOY-114 AC-2): the panel open on an AI response (four stage rows) and on
+ * a keystroke preview (one `classic` row — the missing model rows are the
+ * point), desktop and mobile, EN and HE.
  * Tagged @evidence — off the default lane, captured with
  * `PLAYGROUND_EVIDENCE=1 npx playwright test --project=playground -g @evidence`.
  */
@@ -44,11 +44,10 @@ test.describe("@evidence", () => {
         await submit(page, "ai elegant dress");
         await shot(page, `${device}-${locale}-1-ai-stages`);
 
-        await submit(page, "dress");
+        // A preview: typed, not submitted.
+        await input(page).fill("dress");
+        await stages(page).getByText(/^classic · /).waitFor();
         await shot(page, `${device}-${locale}-2-classic-stages`);
-
-        await submit(page, "ai zero hit dress");
-        await shot(page, `${device}-${locale}-3-zero-hit-stages`);
       });
     }
   }

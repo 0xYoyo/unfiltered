@@ -24,6 +24,9 @@ const themeInput = (page: Page) =>
 const nativeChips = (page: Page) =>
   page.getByTestId("unfiltered-native-chip");
 const overlayChips = (page: Page) => page.getByTestId("unfiltered-widget-chip");
+/** The fixture's exclusion chips (v2 `exclude`, the term as typed). */
+const excludedChip = (page: Page, value: string) =>
+  page.locator(`[data-chip-field='exclude'][data-chip-value='${value}']`);
 
 async function submitQuery(page: Page, query: string): Promise<void> {
   await themeInput(page).fill(query);
@@ -67,7 +70,7 @@ test.describe("theme-native mirror", () => {
     await submitQuery(page, "dress not black not wool");
     await expect(nativeChips(page)).toHaveCount(3);
 
-    const plain = nativeChips(page).filter({ hasText: "dress" });
+    const plain = nativeChips(page).filter({ hasText: "Size M" });
     const excluded = page.locator("[data-chip-negated='true']");
     await expect(excluded).toHaveCount(2);
 
@@ -100,7 +103,7 @@ test.describe("theme-native mirror", () => {
     await submitQuery(page, "dress not black not wool");
     await expect(nativeChips(page)).toHaveCount(3);
 
-    const chip = page.locator("[data-chip-field='colorsExclude']");
+    const chip = excludedChip(page, "black");
     await expect(chip.locator(".unfiltered-native__chip-negator")).toHaveText(
       "Not",
     );
@@ -119,7 +122,7 @@ test.describe("theme-native mirror", () => {
     expect(negator).not.toContain("line-through");
 
     // A plain chip has neither part and no strike at all.
-    const plain = nativeChips(page).filter({ hasText: "dress" });
+    const plain = nativeChips(page).filter({ hasText: "Size M" });
     await expect(
       plain.locator(".unfiltered-native__chip-value"),
     ).toHaveCount(0);
@@ -131,12 +134,14 @@ test.describe("theme-native mirror", () => {
     await expect(nativeChips(page)).toHaveCount(3);
 
     // The strike is a visual mark; a screen reader still hears the filter.
-    await expect(
-      page.locator("[data-chip-field='colorsExclude']"),
-    ).toHaveAttribute("aria-label", "Remove filter: Not black");
-    await expect(
-      page.locator("[data-chip-field='attributesExclude']"),
-    ).toHaveAttribute("aria-label", "Remove filter: Not wool");
+    await expect(excludedChip(page, "black")).toHaveAttribute(
+      "aria-label",
+      "Remove filter: Not black",
+    );
+    await expect(excludedChip(page, "wool")).toHaveAttribute(
+      "aria-label",
+      "Remove filter: Not wool",
+    );
   });
 
   test("an exclusion is still a removable filter (W-7)", async ({ page }) => {
@@ -144,7 +149,7 @@ test.describe("theme-native mirror", () => {
     await submitQuery(page, "dress not black not wool");
     await expect(nativeChips(page)).toHaveCount(3);
 
-    await page.locator("[data-chip-field='colorsExclude']").click();
+    await excludedChip(page, "black").click();
     await expect(nativeChips(page)).toHaveCount(2);
   });
 
@@ -155,7 +160,7 @@ test.describe("theme-native mirror", () => {
     await submitQuery(page, "שמלה לא שחורה");
     await expect(nativeChips(page)).toHaveCount(3);
 
-    const chip = page.locator("[data-chip-field='colorsExclude']");
+    const chip = excludedChip(page, "שחור");
     await expect(chip.locator(".unfiltered-native__chip-negator")).toHaveText(
       "לא",
     );
@@ -169,18 +174,14 @@ test.describe("shadow-DOM overlay", () => {
   test("an excluded constraint is marked achromatically there too", async ({
     page,
   }) => {
+    // The AI fixture's chips: "Size M", "Under 400" and "Not black".
     await page.goto("/?fixture=ai&lang=en");
-    await themeInput(page).fill("blue dress");
+    await themeInput(page).fill("dress size m under 400 not black");
     await themeInput(page).press("Enter");
     await expect(overlayChips(page)).toHaveCount(3);
     const plainSkin = await skinOf(overlayChips(page).first());
 
-    await page.goto("/?fixture=ai-color-exclude&lang=en");
-    await themeInput(page).fill("dress not black");
-    await themeInput(page).press("Enter");
-    await expect(overlayChips(page)).toHaveCount(1);
-
-    const chip = overlayChips(page).first();
+    const chip = overlayChips(page).nth(2);
     await expect(chip).toHaveAttribute("data-chip-negated", "true");
     const excludedSkin = await skinOf(chip);
     expect(Number.parseFloat(excludedSkin.borderWidth)).toBeGreaterThan(

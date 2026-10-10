@@ -24,20 +24,6 @@ const searchRequests = (page: Page) =>
         .__searchRequests,
   );
 
-/** The echoed intent of the harness AI fixture (wire shape). */
-const AI_INTENT = {
-  category: "dress",
-  priceMin: null,
-  priceMax: 400,
-  currency: "ILS",
-  colorsInclude: [],
-  colorsExclude: ["black"],
-  occasion: null,
-  size: null,
-  availabilityRequired: false,
-  softAttributes: ["elegant"],
-};
-
 test("AI responses render a chip row with remove controls and accessible labels (AC-1)", async ({
   page,
 }) => {
@@ -48,16 +34,18 @@ test("AI responses render a chip row with remove controls and accessible labels 
 
   await expect(page.getByTestId("unfiltered-widget-chips")).toBeVisible();
   await expect(chips(page)).toHaveCount(3);
-  await expect(chips(page).nth(0)).toContainText("dress");
+  await expect(chips(page).nth(0)).toContainText("Size M");
   await expect(chips(page).nth(1)).toContainText("Under 400");
   await expect(chips(page).nth(2)).toContainText("Not black");
   await expect(chips(page).nth(1)).toHaveAttribute(
     "aria-label",
     "Remove filter: Under 400",
   );
+  // Every card renders alike: no colour note on any (YOY-155).
+  await expect(page.getByTestId("unfiltered-widget-color-note")).toHaveCount(0);
 });
 
-test("removing a chip sends the echoed intent + removed chip and re-renders (AC-2)", async ({
+test("removing a chip re-asks the query with the removed chip and re-renders (AC-2)", async ({
   page,
 }) => {
   await page.goto("/?fixture=ai&debounce=30000");
@@ -77,12 +65,11 @@ test("removing a chip sends the echoed intent + removed chip and re-renders (AC-
   expect(requests).toHaveLength(2);
   expect(requests[1]).toMatchObject({
     query: "elegant dress",
-    previousIntent: AI_INTENT,
-    removeChip: { field: "priceMax", value: "400" },
+    removedChips: [{ field: "priceMax", value: "400" }],
   });
 });
 
-test("AI zero-hits render the message, removable chips, and close matches (AC-3)", async ({
+test("AI zero-hits render the message and removable chips, with no close-matches section (AC-3)", async ({
   page,
 }) => {
   await page.goto("/?fixture=ai-zero-hit&debounce=30000");
@@ -95,17 +82,12 @@ test("AI zero-hits render the message, removable chips, and close matches (AC-3)
   );
   await expect(chips(page)).toHaveCount(3);
 
-  const closeMatches = page.getByTestId("unfiltered-widget-close-matches");
-  await expect(closeMatches).toBeVisible();
-  // The heading names what the server relaxed (YOY-111 AC-4): the fixture
-  // relaxed the budget cap.
-  await expect(closeMatches.locator("h2")).toHaveText(
-    "Close matches — over your budget",
-  );
+  // No card, no "Close matches" heading of any wording (YOY-155).
+  await expect(cards(page)).toHaveCount(0);
+  await expect(page.getByTestId("unfiltered-widget-close-matches")).toHaveCount(0);
   await expect(
-    closeMatches.getByTestId("unfiltered-widget-card"),
-  ).toHaveCount(1);
-  await expect(closeMatches).toContainText("Black Evening Dress");
+    page.getByTestId("unfiltered-widget-overlay").locator("h2"),
+  ).toHaveCount(0);
 
   // The chips are still removable in the zero-hit state: removing one
   // issues the removal request and re-renders results.
@@ -114,23 +96,7 @@ test("AI zero-hits render the message, removable chips, and close matches (AC-3)
   await expect(cards(page).first()).toBeVisible();
 });
 
-test("a follow-up query carries the held intent; the response's echo replaces it (AC-4)", async ({
-  page,
-}) => {
-  await page.goto("/?fixture=ai&debounce=30000");
-
-  await submitQuery(page, "elegant dress");
-  await expect(cards(page)).toHaveCount(2);
-
-  await submitQuery(page, "same but cheaper");
-  await expect.poll(async () => (await searchRequests(page)).length).toBe(2);
-
-  const requests = await searchRequests(page);
-  expect("previousIntent" in requests[0]!).toBe(false);
-  expect(requests[1]!.previousIntent).toEqual(AI_INTENT);
-});
-
-test("new search clears intent, input, chips, and results; next query has no previousIntent (AC-5)", async ({
+test("new search clears the input, chips, and results; the next query starts afresh (AC-5)", async ({
   page,
 }) => {
   await page.goto("/?fixture=ai&debounce=30000");
@@ -147,7 +113,8 @@ test("new search clears intent, input, chips, and results; next query has no pre
   await expect.poll(async () => (await searchRequests(page)).length).toBe(2);
   const requests = await searchRequests(page);
   expect(requests[1]!.query).toBe("fresh query");
-  expect("previousIntent" in requests[1]!).toBe(false);
+  expect("removedChips" in requests[1]!).toBe(false);
+  expect("previousQuery" in requests[1]!).toBe(false);
 });
 
 test("degraded responses render plain classic cards: no chips, no error text (AC-6)", async ({
@@ -184,52 +151,6 @@ test("the AI loading indicator survives slow responses and the input stays respo
   await expect(page.getByTestId("unfiltered-widget-loading")).toBeHidden();
 });
 
-test("unknown-color results rank after known matches and carry the label (YOY-67 AC-5)", async ({
-  page,
-}) => {
-  await page.goto("/?fixture=ai-color&debounce=30000");
-
-  await submitQuery(page, "blue snowboard");
-  await expect(cards(page)).toHaveCount(3);
-  await expect(chips(page)).toHaveCount(1);
-  await expect(chips(page).first()).toContainText("blue");
-
-  // Known-color matches render first; the unknown-color product is last,
-  // visually de-emphasized, and explicitly labeled.
-  await expect(cards(page).nth(0)).toContainText("Blue Snowboard");
-  await expect(cards(page).nth(1)).toContainText("Ocean Board");
-  const unknown = cards(page).nth(2);
-  await expect(unknown).toContainText("Mystery Board");
-  await expect(unknown).toHaveClass(/card-color-unknown/);
-  await expect(
-    unknown.getByTestId("unfiltered-widget-color-note"),
-  ).toHaveText("Color not confirmed");
-
-  // Known matches carry no label and no de-emphasis.
-  await expect(
-    cards(page).nth(0).getByTestId("unfiltered-widget-color-note"),
-  ).toHaveCount(0);
-  const knownOpacity = await cards(page)
-    .nth(0)
-    .evaluate((element) => getComputedStyle(element).opacity);
-  const unknownOpacity = await unknown.evaluate(
-    (element) => getComputedStyle(element).opacity,
-  );
-  expect(Number(unknownOpacity)).toBeLessThan(Number(knownOpacity));
-});
-
-test("the unknown-color label is localized in Hebrew chrome (YOY-67 AC-5)", async ({
-  page,
-}) => {
-  await page.goto("/?fixture=ai-color&locale=he&debounce=30000");
-
-  await submitQuery(page, "סנובורד כחול");
-  await expect(cards(page)).toHaveCount(3);
-  await expect(
-    cards(page).nth(2).getByTestId("unfiltered-widget-color-note"),
-  ).toHaveText("צבע לא מאומת");
-});
-
 test("focus renders no panel; loading opens it; results keep it open (YOY-67 AC-6)", async ({
   page,
 }) => {
@@ -245,26 +166,4 @@ test("focus renders no panel; loading opens it; results keep it open (YOY-67 AC-
   await expect(page.getByTestId("unfiltered-widget-loading")).toBeVisible();
   await expect(overlay).toBeVisible();
   await expect(cards(page).first()).toBeVisible();
-});
-
-test("the unknown-color label renders under an exclusion-only color chip too (YOY-67 AC-5)", async ({
-  page,
-}) => {
-  await page.goto("/?fixture=ai-color-exclude&debounce=30000");
-
-  await submitQuery(page, "snowboard not black");
-  await expect(cards(page)).toHaveCount(2);
-  await expect(chips(page)).toHaveCount(1);
-  await expect(chips(page).first()).toContainText("Not black");
-
-  // The evidence-backed hit is unlabeled; the unknown-color hit is flagged
-  // exactly as under an inclusion chip.
-  await expect(
-    cards(page).nth(0).getByTestId("unfiltered-widget-color-note"),
-  ).toHaveCount(0);
-  const unknown = cards(page).nth(1);
-  await expect(unknown).toHaveClass(/card-color-unknown/);
-  await expect(
-    unknown.getByTestId("unfiltered-widget-color-note"),
-  ).toHaveText("Color not confirmed");
 });

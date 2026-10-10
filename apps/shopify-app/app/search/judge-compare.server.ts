@@ -77,7 +77,6 @@ export async function judgeCompareCommand(
   }
   // The orchestrator reads these at construction, like production; the
   // deadline is the score run's, so a slow answer is measured, not cut.
-  process.env.ENGINE_V2 = "1";
   process.env.JUDGE_PROVIDER = judge;
   process.env.JUDGE_DEADLINE_MS ??= "4000";
 

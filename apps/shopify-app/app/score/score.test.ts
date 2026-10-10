@@ -408,7 +408,7 @@ describe("the grader's shopper view (YOY-141 AC-11)", () => {
     const { llm, requests } = fakeGrader();
     await runScoreSet({
       db,
-      orchestrator: createSyntheticOrchestrator(db, set),
+      orchestrator: createSyntheticOrchestrator(db),
       grader: llm,
       storeKey: SYNTHETIC_STORE_KEY,
       set,
@@ -455,7 +455,7 @@ describe("the scoring math (AC-5)", () => {
       { query: "zzzz qqqq", language: "en", source: "model", modelWritten: false },
       { query: "black dress", language: "fr", source: "model", modelWritten: true },
     ];
-    const orchestrator = createSyntheticOrchestrator(db, set);
+    const orchestrator = createSyntheticOrchestrator(db);
     const report = await runScoreSet({
       db,
       orchestrator,
@@ -493,7 +493,7 @@ describe("the scoring math (AC-5)", () => {
     let flushed = false;
     const report = await runScoreSet({
       db,
-      orchestrator: createSyntheticOrchestrator(db, set),
+      orchestrator: createSyntheticOrchestrator(db),
       grader: fakeGrader(3).llm,
       storeKey: SYNTHETIC_STORE_KEY,
       set,
@@ -521,7 +521,7 @@ describe("the runner (AC-6, AC-7)", () => {
     const set: ScoreSetEntry[] = [
       { query: "shirt", language: "en", source: "log", modelWritten: false },
     ];
-    const orchestrator = createSyntheticOrchestrator(db, set);
+    const orchestrator = createSyntheticOrchestrator(db);
     const runSearch = vi.spyOn(orchestrator, "runSearch");
     await runScoreSet({ db, orchestrator, grader: fakeGrader().llm, storeKey: SYNTHETIC_STORE_KEY, set });
     expect(runSearch).toHaveBeenCalledWith({ query: "shirt", shopDomain: SYNTHETIC_STORE_KEY, limit: 24 });
@@ -530,8 +530,8 @@ describe("the runner (AC-6, AC-7)", () => {
   it("prints the score table only — a marker in the queries never reaches the output", async () => {
     const marker = "ZQX-MARKER-140";
     const set: ScoreSetEntry[] = [
-      // A purpose phrase routes to the AI path, whose intent call has no
-      // recording: the orchestrator warns with the query in the message.
+      // No query vector is recorded: the find step's embedding fails and the
+      // search is served degraded, logging as a live outage would.
       { query: `${marker} dress for a wedding`, language: "en", source: "log", modelWritten: false },
       { query: `${marker} linen shirt`, language: "he", source: "model", modelWritten: false },
       { query: `shirt ${marker}`, language: "fr", source: "model", modelWritten: true },
@@ -559,15 +559,15 @@ describe("the runner (AC-6, AC-7)", () => {
     expect(code).toBe(0);
     const output = written.join("");
     expect(output).not.toContain(marker);
-    // Progress lines go to stderr as the run goes; stdout starts with the engine.
-    expect(output.replace(/^\[\d+\/\d+\] .*\n/gm, "")).toMatch(/^engine synthetic\nlanguage\s+score/);
-    // The engine line, header, three language rows, the cost line, the extract-call
-    // line — plus one progress line per search on stderr (YOY-149 runner guard).
+    // Progress lines go to stderr as the run goes; stdout starts with the table.
+    expect(output.replace(/^\[\d+\/\d+\] .*\n/gm, "")).toMatch(/^language\s+score/);
+    // The header, three language rows, the cost line, the extract-call line —
+    // plus one progress line per search on stderr (YOY-149 runner guard).
     const onePass = output.trim().split("\n");
     const progressLines = onePass.filter((line) => /^\[\d+\/\d+\] /.test(line));
     expect(progressLines.length).toBeGreaterThan(0);
     expect(progressLines.every((line) => / ok$/.test(line))).toBe(true);
-    expect(onePass.filter((line) => !/^\[\d+\/\d+\] /.test(line))).toHaveLength(7);
+    expect(onePass.filter((line) => !/^\[\d+\/\d+\] /.test(line))).toHaveLength(6);
     expect(output.trim().split("\n").at(-1)).toBe("extract calls 0");
 
     written.length = 0;
@@ -585,26 +585,6 @@ describe("the runner (AC-6, AC-7)", () => {
     expect(lines.filter((line) => /^pass \d$/.test(line))).toEqual(["pass 1", "pass 2"]);
     expect(lines.filter((line) => line.startsWith("language"))).toHaveLength(2);
     expect(await runScoreCommand(["--synthetic", "--set", setPath, "--passes", "4"])).toBe(2);
-  });
-
-  it("refuses to start a real run with no engine named, before it spends (YOY-149)", async () => {
-    const saved = process.env.ENGINE_V2;
-    delete process.env.ENGINE_V2;
-    const errors: string[] = [];
-    try {
-      const code = await runScoreCommand(["--set", "/nonexistent/set.json"], {
-        out: () => undefined,
-        err: (line: string) => void errors.push(line),
-      });
-      expect(code).toBe(2);
-      expect(errors.join("\n")).toMatch(/ENGINE_V2 is not set/);
-      expect(
-        await runScoreCommand(["--engine", "v3"], { out: () => undefined, err: () => undefined }),
-      ).toBe(2);
-    } finally {
-      if (saved === undefined) delete process.env.ENGINE_V2;
-      else process.env.ENGINE_V2 = saved;
-    }
   });
 
   it("reports progress per search, stops after five consecutive failures, and times a stuck search out (YOY-149 runner guards)", async () => {
@@ -657,7 +637,7 @@ describe("the runner (AC-6, AC-7)", () => {
     expect(timed.failures).toEqual([{ stage: "search", className: "ScoreSearchTimeout", count: 1 }]);
   });
 
-  it("captures the query-bearing warnings a degraded search logs", async () => {
+  it("captures the warnings a degraded search logs, which never name the query", async () => {
     const marker = "ZQX-MARKER-140";
     const db = await createTestDb();
     await importScoreFixture(db, buildSyntheticFixture());
@@ -668,14 +648,16 @@ describe("the runner (AC-6, AC-7)", () => {
     const { captured } = await withCapturedConsole(() =>
       runScoreSet({
         db,
-        orchestrator: createSyntheticOrchestrator(db, set),
+        orchestrator: createSyntheticOrchestrator(db),
         grader: fakeGrader().llm,
         storeKey: SYNTHETIC_STORE_KEY,
         set,
       }),
     );
-    // The leak the capture exists for: the orchestrator's warning names the query.
-    expect(captured.join("\n")).toContain(marker);
+    // The find step's warning is captured, not printed — and it names the
+    // error class only, never the query.
+    expect(captured.join("\n")).toContain("find step vector half failed");
+    expect(captured.join("\n")).not.toContain(marker);
   });
 
   it("captures the console while a run is in flight", async () => {
@@ -694,7 +676,7 @@ describe("the runner (AC-6, AC-7)", () => {
     const set: ScoreSetEntry[] = [
       { query: "linen shirt", language: "en", source: "log", modelWritten: false },
     ];
-    const orchestrator = createSyntheticOrchestrator(db, set);
+    const orchestrator = createSyntheticOrchestrator(db);
     const grader = await createSyntheticGrader(orchestrator, set);
     const report = await runScoreSet({ db, orchestrator, grader, storeKey: SYNTHETIC_STORE_KEY, set });
     expect(report.languages[0]!.failed).toBe(0);
@@ -836,7 +818,7 @@ describe("failures by stage and class (YOY-141 AC-13)", () => {
       { query: `${marker} black dress`, language: "en", source: "log", modelWritten: false },
       { query: `${marker} shirt`, language: "he", source: "log", modelWritten: false },
     ];
-    const orchestrator = createSyntheticOrchestrator(db, set);
+    const orchestrator = createSyntheticOrchestrator(db);
     vi.spyOn(orchestrator, "runSearch").mockImplementation(async (request) => {
       throw new GeminiTimeoutError(`timed out on ${request.query}`);
     });
@@ -863,7 +845,7 @@ describe("failures by stage and class (YOY-141 AC-13)", () => {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     const graded = await runScoreSet({
       db,
-      orchestrator: createSyntheticOrchestrator(db, set),
+      orchestrator: createSyntheticOrchestrator(db),
       grader: failingGrader,
       storeKey: SYNTHETIC_STORE_KEY,
       set: set.slice(0, 1).map((entry) => ({ ...entry, query: "linen shirt" })),
@@ -879,7 +861,7 @@ describe("failures by stage and class (YOY-141 AC-13)", () => {
     ];
     const report = await runScoreSet({
       db,
-      orchestrator: createSyntheticOrchestrator(db, set),
+      orchestrator: createSyntheticOrchestrator(db),
       grader: fakeGrader(3).llm,
       storeKey: SYNTHETIC_STORE_KEY,
       set,
@@ -983,7 +965,7 @@ describe("the hidden run's leak check (YOY-141 AC-3)", () => {
       { query: "pass", language: "en", source: "model", modelWritten: false },
       { query: "extract", language: "en", source: "model", modelWritten: false },
     ];
-    expect(findLeaks("pass 2\nextract calls 0\nengine v2\n", hiddenWord)).toEqual({ leaked: 0 });
+    expect(findLeaks("pass 2\nextract calls 0\n", hiddenWord)).toEqual({ leaked: 0 });
     expect(findLeaks("pass the salt\nextract calls for linen\n", hiddenWord)).toEqual({ leaked: 2 });
     expect(formatScoreTable({ languages: [], cost: { usd: 0, calls: 0 }, failures: [], extractCalls: 0 })).toContain(
       "extract calls 0",
@@ -1077,9 +1059,9 @@ describe("the score workflow (YOY-141 AC-1, AC-2)", () => {
     expect(triggers).toMatch(/ref:\n(?:\s+.*\n)*?\s+default: main/);
   });
 
-  it("scores the engine the dispatch names: v2 sets ENGINE_V2=1, v2 by default (YOY-145 AC-13; YOY-157 AC-20)", () => {
-    expect(triggers).toMatch(/engine:\n(?:\s+.*\n)*?\s+default: v2/);
-    expect(workflow).toContain("ENGINE_V2: ${{ inputs.engine == 'v2' && '1' || '0' }}");
+  it("has no engine input: there is one engine (YOY-155 AC-3)", () => {
+    expect(triggers).not.toMatch(/^\s+engine:$/m);
+    expect(workflow).not.toMatch(/ENGINE_V\d/);
   });
 
   it("scores with the judge the dispatch names: gemini or jev into JUDGE_PROVIDER, jev by default (YOY-152 AC-6; YOY-157 AC-19)", () => {
@@ -1161,8 +1143,8 @@ describe("the score workflow (YOY-141 AC-1, AC-2)", () => {
     expect(checkJob).toContain('exit "${RUN_STATUS:-1}"');
   });
 
-  it("prints the GEMINI_ and INTENT_ env names before the run, never their values (YOY-141 AC-13)", () => {
-    const names = workflow.indexOf("env | cut -d= -f1 | grep -E '^(GEMINI|INTENT)_'");
+  it("prints the GEMINI_ env names before the run, never their values (YOY-141 AC-13)", () => {
+    const names = workflow.indexOf("env | cut -d= -f1 | grep -E '^GEMINI_'");
     expect(names).toBeGreaterThan(-1);
     expect(names).toBeLessThan(workflow.indexOf("scripts/score-run.mts --hidden-set"));
   });

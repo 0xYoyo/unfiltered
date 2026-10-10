@@ -11,11 +11,8 @@ import {
   parseJudgeAnswer,
   type EmbeddingClient,
   type ExtractedWishes,
-  type IntentExtractor,
   type JudgeCandidate,
   type LlmClient,
-  type QueryClassifier,
-  type Retriever,
   type StructuredCompletionRequest,
   type WishExtractor,
 } from "@unfiltered/engine";
@@ -211,11 +208,6 @@ describe("the find step merges both candidate sets (AC-1)", () => {
   });
 });
 
-const untouchable = {
-  classifier: { classify: () => Promise.reject(new Error("unexpected classification")) } as QueryClassifier,
-  extractor: { extract: () => Promise.reject(new Error("unexpected intent")) } as IntentExtractor,
-  retriever: { retrieve: () => Promise.reject(new Error("unexpected retrieval")) } as Retriever,
-};
 
 /**
  * An embedding port recording each call's texts: the new sentence alone
@@ -329,7 +321,6 @@ describe("refinement and the second reading on Engine v2 (on the database)", () 
   }) {
     return createSearchOrchestrator({
       db,
-      ...untouchable,
       classicStore: createPgTrgmClassicStore(db),
       find: createFindStep({
         db,
@@ -337,7 +328,6 @@ describe("refinement and the second reading on Engine v2 (on the database)", () 
         classicStore: createPgTrgmClassicStore(db),
         findSetSize: options.findSetSize ?? 1,
       }),
-      engineV2: true,
       ...(options.extractor !== undefined ? { wishExtractor: options.extractor } : {}),
       ...(options.judge !== undefined ? { judge: createLlmJudge({ llm: options.judge }) } : {}),
       ...(options.graceMs !== undefined ? { extractionGraceMs: options.graceMs } : {}),
@@ -424,8 +414,6 @@ describe("refinement and the second reading on Engine v2 (on the database)", () 
       latencyMs: 1,
       limited: null,
       stages: first.stages,
-      intentTier: null,
-      engine: "v2",
     });
     expect(playground.otherReading).toBe("Bridal gowns");
     const second = await search(engine, { query: "wedding dress", paging: { page: 2, pageSize: 1 } });
@@ -443,18 +431,15 @@ describe("refinement and the second reading on Engine v2 (on the database)", () 
     expect(judge.prompts).toHaveLength(1);
   });
 
-  it("ignores the chain on the old engine (NG-4): no carry", async () => {
-    const engine = createSearchOrchestrator({
-      db,
-      ...untouchable,
-      classifier: {
-        classify: () => Promise.resolve({ route: "classic", reason: "short-query" }),
-        settled: () => ({ route: "classic", reason: "short-query" }),
-      } as QueryClassifier,
-      classicStore: createPgTrgmClassicStore(db),
+  it("carries no chain on a keystroke preview: no carry", async () => {
+    const engine = orchestrator({ embeddings: recordingEmbeddings() });
+    const response = await engine.runSearch({
+      query: "gown",
+      shopDomain: SHOP,
+      previousQuery: "black dress",
+      preview: true,
     });
-    const response = await engine.runSearch({ query: "gown", shopDomain: SHOP, previousQuery: "black dress" });
-    expect(response.engine).toBe("v1");
+    expect(response.routeReason).toBe("preview");
     expect(response).not.toHaveProperty("carry");
   });
 });

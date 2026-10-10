@@ -20,14 +20,10 @@
  *   npx tsx scripts/latency-probe.mts --url https://<service>.onrender.com \
  *     [--catalog <slug>] [--runs 20] [--set classic|ai-en|ai-he|all] \
  *     [--assert-classic-p95 500] [--assert-ai-p50 2000] [--assert-ai-p95 3500] \
- *     [--ai-per-minute 10] [--engine v1|v2]
+ *     [--ai-per-minute 10]
  *
- * `--engine` (YOY-147 AC-13) is sent to the playground API as its `engine`
- * parameter, so the probe can time one engine whatever the deployment's
- * default. Absent — the default (YOY-153 AC-5) — no parameter is sent and the
- * engine the deployment serves answers: Engine v2 unless its `ENGINE_V2=0`.
- * Every set reports its under-1-s share and, for v2 samples, the share
- * composed without the wish extraction (`no-extraction`). A last line
+ * Every set reports its under-1-s share and the share of its submitted
+ * searches composed without the wish extraction (`no-extraction`). A last line
  * gives the judge stage over every set (YOY-154 AC-8): its p50/p95 and how
  * many searches ended `judged`, `judge-cached`, `judge-timeout` or
  * `judge-error` — and the split (YOY-159 AC-1): the `judgeRows` stage (the
@@ -60,8 +56,6 @@ export interface ProbeArgs {
   assertAiP95: number | null;
   /** Ceiling on AI-set requests per sliding minute; the playground's is 10. */
   aiPerMinute: number;
-  /** The playground's `engine` parameter (YOY-147 AC-13); null sends none. */
-  engine: "v1" | "v2" | null;
 }
 
 const DEFAULT_RUNS = 20;
@@ -70,32 +64,30 @@ const DEFAULT_RUNS = 20;
  * Four zero-width format characters used as base-4 digits of an invisible
  * per-request marker (YOY-64 AC-6). None is whitespace to `\s` or to
  * `String.prototype.trim`, none is a letter or a digit, so the exact-query
- * reuse key (`normalizeReuseQuery`: trim, collapse whitespace, case-fold)
- * and the classifier's token rules both keep the marker. The marker is
- * invisible, not absent: nothing on the server strips it, so the classifier
- * and the intent model receive the committed query plus the marker as-is
- * (see `distinctQueryText`). U+FEFF is deliberately absent: `trim()`
- * removes it.
+ * cache key (`normalizeReuseQuery`: trim, collapse whitespace, case-fold)
+ * keeps the marker. The marker is invisible, not absent: nothing on the
+ * server strips it, so the query embedding, the wish extraction and the
+ * judge receive the committed query plus the marker as-is (see
+ * `distinctQueryText`). U+FEFF is deliberately absent: `trim()` removes it.
  */
 const INVISIBLE_DIGITS = ["\u200B", "\u200C", "\u200D", "\u2060"] as const;
 
 /**
  * The committed query with an invisible marker unique to this probe
- * invocation and run appended. Exact-query intent reuse (YOY-64 AC-4)
- * answers a repeated query from its stored intent with zero LLM calls, so a
- * probe that sent the same text `--runs` times would measure the cache from
- * run 2 on and mask the AI bar; with a distinct text per (invocation, run)
- * every AI sample pays the full path. Classic queries never store an intent
- * and are sent unchanged.
+ * invocation and run appended. The judge's answer cache (YOY-148) and the
+ * extraction cache (YOY-149 AC-18) answer a repeated query with no model
+ * call, so a probe that sent the same text `--runs` times would measure the
+ * caches from run 2 on and mask the AI bar; with a distinct text per
+ * (invocation, run) every AI sample pays the full path. Classic queries are
+ * keyword-only and are sent unchanged.
  *
  * What the marker reaches (YOY-125 AC-5): the orchestrator passes the raw
- * query to the LLM classifier and to the intent extractor, so both models
- * receive the committed query plus one trailing space and 24 zero-width
- * characters — roughly 6 extra input tokens per call, no retrieval change.
- * Only `visibleQueryText` strips it, and only for reporting (the per-run
- * log line); the reuse key treats it as text. The AI bars are therefore
- * measured on committed-query-plus-marker, not on the byte-identical
- * shopper query.
+ * query to the embedding, the wish extraction and the judge, so each
+ * receives the committed query plus one trailing space and 24 zero-width
+ * characters — a few extra input tokens per call. Only `visibleQueryText`
+ * strips it, and only for reporting (the per-run log line); the cache keys
+ * treat it as text. The AI bars are therefore measured on
+ * committed-query-plus-marker, not on the byte-identical shopper query.
  */
 export function distinctQueryText(
   query: string,
@@ -148,7 +140,6 @@ export function parseArgs(argv: readonly string[]): ProbeArgs {
     "assert-ai-p50",
     "assert-ai-p95",
     "ai-per-minute",
-    "engine",
   ]);
   for (const flag of values.keys()) {
     if (!known.has(flag)) {
@@ -187,10 +178,6 @@ export function parseArgs(argv: readonly string[]): ProbeArgs {
       `--set must be one of ${[...PROBE_SETS, "all"].join("|")}, got ${set}`,
     );
   }
-  const engine = values.get("engine") ?? null;
-  if (engine !== null && engine !== "v1" && engine !== "v2") {
-    throw new ProbeUsageError(`--engine must be v1 or v2, got ${engine}`);
-  }
   return {
     url: url.replace(/\/+$/, ""),
     catalog: values.get("catalog") ?? null,
@@ -200,7 +187,6 @@ export function parseArgs(argv: readonly string[]): ProbeArgs {
     assertAiP50: optionalMs("assert-ai-p50"),
     assertAiP95: optionalMs("assert-ai-p95"),
     aiPerMinute: positive("ai-per-minute", DEFAULT_AI_PER_MINUTE),
-    engine,
   };
 }
 
@@ -266,8 +252,6 @@ export interface SetSummary {
   underOneSecond: number;
   degraded: number;
   limited: number;
-  /** Responses served by exact-query intent reuse: a masked sample (AC-6). */
-  reused: number;
   /**
    * Share of Engine v2 samples composed without the wish extraction, 0–1
    * (YOY-149 AC-4); null when no sample reported it.
@@ -312,7 +296,6 @@ export function summarize(
       latencies.filter((latency) => latency < UNDER_ONE_SECOND_MS).length / latencies.length,
     degraded: samples.filter((sample) => sample.degraded).length,
     limited: samples.filter((sample) => sample.limited !== null).length,
-    reused: samples.filter((sample) => sample.routeReason === "intent-reuse").length,
     withoutExtraction: shareWithoutExtraction(samples),
     extractionCached: shareOf(samples, (sample) => sample.extractionCached),
     routes,
@@ -374,7 +357,7 @@ function spread(values: readonly (number | undefined)[]): Spread | null {
 /**
  * The judge stage over every sample of the run (YOY-154 AC-8): its median
  * and 95th percentile as the server timed them, and how the step ended.
- * Null when no sample ran the judge — the old engine, a classic-only run.
+ * Null when no sample ran the judge — a classic-only run.
  */
 export function summarizeJudge(samples: readonly ProbeSample[]): JudgeSummary | null {
   const timed = samples
@@ -436,7 +419,6 @@ export function formatSampleLine(
   return (
     `${sample.set} run ${run}/${runs} ${sample.latencyMs} ms ${sample.route}` +
     `${sample.degraded ? " degraded" : ""}${sample.limited !== null ? ` limited=${sample.limited}` : ""}` +
-    `${sample.routeReason === "intent-reuse" ? " REUSED" : ""}` +
     `${judged ? ` ${sample.routeReason}` : ""}` +
     `${sample.stages.judgeRows !== undefined ? ` rows=${sample.stages.judgeRows} ms` : ""}` +
     `${calls == null ? "" : ` calls slowest=${atLeast}${calls.slowestMs} ms median=${atLeast}${calls.medianMs} ms`}` +
@@ -501,7 +483,7 @@ export function formatSummary(summary: SetSummary): string {
       (summary.extractionCached === null
         ? ""
         : ` extraction-cached=${Math.round(summary.extractionCached * 100)}%`) +
-      ` degraded=${summary.degraded} limited=${summary.limited} reused=${summary.reused} routes: ${routes}`,
+      ` degraded=${summary.degraded} limited=${summary.limited} routes: ${routes}`,
     `  mean per stage: ${stages === "" ? "(none)" : stages}`,
   ].join("\n");
 }
@@ -542,9 +524,9 @@ interface PlaygroundBody {
   };
 }
 
-/** The query string of one probe request: the catalog and engine when given. */
+/** The query string of one probe request: the catalog when given. */
 export function probeSearchParams(
-  args: Pick<ProbeArgs, "catalog" | "engine">,
+  args: Pick<ProbeArgs, "catalog">,
   query: string,
 ): URLSearchParams {
   const params = new URLSearchParams({
@@ -553,9 +535,6 @@ export function probeSearchParams(
   });
   if (args.catalog !== null) {
     params.set("catalog", args.catalog);
-  }
-  if (args.engine !== null) {
-    params.set("engine", args.engine);
   }
   return params;
 }
@@ -683,7 +662,7 @@ export async function main(argv: readonly string[]): Promise<0 | 1> {
   }
 
   console.log("");
-  console.log(`latency probe — ${args.url}${args.catalog === null ? "" : ` catalog=${args.catalog}`}${args.engine === null ? "" : ` engine=${args.engine}`} runs=${args.runs}`);
+  console.log(`latency probe — ${args.url}${args.catalog === null ? "" : ` catalog=${args.catalog}`} runs=${args.runs}`);
   for (const summary of summaries) {
     console.log(formatSummary(summary));
   }

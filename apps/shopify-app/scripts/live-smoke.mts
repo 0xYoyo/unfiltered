@@ -16,11 +16,11 @@
  *       route=classic, not degraded, ≥ 1 result, 0 chips,
  *       details.latencyMs ≤ classicMaxMs — the keyword-path canary: keyword
  *       only, zero model calls (YOY-153 AC-4).
- *   (3) EN `elegant evening dress under 400`, submitted → the Engine v2
+ *   (3) EN `elegant evening dress under 400`, submitted → the find-path
  *       shape: not degraded, ≥ 1 result, `page` and `totalCount` present,
- *       details.engine "v2", latencyMs ≤ aiMaxMs (YOY-153 AC-4). No route
- *       or chip assertion: under v2 the route says whether the judge ran,
- *       and the chips are the shopper's own wishes.
+ *       latencyMs ≤ aiMaxMs (YOY-153 AC-4). No route or chip assertion:
+ *       the route says whether the judge ran, and the chips are the
+ *       shopper's own wishes.
  *   (4) HE `שמלה אלגנטית לערב מתחת ל-400`, submitted → the same assertions.
  *
  * Ceilings come from scripts/live-smoke.config.json. Every probe runs even
@@ -51,8 +51,6 @@ export interface ProbeResult {
   route: string | null;
   routeReason: string | null;
   chips: number | null;
-  /** `details.engine` as answered; null for healthz or when missing. */
-  engine: string | null;
   /** Every assertion that failed, in order; empty when the probe passed. */
   failures: string[];
 }
@@ -131,7 +129,7 @@ interface PlaygroundBody {
   chips?: unknown[];
   page?: unknown;
   totalCount?: unknown;
-  details?: { routeReason?: string; latencyMs?: number; engine?: string };
+  details?: { routeReason?: string; latencyMs?: number };
 }
 
 function emptyResult(name: ProbeResult["name"]): ProbeResult {
@@ -143,7 +141,6 @@ function emptyResult(name: ProbeResult["name"]): ProbeResult {
     route: null,
     routeReason: null,
     chips: null,
-    engine: null,
     failures: [],
   };
 }
@@ -219,7 +216,6 @@ async function probeSearch(
   result.routeReason = body.details?.routeReason ?? null;
   result.latencyMs = typeof body.details?.latencyMs === "number" ? body.details.latencyMs : null;
   result.chips = Array.isArray(body.chips) ? body.chips.length : null;
-  result.engine = typeof body.details?.engine === "string" ? body.details.engine : null;
   const results = Array.isArray(body.results) ? body.results.length : 0;
 
   if (body.degraded !== false) {
@@ -229,8 +225,8 @@ async function probeSearch(
     result.failures.push(`results: ${results}, expected ≥ 1`);
   }
   if (preview) {
-    // The keystroke preview is the keyword path on either engine: classic,
-    // no chips, no model call.
+    // The keystroke preview is the keyword path: classic, no chips, no
+    // model call.
     if (result.route !== "classic") {
       result.failures.push(`route is ${JSON.stringify(result.route)}, expected "classic"`);
     }
@@ -238,15 +234,12 @@ async function probeSearch(
       result.failures.push(`chips: ${result.chips ?? "missing"}, expected 0 on the preview`);
     }
   } else {
-    // The Engine v2 shape (YOY-153 AC-4): a paged answer from v2.
+    // The find-path shape (YOY-153 AC-4): a paged answer.
     if (typeof body.page !== "number") {
       result.failures.push(`page: ${JSON.stringify(body.page ?? null)}, expected a number`);
     }
     if (typeof body.totalCount !== "number") {
       result.failures.push(`totalCount: ${JSON.stringify(body.totalCount ?? null)}, expected a number`);
-    }
-    if (result.engine !== "v2") {
-      result.failures.push(`details.engine is ${JSON.stringify(result.engine)}, expected "v2"`);
     }
   }
   const ceiling = preview ? config.classicMaxMs : config.aiMaxMs;
@@ -298,7 +291,6 @@ export function formatSummary(report: SmokeReport): string {
   const rows = report.probes.map((probe) => {
     const verdict = probe.pass ? "PASS" : "FAIL";
     const facts = [
-      probe.engine === null ? null : `engine=${probe.engine}`,
       probe.route === null ? null : `route=${probe.route}`,
       probe.routeReason === null ? null : `reason=${probe.routeReason}`,
       probe.latencyMs === null ? null : `${probe.latencyMs} ms`,

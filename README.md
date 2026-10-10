@@ -22,28 +22,21 @@ npm-workspaces monorepo with three workspaces:
 | Workspace | Purpose |
 | --- | --- |
 | `apps/shopify-app` | Embedded Shopify app (official Shopify React Router + TypeScript template). Consumes the engine as a client. |
-| `packages/engine` | Catalog-agnostic search engine with a versioned, typed public API: query classification, intent extraction, vector retrieval, and classic keyword search — all data and AI access through vendor-free ports (LLM, embedding, cost metering, retrieval store, classic-search store). |
+| `packages/engine` | Catalog-agnostic search engine with a versioned, typed public API: the wish extraction, the judge, the enrichment vocabularies and the classic keyword-search port — all data and AI access through vendor-free ports (LLM, decision model, embedding, cost metering, classic-search store). |
 | `packages/provider-gemini` | Google AI Studio (Gemini) adapter implementing the engine's LLM and embedding ports, metered through the cost-recorder port. |
 
 ## Follow-up queries (refinement)
 
 After a result set, "same but cheaper" or "בלי שרוולים" means *modify that
-search*, not start a new one. The engine's intent extractor takes the previous
-query's intent as optional per-call context:
-
-```ts
-const refined = await extractor.extract("same but cheaper", { previousIntent });
-```
-
-With it, the model returns either the previous intent with the new query's
-deltas applied — every constraint and soft attribute the query did not touch
-preserved — or, when the shopper changed topic ("nike air max 90"), a
-completely fresh intent with nothing carried over. Either way the answer is a
-full `Intent`, never a patch. The engine stores nothing between calls: the
-caller supplies `previousIntent`, and only one is ever considered. Called
-without it, extraction behaves exactly as before. See
-[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full contract and
-`apps/shopify-app/app/eval/` for the refinement goldens that pin the behavior.
+search*, not start a new one. Every submitted response carries a `carry` —
+the chain's first sentence plus its two most recent refinements — and the
+client sends it back as `previousQuery` on the next search. The find step,
+the wish extraction and the judge read it; the extraction also answers
+whether the new sentence refines the chain or replaces it ("nike air max 90"
+starts a new one). The server stores nothing between searches: the client
+holds the carry. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the
+full contract and `apps/shopify-app/app/search/refinement.test.ts` for the
+tests that pin the behavior.
 
 ## Setup
 

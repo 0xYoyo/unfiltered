@@ -12,7 +12,6 @@
       "priceMax": 420,
       "currencyCode": "ILS",
       "available": true,
-      "colorUnknown": false,
       "label": null
     },
     {
@@ -24,7 +23,6 @@
       "priceMax": 640,
       "currencyCode": "ILS",
       "available": true,
-      "colorUnknown": false,
       "label": null
     },
     {
@@ -36,7 +34,6 @@
       "priceMax": 245,
       "currencyCode": "ILS",
       "available": true,
-      "colorUnknown": false,
       "label": null
     },
     {
@@ -48,7 +45,6 @@
       "priceMax": 310,
       "currencyCode": "ILS",
       "available": true,
-      "colorUnknown": false,
       "label": null
     },
     {
@@ -60,7 +56,6 @@
       "priceMax": 290,
       "currencyCode": "ILS",
       "available": true,
-      "colorUnknown": false,
       "label": null
     },
     {
@@ -72,7 +67,6 @@
       "priceMax": 350,
       "currencyCode": "ILS",
       "available": true,
-      "colorUnknown": false,
       "label": null
     }
   ],
@@ -87,7 +81,6 @@
       "value": "M"
     }
   ],
-  "intent": null,
   "details": {
     "routeReason": "judge-timeout",
     "latencyMs": 912,
@@ -97,8 +90,6 @@
       "hydrate": 9,
       "judge": 702
     },
-    "intentTier": null,
-    "engine": "v2",
     "judge": null
   },
   "labelsPending": true

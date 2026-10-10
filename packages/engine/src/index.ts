@@ -20,6 +20,7 @@ export const version = "0.4.0";
 export const ENGINE_SOURCE_URL = import.meta.url;
 
 export {
+  normalizeQuery,
   type ClassicSearchHit,
   type ClassicSearchRequest,
   type ClassicSearchResult,
@@ -27,56 +28,11 @@ export {
 } from "./classic.js";
 
 export {
-  CLASSIFICATION_SCHEMA,
-  classifyByHeuristics,
-  createQueryClassifier,
-  normalizeQuery,
-  type ClassificationContext,
-  type ClassificationDecision,
-  type ClassificationReason,
-  type QueryClassifier,
-  type QueryClassifierOptions,
-  type QueryRoute,
-} from "./classify.js";
-export {
-  CLASSIFIER_COLOR_WORDS,
   COLORWAY_COLORS,
   COLORWAY_MODIFIERS,
   COLORWAY_WORDS,
   isColorwayDesignator,
 } from "./colors.js";
-
-export {
-  carryOverRefinementConstraints,
-  createIntentExtractor,
-  enforceComparativeBounds,
-  INTENT_SCHEMA,
-  IntentExtractionError,
-  mergeRefinementIntent,
-  parseIntent,
-  parseRefinementAnswer,
-  REFINEMENT_INTENT_SCHEMA,
-  REFINEMENT_OUTCOMES,
-  type Intent,
-  type IntentEscalation,
-  type IntentExtraction,
-  type IntentExtractionContext,
-  type IntentExtractor,
-  type IntentExtractorOptions,
-  type IntentTier,
-  type RefinementAnswer,
-  type RefinementOutcome,
-} from "./intent.js";
-
-export {
-  createEscalatingIntentExtractor,
-  DEFAULT_INTENT_ESCALATION_THRESHOLD,
-  DEFAULT_INTENT_HEDGE_AFTER_MS,
-  INTENT_ESCALATION_CLASSES,
-  matchIntentEscalationClass,
-  type EscalatingIntentExtractorOptions,
-  type IntentEscalationClass,
-} from "./intent-escalation.js";
 
 export {
   buildJudgePrompt,
@@ -146,16 +102,11 @@ export {
 } from "./extract.js";
 
 export {
-  ATTRIBUTE_EVIDENCE_TERMS,
-  attributeEvidenceTerms,
   CANONICAL_CATEGORIES,
   CANONICAL_OCCASIONS,
   CATEGORY_GROUPS,
-  CATEGORY_LIKE_ATTRIBUTES,
   expandCategoryConstraint,
-  normalizeAttributeWord,
   normalizeCategory,
-  normalizeCategoryLikeAttribute,
   normalizeOccasion,
   normalizeVisionValue,
   VISION_GARMENT_LENGTHS,
@@ -166,32 +117,12 @@ export {
   VISION_SLEEVE_LENGTHS,
   type CanonicalCategory,
   type CanonicalOccasion,
-  type CategoryLikeAttribute,
   type VisionGarmentLength,
   type VisionMaterialAppearance,
   type VisionNeckline,
   type VisionPattern,
   type VisionSleeveLength,
 } from "./taxonomy.js";
-
-export {
-  appliedConstraints,
-  composeQueryText,
-  constraintsFromIntent,
-  createRetriever,
-  EmptyQueryTextError,
-  type AppliedConstraint,
-  type RetrievalConstraints,
-  type RetrievalHit,
-  type RetrievalRequest,
-  type RetrievalResult,
-  type RetrievalTimings,
-  type Retriever,
-  type RetrieverOptions,
-  type RetrievalStore,
-  type StoreQueryHit,
-  type StoreQueryRequest,
-} from "./retrieve.js";
 
 /** A single searchable document, as the consumer indexed it. */
 export interface EngineDocument {

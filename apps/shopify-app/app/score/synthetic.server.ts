@@ -1,16 +1,7 @@
 import { createHash } from "node:crypto";
 
 import type { PrismaClient } from "@prisma/client";
-import {
-  createEscalatingIntentExtractor,
-  createIntentExtractor,
-  createQueryClassifier,
-  createRetriever,
-  DEFAULT_INTENT_ESCALATION_THRESHOLD,
-  normalizeQuery,
-  type CostRecorder,
-  type LlmClient,
-} from "@unfiltered/engine";
+import type { CostRecorder, LlmClient } from "@unfiltered/engine";
 
 import {
   createReplayEmbeddingClient,
@@ -19,11 +10,11 @@ import {
 } from "../eval/replay.server";
 import { runPlaygroundSearch } from "../search/playground-search.server";
 import { createPgTrgmClassicStore } from "../search/classic-store.server";
+import { createFindStep } from "../search/find.server";
 import {
   createSearchOrchestrator,
   type SearchOrchestrator,
 } from "../search/orchestrator.server";
-import { createPgVectorRetrievalStore } from "../search/retrieval-store.server";
 import { encodeVector, type ScoreFixture } from "./fixture.server";
 import { GRADED_RESULTS, SCORE_GRADE_OPERATION } from "./grade.server";
 import { SCORE_RESULT_LIMIT } from "./run.server";
@@ -191,46 +182,24 @@ export function createSyntheticFillerLlm(): LlmClient {
 }
 
 /**
- * The search side over replay clients: every query of the set is recorded
- * as classified classic, so each search runs the playground's real classic
- * path over the seeded catalog with no model behind it.
+ * The search side over replay clients: no query vector is recorded, so the
+ * find step's embedding fails and every search is served in the keyword
+ * order over the seeded catalog (YOY-145 AC-8) — the playground's real
+ * search path with no model behind it. No judge and no extraction are wired.
  */
-export function createSyntheticOrchestrator(
-  db: PrismaClient,
-  set: readonly ScoreSetEntry[],
-): SearchOrchestrator {
-  const classification: LlmRecording = { modelId: SYNTHETIC_MODEL_ID, provenance: "synthesized", entries: {} };
-  for (const entry of set) {
-    classification.entries[normalizeQuery(entry.query)] = {
-      output: { route: "classic" },
-      inputTokens: 0,
-      outputTokens: 0,
-    };
-  }
-  // No intent is recorded: a search the classifier sends to the AI path
-  // (a purpose phrase, say) fails its intent call and degrades to classic,
-  // exactly as a live outage would.
-  const intent: LlmRecording = { modelId: SYNTHETIC_MODEL_ID, provenance: "synthesized", entries: {} };
-  const llm = createReplayLlmClient({
-    recordings: { classification, intent },
-    costRecorder: noCost,
-  });
+export function createSyntheticOrchestrator(db: PrismaClient): SearchOrchestrator {
+  const classicStore = createPgTrgmClassicStore(db);
   return createSearchOrchestrator({
     db,
-    classifier: createQueryClassifier({ llm }),
-    extractor: createEscalatingIntentExtractor({
-      lite: createIntentExtractor({ llm }),
-      accuracy: createIntentExtractor({ llm }),
-      threshold: DEFAULT_INTENT_ESCALATION_THRESHOLD,
-    }),
-    retriever: createRetriever({
+    classicStore,
+    find: createFindStep({
+      db,
       embeddings: createReplayEmbeddingClient({
         recording: { modelId: SYNTHETIC_MODEL_ID, dimension: SYNTHETIC_DIMENSION, vectors: {} },
         costRecorder: noCost,
       }),
-      store: createPgVectorRetrievalStore(db),
+      classicStore,
     }),
-    classicStore: createPgTrgmClassicStore(db),
   });
 }
 

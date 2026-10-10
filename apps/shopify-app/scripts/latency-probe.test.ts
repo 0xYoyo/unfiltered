@@ -67,11 +67,11 @@ function sample(overrides: Partial<ProbeSample>): ProbeSample {
     query: "q",
     searchId: "s",
     route: "ai",
-    routeReason: "model",
+    routeReason: "find-only",
     degraded: false,
     limited: null,
     latencyMs: 1000,
-    stages: { classify: 40, intent: 600, embed: 100, retrieve: 200, hydrate: 10 },
+    stages: { find: 600, compose: 4, hydrate: 10 },
     extractionInTime: null,
     extractionCached: null,
     judgeCalls: null,
@@ -83,8 +83,8 @@ describe("set summaries", () => {
   it("reports n, p50, p95, degraded/limited counts, routes, and the mean per stage", () => {
     const samples = [
       sample({ latencyMs: 900 }),
-      sample({ latencyMs: 1100, routeReason: "intent-reuse", stages: { classify: 20, intent: 400, embed: 50, retrieve: 100, hydrate: 10 } }),
-      sample({ latencyMs: 300, route: "classic", degraded: true, stages: { classify: 30, intent: 900, classic: 20, hydrate: 5 } }),
+      sample({ latencyMs: 1100, routeReason: "judge-cached", stages: { find: 400, compose: 2, hydrate: 10, judgeRows: 5 } }),
+      sample({ latencyMs: 300, degraded: true, stages: { find: 900, hydrate: 5 } }),
       sample({ latencyMs: 250, route: "classic", degraded: true, limited: "ip", stages: { classic: 20, hydrate: 5 } }),
     ];
     const summary = summarize("ai-en", samples);
@@ -94,30 +94,28 @@ describe("set summaries", () => {
     expect(summary!.p95).toBe(1100);
     expect(summary!.degraded).toBe(2);
     expect(summary!.limited).toBe(1);
-    expect(summary!.reused).toBe(1);
-    expect(summary!.routes).toEqual({ ai: 2, classic: 2 });
+    expect(summary!.routes).toEqual({ ai: 3, classic: 1 });
     // Means are over the samples that ran the stage, in pipeline order —
     // the orchestrator's own `SEARCH_STAGES` (YOY-125 AC-1), so the probe's
-    // key order cannot drift from a stage added there. `closeMatches` is a
-    // real stage no sample ran here, so it is absent, not zero.
+    // key order cannot drift from a stage added there. `judge` is a real
+    // stage no sample ran here, so it is absent, not zero.
     expect(Object.keys(summary!.meanStages)).toEqual(
       SEARCH_STAGES.filter((stage) => samples.some((s) => s.stages[stage] !== undefined)),
     );
     expect(Object.keys(summary!.meanStages)).toEqual([
-      "classify",
-      "intent",
-      "embed",
-      "retrieve",
+      "find",
+      "compose",
       "classic",
       "hydrate",
+      "judgeRows",
     ]);
-    expect(SEARCH_STAGES).toContain("closeMatches");
-    expect(summary!.meanStages.closeMatches).toBeUndefined();
-    expect(summary!.meanStages.intent).toBe(Math.round((600 + 400 + 900) / 3));
+    expect(SEARCH_STAGES).toContain("judge");
+    expect(summary!.meanStages.judge).toBeUndefined();
+    expect(summary!.meanStages.find).toBe(Math.round((600 + 400 + 900) / 3));
     expect(summary!.meanStages.classic).toBe(20);
     expect(summary!.underOneSecond).toBe(0.75);
     expect(formatSummary(summary!)).toContain(
-      "p50=300 ms p95=1100 ms under-1s=75% degraded=2 limited=1 reused=1",
+      "p50=300 ms p95=1100 ms under-1s=75% degraded=2 limited=1 routes:",
     );
   });
 
@@ -187,8 +185,8 @@ describe("the judge stage over every set (YOY-154 AC-8)", () => {
       formatSampleLine(sample({ searchId: "abc-123", routeReason: "judge-timeout", latencyMs: 2100 }), 2, 5, "linen dress"),
     ).toBe('ai-en run 2/5 2100 ms ai judge-timeout abc-123 "linen dress"');
     // A route that never reached the judge prints no outcome, still the searchId.
-    expect(formatSampleLine(sample({ searchId: "s-9", routeReason: "intent-reuse" }), 1, 5, "q")).toBe(
-      'ai-en run 1/5 1000 ms ai REUSED s-9 "q"',
+    expect(formatSampleLine(sample({ searchId: "s-9", routeReason: "find-only" }), 1, 5, "q")).toBe(
+      'ai-en run 1/5 1000 ms ai s-9 "q"',
     );
   });
 
@@ -220,7 +218,7 @@ describe("the judge stage over every set (YOY-154 AC-8)", () => {
     );
   });
 
-  it("is null when no sample ran the judge — the old engine reports no judge line", () => {
+  it("is null when no sample ran the judge — a run with no judge reports no judge line", () => {
     expect(summarizeJudge([sample({})])).toBeNull();
   });
 });
@@ -279,7 +277,6 @@ describe("arguments", () => {
       assertAiP50: null,
       assertAiP95: null,
       aiPerMinute: 10,
-      engine: null,
     });
     expect(
       parseArgs([
@@ -298,16 +295,13 @@ describe("arguments", () => {
     expect(() => parseArgs(["--url", "u", "--runs"])).toThrow(ProbeUsageError);
   });
 
-  it("accepts --engine v1|v2 and sends it to the playground API (YOY-147 AC-13)", () => {
-    const args = parseArgs(["--url", "https://x.example", "--engine", "v2"]);
-    expect(args.engine).toBe("v2");
-    expect(probeSearchParams(args, "linen dress").get("engine")).toBe("v2");
-    expect(parseArgs(["--url", "u", "--engine", "v1"]).engine).toBe("v1");
-    expect(() => parseArgs(["--url", "u", "--engine", "v3"])).toThrow(ProbeUsageError);
-    // Absent: no parameter, the deployment's default engine answers.
+  it("sends the query, a fresh session and the catalog when given — never an engine (YOY-155 AC-3)", () => {
+    expect(() => parseArgs(["--url", "u", "--engine", "v2"])).toThrow(ProbeUsageError);
     const plain = probeSearchParams(parseArgs(["--url", "u"]), "linen dress");
     expect(plain.has("engine")).toBe(false);
+    expect(plain.has("catalog")).toBe(false);
     expect(plain.get("query")).toBe("linen dress");
+    expect(probeSearchParams(parseArgs(["--url", "u", "--catalog", "demo"]), "q").get("catalog")).toBe("demo");
   });
 });
 
@@ -343,7 +337,7 @@ describe("distinct query text per run (YOY-64 AC-6)", () => {
     expect(keys.has(normalizeReuseQuery(base))).toBe(false);
   });
 
-  it("keeps the shopper-visible text — and every classifier token — exactly the committed query", () => {
+  it("keeps the shopper-visible text — and every committed token — exactly the committed query", () => {
     for (const base of ["summer dress, not black", "מעיל חם לחורף עד 600", "warm coat for winter under 600"]) {
       const varied = distinctQueryText(base, invocation, 7);
       expect(visibleQueryText(varied)).toBe(base);

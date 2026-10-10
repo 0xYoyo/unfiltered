@@ -372,9 +372,8 @@ model SearchEvent {
   // Which page the request served (YOY-145 AC-10): one row per page request.
   // Unpaged searches and rows before the column are page 1.
   page        Int      @default(1)
-  // Exact-query intent reuse (YOY-64 AC-4): the query as the reuse key
-  // (trimmed, whitespace-collapsed, case-folded) and the intent the search
-  // was served with, both null on classic, degraded, and pre-column rows.
+  // Written by the previous engine (YOY-64 AC-4) and no longer written since
+  // YOY-155; kept with their rows (NG-1: no column is dropped).
   normalizedQuery String?
   intent          Json?
   createdAt   DateTime @default(now())
@@ -382,7 +381,7 @@ model SearchEvent {
   @@index([shopDomain, createdAt])
   // The click beacon validates its searchId against this table.
   @@index([searchId])
-  // Intent reuse looks up the latest row for a shop's normalized query.
+  // Kept with its columns (YOY-155 NG-1).
   @@index([shopDomain, normalizedQuery, createdAt])
 }
 

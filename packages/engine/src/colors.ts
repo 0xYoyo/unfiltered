@@ -1,17 +1,11 @@
 /**
- * Colour vocabulary shared across the engine and its consumers.
- *
- * CLASSIFIER_COLOR_WORDS is the classifier's own list (YOY-61): a colour
- * next to anything else makes a query constraint-shaped. It stays
- * deliberately small so an unlisted colour never blocks the classic fast
- * path, and it is not extended here — routing behaviour is pinned by the
- * eval goldens.
+ * Colour vocabulary of the product-family rule.
  *
  * The product-family rule reads two sets (YOY-117 AC-1, split on YOY-125
  * AC-11). COLORWAY_COLORS holds the words that are a colour ON THEIR OWN —
- * the classifier list plus the common colourway vocabulary of fashion
- * catalogues, finishes and patterns included ("floral", "multi") because a
- * catalogue really does sell "Dress - Floral" as a variant. COLORWAY_MODIFIERS
+ * the basic colours in English and Hebrew plus the common colourway
+ * vocabulary of fashion catalogues, finishes and patterns included
+ * ("floral", "multi") because a catalogue really does sell "Dress - Floral" as a variant. COLORWAY_MODIFIERS
  * holds the shade and finish adjectives that only ever qualify a colour
  * ("dusty pink", "washed indigo", "soft", "natural"): a designator made of a
  * modifier alone names the product, not its colourway. `print` sits with the
@@ -28,7 +22,7 @@
  * "Jacket", "Sofa" and "Tee" of the same vendor and type — hiding a different
  * product behind a colourway that was never one.
  */
-export const CLASSIFIER_COLOR_WORDS: ReadonlySet<string> = new Set([
+export const COLORWAY_COLORS: ReadonlySet<string> = new Set([
   "black",
   "white",
   "red",
@@ -70,10 +64,6 @@ export const CLASSIFIER_COLOR_WORDS: ReadonlySet<string> = new Set([
   "בז'",
   "זהב",
   "כסף",
-]);
-
-export const COLORWAY_COLORS: ReadonlySet<string> = new Set([
-  ...CLASSIFIER_COLOR_WORDS,
   "ivory",
   "cream",
   "off-white",

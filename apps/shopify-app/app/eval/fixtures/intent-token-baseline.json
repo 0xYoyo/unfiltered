@@ -1,6 +1,0 @@
-{
-  "$comment": "Mean intent input tokens over the eval goldens on the accuracy tier BEFORE the YOY-64 AC-2 prompt trim (recorded/intent.json as of 2026-08-26, 31 goldens). harness.test.ts asserts the current recordings sit >= 30% below it. Regenerate only if the golden set itself changes.",
-  "recordedAt": "2026-08-26",
-  "meanInputTokens": 393.58,
-  "goldens": 31
-}

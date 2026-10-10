@@ -1,6 +1,6 @@
 {
   "searchId": "fixture-results",
-  "route": "classic",
+  "route": "ai",
   "degraded": false,
   "results": [
     {
@@ -11,8 +11,7 @@
       "priceMin": 320,
       "priceMax": 320,
       "currencyCode": "ILS",
-      "available": true,
-      "colorUnknown": false
+      "available": true
     },
     {
       "productId": "p-2",
@@ -22,8 +21,7 @@
       "priceMin": 280,
       "priceMax": 320,
       "currencyCode": "ILS",
-      "available": true,
-      "colorUnknown": false
+      "available": true
     },
     {
       "productId": "p-3",
@@ -33,8 +31,7 @@
       "priceMin": 210,
       "priceMax": 210,
       "currencyCode": "ILS",
-      "available": false,
-      "colorUnknown": false
+      "available": false
     },
     {
       "productId": "p-4",
@@ -44,20 +41,18 @@
       "priceMin": 640,
       "priceMax": 640,
       "currencyCode": "ILS",
-      "available": true,
-      "colorUnknown": false
+      "available": true
     }
   ],
   "chips": [],
-  "intent": null,
   "details": {
-    "routeReason": "heuristic",
+    "routeReason": "find-only",
     "latencyMs": 42,
     "limited": null,
     "stages": {
-      "classify": 1,
-      "classic": 28
+      "find": 28,
+      "hydrate": 6
     },
-    "intentTier": null
+    "judge": null
   }
 }

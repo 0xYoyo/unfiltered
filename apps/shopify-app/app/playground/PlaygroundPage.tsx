@@ -1,11 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { underCloseHeading } from "../../widget/src/labels";
-import type {
-  ProxyChip,
-  ProxyIntent,
-  ProxyLabel,
-} from "../search/proxy.server";
+import type { ProxyChip, ProxyLabel } from "../search/proxy.server";
 import type { PlaygroundSearchResponse } from "./api.server";
 import type { PlaygroundCard } from "./components/Card";
 import { ChipRow } from "./components/ChipRow";
@@ -22,14 +18,9 @@ import {
   fetchPlaygroundLabels,
   searchPlayground,
   sendPlaygroundClick,
-  type PlaygroundEngine,
   type RemovedChip,
 } from "./search-client";
-import {
-  closeMatchesHeadingText,
-  getPlaygroundStrings,
-  type PlaygroundLocale,
-} from "./strings";
+import { getPlaygroundStrings, type PlaygroundLocale } from "./strings";
 
 /** One shown page's cards: its results, then its close products (YOY-166). */
 interface ShownPage {
@@ -40,8 +31,7 @@ interface ShownPage {
 /**
  * A page's close products that sit inside its grid under the divider
  * (YOY-166): a judged page with matches carries them in `closeMatches`
- * beside non-empty `results`. A zero-hit response's close matches (empty
- * `results`) keep their own section below the grid.
+ * beside non-empty `results`.
  */
 function inlineCloseMatches(page: PlaygroundSearchResponse): PlaygroundCard[] {
   // Under the heading, the heading is the label (YOY-168 AC-3).
@@ -58,14 +48,11 @@ function inlineCloseMatches(page: PlaygroundSearchResponse): PlaygroundCard[] {
  * refinement carried in the bar rather than a chat log, and an opt-in panel
  * that shows exactly what the engine understood.
  *
- * The held intent is the whole state model, and it is deliberately ONE
- * intent held in memory: each response's echoed intent replaces it, nothing
- * persists, and there is no transcript (NG-2, X-2). "New search" drops it.
- *
- * Engine v2 (YOY-150) holds a `carry` instead: the last submitted
- * response's text for the next search's `previousQuery`, in memory only
- * (AC-6). Every submitted search sends it; "New search", an example and the
- * second-reading chip start afresh without it (AC-5, AC-9).
+ * The page holds a `carry` (YOY-150): the last submitted response's text
+ * for the next search's `previousQuery`, in memory only (AC-6) — nothing
+ * persists, and there is no transcript (NG-2, X-2). Every submitted search
+ * sends it; "New search", an example and the second-reading chip start
+ * afresh without it (AC-5, AC-9).
  */
 
 type Phase = "initial" | "loading" | "settled";
@@ -81,9 +68,7 @@ const PAGE_SIZE = 24;
  */
 interface PagingState {
   query: string;
-  previousIntent: ProxyIntent | null;
-  removeChip?: ProxyChip;
-  /** The engine v2 removal list that produced page 1 (YOY-149). */
+  /** The removal list that produced page 1 (YOY-149). */
   removedChips?: readonly RemovedChip[];
   /** The `previousQuery` that produced page 1 (YOY-150). */
   previousQuery?: string;
@@ -102,18 +87,11 @@ export function PlaygroundPage({
   detailsOpen: initialDetailsOpen,
   catalog,
   store,
-  engine,
 }: {
   locale: PlaygroundLocale;
   pathname: string;
   initialQuery: string;
   detailsOpen: boolean;
-  /**
-   * The engine `/try?engine=` names (YOY-165 AC-1): every submitted
-   * search, chip removal and page request of this page view carries it.
-   * Absent means the server default.
-   */
-  engine?: PlaygroundEngine;
   /** Registry slug; every request on a preload page carries it (YOY-94). */
   catalog?: string;
   /** The preloaded store, when this is a `/s/<slug>` page. */
@@ -153,8 +131,6 @@ export function PlaygroundPage({
     string | null
   >(null);
 
-  // The held intent: the last AI response's echoed intent, in memory only.
-  const [heldIntent, setHeldIntent] = useState<ProxyIntent | null>(null);
   // Seeded from the URL by the loader, then owned here: toggling must not
   // navigate, or the answer the panel explains would be thrown away.
   const [detailsOpen, setDetailsOpen] = useState(initialDetailsOpen);
@@ -169,20 +145,11 @@ export function PlaygroundPage({
   // which would schedule a preview that aborts the in-flight submitted
   // search 200ms later and replace a real AI answer with classic cards.
   const submittedQueryRef = useRef<string | null>(null);
-  // Read inside `run` without making it a dependency: a keystroke must not
-  // restart the debounce just because the held intent changed. Mirrored in
-  // an effect rather than during render — a render may be discarded, and a
-  // ref written from one would leak that discarded value.
-  const heldIntentRef = useRef<ProxyIntent | null>(null);
-  useEffect(() => {
-    heldIntentRef.current = heldIntent;
-  }, [heldIntent]);
-  // Engine v2 chip removal (YOY-149 AC-15): every chip removed so far in
-  // this search chain. A v2 response echoes no intent, so a removal re-asks
-  // the same query with this whole list; a search the visitor submits
-  // starts a new chain with an empty one.
+  // Chip removal (YOY-149 AC-15): every chip removed so far in this search
+  // chain. A removal re-asks the same query with this whole list; a search
+  // the visitor submits starts a new chain with an empty one.
   const removedChipsRef = useRef<RemovedChip[]>([]);
-  // The refinement chain (YOY-150): `carryRef` is the last submitted v2
+  // The refinement chain (YOY-150): `carryRef` is the last submitted
   // response's `carry`, sent as the next search's `previousQuery`;
   // `chainRef` is the `previousQuery` that produced the response on screen,
   // which a chip removal re-asks with. Memory only (AC-6).
@@ -234,7 +201,6 @@ export function PlaygroundPage({
       text: string,
       preview: boolean,
       refinement?: {
-        removeChip?: ProxyChip;
         removedChips?: readonly RemovedChip[];
         /** A new submitted search: it sends the held carry (YOY-150 AC-4). */
         submitted?: boolean;
@@ -248,12 +214,10 @@ export function PlaygroundPage({
       const controller = new AbortController();
       requestRef.current = controller;
 
-      // A preview is classic-only by contract, so it never carries the held
-      // intent: refinement is a submitted-search idea (YOY-68, AC-2). An
-      // engine v2 removal (YOY-149) carries its removal list and no intent.
+      // A preview is classic-only by contract, so it never carries a
+      // refinement: that is a submitted-search idea (YOY-68, AC-2). A chip
+      // removal (YOY-149) carries its removal list.
       const removedChips = preview ? undefined : refinement?.removedChips;
-      const held =
-        preview || removedChips !== undefined ? null : heldIntentRef.current;
       // A new submit refines the held chain; a removal re-asks the chain
       // that produced the response on screen (YOY-150 AC-11).
       const previousQuery = preview
@@ -270,17 +234,11 @@ export function PlaygroundPage({
           query: trimmed,
           preview,
           ...(catalog === undefined ? {} : { catalog }),
-          ...(held === null ? {} : { previousIntent: held }),
-          ...(refinement?.removeChip === undefined
-            ? {}
-            : { removeChip: refinement.removeChip }),
           ...(removedChips === undefined ? {} : { removedChips }),
           ...(previousQuery === null ? {} : { previousQuery }),
           // Every submit asks for page 1 (YOY-146 AC-1); a preview is
           // never paged.
           ...(preview ? {} : { paging: { page: 1, pageSize: PAGE_SIZE } }),
-          // A preview is classic-only and never names an engine (YOY-165).
-          ...(preview || engine === undefined ? {} : { engine }),
           signal: controller.signal,
         });
         if (controller.signal.aborted) {
@@ -294,10 +252,6 @@ export function PlaygroundPage({
           ? null
           : {
               query: trimmed,
-              previousIntent: held,
-              ...(refinement?.removeChip === undefined
-                ? {}
-                : { removeChip: refinement.removeChip }),
               ...(removedChips === undefined ? {} : { removedChips }),
               ...(previousQuery === null ? {} : { previousQuery }),
               nextPage: (next.page ?? 1) + 1,
@@ -309,16 +263,6 @@ export function PlaygroundPage({
         // The cards on screen are now this response's: attributable only
         // when it was submitted (AC-14).
         setAttributableSearchId(preview ? null : next.searchId);
-        // Only a SUBMITTED response replaces the held intent (AC-2). A
-        // preview echoes `intent: null` because it is classic-only, so
-        // replacing on every response would erase the refinement memory
-        // between two keystrokes — a follow-up typed at human speed would
-        // then go out with no `previousIntent` at all, and "New search"
-        // would blink out mid-typing. The widget keeps its memory across
-        // previews for exactly this reason (P-5 parity).
-        if (!preview) {
-          setHeldIntent(next.intent);
-        }
         if (refinement?.submitted === true) {
           // The response's carry is the chain the next submit refines. One
           // with no earlier sentence started a new chain: the old chain's
@@ -347,7 +291,7 @@ export function PlaygroundPage({
         setPhase("settled");
       }
     },
-    [catalog, engine, awaitLabels],
+    [catalog, awaitLabels],
   );
 
   /**
@@ -373,12 +317,6 @@ export function PlaygroundPage({
         query: state.query,
         preview: false,
         ...(catalog === undefined ? {} : { catalog }),
-        ...(state.previousIntent === null
-          ? {}
-          : { previousIntent: state.previousIntent }),
-        ...(state.removeChip === undefined
-          ? {}
-          : { removeChip: state.removeChip }),
         ...(state.removedChips === undefined
           ? {}
           : { removedChips: state.removedChips }),
@@ -386,7 +324,6 @@ export function PlaygroundPage({
           ? {}
           : { previousQuery: state.previousQuery }),
         paging: { page: state.nextPage, pageSize: PAGE_SIZE },
-        ...(engine === undefined ? {} : { engine }),
       });
       if (pagingRef.current !== state) {
         return;
@@ -409,7 +346,7 @@ export function PlaygroundPage({
         setLoadingMore(false);
       }
     }
-  }, [catalog, engine, awaitLabels]);
+  }, [catalog, awaitLabels]);
 
   // Stable, so the grid's last-card watch re-arms only when cards change.
   const appendNextPage = useCallback(() => {
@@ -470,12 +407,8 @@ export function PlaygroundPage({
         clearTimeout(debounceRef.current);
         debounceRef.current = null;
       }
-      if (heldIntentRef.current !== null) {
-        void run(query, false, { removeChip: chip });
-        return;
-      }
-      // Engine v2 (YOY-149 AC-15): no intent to adjust — the same query,
-      // page 1, with every chip removed in this chain, the new one included.
+      // The same query, page 1, with every chip removed in this chain, the
+      // new one included (YOY-149 AC-15).
       removedChipsRef.current = [
         ...removedChipsRef.current,
         { field: chip.field, value: chip.value },
@@ -498,7 +431,6 @@ export function PlaygroundPage({
     setQuery("");
     submittedQueryRef.current = null;
     dropChain();
-    setHeldIntent(null);
     setResponse(null);
     labelsGenRef.current += 1;
     setLabelsPending(new Set());
@@ -540,18 +472,11 @@ export function PlaygroundPage({
     [attributableSearchId, catalog],
   );
 
-  // Chips belong to AI-routed responses only: never on a preview, never on
-  // classic results, never on a degraded one — a degraded response is
-  // classic results wearing the AI route's name (AC-1, AC-4, W-7).
-  // An engine v2 response (YOY-149, `intent: null`) carries chips on
-  // whichever route its judge took and sends none it did not apply; a
-  // preview or a classic v1 response carries none.
-  const chips =
-    response !== null &&
-    !response.degraded &&
-    (response.route === "ai" || response.intent === null)
-      ? response.chips
-      : [];
+  // Chips are never shown on a degraded response — classic results wearing
+  // the AI route's name (AC-4, W-7). A submitted response (YOY-149) carries
+  // chips on whichever route its judge took and sends none it did not
+  // apply; a preview carries none.
+  const chips = response !== null && !response.degraded ? response.chips : [];
 
   // A late label replaces the card's own; card order is the response's,
   // untouched by any label (YOY-151 AC-9). Keystroke-preview cards — the
@@ -579,11 +504,6 @@ export function PlaygroundPage({
       ),
     };
   }, [response, more, lateLabels, previewCards]);
-  // A zero-hit response's close matches keep their own section (YOY-111).
-  const closeMatches =
-    response !== null && response.results.length === 0
-      ? (response.closeMatches ?? []).map(underCloseHeading)
-      : [];
   const zeroHit =
     response !== null &&
     response.route === "ai" &&
@@ -616,17 +536,14 @@ export function PlaygroundPage({
     if (!detailsOpen) {
       params.set("details", "1");
     }
-    if (engine !== undefined) {
-      params.set("engine", engine);
-    }
     const search = params.toString();
     return search === "" ? pathname : `${pathname}?${search}`;
-  }, [detailsOpen, engine, locale, pathname, query]);
+  }, [detailsOpen, locale, pathname, query]);
 
   /**
    * Flip the panel and record it in the URL without navigating, so an
    * opened panel still survives a reload and can be shared, while the
-   * answer on screen — and the memory-only held intent — stay put (AC-5).
+   * answer on screen — and the memory-only refinement chain — stay put (AC-5).
    */
   const toggleDetails = useCallback(() => {
     const next = !detailsOpen;
@@ -655,7 +572,6 @@ export function PlaygroundPage({
           pathname={pathname}
           query={query}
           detailsOpen={detailsOpen}
-          {...(engine === undefined ? {} : { engine })}
         />
       </header>
 
@@ -680,14 +596,6 @@ export function PlaygroundPage({
             the ivory page: the search is the page's subject, and the card
             is what says so (P-3). */}
         <section className="searchCard" data-testid="playground-search-card">
-          {engine === undefined ? null : (
-            // Which engine this page view asks for (YOY-165 AC-2): muted
-            // text, no colour of its own — a fact for the comparison, not
-            // a control.
-            <p className="engineBadge" data-testid="playground-engine-badge">
-              {strings.engineBadge.replace("{engine}", engine)}
-            </p>
-          )}
           <SearchBar
             strings={strings}
             value={query}
@@ -715,15 +623,12 @@ export function PlaygroundPage({
             chips={chips}
             locale={locale}
             strings={strings}
-            {...(response?.intent?.currency == null
-              ? {}
-              : { currency: response.intent.currency })}
             onRemove={removeChip}
             {...(response?.otherReading === undefined
               ? {}
               : { otherReading: response.otherReading, onPickReading: searchAfresh })}
           />
-          {heldIntent === null && !carryHeld ? null : (
+          {!carryHeld ? null : (
             <NewSearch strings={strings} onClick={newSearch} />
           )}
         </div>
@@ -744,7 +649,7 @@ export function PlaygroundPage({
           skeleton={phase === "loading" && cards.length === 0}
           labelsPending={labelsPending}
           closeStarts={closeStarts}
-          closeHeading={closeMatchesHeadingText(strings, [])}
+          closeHeading={strings.closeMatchesHeading}
           onOpen={openCard}
           onLastCardVisible={appendNextPage}
         />
@@ -760,19 +665,6 @@ export function PlaygroundPage({
             {strings.loadingMore}
           </p>
         ) : null}
-
-        {closeMatches.length === 0 ? null : (
-          <section className="closeMatches">
-            <h2 className="closeMatchesHeading">
-              {closeMatchesHeadingText(strings, response?.closeMatchesRelaxed)}
-            </h2>
-            <ResultsGrid
-              cards={closeMatches}
-              strings={strings}
-              onOpen={openCard}
-            />
-          </section>
-        )}
       </main>
 
       <footer className="footer shell">{strings.footerNote}</footer>

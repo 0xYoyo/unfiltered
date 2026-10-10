@@ -1,12 +1,11 @@
 import type { PrismaClient } from "@prisma/client";
 
 import { PLAYGROUND_STORE_KEY_PREFIX } from "./ingest-public.server";
-import type { IntentTier, JudgeVerdictCode } from "@unfiltered/engine";
+import type { JudgeVerdictCode } from "@unfiltered/engine";
 
 import type { JudgeCallTimes } from "../search/judge-step.server";
 import {
   SEARCH_STAGES,
-  type SearchEngine,
   type SearchResponse,
   type SearchStages,
   type V2RouteReason,
@@ -62,14 +61,10 @@ export interface PlaygroundSearchDetails {
   limited: PlaygroundLimit | null;
   /** Whole ms per pipeline stage actually run, in pipeline order (YOY-114). */
   stages: SearchStages;
-  /** Which model tier extracted the intent; null when no intent call ran (YOY-116). */
-  intentTier: IntentTier | null;
-  /** Which engine served the search (YOY-145 AC-11). */
-  engine: SearchEngine;
   /**
    * What the judge did (YOY-147 AC-12): its outcome and the verdict per
    * result, in result order — null for a result the judge did not answer
-   * for. Null on the old engine. The storefront wire carries none of it.
+   * for. Null on the keyword paths. The storefront wire carries none of it.
    */
   judge: PlaygroundJudgeDetails | null;
   /**
@@ -102,8 +97,8 @@ export interface PlaygroundSearchResponse extends ProxySearchResponse {
 
 /**
  * Map an orchestrator response onto the playground wire contract. Delegates
- * the card/chip/intent mapping to the proxy's own serializer — the two APIs
- * must never drift — and adds exactly the six detail fields the route hands
+ * the card/chip mapping to the proxy's own serializer — the two APIs
+ * must never drift — and adds exactly the four detail fields the route hands
  * over, plus the judge's details read from the response (YOY-147 AC-12). Explicit
  * re-mapping is what keeps a later orchestrator field from leaking out
  * (AC-2, the same guarantee `serializeProxySearchResponse` gives); `stages`
@@ -121,8 +116,6 @@ export function serializePlaygroundSearchResponse(
       latencyMs: details.latencyMs,
       limited: details.limited,
       stages: serializeStages(details.stages),
-      intentTier: details.intentTier,
-      engine: details.engine,
       judge: judgeDetails(response),
       extractionInTime: response.extractionInTime ?? null,
       extractionCached: response.extractionCached ?? null,
@@ -141,11 +134,10 @@ const V2_ROUTE_REASONS: ReadonlySet<string> = new Set<V2RouteReason>([
 
 /**
  * The judge's outcome and per-result verdicts on a response the find path
- * served; null otherwise — the old engine, and the keyword paths (preview,
- * classic rescue) a v2 request still takes.
+ * served; null on the keyword paths (preview, classic rescue).
  */
 function judgeDetails(response: SearchResponse): PlaygroundJudgeDetails | null {
-  if (response.engine !== "v2" || !V2_ROUTE_REASONS.has(response.routeReason)) {
+  if (!V2_ROUTE_REASONS.has(response.routeReason)) {
     return null;
   }
   return {
@@ -337,7 +329,7 @@ export function startOfUtcDay(now: Date): Date {
  * than from memory: the ceilings are a spend guard, and a guard that resets
  * when the process restarts is not one. Only `route = "ai"` rows count — a
  * search served classic (throttled, capped, or simply keyword-routed) spent
- * no LLM budget, so it must not consume the AI ceiling it was denied. Only
+ * no judge budget, so it must not consume the AI ceiling it was denied. Only
  * page-1 rows count (YOY-157 AC-29): every page request writes its own row
  * (YOY-145 AC-10), but a later page is the same search scrolled.
  */
@@ -354,9 +346,6 @@ export async function countAiSearchesToday(
       shopDomain: { in: storeKeys },
       route: "ai",
       page: 1,
-      // An exact-query reuse row (YOY-64 AC-4) is an AI-routed search that
-      // spent no LLM budget, so it must not consume the ceiling either.
-      OR: [{ routeReason: null }, { routeReason: { not: "intent-reuse" } }],
       createdAt: { gte: startOfUtcDay(now) },
     },
   });

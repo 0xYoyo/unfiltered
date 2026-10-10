@@ -35,8 +35,6 @@ export interface PlaygroundCard {
   priceMax: number;
   currencyCode: string;
   available: boolean;
-  /** Passed a colour filter without colour evidence (YOY-93 AC-4). */
-  colorUnknown?: boolean;
   /** How it misses a stated wish (YOY-147, YOY-149), or null (YOY-151). */
   label?: LabelLike | null;
 }
@@ -156,26 +154,11 @@ export function Card({
           {strings.soldOut}
         </span>
       )}
-      {card.colorUnknown !== true ? null : (
-        // Widget parity (W-8, P-5): a product that satisfied a colour filter
-        // without colour evidence is shown, but says so and is de-emphasised
-        // rather than presented with the same confidence as a real match.
-        <span
-          className="cardColorUnknown"
-          data-testid="playground-card-color-unknown"
-        >
-          {strings.colorNotConfirmed}
-        </span>
-      )}
     </>
   );
 
   return (
-    <li
-      className={card.colorUnknown === true ? "card cardDimmed" : "card"}
-      data-testid="playground-card"
-      data-color-unknown={card.colorUnknown === true ? "true" : undefined}
-    >
+    <li className="card" data-testid="playground-card">
       {card.url === null ? (
         // No anchor at all rather than a dead one: a link that goes nowhere
         // is a worse answer than plain text (AC-6).

@@ -365,7 +365,6 @@
         degraded: false,
         results: RESULTS,
         chips: [],
-        intent: null,
       };
 
       /**
@@ -384,15 +383,14 @@
           priceMax: 100 + index,
           currencyCode: "ILS",
           available: true,
-          colorUnknown: false,
         }));
 
       /**
-       * The blue subset of that set, for the refinement contract (AC-3):
+       * The narrowed subset of that set, for the refinement contract (AC-3):
        * every third product, which must all still be present — somewhere in
-       * the paginated set — once the colour chip is removed and it widens.
+       * the paginated set — once the exclusion chip is removed and it widens.
        */
-      const blueSubset = (count) =>
+      const narrowedSubset = (count) =>
         manyResults(count).filter((_, index) => index % 3 === 0);
 
       /**
@@ -403,7 +401,7 @@
       /**
        * A judged Engine v2 page with matches (YOY-166): the page's last two
        * products are close — labelled "close match" and served in
-       * `closeMatches` beside the matched ones, `closeMatchesRelaxed: []`.
+       * `closeMatches` beside the matched ones.
        * `?fixture=close-divider` selects it; every page splits the same way.
        */
       const closeDivider = (page) => {
@@ -423,7 +421,6 @@
             ...result,
             label: { template: "close-match", values: [] },
           })),
-          closeMatchesRelaxed: [],
         };
       };
 
@@ -440,72 +437,51 @@
         };
       };
 
-      const AI_INTENT = {
-        category: "dress",
-        priceMin: null,
-        priceMax: 400,
-        currency: "ILS",
-        colorsInclude: ["blue"],
-        colorsExclude: [],
-        occasion: null,
-        size: null,
-        availabilityRequired: false,
-        softAttributes: [],
-      };
+      // The AI fixture's chips: three plain v2 ones — the size, a price cap
+      // with no currency of its own, and an exclusion (Hebrew under
+      // `locale=he`, as a Hebrew shopper would type it).
+      const AI_LOCALE = new URLSearchParams(window.location.search).get("locale");
+      const AI_EXCLUDED = AI_LOCALE === "he" ? "שחור" : "black";
       const AI_CHIPS = [
-        { field: "category", value: "dress" },
+        { field: "size", value: "M" },
         { field: "priceMax", value: "400" },
-        { field: "colorsInclude", value: "blue" },
+        { field: "exclude", value: AI_EXCLUDED },
       ];
       const AI_RESPONSE = {
         searchId: "harness-ai-1",
         route: "ai",
         degraded: false,
-        results: [
-          { ...RESULTS[0], colorUnknown: false },
-          { ...RESULTS[1], colorUnknown: false },
-          { ...RESULTS[2], colorUnknown: true },
-        ],
+        results: RESULTS,
         chips: AI_CHIPS,
-        intent: AI_INTENT,
       };
       /**
-       * A response carrying EXCLUSIONS (YOY-123 AC-4): a colour and an
-       * attribute the shopper ruled out, beside two ordinary inclusions.
+       * A response carrying EXCLUSIONS (YOY-123 AC-4): a colour and a
+       * material the shopper ruled out, beside one ordinary chip.
        * `?fixture=ai-negation` selects it. The widget must make these two
        * chips read as exclusions without introducing a hue the theme does
        * not have (W-3), so this is what the Dawn-mirror evidence is taken
        * against.
        */
       const AI_NEGATION_CHIPS = [
-        { field: "category", value: "dress" },
-        { field: "colorsExclude", value: "black" },
-        { field: "attributesExclude", value: "wool" },
+        { field: "size", value: "M" },
+        { field: "exclude", value: AI_EXCLUDED },
+        { field: "exclude", value: AI_LOCALE === "he" ? "צמר" : "wool" },
       ];
       const AI_NEGATION_RESPONSE = {
         ...AI_RESPONSE,
         searchId: "harness-ai-negation-1",
         chips: AI_NEGATION_CHIPS,
-        intent: {
-          ...AI_INTENT,
-          colorsInclude: [],
-          colorsExclude: ["black"],
-          attributesExclude: ["wool"],
-          attributesInclude: [],
-        },
       };
 
+      // An AI response with no results: the zero-hit message and its
+      // chips, and nothing under a "Close matches" heading.
       const AI_ZERO_HIT_RESPONSE = {
         ...AI_RESPONSE,
         searchId: "harness-ai-zero-1",
         results: [],
-        closeMatches: [RESULTS[0]],
-        // The server relaxed the budget cap to find them (YOY-111).
-        closeMatchesRelaxed: ["priceMax"],
       };
 
-      // Engine v2 fixtures (YOY-149): `intent: null`, chips of the v2
-      // fields only — a price chip carrying the shopper's number and its
+      // Engine v2 fixtures (YOY-149): chips of the v2 fields only — a price chip carrying the shopper's number and its
       // ISO currency, the size as typed, availability, and an exclusion
       // carrying the excluded term as typed (Hebrew under `locale=he`, as a
       // Hebrew shopper would type it). `?fixture=budget|exclude|size`
@@ -548,7 +524,6 @@
             ? results.filter((result) => result.priceMin <= 400)
             : results,
           chips,
-          intent: null,
           ...(name === "refine" || name === "two-meanings"
             ? {
                 carry:
@@ -567,12 +542,10 @@
         searchId: "harness-ai-removal-1",
         chips: (fixture === "ai-negation" ? AI_NEGATION_CHIPS : AI_CHIPS).filter(
           (chip) =>
-            !(
-              chip.field === request.removeChip.field &&
-              chip.value === request.removeChip.value
+            !request.removedChips.some(
+              (gone) => gone.field === chip.field && gone.value === chip.value,
             ),
         ),
-        intent: request.previousIntent,
         // Same three products (cache reuse) plus one the constraint excluded.
         results: [
           ...AI_RESPONSE.results,
@@ -670,7 +643,6 @@
         priceMax: price,
         currencyCode: "ILS",
         available: true,
-        colorUnknown: false,
         label,
       });
       const LABEL_RESULTS = [
@@ -690,7 +662,6 @@
           { field: "priceMax", value: "400", currency: "ILS" },
           { field: "size", value: "M" },
         ],
-        intent: null,
         ...extra,
       });
       const LABEL_FIXTURES = {
@@ -723,7 +694,7 @@
       const PRODUCTS = new Map(
         [
           ...RESULTS,
-          ...chipRemovalResponse({ removeChip: {}, previousIntent: {} }).results,
+          ...chipRemovalResponse({ removedChips: [] }).results,
           // The full-set fixture's products, so paging renders the theme's
           // real cards rather than the fallback (YOY-107).
           ...manyResults(200),
@@ -790,12 +761,6 @@
             query: parsed.searchParams.get("query"),
             sessionId: parsed.searchParams.get("sessionId"),
           };
-          if (parsed.searchParams.has("previousIntent")) {
-            request.previousIntent = JSON.parse(parsed.searchParams.get("previousIntent"));
-          }
-          if (parsed.searchParams.has("removeChip")) {
-            request.removeChip = JSON.parse(parsed.searchParams.get("removeChip"));
-          }
           if (parsed.searchParams.has("removedChips")) {
             request.removedChips = JSON.parse(parsed.searchParams.get("removedChips"));
           }
@@ -845,19 +810,18 @@
           let body;
           if (fixture === "full-set") {
             // YOY-107: the full match set on both routes. A chip removal
-            // widens the set (the colour constraint comes off) instead of
-            // returning a different window of the same one.
+            // widens the set (the exclusion comes off) instead of returning
+            // a different window of the same one.
             const total = Number(params.get("results") ?? 30);
-            const removed = request.removeChip !== undefined;
+            const removed = (request.removedChips ?? []).length > 0;
             body = {
               searchId: "harness-full-set-1",
               route: "ai",
               degraded: false,
-              results: removed ? manyResults(total) : blueSubset(total),
+              results: removed ? manyResults(total) : narrowedSubset(total),
               chips: removed
-                ? AI_CHIPS.filter((chip) => chip.field !== "colorsInclude")
+                ? AI_CHIPS.filter((chip) => chip.field !== "exclude")
                 : AI_CHIPS,
-              intent: AI_INTENT,
             };
           } else if (fixture === "many" || fixture === "close-divider") {
             // YOY-146: a plain 30-product order (`?results=<N>` sizes it),
@@ -870,7 +834,11 @@
           } else if (request.mode === "preview" || request.mode === "classic") {
             body = RESULTS_RESPONSE;
           } else if (fixture in V2_CHIPS) {
-            body = v2Response(fixture, AI_RESPONSE.results, request);          } else if (request.removeChip !== undefined) {
+            body = v2Response(fixture, AI_RESPONSE.results, request);
+          } else if (
+            request.removedChips !== undefined &&
+            (fixture === "ai" || fixture === "ai-negation" || fixture === "ai-zero-hit")
+          ) {
             body = chipRemovalResponse(request);
           } else if (fixture in LABEL_FIXTURES) {
             body = LABEL_FIXTURES[fixture];

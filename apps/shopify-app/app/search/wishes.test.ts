@@ -13,10 +13,7 @@ import {
   statedCurrency,
   type EmbeddingClient,
   type ExtractedWishes,
-  type IntentExtractor,
   type LlmClient,
-  type QueryClassifier,
-  type Retriever,
   type StructuredCompletionRequest,
   type WishExtractor,
 } from "@unfiltered/engine";
@@ -554,11 +551,6 @@ const embeddings: EmbeddingClient = {
   embed: async ({ texts }) => texts.map(() => [1, 0, 0]),
 };
 
-const untouchable = {
-  classifier: { classify: () => Promise.reject(new Error("unexpected classification")) } as QueryClassifier,
-  extractor: { extract: () => Promise.reject(new Error("unexpected intent")) } as IntentExtractor,
-  retriever: { retrieve: () => Promise.reject(new Error("unexpected retrieval")) } as Retriever,
-};
 
 interface Seeded {
   productId: string;
@@ -681,10 +673,8 @@ describe("wishes on Engine v2 (on the database)", () => {
   }) {
     return createSearchOrchestrator({
       db,
-      ...untouchable,
       classicStore: createPgTrgmClassicStore(db),
       find: createFindStep({ db, embeddings, classicStore: createPgTrgmClassicStore(db) }),
-      engineV2: true,
       ...(options.extractor !== undefined ? { wishExtractor: options.extractor } : {}),
       ...(options.judge !== undefined ? { judge: createLlmJudge({ llm: options.judge }) } : {}),
       ...(options.graceMs !== undefined ? { extractionGraceMs: options.graceMs } : {}),
@@ -737,8 +727,6 @@ describe("wishes on Engine v2 (on the database)", () => {
       latencyMs: 1,
       limited: null,
       stages: response.stages,
-      intentTier: null,
-      engine: "v2",
     });
     expect(playground.details.extractionInTime).toBe(true);
     expect(Object.keys(playground.details.stages)).toContain("compose");
@@ -913,8 +901,6 @@ describe("wishes on Engine v2 (on the database)", () => {
       latencyMs: 1,
       limited: null,
       stages: second.stages,
-      intentTier: null,
-      engine: "v2",
     });
     expect(playground.details).toMatchObject({ extractionInTime: true, extractionCached: true });
   });

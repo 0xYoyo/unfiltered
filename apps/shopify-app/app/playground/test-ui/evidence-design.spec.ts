@@ -10,9 +10,8 @@ import { mkdirSync } from "node:fs";
  *   PLAYGROUND_EVIDENCE=1 npx playwright test --project=playground evidence-design
  *
  * Every state the issue's "How to verify" names, in EN and HE, at 1280 and
- * at 360: the initial page, classic results, the AI state, the zero-hit
- * rescue with its close matches, the negation chips, the engine panel, and
- * the store-preload page. Full-page frames, so what a reviewer judges is
+ * at 360: the initial page, results, the AI state, the negation chips, the
+ * engine panel, and the store-preload page. Full-page frames, so what a reviewer judges is
  * the whole page and not a viewport crop.
  */
 const OUT = "docs/evidence/M5-design";
@@ -58,10 +57,6 @@ test.describe("@evidence", () => {
         await submit(page, "ai negation");
         await page.locator("[data-chip-negated='true']").first().waitFor();
         await shot(page, `${device}-${locale}-4-negation-chip`);
-
-        await submit(page, "ai zero hit");
-        await page.locator(".closeMatches").waitFor();
-        await shot(page, `${device}-${locale}-5-zero-hit-close-matches`);
 
         await page.goto(
           locale === "en" ? "/s/demo-store" : "/s/demo-store?lang=he",

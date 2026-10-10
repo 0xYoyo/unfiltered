@@ -12,13 +12,7 @@
  * and the tests that assert the guard is off would need a separate server.
  */
 
-import aiChipRemovedFixture from "./fixtures/ai-chip-removed.json";
-import aiNegationChipRemovedFixture from "./fixtures/ai-negation-chip-removed.json";
-import aiNegationFixture from "./fixtures/ai-negation.json";
-import aiReuseFixture from "./fixtures/ai-reuse.json";
-import aiZeroHitFixture from "./fixtures/ai-zero-hit.json";
 import aiFixture from "./fixtures/ai.json";
-import colorUnknownFixture from "./fixtures/color-unknown.json";
 import degradedFixture from "./fixtures/degraded.json";
 import emptyFixture from "./fixtures/empty.json";
 import labelOverflowFixture from "./fixtures/label-overflow.json";
@@ -44,26 +38,20 @@ export type PlaygroundFixtureName =
   | "timeout"
   | "delayed"
   | "preview"
-  // YOY-93: the AI states.
+  // YOY-93: the AI states — a judged answer with its chips and its
+  // `carry`, the same answer late, and a degraded one.
   | "ai"
-  | "ai-chip-removed"
-  // YOY-133: a negated attribute as a chip, and its removal echo.
-  | "ai-negation"
-  | "ai-negation-chip-removed"
-  | "ai-zero-hit"
   | "ai-delayed"
-  | "ai-reuse"
   | "degraded"
-  | "color-unknown"
   // YOY-146: a 30-product order served one page at a time, and the same
   // order whose page 2 fails.
   | "paged"
   | "paged-fail"
   | "paged-slow"
-  // YOY-149: an engine v2 response — `intent: null`, chips of the v2
-  // fields (a price cap with its currency, size, availability, exclude).
+  // YOY-149: chips of every field (a price cap with its currency, size,
+  // availability, exclude).
   | "v2-budget"
-  // YOY-150: an engine v2 response that carries `carry` (a refinement
+  // YOY-150: a response that carries `carry` (a refinement
   // chain), and one that also carries a second reading.
   | "v2-refine"
   | "v2-two-meanings"
@@ -117,23 +105,8 @@ export function selectFixture(
   // A preview is classic-only by contract, so it can never select an AI
   // fixture however it is worded (AC-1: chips never render on a preview).
   if (!preview) {
-    if (has("zero")) {
-      return "ai-zero-hit";
-    }
-    if (has("reuse")) {
-      // Exact-query intent reuse (YOY-64 AC-4): the AI answer served from a
-      // stored intent — reason "intent-reuse", no classify/intent stages.
-      return "ai-reuse";
-    }
     if (has("degraded")) {
       return "degraded";
-    }
-    if (has("color")) {
-      return "color-unknown";
-    }
-    if (has("wool")) {
-      // A negated attribute (YOY-133 AC-5): "ai winter coat not wool".
-      return "ai-negation";
     }
     if (has("refine")) {
       // A refinement chain (YOY-150): "refine black dress", then "refine cheaper".
@@ -164,7 +137,7 @@ export function selectFixture(
       return has("jev") ? "v2-close-jev" : "v2-close";
     }
     if (has("budget")) {
-      // Engine v2 chips (YOY-149): "budget dress under 400".
+      // The chips (YOY-149): "budget dress under 400".
       return "v2-budget";
     }
     if (has("ai")) {
@@ -241,9 +214,9 @@ const CLOSE_DIVIDER_CLOSE_PER_PAGE: Record<number, number> = { 1: 4, 2: 2 };
 
 /**
  * One page of the `v2-close` fixture (YOY-166 AC-1, AC-3), as a judged
- * Engine v2 page with matches answers: its matched products in `results`,
- * its close ones — each labelled "close match" — in `closeMatches` with
- * `closeMatchesRelaxed: []`, `totalCount` counting both.
+ * page with matches answers: its matched products in `results`, its close
+ * ones — each labelled "close match" — in `closeMatches`, `totalCount`
+ * counting both.
  */
 function closeDividerPage(page: number): PlaygroundSearchResponse {
   const base = asResponse(labelsFixture);
@@ -274,12 +247,9 @@ function closeDividerPage(page: number): PlaygroundSearchResponse {
     ...base,
     searchId: "fixture-v2-close",
     route: "ai",
-    intent: null,
     chips: [],
     results: matched.map((index) => card(index, false)),
-    ...(close.length === 0
-      ? {}
-      : { closeMatches: close.map((index) => card(index, true)), closeMatchesRelaxed: [] }),
+    ...(close.length === 0 ? {} : { closeMatches: close.map((index) => card(index, true)) }),
     page,
     totalCount: CLOSE_DIVIDER_FIXTURE_SIZE,
   };
@@ -321,11 +291,9 @@ function closeDividerJevPage(): PlaygroundSearchResponse {
     ...base,
     searchId: "fixture-v2-close-jev",
     route: "ai",
-    intent: null,
     chips: [],
     results: split.matched.map(card),
     closeMatches: split.close.map(card),
-    closeMatchesRelaxed: [],
     page: 1,
     totalCount: hits.length,
   };
@@ -393,24 +361,6 @@ export function fixtureOutcome(
       return { delayMs: 0, status: 200, body: asResponse(resultsFixture) };
     case "ai":
       return { delayMs: 0, status: 200, body: asResponse(aiFixture) };
-    case "ai-chip-removed":
-      return {
-        delayMs: 0,
-        status: 200,
-        body: asResponse(aiChipRemovedFixture),
-      };
-    case "ai-negation":
-      return { delayMs: 0, status: 200, body: asResponse(aiNegationFixture) };
-    case "ai-negation-chip-removed":
-      return {
-        delayMs: 0,
-        status: 200,
-        body: asResponse(aiNegationChipRemovedFixture),
-      };
-    case "ai-reuse":
-      return { delayMs: 0, status: 200, body: asResponse(aiReuseFixture) };
-    case "ai-zero-hit":
-      return { delayMs: 0, status: 200, body: asResponse(aiZeroHitFixture) };
     case "ai-delayed":
       return {
         delayMs: FIXTURE_DELAY_MS,
@@ -439,12 +389,6 @@ export function fixtureOutcome(
       return { delayMs: 0, status: 200, body: closeDividerPage(paging?.page ?? 1) };
     case "v2-close-jev":
       return { delayMs: 0, status: 200, body: closeDividerJevPage() };
-    case "color-unknown":
-      return {
-        delayMs: 0,
-        status: 200,
-        body: asResponse(colorUnknownFixture),
-      };
   }
 }
 
@@ -452,34 +396,7 @@ function asResponse(fixture: unknown): PlaygroundSearchResponse {
   return fixture as PlaygroundSearchResponse;
 }
 
-/**
- * Chip removal answers a contract-correct echo (AC-7): the same search with
- * the dismissed constraint gone from BOTH the chip row and the intent, and
- * the products it had excluded back in the set. Serving the unchanged AI
- * fixture would let a broken remove-and-re-render pass its test.
- *
- * Only the `colorsExclude` chip and the `attributesExclude` chip (YOY-133)
- * have recorded echoes, because those are the ones the specs remove; any
- * other chip falls through to the plain AI fixture rather than pretending
- * to a change the fixture cannot represent.
- */
-export function selectFixtureForRemoval(
-  removeChip: { field: string; value: string } | null,
-): PlaygroundFixtureName {
-  if (removeChip === null) {
-    return "ai";
-  }
-  switch (removeChip.field) {
-    case "colorsExclude":
-      return "ai-chip-removed";
-    case "attributesExclude":
-      return "ai-negation-chip-removed";
-    default:
-      return "ai";
-  }
-}
-
-/** A removed engine v2 chip as `removedChips` carries it (YOY-149). */
+/** A removed chip as `removedChips` carries it (YOY-149). */
 export interface FixtureRemovedChip {
   field: string;
   value: string;
@@ -524,21 +441,20 @@ const OVER_BUDGET_CARD = {
   priceMax: 640,
   currencyCode: "ILS",
   available: true,
-  colorUnknown: false,
 };
 
 /**
- * An engine v2 removal (YOY-149 AC-15) answers a contract-correct echo: the
- * same response with every chip in `removedChips` gone — the server
- * re-runs the same query without those constraints — and, once the price
- * cap is among them, the product the cap kept out back in the set. A
- * fixture with no v2 chips answers unchanged.
+ * A chip removal (YOY-149 AC-15) answers a contract-correct echo: the same
+ * response with every chip in `removedChips` gone — the server re-runs the
+ * same query without those constraints — and, once the price cap is among
+ * them, the product the cap kept out back in the set. Serving the unchanged
+ * fixture would let a broken remove-and-re-render pass its test.
  */
 export function withoutRemovedChips(
   outcome: FixtureOutcome,
   removed: readonly FixtureRemovedChip[],
 ): FixtureOutcome {
-  if (outcome.body === null || outcome.body.intent !== null) {
+  if (outcome.body === null) {
     return outcome;
   }
   const gone = (chip: { field: string; value: string }): boolean =>

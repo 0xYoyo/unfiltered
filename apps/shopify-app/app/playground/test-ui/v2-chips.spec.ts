@@ -4,12 +4,11 @@ import { PLAYGROUND_STRING_CATALOG } from "../strings";
 
 /**
  * Engine v2 chips in the playground (YOY-149 AC-15 client half, AC-16),
- * against the `v2-budget` fixture: a response with `intent: null` whose
- * chips are the v2 fields — a price cap carrying the shopper's number and
- * its ISO currency, the size as typed, availability, and an `exclude`.
- * Labels come from the widget's shared `chipLabel`; removal re-asks the same
- * query with `removedChips` (every chip removed in the chain) instead of
- * `previousIntent`/`removeChip`.
+ * against the `v2-budget` fixture: a response whose chips are the v2 fields
+ * — a price cap carrying the shopper's number and its ISO currency, the
+ * size as typed, availability, and an `exclude`. Labels come from the
+ * widget's shared `chipLabel`; removal re-asks the same query with
+ * `removedChips` (every chip removed in the chain).
  */
 
 const input = (page: Page) => page.getByTestId("playground-input");
@@ -101,8 +100,6 @@ test("verify 3: removing the chip sends one request with removedChips and the ch
   expect(JSON.parse(removal.searchParams.get("removedChips") ?? "null")).toEqual(
     [{ field: "priceMax", value: "400" }],
   );
-  expect(removal.searchParams.has("previousIntent")).toBe(false);
-  expect(removal.searchParams.has("removeChip")).toBe(false);
   expect(removal.searchParams.get("page")).toBe("1");
 
   // The chain accumulates: a second removal carries both chips.

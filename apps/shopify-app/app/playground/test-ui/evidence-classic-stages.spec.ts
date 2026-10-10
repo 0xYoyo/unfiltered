@@ -3,8 +3,8 @@ import { mkdirSync } from "node:fs";
 
 /**
  * Design evidence for the one-statement classic search (YOY-115 AC-3): the
- * engine-details panel on a classic response shows `classify` and `classic`
- * rows and no `hydrate` row, desktop and mobile, EN and HE. Tagged
+ * engine-details panel on a keystroke preview shows a `classic` row and no
+ * `hydrate` row, desktop and mobile, EN and HE. Tagged
  * @evidence — off the default lane, captured with
  * `PLAYGROUND_EVIDENCE=1 npx playwright test --project=playground -g @evidence`.
  */
@@ -26,9 +26,9 @@ test.describe("@evidence", () => {
       test(`classic stages ${device} ${locale}`, async ({ page }) => {
         await page.setViewportSize(viewport);
         await page.goto(`/try?details=1${suffix}`);
+        // A preview — the classic keyword path: typed, not submitted.
         await input(page).fill("dress");
-        await input(page).press("Enter");
-        await stages(page).locator("li").first().waitFor();
+        await stages(page).getByText(/^classic · /).waitFor();
         mkdirSync(OUT, { recursive: true });
         await page.evaluate(() => document.fonts.ready);
         await stages(page).scrollIntoViewIfNeeded();

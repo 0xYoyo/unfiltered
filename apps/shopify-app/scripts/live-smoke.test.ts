@@ -32,14 +32,12 @@ function searchBody(query: string, preview: boolean, overrides: Record<string, u
     degraded: false,
     results: [{ productId: "p1" }],
     chips: preview ? [] : [{ field: "price", value: "≤ 400" }],
-    intent: null,
     ...(preview ? {} : { page: 1, totalCount: 37 }),
     details: {
       routeReason: preview ? "preview" : "judged",
       latencyMs: preview ? 24 : 1800,
       limited: null,
       stages: {},
-      engine: "v2",
     },
     ...overrides,
   };
@@ -102,8 +100,7 @@ describe("live smoke (YOY-112)", () => {
       SMOKE_QUERIES["ai-he"],
     ]);
     // Only the `dress` probe is a keystroke preview (YOY-153 AC-4); the two
-    // others are submitted searches and name no engine, so the deployment's
-    // default answers.
+    // others are submitted searches.
     expect(submitted.map((url) => url.searchParams.get("mode"))).toEqual(["preview", null, null]);
     expect(submitted.every((url) => !url.searchParams.has("engine"))).toBe(true);
     expect(new Set(submitted.map((url) => url.searchParams.get("sessionId"))).size).toBe(3);
@@ -114,15 +111,14 @@ describe("live smoke (YOY-112)", () => {
       route: "ai",
       routeReason: "judged",
       chips: 1,
-      engine: "v2",
       failures: [],
     });
     expect(formatSummary(report)).toContain("4/4 passed → exit 0");
   });
 
   it("one failing probe: exit 1, the other three still run and pass", async () => {
-    // The EN probe is answered by the old engine, degraded and unpaged —
-    // the flip did not land (YOY-153 AC-4).
+    // The EN probe is answered degraded and unpaged — not by the find path
+    // (YOY-153 AC-4).
     const store = healthyStore((query) =>
       query === SMOKE_QUERIES["ai-en"]
         ? {
@@ -130,7 +126,7 @@ describe("live smoke (YOY-112)", () => {
             degraded: true,
             page: undefined,
             totalCount: undefined,
-            details: { routeReason: "model", latencyMs: 900, limited: null, stages: {}, engine: "v1" },
+            details: { routeReason: "client-timeout-rescue", latencyMs: 900, limited: null, stages: {} },
           }
         : {},
     );
@@ -144,7 +140,6 @@ describe("live smoke (YOY-112)", () => {
       "degraded is true, expected false",
       "page: null, expected a number",
       "totalCount: null, expected a number",
-      'details.engine is "v1", expected "v2"',
     ]);
     const summary = formatSummary(report);
     expect(summary).toContain("FAIL  ai-en");
@@ -165,15 +160,15 @@ describe("live smoke (YOY-112)", () => {
     ]);
   });
 
-  it("submitted probes carry no route or chip assertion under Engine v2 (YOY-153 AC-4)", async () => {
+  it("submitted probes carry no route or chip assertion (YOY-153 AC-4)", async () => {
     // Find order served with no judge and no extracted wish is still a
-    // healthy v2 page: route classic, zero chips.
+    // healthy page: route classic, zero chips.
     const store = healthyStore((query) =>
       query === SMOKE_QUERIES["ai-he"] ? { route: "classic", chips: [] } : {},
     );
     const { report } = await run(store);
     expect(report.exitCode).toBe(0);
-    expect(report.probes[3]).toMatchObject({ pass: true, route: "classic", chips: 0, engine: "v2" });
+    expect(report.probes[3]).toMatchObject({ pass: true, route: "classic", chips: 0 });
   });
 
   it("version mismatch fails the healthz probe and names both versions", async () => {
@@ -190,9 +185,9 @@ describe("live smoke (YOY-112)", () => {
   it("a latency over its ceiling fails that probe only", async () => {
     const store = healthyStore((query) =>
       query === SMOKE_QUERIES.preview
-        ? { details: { routeReason: "preview", latencyMs: 1501, limited: null, stages: {}, engine: "v2" } }
+        ? { details: { routeReason: "preview", latencyMs: 1501, limited: null, stages: {} } }
         : query === SMOKE_QUERIES["ai-he"]
-          ? { details: { routeReason: "judged", latencyMs: 6000, limited: null, stages: {}, engine: "v2" } }
+          ? { details: { routeReason: "judged", latencyMs: 6000, limited: null, stages: {} } }
           : {},
     );
     const { report } = await run(store);

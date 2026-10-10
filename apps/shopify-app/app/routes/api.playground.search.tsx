@@ -7,7 +7,6 @@ import {
   parseFixtureRemovedChips,
   playgroundFixturesEnabled,
   selectFixture,
-  selectFixtureForRemoval,
   sleep,
   withFixtureCarry,
   withoutRemovedChips,
@@ -22,13 +21,9 @@ import {
   resolveLimit,
   serializePlaygroundSearchResponse,
 } from "../playground/api.server";
-import { normalizeReuseQuery, writeSearchEvent } from "../search/events.server";
+import { writeSearchEvent } from "../search/events.server";
 import { runPlaygroundSearch } from "../search/playground-search.server";
-import {
-  getProxySearchOrchestrator,
-  parseProxySearchParams,
-  removeChipFromIntent,
-} from "../search/proxy.server";
+import { getProxySearchOrchestrator, parseProxySearchParams } from "../search/proxy.server";
 
 /**
  * The playground's search endpoint (YOY-90): `GET /api/playground/search` on
@@ -42,10 +37,10 @@ import {
  * `details` object the playground renders as "what the engine did".
  *
  * Being unauthenticated, its real exposure is the AI bill, so three guards
- * sit in front of the AI path (see playground/api.server.ts). Every one of
- * them degrades to classic results rather than to an error: a visitor who
- * trips a ceiling still gets a working search, told honestly through
- * `degraded` and `details.limited`.
+ * sit in front of the judge (see playground/api.server.ts). Every one of
+ * them serves find order with no judge call rather than an error: a visitor
+ * who trips a ceiling still gets a working search, told honestly through
+ * `details.limited`.
  *
  * No CORS headers are set anywhere (NG-2): the playground's own pages are
  * same-origin, and a third party must not be able to spend our AI budget
@@ -69,32 +64,20 @@ export const loader = async ({
   if (body === null) {
     return emptyResponse(400);
   }
-  // The engine for this request (YOY-145 AC-6), overriding ENGINE_V2; only
-  // this API reads it — the storefront proxy ignores the parameter. An
-  // unknown value is a malformed request, like any other parse failure.
-  const engineParam = url.searchParams.get("engine");
-  if (engineParam !== null && engineParam !== "v1" && engineParam !== "v2") {
-    return emptyResponse(400);
-  }
-
   // Fixture mode (YOY-92 AC-8): the UI lane answers from committed JSON, so
   // the page under test needs no database, no Gemini key, and no network.
   // The branch sits after parsing so a malformed request still answers 400
   // in the lane exactly as it does in production.
   if (playgroundFixturesEnabled()) {
-    // A chip removal is answered by its own echo rather than by the query
-    // text, because the query has not changed — only the constraint set has.
     // Paged like the real endpoint (YOY-146): page parameters in, that
-    // page plus `page` and `totalCount` out.
-    // An engine v2 removal (YOY-149) re-asks the same query, so the query
-    // still picks the fixture; `removedChips` takes those chips off it.
+    // page plus `page` and `totalCount` out. A chip removal (YOY-149)
+    // re-asks the same query, so the query still picks the fixture;
+    // `removedChips` takes those chips off it.
     const removedChips = parseFixtureRemovedChips(
       url.searchParams.get("removedChips"),
     );
     const selected = fixtureOutcome(
-      body.removeChip !== undefined
-        ? selectFixtureForRemoval(body.removeChip)
-        : selectFixture(body.query, body.mode !== undefined),
+      selectFixture(body.query, body.mode !== undefined),
       body.paging,
     );
     const outcome = withFixtureCarry(
@@ -118,21 +101,15 @@ export const loader = async ({
     return emptyResponse(catalog.status);
   }
 
-  // Chip removal: pure intent surgery, then straight to retrieval — no
-  // classification and no extraction, exactly as the proxy route does it.
-  const resolvedIntent =
-    body.removeChip !== undefined && body.previousIntent !== undefined
-      ? removeChipFromIntent(body.previousIntent, body.removeChip)
-      : undefined;
   const preview = body.mode === "preview";
   // The classic rescue (YOY-96 AC-9): a submitted search re-asked down the
   // classic path after timing out client-side — logged, unlike a preview.
   const classic = body.mode === "classic";
 
   // Guards apply only where AI spend is possible. A preview and a classic
-  // rescue are classic-only by contract and chip removal makes no LLM call
-  // at all, so none can burn budget and none is counted or limited (AC-3).
-  const guarded = !preview && !classic && resolvedIntent === undefined;
+  // rescue are classic-only by contract, so neither can burn budget and
+  // neither is counted or limited (AC-3).
+  const guarded = !preview && !classic;
   const throttle = getPlaygroundIpThrottle();
   // Keyed by the last trusted X-Forwarded-For hop; the connection address is
   // only available to a custom server's load context (YOY-96 AC-11).
@@ -156,30 +133,17 @@ export const loader = async ({
       preview,
       classic,
       limited: limited !== null,
-      resolvedIntent,
-      previousIntent: body.previousIntent,
       ...(body.removedChips !== undefined ? { removedChips: body.removedChips } : {}),
       ...(body.previousQuery !== undefined ? { previousQuery: body.previousQuery } : {}),
-      ...(engineParam !== null ? { engine: engineParam } : {}),
       ...(body.paging !== undefined ? { paging: body.paging } : {}),
     });
 
-    // Budget is consumed whenever the classifier actually took the AI route,
-    // mirroring the proxy's accounting: a degraded response that still spent
-    // its intent call counts, a heuristic classic route does not.
-    // An exact-query reuse (YOY-64 AC-4) made no LLM call: no budget spent.
-    const aiDecided =
-      (response.route === "ai" && response.routeReason !== "intent-reuse") ||
-      (response.degraded &&
-        (response.routeReason === "model" ||
-          // A purpose phrase settles AI deterministically (YOY-133); its
-          // degraded fallback still spent the intent call, like "model".
-          response.routeReason === "purpose-phrase" ||
-          response.routeReason === "classic-zero-hit"));
+    // Budget is consumed by every search the find step served (route
+    // "ai"), mirroring the proxy's accounting.
     // Only page 1 of a submitted search spends budget (YOY-157 AC-29); the
     // daily ceilings count page-1 rows only (`countAiSearchesToday`).
     const firstPage = (response.page ?? 1) === 1;
-    if (guarded && limited === null && aiDecided && firstPage) {
+    if (guarded && limited === null && response.route === "ai" && firstPage) {
       throttle.recordAiSearch(ip);
     }
 
@@ -199,15 +163,6 @@ export const loader = async ({
         resultCount: response.hits.length,
         // One row per page request, with its page (YOY-145 AC-10).
         page: response.page ?? 1,
-        // Only a freshly EXTRACTED intent is stored (YOY-125 AC-3): a
-        // response served under "intent-reuse" must not re-anchor the reuse
-        // window on itself.
-        ...(response.route === "ai" &&
-        response.routeReason !== "intent-reuse" &&
-        !response.degraded &&
-        response.intent !== null
-          ? { intent: response.intent, normalizedQuery: normalizeReuseQuery(body.query) }
-          : {}),
       });
     }
 
@@ -217,8 +172,6 @@ export const loader = async ({
         latencyMs,
         limited,
         stages: response.stages,
-        intentTier: response.intentTier,
-        engine: response.engine,
       }),
       { headers: PLAYGROUND_RESPONSE_HEADERS },
     );
@@ -226,8 +179,8 @@ export const loader = async ({
     if (error instanceof Response) {
       throw error;
     }
-    // Containment, as on the proxy route: nothing below the orchestrator's
-    // own fallback ladder may surface framework error detail to a visitor.
+    // Containment, as on the proxy route: nothing below the orchestrator
+    // may surface framework error detail to a visitor.
     return emptyResponse(500);
   }
 };

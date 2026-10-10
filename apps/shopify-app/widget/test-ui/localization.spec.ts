@@ -1,9 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
-import { CANONICAL_CATEGORIES, CANONICAL_OCCASIONS } from "@unfiltered/engine";
 
 import {
-  HEBREW_CATEGORY_DISPLAY,
-  HEBREW_OCCASION_DISPLAY,
   STRING_CATALOG,
   WIDGET_LOCALES,
   type WidgetLocale,
@@ -31,24 +28,6 @@ test("the string catalog has complete, non-empty EN and HE sets (AC-1)", () => {
     for (const [key, value] of Object.entries(STRING_CATALOG[locale])) {
       expect(value.trim(), `${locale}.${key} must not be empty`).not.toBe("");
     }
-  }
-});
-
-test("every canonical category and occasion has a Hebrew display entry (YOY-52 AC-7)", () => {
-  // The engine owns the canonical sets; the widget owns only their Hebrew
-  // display. Importing the canonical arrays here means adding a new
-  // canonical value fails this suite until its Hebrew string exists —
-  // and removing a display entry fails it immediately. The color list
-  // stays widget-owned (YOY-50 AC-4) and is deliberately not tied.
-  for (const category of CANONICAL_CATEGORIES) {
-    const display = HEBREW_CATEGORY_DISPLAY[category];
-    expect(display, `category "${category}" needs a Hebrew display`).toBeDefined();
-    expect(display!.trim(), `category "${category}" display must not be empty`).not.toBe("");
-  }
-  for (const occasion of CANONICAL_OCCASIONS) {
-    const display = HEBREW_OCCASION_DISPLAY[occasion];
-    expect(display, `occasion "${occasion}" needs a Hebrew display`).toBeDefined();
-    expect(display!.trim(), `occasion "${occasion}" display must not be empty`).not.toBe("");
   }
 });
 
@@ -133,46 +112,6 @@ test("Hebrew chrome mirrors the layout and isolates Latin card text (AC-3)", asy
   await expect(firstCard.locator(".card-title")).toContainText("Silk Gown");
 });
 
-test("Hebrew chrome localizes chip values; unknown values render as extracted (AC-4)", async ({
-  page,
-}) => {
-  await page.goto("/?fixture=ai-localized&locale=he&debounce=30000");
-
-  await themeInput(page).fill("elegant dress");
-  await themeInput(page).press("Enter");
-  await expect(chips(page)).toHaveCount(6);
-
-  // Canonical values display in Hebrew; the price chip carries the intent's
-  // currency; "chartreuse" is outside the fixed color list and renders raw.
-  await expect(chips(page).nth(0)).toContainText("שמלה");
-  await expect(chips(page).nth(1)).toContainText("עד 400 ILS");
-  await expect(chips(page).nth(2)).toContainText("לא שחור");
-  await expect(chips(page).nth(3)).toContainText("chartreuse");
-  await expect(chips(page).nth(4)).toContainText("ערב");
-  await expect(chips(page).nth(5)).toContainText("במלאי");
-  await expect(chips(page).nth(1)).toHaveAttribute(
-    "aria-label",
-    "הסרת סינון: עד 400 ILS",
-  );
-});
-
-test("English chrome keeps the YOY-49 chip labels on the same fixture (AC-4)", async ({
-  page,
-}) => {
-  await page.goto("/?fixture=ai-localized&locale=en&debounce=30000");
-
-  await themeInput(page).fill("elegant dress");
-  await themeInput(page).press("Enter");
-  await expect(chips(page)).toHaveCount(6);
-
-  await expect(chips(page).nth(0)).toContainText("dress");
-  await expect(chips(page).nth(1)).toContainText("Under 400");
-  await expect(chips(page).nth(2)).toContainText("Not black");
-  await expect(chips(page).nth(3)).toContainText("chartreuse");
-  await expect(chips(page).nth(4)).toContainText("evening");
-  await expect(chips(page).nth(5)).toContainText("In stock");
-});
-
 // Mirroring regressions are caught in both directions (AC-5): RTL and LTR
 // baselines of the overlay's main states.
 for (const locale of ["en", "he"] as WidgetLocale[]) {
@@ -187,29 +126,5 @@ for (const locale of ["en", "he"] as WidgetLocale[]) {
     await expect(chips(page)).toHaveCount(3);
 
     await expect(overlay(page)).toHaveScreenshot(`ai-results-${locale}.png`);
-  });
-
-  test(`zero-hit state matches the ${locale} baseline (AC-5)`, async ({
-    page,
-  }) => {
-    await page.goto(`/?fixture=ai-zero-hit&locale=${locale}&debounce=30000`);
-
-    await themeInput(page).fill("elegant dress under 400");
-  await themeInput(page).press("Enter");
-    await expect(page.getByTestId("unfiltered-widget-zero-hit")).toBeVisible();
-    await expect(
-      page.getByTestId("unfiltered-widget-close-matches"),
-    ).toBeVisible();
-    // The relaxed-constraint heading comes from the catalog in the page's
-    // language (YOY-111 AC-4).
-    await expect(
-      page.getByTestId("unfiltered-widget-close-matches").locator("h2"),
-    ).toHaveText(
-      locale === "he"
-        ? "התאמות קרובות — מעל התקציב"
-        : "Close matches — over your budget",
-    );
-
-    await expect(overlay(page)).toHaveScreenshot(`zero-hit-${locale}.png`);
   });
 }

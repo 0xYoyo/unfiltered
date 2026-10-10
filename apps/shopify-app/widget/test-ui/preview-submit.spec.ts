@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 // The preview/submit interaction model (YOY-68 AC-5): typing produces live,
 // classic-only preview results with zero AI involvement; the full pipeline
-// (chips, zero-hit rescue, refinement) fires only on explicit submit; and the
+// (chips, the zero-hit line, refinement) fires only on explicit submit; and the
 // preview→submitted transition is clean — panels swap, never stack.
 
 const themeInput = (page: Page) => page.locator('input[type="search"]');
@@ -18,7 +18,7 @@ const zeroHit = (page: Page) => page.getByTestId("unfiltered-widget-zero-hit");
 interface CapturedRequest {
   query: string;
   mode?: string;
-  previousIntent?: unknown;
+  previousQuery?: string;
 }
 
 const searchRequests = (page: Page) =>
@@ -47,8 +47,8 @@ test("typing produces live-updating classic previews: every request is mode=prev
   const requests = await searchRequests(page);
   for (const request of requests) {
     expect(request.mode).toBe("preview");
-    expect("previousIntent" in request).toBe(false);
-    expect("removeChip" in request).toBe(false);
+    expect("previousQuery" in request).toBe(false);
+    expect("removedChips" in request).toBe(false);
   }
 });
 
@@ -103,31 +103,36 @@ test("preview zero hits show the quiet empty state; the flat no-results panel wa
 test("typing after a submitted AI response drops to a plain preview but keeps the refinement memory for the next submit (AC-2)", async ({
   page,
 }) => {
-  await page.goto("/?fixture=ai");
+  // The `refine` fixture answers a `carry` (YOY-150), the refinement
+  // memory a submitted response leaves behind.
+  await page.goto("/?fixture=refine");
 
   await themeInput(page).fill("elegant dress");
   await expect(cards(page)).toHaveCount(3);
   await themeInput(page).press("Enter");
-  await expect(chips(page)).toHaveCount(3);
+  await expect(chips(page)).toHaveCount(1);
 
   // Typing again previews without chips — refinement is submit-gated.
   await themeInput(page).fill("same but cheaper");
   await expect(chips(page)).toHaveCount(0);
   await expect(cards(page)).toHaveCount(3);
 
-  // The follow-up submit still carries the held intent from the last
+  // The follow-up submit still carries the held carry from the last
   // submitted response; the preview in between never did.
   await themeInput(page).press("Enter");
-  await expect(chips(page)).toHaveCount(3);
+  await expect.poll(async () =>
+    (await searchRequests(page)).filter((request) => request.mode === undefined).length,
+  ).toBe(2);
+  await expect(chips(page)).toHaveCount(1);
   const requests = await searchRequests(page);
   const submitted = requests.filter((request) => request.mode === undefined);
   expect(submitted).toHaveLength(2);
-  expect("previousIntent" in submitted[0]!).toBe(false);
-  expect(submitted[1]!.previousIntent).toBeDefined();
+  expect("previousQuery" in submitted[0]!).toBe(false);
+  expect(submitted[1]!.previousQuery).toBe("elegant dress");
   const previews = requests.filter((request) => request.mode === "preview");
   expect(previews.length).toBeGreaterThan(0);
   for (const preview of previews) {
-    expect("previousIntent" in preview).toBe(false);
+    expect("previousQuery" in preview).toBe(false);
   }
 });
 

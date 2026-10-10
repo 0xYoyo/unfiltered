@@ -76,8 +76,40 @@ for (const locale of ["en", "he"] as const) {
       await expect(cards(page).nth(index).locator(".cardLabel")).toHaveCount(0);
     }
 
-    // The zero-hit section below the grid is not used for a page with matches.
+    // The divider is the only "Close matches" heading: nothing renders a
+    // second section below the grid.
     await expect(page.locator(".closeMatches")).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: strings.closeMatchesHeading })).toHaveCount(2);
+  });
+}
+
+for (const locale of ["en", "he"] as const) {
+  const strings = PLAYGROUND_STRING_CATALOG[locale];
+  const path = locale === "he" ? "/try?lang=he" : "/try";
+
+  test(`a results answer renders its cards and nothing else: no colour note, no close-matches section (YOY-155, ${locale})`, async ({
+    page,
+  }) => {
+    await page.goto(path);
+    await page.getByTestId("playground-input").fill("dress");
+    await page.getByTestId("playground-input").press("Enter");
+    await expect(cards(page)).toHaveCount(4);
+
+    // No card is dimmed or annotated about its colour.
+    await expect(page.getByTestId("playground-card-color-unknown")).toHaveCount(0);
+    await expect(page.locator("[data-color-unknown], .cardDimmed, .cardColorUnknown")).toHaveCount(0);
+    for (let index = 0; index < 4; index += 1) {
+      const opacity = await cards(page)
+        .nth(index)
+        .evaluate((element) => getComputedStyle(element).opacity);
+      expect(opacity).toBe("1");
+    }
+    // No "Close matches" heading anywhere: neither a divider nor a section
+    // below the grid.
+    await expect(dividers(page)).toHaveCount(0);
+    await expect(page.locator(".closeMatches")).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: strings.closeMatchesHeading })).toHaveCount(0);
+    await expect(page.locator(".results")).toHaveCount(1);
   });
 }
 

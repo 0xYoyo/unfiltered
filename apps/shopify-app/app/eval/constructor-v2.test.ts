@@ -12,7 +12,6 @@ import {
 } from "./constructor-v2.server";
 import {
   CONSTRUCTOR_GROUPS,
-  loadConstructorFloor,
   loadConstructorGoldens,
   type ConstructorGolden,
 } from "./harness.server";
@@ -21,8 +20,7 @@ import { assertEngineSourceExecution } from "./source-guard.server";
 
 // The Constructor-bar set on Engine v2 (YOY-153 AC-2, AC-3): offline and
 // deterministic over fixtures/recorded/{card,extract,judge-jev,embeddings-v2}.json,
-// recorded by constructor-v2-regen.test.ts. The old engine's run of the
-// same set stays in harness.test.ts against its own floor fields.
+// recorded by constructor-v2-regen.test.ts.
 assertEngineSourceExecution();
 
 const goldens = loadConstructorGoldens();
@@ -170,18 +168,12 @@ describe("the Constructor bar on Engine v2 (AC-2, AC-3)", () => {
     }
   });
 
-  it("records the v2 floor beside the old engine's fields, which keep their values (NG-2)", () => {
+  it("records the v2 floor as whole numbers", () => {
     const floor = loadConstructorV2Floor();
     for (const group of CONSTRUCTOR_GROUPS) {
       expect(Number.isInteger(floor.byGroup[group].hitRatePercent)).toBe(true);
       expect(Number.isInteger(floor.byGroup[group].mustNotViolationsMax)).toBe(true);
     }
-    expect(loadConstructorFloor()).toMatchObject({
-      recordedAt: "2026-08-28",
-      overallHitRatePercent: 100,
-      mustNotViolationsMax: 0,
-      mustNotCleanRatePercent: 100,
-    });
   });
 
   it("meters every judge decision under the Jev model on the ledger", () => {

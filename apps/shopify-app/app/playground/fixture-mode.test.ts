@@ -5,7 +5,6 @@ import {
   fixtureOutcome,
   playgroundFixturesEnabled,
   selectFixture,
-  selectFixtureForRemoval,
 } from "./fixture-mode.server";
 
 /**
@@ -49,21 +48,11 @@ describe("fixture selection by query text", () => {
 
   it("routes the AI states, and never on a preview (AC-1)", () => {
     expect(selectFixture("ai elegant dress", false)).toBe("ai");
-    expect(selectFixture("ai zero hit", false)).toBe("ai-zero-hit");
     expect(selectFixture("ai delayed", false)).toBe("ai-delayed");
     expect(selectFixture("degraded", false)).toBe("degraded");
-    expect(selectFixture("ai color beige", false)).toBe("color-unknown");
-    // A negated attribute (YOY-133 AC-5), and its removal echo.
-    expect(selectFixture("ai winter coat not wool", false)).toBe("ai-negation");
-    expect(selectFixture("ai winter coat not wool", true)).toBe("preview");
-    expect(selectFixtureForRemoval({ field: "attributesExclude", value: "wool" })).toBe(
-      "ai-negation-chip-removed",
-    );
-    expect(selectFixtureForRemoval({ field: "colorsExclude", value: "black" })).toBe("ai-chip-removed");
-    expect(selectFixtureForRemoval({ field: "category", value: "coat" })).toBe("ai");
     // A preview is classic-only however it is worded.
     expect(selectFixture("ai elegant dress", true)).toBe("preview");
-    expect(selectFixture("ai zero hit", true)).toBe("preview");
+    expect(selectFixture("degraded", true)).toBe("preview");
   });
 
   it("matches whole words, not substrings", () => {
@@ -83,10 +72,10 @@ describe("fixture outcomes", () => {
       expect(outcome.delayMs).toBe(0);
       expect(outcome.body).not.toBeNull();
       expect(Object.keys(outcome.body!).sort()).toEqual(
-        ["chips", "degraded", "details", "intent", "results", "route", "searchId"].sort(),
+        ["chips", "degraded", "details", "results", "route", "searchId"].sort(),
       );
       expect(Object.keys(outcome.body!.details).sort()).toEqual(
-        ["intentTier", "latencyMs", "limited", "routeReason", "stages"].sort(),
+        expect.arrayContaining(["latencyMs", "limited", "routeReason", "stages"]),
       );
     }
   });

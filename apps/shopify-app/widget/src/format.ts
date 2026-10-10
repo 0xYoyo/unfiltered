@@ -1,11 +1,4 @@
-import {
-  HEBREW_ATTRIBUTE_DISPLAY,
-  HEBREW_CATEGORY_DISPLAY,
-  HEBREW_COLOR_DISPLAY,
-  HEBREW_OCCASION_DISPLAY,
-  STRING_CATALOG,
-  type WidgetLocale,
-} from "./strings";
+import { STRING_CATALOG, type WidgetLocale } from "./strings";
 
 /**
  * Price display for result cards (YOY-48 AC-3): formatted with the currency
@@ -40,23 +33,16 @@ export interface ChipLike {
 /** Display context for chip labels (YOY-50 AC-4). */
 export interface ChipDisplayContext {
   locale: WidgetLocale;
-  /** Currency code from the response's echoed intent, when present. */
-  currency?: string;
 }
 
 /**
  * Shopper-facing display text for one applied-constraint chip (YOY-49 AC-1,
- * localized for Hebrew chrome by YOY-50 AC-4). English labels stay exactly
- * as YOY-49 shipped them. Hebrew price chips carry the currency, canonical
- * taxonomy values (categories, occasions, availability, common colors) get
- * Hebrew display strings, and anything outside those sets renders as
- * extracted — display-only; the chip's wire value is untouched (NG-3).
- * A negated attribute (YOY-133) reads "Not wool" / "לא צמר", exactly the
- * colour-exclusion shape; a required category-like attribute reads its
- * word ("bridal" / "כלה"). Engine v2 chips (YOY-149) add `size`
- * ("Size M" / "מידה M"), `exclude` ("Not black" / "לא שחור", the term as
- * typed) and price chips carrying their own currency ("Under ₪400"). The
- * words come from the string catalog.
+ * localized for Hebrew chrome by YOY-50 AC-4) — display-only; the chip's
+ * wire value is untouched (NG-3). Engine v2 chips (YOY-149): price chips
+ * carrying their own currency ("Under ₪400"), `size` ("Size M" /
+ * "מידה M"), availability ("In stock" / "במלאי") and `exclude`
+ * ("Not black" / "לא שחור", the term as typed). The words come from the
+ * string catalog.
  *
  * The joined string; `chipLabelParts` is the same label with the negator
  * kept separate, for surfaces that mark an exclusion typographically.
@@ -76,8 +62,6 @@ export function chipLabel(
  * difference (P-9, W-7).
  */
 export const NEGATION_CHIP_FIELDS: ReadonlySet<string> = new Set([
-  "colorsExclude",
-  "attributesExclude",
   // Engine v2 (YOY-149): one exclusion field for any excluded term.
   "exclude",
 ]);
@@ -109,7 +93,6 @@ export function chipLabelParts(
   context: ChipDisplayContext = { locale: "en" },
 ): ChipLabelParts {
   const strings = STRING_CATALOG[context.locale];
-  const hebrew = context.locale === "he";
   const money = chipMoney(chip, context);
   switch (chip.field) {
     case "priceMin":
@@ -126,42 +109,6 @@ export function chipLabelParts(
       // whatever language they typed it — no display map, nothing to
       // translate.
       return { negator: strings.chipNegator, value: chip.value };
-    case "colorsExclude":
-      return {
-        negator: strings.chipNegator,
-        value: hebrew
-          ? (HEBREW_COLOR_DISPLAY[chip.value] ?? chip.value)
-          : chip.value,
-      };
-    case "attributesExclude":
-      return {
-        negator: strings.chipNegator,
-        value: hebrew
-          ? (HEBREW_ATTRIBUTE_DISPLAY[chip.value] ?? chip.value)
-          : chip.value,
-      };
-    case "colorsInclude":
-      return bare(
-        hebrew ? (HEBREW_COLOR_DISPLAY[chip.value] ?? chip.value) : chip.value,
-      );
-    case "attributesInclude":
-      return bare(
-        hebrew
-          ? (HEBREW_ATTRIBUTE_DISPLAY[chip.value] ?? chip.value)
-          : chip.value,
-      );
-    case "category":
-      return bare(
-        hebrew
-          ? (HEBREW_CATEGORY_DISPLAY[chip.value] ?? chip.value)
-          : chip.value,
-      );
-    case "occasion":
-      return bare(
-        hebrew
-          ? (HEBREW_OCCASION_DISPLAY[chip.value] ?? chip.value)
-          : chip.value,
-      );
     default:
       // A field this client does not know (a newer server): the value
       // speaks for itself.
@@ -175,10 +122,6 @@ export function chipLabelParts(
  * An engine v2 chip (YOY-149) carries its own ISO `currency`: the shopper's
  * number is shown with that currency's symbol in the chrome language
  * ("₪400" / "‏400 ₪"), whole units only. Without one, the bare number.
- *
- * A v1 chip carries no currency of its own and keeps exactly the YOY-49 /
- * YOY-50 display: English shows the bare number, Hebrew appends the
- * intent's currency CODE ("400 ILS").
  */
 function chipMoney(chip: ChipLike, context: ChipDisplayContext): string {
   if (chip.currency !== undefined && chip.currency !== "") {
@@ -195,9 +138,6 @@ function chipMoney(chip: ChipLike, context: ChipDisplayContext): string {
       }
     }
     return `${chip.value} ${chip.currency}`;
-  }
-  if (context.locale === "he" && context.currency !== undefined) {
-    return `${chip.value} ${context.currency}`;
   }
   return chip.value;
 }

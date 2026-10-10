@@ -16,9 +16,9 @@ import type { PlaygroundLocale, PlaygroundStrings } from "../strings";
  * inside a merchant theme (W-3, W-4), which is why only the anatomy is
  * shared.
  *
- * Engine v2 chips (YOY-149) need nothing new here: `chipLabel` reads a price
- * chip's own currency off the chip, and the v2 `exclude` field is in the
- * shared negation set, so it takes the exclusion tint below.
+ * The chips are Engine v2's (YOY-149): `chipLabel` reads a price chip's own
+ * currency off the chip, and the `exclude` field is in the shared negation
+ * set, so it takes the exclusion tint below.
  *
  * A NEGATED constraint (`isNegationChip`, shared with the widget so the two
  * surfaces cannot disagree about what an exclusion is) is tinted:
@@ -60,7 +60,6 @@ export function ChipRow({
   chips,
   locale,
   strings,
-  currency,
   onRemove,
   otherReading,
   onPickReading,
@@ -68,7 +67,6 @@ export function ChipRow({
   chips: ProxyChip[];
   locale: PlaygroundLocale;
   strings: PlaygroundStrings;
-  currency?: string;
   onRemove: (chip: ProxyChip) => void;
   /** The judge's second reading (YOY-150 AC-7); no reading chip when absent. */
   otherReading?: string;
@@ -129,10 +127,7 @@ export function ChipRow({
         </li>
       )}
       {chips.map((chip) => {
-        const label = chipLabel(chip, {
-          locale,
-          ...(currency === undefined ? {} : { currency }),
-        });
+        const label = chipLabel(chip, { locale });
         const key = chipKey(chip);
         const negated = isNegationChip(chip);
         const className = [

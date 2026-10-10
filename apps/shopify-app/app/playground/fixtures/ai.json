@@ -11,8 +11,7 @@
       "priceMin": 320,
       "priceMax": 320,
       "currencyCode": "ILS",
-      "available": true,
-      "colorUnknown": false
+      "available": true
     },
     {
       "productId": "p-2",
@@ -22,8 +21,7 @@
       "priceMin": 280,
       "priceMax": 320,
       "currencyCode": "ILS",
-      "available": true,
-      "colorUnknown": false
+      "available": true
     },
     {
       "productId": "p-3",
@@ -33,51 +31,37 @@
       "priceMin": 210,
       "priceMax": 210,
       "currencyCode": "ILS",
-      "available": false,
-      "colorUnknown": false
+      "available": false
     }
   ],
   "chips": [
     {
-      "field": "category",
-      "value": "dress"
-    },
-    {
       "field": "priceMax",
-      "value": "400"
+      "value": "400",
+      "currency": "ILS"
     },
     {
-      "field": "colorsExclude",
+      "field": "size",
+      "value": "M"
+    },
+    {
+      "field": "exclude",
       "value": "black"
     }
   ],
-  "intent": {
-    "category": "dress",
-    "priceMin": null,
-    "priceMax": 400,
-    "currency": "ILS",
-    "colorsInclude": [],
-    "colorsExclude": [
-      "black"
-    ],
-    "occasion": null,
-    "size": null,
-    "availabilityRequired": false,
-    "softAttributes": [
-      "elegant"
-    ]
-  },
   "details": {
-    "routeReason": "model",
+    "routeReason": "judged",
     "latencyMs": 812,
     "limited": null,
     "stages": {
-      "classify": 38,
-      "intent": 412,
-      "embed": 96,
-      "retrieve": 57,
-      "hydrate": 9
+      "find": 96,
+      "hydrate": 9,
+      "judgeRows": 12,
+      "judge": 640
     },
-    "intentTier": "lite"
-  }
+    "judge": null
+  },
+  "page": 1,
+  "totalCount": 3,
+  "carry": "ai elegant dress"
 }
