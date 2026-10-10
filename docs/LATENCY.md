@@ -82,9 +82,13 @@ npx tsx scripts/latency-probe.mts --url https://unfiltered-eu.onrender.com \
 `--set classic|ai-en|ai-he|all` chooses the sets; `--catalog <slug>`
 targets a registry catalog instead of the seed. With `--assert-*` flags the
 probe exits 1 on any breach; a failed request (non-200) also exits 1,
-because an incomplete sample is not a pass. The AI sets are paced under the
+because an incomplete sample is not a pass. Every set is paced under the
 playground's per-IP AI throttle (10 per sliding minute, `--ai-per-minute`)
-so the probe measures the pipeline rather than the guard. The percentile
+so the probe measures the pipeline rather than the guard — the `classic`
+set too, since with Engine v2 the default its queries take the AI path
+(YOY-171 AC-12). A paced request is an AI search: `--set all --runs N` is
+15 × N of them plus the warm-up, at most 10 a minute, and each counts
+against the playground's daily caps. The percentile
 math and the exit semantics are unit-tested in
 `scripts/latency-probe.test.ts`.
 
@@ -161,7 +165,8 @@ https://unfiltered-eu.onrender.com --set ai-en --runs 5`, then the same with
 `classic` set also runs the AI path, and the probe paces only the AI sets,
 so with `--set all` the classic set spends the per-IP AI budget (10 a
 minute) and every later request is served classic (`limited=ip`). The first
-attempt hit exactly that and was stopped. Cost of the whole measurement,
+attempt hit exactly that and was stopped. (Fixed since by AC-12: every set
+is paced.) Cost of the whole measurement,
 attempt included, from the cost ledger: **$0.085** (63 extractions, 1,303
 judge calls, 68 embeddings).
 

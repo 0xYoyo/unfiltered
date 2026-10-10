@@ -9,10 +9,12 @@
  * Method, verbatim in docs/LATENCY.md: one discarded warm-up request first,
  * then sequential runs — every query of the set, `--runs` times — each with
  * a fresh `sessionId`; nearest-rank percentiles per set; EN and HE AI
- * reported separately and combined. The AI sets are paced under the
+ * reported separately and combined. Every set is paced under the
  * playground's per-IP AI throttle (10 per sliding minute): a throttled
  * request is served classic and `limited`, which would measure the guard
- * rather than the pipeline. Any `degraded` or `limited` response is counted
+ * rather than the pipeline. Since Engine v2 is the default the `classic`
+ * set's queries take the AI path too, so it is paced like the AI sets
+ * (YOY-171 AC-12). Any `degraded` or `limited` response is counted
  * and reported, never silently folded into the percentiles' story.
  *
  * Usage, from apps/shopify-app:
@@ -594,13 +596,21 @@ async function probeOnce(
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/** Waits before a request and records its completion (`createPacer`). */
+export interface ProbePacer {
+  wait(): Promise<void>;
+  record(): void;
+}
+
 /**
- * Keep the AI sets under the playground's per-IP throttle: before an AI-set
- * request, wait until fewer than `aiPerMinute` AI-set requests completed
- * within the last window. The throttle counts AI-decided searches at
- * response time, so completions are what is tracked.
+ * Keep the probe under the playground's per-IP throttle: before a request,
+ * wait until fewer than `aiPerMinute` requests completed within the last
+ * window. The throttle counts AI-decided searches at response time, so
+ * completions are what is tracked. Every set is paced (YOY-171 AC-12):
+ * with Engine v2 the default, the `classic` set's queries take the AI path
+ * too.
  */
-function createPacer(aiPerMinute: number) {
+function createPacer(aiPerMinute: number): ProbePacer {
   const completions: number[] = [];
   return {
     async wait(): Promise<void> {
@@ -621,10 +631,13 @@ function createPacer(aiPerMinute: number) {
   };
 }
 
-export async function main(argv: readonly string[]): Promise<0 | 1> {
+export async function main(
+  argv: readonly string[],
+  options: { pacer?: ProbePacer } = {},
+): Promise<0 | 1> {
   const args = parseArgs(argv);
   const queries = loadQueries();
-  const pacer = createPacer(args.aiPerMinute);
+  const pacer = options.pacer ?? createPacer(args.aiPerMinute);
   const samples: ProbeSample[] = [];
   let failures = 0;
   // Four random bytes name this invocation in every AI query's marker, so
@@ -635,13 +648,9 @@ export async function main(argv: readonly string[]): Promise<0 | 1> {
   // for connection setup and cold caches that the method excludes.
   const warmSet = args.sets[0]!;
   try {
-    if (warmSet !== "classic") {
-      await pacer.wait();
-    }
+    await pacer.wait();
     const warm = await probeOnce(args, warmSet, queries[warmSet][0]!);
-    if (warmSet !== "classic") {
-      pacer.record();
-    }
+    pacer.record();
     console.log(`warm-up (discarded): ${warm.route} ${warm.latencyMs} ms`);
   } catch (error) {
     console.error(`warm-up failed: ${String(error)}`);
@@ -649,17 +658,14 @@ export async function main(argv: readonly string[]): Promise<0 | 1> {
   }
 
   for (const set of args.sets) {
-    const paced = set !== "classic";
     for (let run = 1; run <= args.runs; run += 1) {
       for (const query of queries[set]) {
-        if (paced) {
-          await pacer.wait();
-        }
+        await pacer.wait();
         try {
           const sample = await probeOnce(
             args,
             set,
-            paced ? distinctQueryText(query, invocation, run) : query,
+            set === "classic" ? query : distinctQueryText(query, invocation, run),
           );
           samples.push(sample);
           console.log(formatSampleLine(sample, run, args.runs, query));
@@ -667,9 +673,7 @@ export async function main(argv: readonly string[]): Promise<0 | 1> {
           failures += 1;
           console.error(`${set} run ${run}/${args.runs} FAILED: ${String(error)}`);
         } finally {
-          if (paced) {
-            pacer.record();
-          }
+          pacer.record();
         }
       }
     }

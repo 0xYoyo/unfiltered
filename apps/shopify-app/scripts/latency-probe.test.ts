@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { normalizeReuseQuery } from "../app/search/events.server";
 import { SEARCH_STAGES } from "../app/search/stages";
@@ -11,6 +11,7 @@ import {
   formatSampleLine,
   formatSummary,
   loadQueries,
+  main,
   parseArgs,
   probeSearchParams,
   percentile,
@@ -19,13 +20,14 @@ import {
   summarizeJudge,
   UNDER_ONE_SECOND_MS,
   visibleQueryText,
+  type ProbePacer,
   type ProbeSample,
 } from "./latency-probe.mjs";
 
 // The probe's measurement math and exit semantics (YOY-114 AC-3): the
 // percentile is nearest-rank exactly as docs/LATENCY.md states it, and the
 // `--assert-*` flags fail the run on any breach. No network: the request
-// loop itself is exercised only against the live deployment.
+// loop runs against a stubbed fetch where it is tested (YOY-171 AC-12).
 
 describe("nearest-rank percentile", () => {
   it("takes the value at rank ⌈p/100 · n⌉ on n=20, without interpolation", () => {
@@ -364,5 +366,59 @@ describe("distinct query text per run (YOY-64 AC-6)", () => {
       expect(tokens.at(-1)).toMatch(/^(?:\u200B|\u200C|\u200D|\u2060)+$/u);
       expect(tokens.at(-1)).not.toMatch(/[\p{L}\p{N}\s]/u);
     }
+  });
+});
+
+describe("pacing every set (YOY-171 AC-12)", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("paces the classic set's requests too, because they take the AI path", async () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const queries = loadQueries();
+    const asked: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        asked.push(new URL(url).searchParams.get("query")!);
+        return new Response(
+          JSON.stringify({
+            searchId: "s",
+            route: "ai",
+            degraded: false,
+            details: { routeReason: "judged", latencyMs: 900, limited: null, stages: {} },
+          }),
+          { status: 200 },
+        );
+      }),
+    );
+    // Each request must pass the pacer before it is sent and record after.
+    const order: string[] = [];
+    const pacer: ProbePacer = {
+      wait: async () => {
+        order.push("wait");
+      },
+      record: () => {
+        order.push("record");
+      },
+    };
+
+    const code = await main(["--url", "https://probe.test", "--set", "all", "--runs", "1"], { pacer });
+
+    expect(code).toBe(0);
+    const classic = queries.classic.length;
+    const total = 1 + classic + queries["ai-en"].length + queries["ai-he"].length;
+    expect(asked).toHaveLength(total);
+    // One wait and one record per request: the warm-up and every query of
+    // every set, the classic set's included.
+    expect(order.filter((step) => step === "wait")).toHaveLength(total);
+    expect(order.filter((step) => step === "record")).toHaveLength(total);
+    expect(order.slice(0, 2 * (1 + classic))).toEqual(
+      Array.from({ length: 1 + classic }, () => ["wait", "record"]).flat(),
+    );
+    // The classic set still sends its committed text unchanged.
+    expect(asked.slice(1, 1 + classic)).toEqual(queries.classic);
   });
 });
