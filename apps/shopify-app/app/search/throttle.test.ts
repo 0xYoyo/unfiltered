@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { createSessionThrottle, throttleLimitFromEnv } from "./throttle.server";
+import {
+  createSessionThrottle,
+  previewExtractionAllowance,
+  previewExtractionLimitFromEnv,
+  throttleLimitFromEnv,
+} from "./throttle.server";
 
 // Sliding-window throttle unit tests (YOY-47 AC-4) with a controllable
 // clock; the route-level behavior (forced classic, no LLM calls) is covered
@@ -111,5 +116,21 @@ describe("throttleLimitFromEnv", () => {
     expect(
       throttleLimitFromEnv({ SEARCH_AI_THROTTLE_PER_MINUTE: "many" }),
     ).toBe(10);
+  });
+});
+
+describe("the preview-extraction allowance (YOY-171 AC-13)", () => {
+  it("defaults to 30 a minute and reads PREVIEW_EXTRACTIONS_PER_MINUTE", () => {
+    expect(previewExtractionLimitFromEnv({})).toBe(30);
+    expect(previewExtractionLimitFromEnv({ PREVIEW_EXTRACTIONS_PER_MINUTE: "5" })).toBe(5);
+    expect(previewExtractionLimitFromEnv({ PREVIEW_EXTRACTIONS_PER_MINUTE: "0" })).toBe(30);
+    expect(previewExtractionLimitFromEnv({ PREVIEW_EXTRACTIONS_PER_MINUTE: "lots" })).toBe(30);
+  });
+
+  it("spends one slot per allowed call, per key, and refuses past the limit", () => {
+    const throttle = createSessionThrottle({ limit: 2 });
+    const allow = previewExtractionAllowance(throttle, "ip-a");
+    expect([allow(), allow(), allow()]).toEqual([true, true, false]);
+    expect(previewExtractionAllowance(throttle, "ip-b")()).toBe(true);
   });
 });

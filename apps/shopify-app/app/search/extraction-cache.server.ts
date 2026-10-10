@@ -108,15 +108,28 @@ function storedWishes(value: Prisma.JsonValue): ExtractedWishes | null {
 }
 
 /**
+ * A cache miss whose request may not make a new extraction call (YOY-171
+ * AC-13): a capped search, or a preview over its allowance. Not a failure.
+ */
+export class ExtractionNotAllowedError extends Error {
+  constructor() {
+    super("extraction not allowed");
+    this.name = "ExtractionNotAllowedError";
+  }
+}
+
+/**
  * Extract through the cache (AC-18): a stored answer for the key is served
  * with no call; otherwise the extractor is called and its answer stored —
  * also when it lands after the grace, so the next search is warm. Rejects
- * only when the call itself fails.
+ * when the call itself fails, or with `ExtractionNotAllowedError` on a miss
+ * that `mayCall` refuses (YOY-171 AC-13).
  */
 export async function extractThroughCache(
   db: PrismaClient,
   extractor: WishExtractor,
   request: ExtractRequest,
+  mayCall: () => boolean = () => true,
 ): Promise<CachedExtraction> {
   const cacheKey = extractionCacheKey({
     sentence: request.sentence,
@@ -134,6 +147,9 @@ export async function extractThroughCache(
     }
   } catch (error) {
     warnCache("read", error);
+  }
+  if (!mayCall()) {
+    throw new ExtractionNotAllowedError();
   }
   const wishes = await extractor.extract(request);
   const value = JSON.parse(JSON.stringify(wishes)) as Prisma.InputJsonValue;

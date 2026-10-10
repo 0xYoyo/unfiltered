@@ -82,8 +82,10 @@ const INVISIBLE_DIGITS = ["\u200B", "\u200C", "\u200D", "\u2060"] as const;
  * extraction cache (YOY-149 AC-18) answer a repeated query with no model
  * call, so a probe that sent the same text `--runs` times would measure the
  * caches from run 2 on and mask the AI bar; with a distinct text per
- * (invocation, run) every AI sample pays the full path. Classic queries are
- * keyword-only and are sent unchanged.
+ * (invocation, run) every sample pays the full path. Every set is marked
+ * (YOY-171 AC-14): with Engine v2 the default, the `classic` set's queries
+ * take the AI path too, and unmarked they were answered from the caches
+ * from run 2 on.
  *
  * What the marker reaches (YOY-125 AC-5): the orchestrator passes the raw
  * query to the embedding, the wish extraction and the judge, so each
@@ -665,7 +667,7 @@ export async function main(
           const sample = await probeOnce(
             args,
             set,
-            set === "classic" ? query : distinctQueryText(query, invocation, run),
+            distinctQueryText(query, invocation, run),
           );
           samples.push(sample);
           console.log(formatSampleLine(sample, run, args.runs, query));

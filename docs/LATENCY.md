@@ -42,12 +42,13 @@ wish extraction.
    (`apps/shopify-app/scripts/latency-probe-queries.json`: 5 classic, 5 EN
    AI, 5 HE AI) is run sequentially, every query of the set, `--runs`
    times (20 minimum), each request with a fresh `sessionId`. A set's
-   sample is therefore ≥ 100 responses. Every AI-set request carries an
-   invisible per-invocation, per-run marker (zero-width format characters
-   after a trailing space) so that the judge's answer cache (YOY-148) and
-   the extraction cache (YOY-149 AC-18) never answer a run from a previous
-   run: each AI sample pays the full path. The visible query text is the
-   committed one.
+   sample is therefore ≥ 100 responses. Every request of every set carries
+   an invisible per-invocation, per-run marker (zero-width format
+   characters after a trailing space) so that the judge's answer cache
+   (YOY-148) and the extraction cache (YOY-149 AC-18) never answer a run
+   from a previous run: each sample pays the full path. The `classic` set
+   is marked too (YOY-171 AC-14): with Engine v2 the default its queries
+   take the AI path. The visible query text is the committed one.
 5. **Nearest-rank percentiles.** Sort a set's `latencyMs` ascending and
    take the value at rank ⌈p/100 · n⌉ (1-based). No interpolation: every
    reported percentile is a latency that actually happened.
