@@ -2,9 +2,12 @@ import { createHmac, randomUUID } from "node:crypto";
 
 import type { PrismaClient } from "@prisma/client";
 import {
+  createDecisionJudge,
   createLlmJudge,
   type CostRecorder,
+  type DecisionClient,
   type EmbeddingClient,
+  type Judge,
   type LlmClient,
   type StructuredCompletionRequest,
 } from "@unfiltered/engine";
@@ -313,6 +316,8 @@ function installOrchestrator(
     embeddings?: EmbeddingClient;
     /** The judge's LLM port (YOY-147); absent = no judge wired, pages are find-only. */
     judgeLlm?: LlmClient;
+    /** A judge wired as is, in place of `judgeLlm` (YOY-171 AC-2). */
+    judge?: Judge;
   } = {},
 ): void {
   resetProxySearchOrchestrator();
@@ -328,9 +333,11 @@ function installOrchestrator(
         embeddings: options.embeddings ?? fakeEmbeddings(),
         classicStore,
       }),
-      ...(options.judgeLlm !== undefined
-        ? { judge: createLlmJudge({ llm: options.judgeLlm }) }
-        : {}),
+      ...(options.judge !== undefined
+        ? { judge: options.judge }
+        : options.judgeLlm !== undefined
+          ? { judge: createLlmJudge({ llm: options.judgeLlm }) }
+          : {}),
     });
   };
 }
@@ -610,6 +617,40 @@ describe("the response contract (AC-3, AC-5)", () => {
     for (const key of ['"intent"', '"closeMatchesRelaxed"', '"colorUnknown"']) {
       expect(raw).not.toContain(key);
     }
+  });
+
+  it("answers a stand-in after the judged results, before closeMatches, labelled unchecked, with no standIn key (YOY-171 AC-2)", async () => {
+    await seed([
+      { productId: "linen-shirt", title: "Linen Shirt", y: 0.1 },
+      { productId: "silk-top", title: "Silk Top", y: 0.2 },
+      { productId: "wrap-dress", title: "Wrap Dress", y: 0.3 },
+    ]);
+    // The silk top's call fails: a stand-in, though it sits second in find order.
+    const decisions: DecisionClient = {
+      async decide(request) {
+        const row = String((request.state as Record<string, unknown>).product);
+        if (row.startsWith("Silk Top")) {
+          throw new Error("HTTP 429");
+        }
+        return {
+          verdict: { type: "choice", choice: row.startsWith("Linen") ? "exact" : "close" },
+          fact: { type: "yes-no", yes: 0.1 },
+          description: { type: "yes-no", yes: 0.1 },
+          excluded: { type: "yes-no", yes: 0.1 },
+        };
+      },
+    };
+    installOrchestrator({ judge: createDecisionJudge({ decisions }) });
+
+    const response = await action(
+      actionArgs(proxyRequest({ payload: { query: QUERY, sessionId: "ac2" } })),
+    );
+    const raw = await response.text();
+    const body = JSON.parse(raw);
+    expect(productIds(body.results)).toEqual(["linen-shirt", "silk-top"]);
+    expect(body.results[1].label).toEqual({ template: "unchecked", values: [] });
+    expect(productIds(body.closeMatches)).toEqual(["wrap-dress"]);
+    expect(raw).not.toContain("standIn");
   });
 });
 

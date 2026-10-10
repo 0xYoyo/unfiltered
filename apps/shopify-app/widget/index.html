@@ -365,6 +365,17 @@
           }),
           LABEL_RESULTS[0],
         ]),
+        // A stand-in (YOY-171 AC-2): after the judged cards, before the
+        // divider, labelled `unchecked`.
+        "stand-in": labelResponse(
+          "harness-stand-in-1",
+          [
+            { ...LABEL_RESULTS[5], label: null },
+            { ...LABEL_RESULTS[1], label: null },
+            { ...LABEL_RESULTS[2], label: { template: "unchecked", values: [] } },
+          ],
+          { closeMatches: [LABEL_RESULTS[3]] },
+        ),
         "labels-pending": labelResponse(
           "harness-labels-pending-1",
           LABEL_RESULTS.map((result) => ({ ...result, label: null })),

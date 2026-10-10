@@ -9,13 +9,17 @@
  * can never read differently on the two surfaces (P-5).
  */
 
-/** The five templates the server can name (YOY-151 AC-1). */
+/**
+ * The templates the server can name (YOY-151 AC-1), with `unchecked` — a
+ * product the judge never answered for (YOY-171 AC-2).
+ */
 export const LABEL_TEMPLATES = [
   "price-near",
   "price-far",
   "size-missing",
   "fact-differs",
   "close-match",
+  "unchecked",
 ] as const;
 export type LabelTemplate = (typeof LABEL_TEMPLATES)[number];
 
@@ -25,13 +29,14 @@ export interface LabelLike {
   values: readonly string[];
 }
 
-/** The catalog keys that hold the five templates, in either catalog. */
+/** The catalog keys that hold the templates, in either catalog. */
 export interface LabelStrings {
   labelPriceNear: string;
   labelPriceFar: string;
   labelSizeMissing: string;
   labelFactDiffers: string;
   labelCloseMatch: string;
+  labelUnchecked: string;
 }
 
 const TEMPLATE_KEYS: Record<LabelTemplate, keyof LabelStrings> = {
@@ -40,6 +45,7 @@ const TEMPLATE_KEYS: Record<LabelTemplate, keyof LabelStrings> = {
   "size-missing": "labelSizeMissing",
   "fact-differs": "labelFactDiffers",
   "close-match": "labelCloseMatch",
+  unchecked: "labelUnchecked",
 };
 
 /**
@@ -57,6 +63,7 @@ export const LABEL_MAX_CHARS: Record<LabelTemplate, number> = {
   "size-missing": 34,
   "fact-differs": 34,
   "close-match": 16,
+  unchecked: 16,
 };
 
 /**

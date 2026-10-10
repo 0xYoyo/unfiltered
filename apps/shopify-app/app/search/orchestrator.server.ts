@@ -580,7 +580,9 @@ export function createSearchOrchestrator(
               ...tail,
             ]),
       ].map((card) => {
-        const codeLabel = codeLabels.get(card.productId);
+        // A stand-in keeps `unchecked` (YOY-171 AC-2): the judge never
+        // answered for it, whatever else is known about it.
+        const codeLabel = card.standIn === true ? undefined : codeLabels.get(card.productId);
         return codeLabel === undefined ? card : { ...card, label: codeLabel };
       });
     const respond = (

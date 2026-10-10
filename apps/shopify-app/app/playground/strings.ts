@@ -90,6 +90,8 @@ export interface PlaygroundStrings {
   labelSizeMissing: string;
   labelFactDiffers: string;
   labelCloseMatch: string;
+  /** A product the judge never answered for (YOY-171 AC-2). */
+  labelUnchecked: string;
   /** The engine-details toggle (P-4), off by default. */
   engineDetailsToggle: string;
   /** Field labels inside the engine-details panel. */
@@ -160,6 +162,7 @@ export const PLAYGROUND_STRING_CATALOG: Record<
     labelSizeMissing: "size {size} not in stock",
     labelFactDiffers: "in {have}, not {asked}",
     labelCloseMatch: "close match",
+    labelUnchecked: "not checked yet",
     engineDetailsToggle: "How it understood you",
     detailsRoute: "Route",
     detailsRouteReason: "Reason",
@@ -213,6 +216,7 @@ export const PLAYGROUND_STRING_CATALOG: Record<
     labelSizeMissing: "מידה {size} לא במלאי",
     labelFactDiffers: "ב{have}, לא {asked}",
     labelCloseMatch: "התאמה קרובה",
+    labelUnchecked: "עוד לא נבדק",
     engineDetailsToggle: "איך זה הבין אתכם",
     detailsRoute: "מסלול",
     detailsRouteReason: "סיבה",

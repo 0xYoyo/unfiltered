@@ -58,8 +58,12 @@ export type JudgeVerdictCode = (typeof JUDGE_VERDICTS)[number];
 export const JUDGE_MISSED_WISHES = ["fact", "description"] as const;
 export type JudgeMissedWish = (typeof JUDGE_MISSED_WISHES)[number];
 
-/** The label templates a judged product can carry (AC-3). */
-export const JUDGE_LABEL_TEMPLATES = ["fact-differs", "close-match"] as const;
+/**
+ * The label templates a judged product can carry (AC-3), and `unchecked`,
+ * which a stand-in carries (YOY-171 AC-2): the judge never answered for it.
+ * The model never writes `unchecked`.
+ */
+export const JUDGE_LABEL_TEMPLATES = ["fact-differs", "close-match", "unchecked"] as const;
 export type JudgeLabelTemplate = (typeof JUDGE_LABEL_TEMPLATES)[number];
 
 /**
@@ -952,10 +956,11 @@ export interface JudgedItem<T> {
  * short. When every product left is "not relevant", the page stays in find
  * order and every item carries `close-match` — nothing exact, here is the
  * closest. A stand-in verdict (YOY-159: a call that never answered) is no
- * judgment: the product stays, ranked where "not relevant" sorts, with no
- * label, and never counts toward the all-not-relevant case; a page of only
- * stand-ins is served in find order without labels. `items` and `verdicts`
- * are parallel, in find order.
+ * judgment: the product stays, after every judged product of the page, in
+ * find order, labelled `unchecked` (YOY-171 AC-2), and never counts toward
+ * the all-not-relevant case; a page of only stand-ins is served in find
+ * order, each `unchecked`. `items` and `verdicts` are parallel, in find
+ * order.
  */
 export function orderByVerdict<T>(
   items: readonly T[],
@@ -974,22 +979,27 @@ export function orderByVerdict<T>(
   const out = ({ item, verdict, label, standIn }: (typeof judged)[number]): JudgedItem<T> => ({
     item,
     verdict,
-    label: standIn ? null : label,
+    label: standIn ? { template: "unchecked", values: [] } : label,
     ...(standIn ? { standIn: true as const } : {}),
   });
   // Stand-ins are no judgment (YOY-159): they never count toward reject-all,
-  // are never dropped, and carry no label.
+  // are never dropped, and follow every judged product (YOY-171 AC-2).
   const real = judged.filter((entry) => !entry.standIn);
+  const standIns = judged.filter((entry) => entry.standIn).map(out);
   if (real.length === 0) {
-    return judged.map(out);
+    return standIns;
   }
   if (real.every((entry) => entry.verdict === "not-relevant")) {
-    return judged.map((entry) =>
-      entry.standIn ? out(entry) : { ...out(entry), label: { template: "close-match", values: [] } },
-    );
+    return [
+      ...real.map((entry) => ({ ...out(entry), label: { template: "close-match" as const, values: [] } })),
+      ...standIns,
+    ];
   }
-  return judged
-    .filter((entry) => entry.standIn || entry.verdict !== "not-relevant")
-    .sort((a, b) => VERDICT_RANK[a.verdict] - VERDICT_RANK[b.verdict] || a.index - b.index)
-    .map(out);
+  return [
+    ...real
+      .filter((entry) => entry.verdict !== "not-relevant")
+      .sort((a, b) => VERDICT_RANK[a.verdict] - VERDICT_RANK[b.verdict] || a.index - b.index)
+      .map(out),
+    ...standIns,
+  ];
 }

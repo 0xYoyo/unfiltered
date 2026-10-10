@@ -399,11 +399,13 @@ export function parseClickBeaconParams(
 
 /**
  * The judge's label on the wire (YOY-147 AC-9): `fact-differs` with the
- * product's value then the asked one, or `close-match` with none.
+ * product's value then the asked one, `close-match` with none, or
+ * `unchecked` with none on a product the judge never answered for
+ * (YOY-171 AC-2).
  */
 export interface ProxyLabel {
   /** The judge's templates (YOY-147) and the code-computed ones (YOY-149 AC-12). */
-  template: "fact-differs" | "close-match" | CodeLabelTemplate;
+  template: "fact-differs" | "close-match" | "unchecked" | CodeLabelTemplate;
   values: string[];
 }
 

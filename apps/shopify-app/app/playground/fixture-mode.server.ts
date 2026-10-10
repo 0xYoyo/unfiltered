@@ -18,6 +18,7 @@ import emptyFixture from "./fixtures/empty.json";
 import labelOverflowFixture from "./fixtures/label-overflow.json";
 import labelTooLongFixture from "./fixtures/label-too-long.json";
 import labelsPendingFixture from "./fixtures/labels-pending.json";
+import standInFixture from "./fixtures/stand-in.json";
 import labelsFixture from "./fixtures/labels.json";
 import previewFixture from "./fixtures/preview.json";
 import resultsFixture from "./fixtures/results.json";
@@ -61,6 +62,8 @@ export type PlaygroundFixtureName =
   | "label-too-long"
   | "label-overflow"
   | "labels-pending"
+  // YOY-171 AC-2: a stand-in after the judged cards, before the divider.
+  | "stand-in"
   // YOY-166: a judged order whose pages each hold matches and close
   // products, the close ones under the page's "Close matches" divider.
   | "v2-close"
@@ -115,6 +118,10 @@ export function selectFixture(
     if (has("meanings")) {
       // The second reading (YOY-150): "two meanings wedding dress".
       return "v2-two-meanings";
+    }
+    if (has("unchecked")) {
+      // A stand-in (YOY-171 AC-2): "unchecked dress".
+      return "stand-in";
     }
     if (has("labels") || has("label")) {
       // The label line (YOY-151): "labels", "label too long", "label
@@ -381,6 +388,8 @@ export function fixtureOutcome(
       return { delayMs: 0, status: 200, body: asResponse(labelTooLongFixture) };
     case "label-overflow":
       return { delayMs: 0, status: 200, body: asResponse(labelOverflowFixture) };
+    case "stand-in":
+      return { delayMs: 0, status: 200, body: asResponse(standInFixture) };
     case "labels-pending": {
       // The late page is the labels endpoint's answer, never the search's.
       const pending: Record<string, unknown> = { ...labelsPendingFixture };
