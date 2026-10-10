@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 
 import { formatPrice } from "../../../widget/src/format";
 import {
+  cardImageFetchPriority,
   cardImageLoading,
   cardImageSources,
 } from "../../../widget/src/image-url";
@@ -136,6 +137,11 @@ export function Card({
           sizes={CARD_IMAGE_SIZES}
           alt=""
           loading={cardImageLoading(position)}
+          // The DOM spelling: React 18 does not know `fetchPriority` and
+          // would warn (YOY-171 AC-8). Absent past the first row.
+          {...(cardImageFetchPriority(position) === undefined
+            ? {}
+            : { fetchpriority: cardImageFetchPriority(position) })}
           decoding="async"
         />
       )}

@@ -1,5 +1,9 @@
 import { chipLabelParts, formatPrice, isNegationChip } from "./format";
-import { cardImageLoading, cardImageSources } from "./image-url";
+import {
+  cardImageFetchPriority,
+  cardImageLoading,
+  cardImageSources,
+} from "./image-url";
 import {
   labelLocale,
   labelOverflows,
@@ -539,6 +543,11 @@ export function createOverlay(options: OverlayOptions): Overlay {
       image.src = sources.src;
       image.alt = result.title;
       image.loading = cardImageLoading(position);
+      // The first row's images are fetched first (YOY-171 AC-8).
+      const priority = cardImageFetchPriority(position);
+      if (priority !== undefined) {
+        image.setAttribute("fetchpriority", priority);
+      }
       image.decoding = "async";
       anchor.appendChild(image);
     }

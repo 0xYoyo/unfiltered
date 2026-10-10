@@ -59,3 +59,31 @@ test("overlay cards size Shopify-CDN images and leave other hosts alone (verify 
     expect(new URL(url).searchParams.get("width")).toMatch(/^(360|540|720)$/);
   }
 });
+
+test("overlay: cards 1–4 load eagerly at high priority; card 5 on lazily with no priority (YOY-171 AC-8)", async ({ page }) => {
+  await page.goto("/?fixture=labels&debounce=30000");
+  await page.locator('input[type="search"]').first().fill("dress");
+  await page.locator('input[type="search"]').first().press("Enter");
+  const images = page.getByTestId("unfiltered-widget-card").locator("img");
+  await expect(images).toHaveCount(6);
+  for (const index of [0, 1, 2, 3]) {
+    await expect(images.nth(index)).toHaveAttribute("loading", "eager");
+    await expect(images.nth(index)).toHaveAttribute("fetchpriority", "high");
+  }
+  await expect(images.nth(4)).toHaveAttribute("loading", "lazy");
+  await expect(images.nth(4)).not.toHaveAttribute("fetchpriority", /.*/);
+});
+
+test("theme-native: the page's first four items load their images first, the fifth does not (YOY-171 AC-8)", async ({ page }) => {
+  await page.goto("/theme-native.html?native=A&fixture=labels&debounce=30000");
+  await page.locator('input[type="search"]').first().fill("dress");
+  await page.locator('input[type="search"]').first().press("Enter");
+  const items = page.getByTestId("unfiltered-native-item");
+  await expect(items).toHaveCount(6);
+  for (const index of [0, 1, 2, 3]) {
+    const image = items.nth(index).locator("img").first();
+    await expect(image).toHaveAttribute("loading", "eager");
+    await expect(image).toHaveAttribute("fetchpriority", "high");
+  }
+  await expect(items.nth(4).locator("img").first()).not.toHaveAttribute("fetchpriority", /.*/);
+});
