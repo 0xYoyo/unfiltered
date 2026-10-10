@@ -105,6 +105,9 @@ export function EngineDetails({
                 <li key={row.stage}>
                   <bdi dir="ltr">
                     {row.stage} · {row.ms} ms
+                    {row.stage === "extract" && response.details.stages.extractLate === 1
+                      ? ` · ${strings.detailsExtractLate}`
+                      : ""}
                   </bdi>
                 </li>
               ))}

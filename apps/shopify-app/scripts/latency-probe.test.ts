@@ -135,6 +135,22 @@ describe("set summaries", () => {
     expect(formatSummary(v1)).not.toContain("no-extraction");
   });
 
+  it("reports the extraction's late share and its p50/p95 from the extract stage (YOY-171 AC-6)", () => {
+    const summary = summarize("ai-en", [
+      sample({ stages: { extract: 300, extractLate: 0, find: 600 } }),
+      sample({ stages: { extract: 900, extractLate: 1, find: 600 } }),
+      sample({ stages: { extract: 400, extractLate: 0, find: 600 } }),
+      sample({ stages: { extract: 500, extractLate: 0, find: 600 } }),
+      sample({}),
+    ])!;
+    expect(summary.extractLate).toBe(0.25);
+    expect(summary.extract).toEqual({ p50: 400, p95: 900 });
+    expect(formatSummary(summary)).toContain(" extract-late=25% extract p50=400 ms p95=900 ms");
+    const none = summarize("ai-en", [sample({})])!;
+    expect(none.extractLate).toBeNull();
+    expect(formatSummary(none)).not.toContain("extract-late");
+  });
+
   it("counts a search as under 1 s only below 1,000 ms (YOY-141 AC-9)", () => {
     const summary = summarize("classic", [
       sample({ set: "classic", latencyMs: 999 }),

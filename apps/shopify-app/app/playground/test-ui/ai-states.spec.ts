@@ -295,11 +295,25 @@ test.describe("engine details (AC-5, verify 5)", () => {
     await submit(page, "budget dress under 400 size m in stock not black");
     const rows = page.getByTestId("playground-details-stages").locator("li");
     await expect(rows).toHaveText([
+      "extract · 412 ms",
       "find · 71 ms",
       "hydrate · 9 ms",
       "judgeRows · 14 ms",
       "judge · 688 ms",
     ]);
+  });
+
+  test("an Engine v2 page lists the wish extraction's time first, and marks it when it missed its grace (YOY-171 AC-6)", async ({
+    page,
+  }) => {
+    await page.goto("/try?details=1");
+    await submit(page, "budget dress under 400 size m in stock not black");
+    const rows = page.getByTestId("playground-details-stages").locator("li");
+    await expect(rows.first()).toHaveText("extract · 412 ms");
+
+    // The labels-pending fixture's extraction missed its grace.
+    await submit(page, "labels pending");
+    await expect(rows.first()).toHaveText(`extract · 930 ms · ${strings("en").detailsExtractLate}`);
   });
 
   test("the stage rows exist only while the panel is open", async ({ page }) => {

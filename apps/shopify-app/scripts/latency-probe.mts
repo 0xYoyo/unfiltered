@@ -22,8 +22,10 @@
  *     [--assert-classic-p95 500] [--assert-ai-p50 2000] [--assert-ai-p95 3500] \
  *     [--ai-per-minute 10]
  *
- * Every set reports its under-1-s share and the share of its submitted
- * searches composed without the wish extraction (`no-extraction`). A last line
+ * Every set reports its under-1-s share, the share of its submitted
+ * searches composed without the wish extraction (`no-extraction`), and —
+ * from the `extract` stage (YOY-171 AC-6) — the share that missed the
+ * extraction grace (`extract-late`) and the extraction's p50/p95. A last line
  * gives the judge stage over every set (YOY-154 AC-8): its p50/p95 and how
  * many searches ended `judged`, `judge-cached`, `judge-timeout` or
  * `judge-error` — and the split (YOY-159 AC-1): the `judgeRows` stage (the
@@ -259,6 +261,13 @@ export interface SetSummary {
   withoutExtraction: number | null;
   /** Share of Engine v2 samples the extraction cache answered, 0–1 (YOY-149 AC-18); null when none reported. */
   extractionCached: number | null;
+  /**
+   * Share of samples whose wish extraction missed its grace, 0–1 (YOY-171
+   * AC-6), from the `extractLate` flag; null when no sample booked one.
+   */
+  extractLate: number | null;
+  /** The `extract` stage's p50 and p95 over the samples that booked it (YOY-171 AC-6); null when none did. */
+  extract: { p50: number; p95: number } | null;
   routes: Record<string, number>;
   /** Mean ms per stage over the samples that ran it; absent when none did. */
   meanStages: Record<string, number>;
@@ -298,9 +307,19 @@ export function summarize(
     limited: samples.filter((sample) => sample.limited !== null).length,
     withoutExtraction: shareWithoutExtraction(samples),
     extractionCached: shareOf(samples, (sample) => sample.extractionCached),
+    extractLate: shareOf(samples, (sample) =>
+      sample.stages.extractLate === undefined ? null : sample.stages.extractLate === 1,
+    ),
+    extract: spreadOf(samples.flatMap((sample) =>
+      sample.stages.extract === undefined ? [] : [sample.stages.extract],
+    )),
     routes,
     meanStages,
   };
+}
+
+function spreadOf(values: readonly number[]): { p50: number; p95: number } | null {
+  return values.length === 0 ? null : { p50: percentile(values, 50), p95: percentile(values, 95) };
 }
 
 function shareWithoutExtraction(samples: readonly ProbeSample[]): number | null {
@@ -483,6 +502,12 @@ export function formatSummary(summary: SetSummary): string {
       (summary.extractionCached === null
         ? ""
         : ` extraction-cached=${Math.round(summary.extractionCached * 100)}%`) +
+      (summary.extractLate === null
+        ? ""
+        : ` extract-late=${Math.round(summary.extractLate * 100)}%`) +
+      (summary.extract === null
+        ? ""
+        : ` extract p50=${summary.extract.p50} ms p95=${summary.extract.p95} ms`) +
       ` degraded=${summary.degraded} limited=${summary.limited} routes: ${routes}`,
     `  mean per stage: ${stages === "" ? "(none)" : stages}`,
   ].join("\n");

@@ -207,6 +207,7 @@ apps/
           evidence-close-divider.spec.ts
           evidence-design.spec.ts
           evidence-examples.spec.ts
+          evidence-extract-time.spec.ts
           evidence-hardening.spec.ts
           evidence-judge-split.spec.ts
           evidence-label-line.spec.ts
@@ -1289,6 +1290,8 @@ docs/
     YOY-171/
       playground-desktop-en-empty.png
       playground-desktop-en-error.png
+      playground-desktop-en-extract-in-time.png
+      playground-desktop-en-extract-late.png
       playground-desktop-en-late-page.png
       playground-desktop-en-loading.png
       playground-desktop-en-one-label-mixed.png
@@ -1297,6 +1300,8 @@ docs/
       playground-desktop-en-stand-in.png
       playground-desktop-he-empty.png
       playground-desktop-he-error.png
+      playground-desktop-he-extract-in-time.png
+      playground-desktop-he-extract-late.png
       playground-desktop-he-late-page.png
       playground-desktop-he-loading.png
       playground-desktop-he-one-label-mixed.png
@@ -1305,6 +1310,8 @@ docs/
       playground-desktop-he-stand-in.png
       playground-mobile-en-empty.png
       playground-mobile-en-error.png
+      playground-mobile-en-extract-in-time.png
+      playground-mobile-en-extract-late.png
       playground-mobile-en-late-page.png
       playground-mobile-en-loading.png
       playground-mobile-en-one-label-mixed.png
@@ -1313,6 +1320,8 @@ docs/
       playground-mobile-en-stand-in.png
       playground-mobile-he-empty.png
       playground-mobile-he-error.png
+      playground-mobile-he-extract-in-time.png
+      playground-mobile-he-extract-late.png
       playground-mobile-he-late-page.png
       playground-mobile-he-loading.png
       playground-mobile-he-one-label-mixed.png

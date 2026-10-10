@@ -623,16 +623,20 @@ caches — are described with their steps below.
 Every response carries `stages: Partial<Record<SearchStage, number>>` — whole
 milliseconds per pipeline stage the search actually ran, keyed in pipeline
 order from the fixed set in `app/search/stages.ts`:
-`find | compose | classic | hydrate | judgeRows | judge`. A stage that did
+`extract | find | compose | classic | hydrate | judgeRows | judge`, plus
+`extractLate` (0 or 1). A stage that did
 not run is absent, so the key set is itself the path's evidence: a preview
 or a rescue reads `classic` alone; a submitted search reads `find`,
 `compose` when a stated wish applied, `hydrate`, and `judgeRows` and `judge`
 when the judge step ran. `find` times the whole find step (the embedding,
 the card-index query and the keyword search); `compose` the stated wishes
 applied to the find order; `judgeRows` the judge step's database work and
-`judge` the rest of it, the call and its wait (YOY-159). Values are floored
-and the stages run one after another, so none exceeds the wall time around
-`runSearch` (`orchestrator.test.ts` pins the key sets and the bound). `stages` is diagnostic: the
+`judge` the rest of it, the call and its wait (YOY-159); `extract` the wish
+extraction from its start with the search to its settle, or — when it missed
+its grace (`extractLate: 1`) — to the moment the page stopped waiting, a
+lower bound (YOY-171 AC-6). Values are floored and, apart from `extract`,
+which runs beside `find`, the stages run one after another, so none exceeds
+the wall time around `runSearch` (`orchestrator.test.ts` pins the key sets and the bound). `stages` is diagnostic: the
 playground shows it, the proxy route logs it, nothing persists it, and the
 storefront contract never carries it. The measurement method built on it is
 docs/LATENCY.md.

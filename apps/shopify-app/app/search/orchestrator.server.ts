@@ -288,11 +288,16 @@ export function nextCarry(query: string, previousQuery: string | undefined, refi
  */
 function createStageLedger() {
   const elapsed = new Map<SearchStage, number>();
+  let extractLate: 0 | 1 | undefined;
   const add = (stage: SearchStage, ms: number): void => {
     elapsed.set(stage, (elapsed.get(stage) ?? 0) + ms);
   };
   return {
     add,
+    /** Whether the wish extraction missed its grace (YOY-171 AC-6). */
+    extractLate(late: boolean): void {
+      extractLate = late ? 1 : 0;
+    },
     async time<T>(stage: SearchStage, run: () => Promise<T>): Promise<T> {
       const startedAt = performance.now();
       try {
@@ -308,6 +313,9 @@ function createStageLedger() {
         if (ms !== undefined) {
           stages[stage] = Math.floor(ms);
         }
+      }
+      if (extractLate !== undefined) {
+        stages.extractLate = extractLate;
       }
       return stages;
     },
@@ -529,6 +537,11 @@ export function createSearchOrchestrator(
       }),
     );
     const settled = await extraction.settle();
+    // The extraction's time (YOY-171 AC-6): to its settle, or — late — to now.
+    if (extraction.timing !== null) {
+      stages.add("extract", extraction.timing.ms());
+      stages.extractLate(extraction.timing.late());
+    }
     const extracted = settled?.wishes ?? null;
     // Removed chips belong to their chain (YOY-150 AC-11): they hold across
     // a refinement, and a query that replaces the chain starts with none.
@@ -680,10 +693,17 @@ export function createSearchOrchestrator(
     request: SearchRequest,
     searchId: string,
     previousQuery: string | undefined,
-  ): { settle(): Promise<CachedExtraction | null> } {
+  ): {
+    settle(): Promise<CachedExtraction | null>;
+    /** The call's time once `settle` resolved (YOY-171 AC-6); null when no extractor is wired. */
+    timing: { ms(): number; late(): boolean } | null;
+  } {
     if (wishExtractor === undefined) {
-      return { settle: () => Promise.resolve(null) };
+      return { settle: () => Promise.resolve(null), timing: null };
     }
+    const startedAt = performance.now();
+    let settledAt: number | null = null;
+    let missedGrace = false;
     const answer = extractThroughCache(db, wishExtractor, {
       sentence: request.query,
       ...(previousQuery !== undefined ? { previousSentence: previousQuery } : {}),
@@ -699,8 +719,15 @@ export function createSearchOrchestrator(
           );
           return null;
         },
-      );
+      )
+      .finally(() => {
+        settledAt = performance.now();
+      });
     return {
+      timing: {
+        ms: () => (settledAt ?? performance.now()) - startedAt,
+        late: () => missedGrace,
+      },
       async settle() {
         let timer: ReturnType<typeof setTimeout> | undefined;
         const grace = new Promise<"late">((resolve) => {
@@ -708,6 +735,7 @@ export function createSearchOrchestrator(
         });
         const settled = await Promise.race([answer, grace]);
         clearTimeout(timer);
+        missedGrace = settled === "late";
         return settled === "late" ? null : settled;
       },
     };

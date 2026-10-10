@@ -762,6 +762,40 @@ describe("wishes on Engine v2 (on the database)", () => {
     expect(Object.keys(playground.details.stages)).toContain("compose");
   });
 
+  it("books the extraction's time and whether it missed its grace in the stage ledger, and the details carry both (YOY-171 AC-6)", async () => {
+    await seed(db, FOUR);
+    const inTime = await search(orchestrator({ extractor: fixedExtractor(STATED, 30), graceMs: 500 }));
+    expect(inTime.stages.extract).toBeGreaterThanOrEqual(25);
+    expect(inTime.stages.extract).toBeLessThan(500);
+    expect(inTime.stages.extractLate).toBe(0);
+    // `extract` leads the ledger's order: the extraction starts with the search.
+    expect(Object.keys(inTime.stages)[0]).toBe("extract");
+
+    const lateExtractor = fixedExtractor(STATED, 300);
+    // Another sentence, so the extraction cache the first search filled cannot answer.
+    const late = await search(orchestrator({ extractor: lateExtractor, graceMs: 20 }), {
+      query: "a second outfit for tonight",
+    });
+    expect(late.stages.extractLate).toBe(1);
+    // Late: the time the page waited for it, a lower bound on the call's.
+    expect(late.stages.extract).toBeGreaterThanOrEqual(15);
+    expect(late.stages.extract).toBeLessThan(300);
+    const details = serializePlaygroundSearchResponse(late, {
+      routeReason: late.routeReason,
+      latencyMs: 1,
+      limited: null,
+      stages: late.stages,
+    }).details.stages;
+    expect(details).toMatchObject({ extractLate: 1 });
+    expect(details.extract).toBe(late.stages.extract);
+
+    // No extractor wired: no extraction stage at all.
+    const none = await search(orchestrator({}));
+    expect(none.stages).not.toHaveProperty("extract");
+    expect(none.stages).not.toHaveProperty("extractLate");
+    await new Promise((resolve) => setTimeout(resolve, 320));
+  });
+
   it("composes without a late extraction: no chips, no ordering, no labels, no exclusion — and records it (AC-3, AC-4)", async () => {
     await seed(db, FOUR);
     const late = fixedExtractor(STATED, 200);
