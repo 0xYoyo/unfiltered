@@ -108,7 +108,9 @@ export const loader = async ({
 
   // Guards apply only where AI spend is possible. A preview and a classic
   // rescue are classic-only by contract, so neither can burn budget and
-  // neither is counted or limited (AC-3).
+  // neither is counted or limited (AC-3). A preview's one spend is the wish
+  // extraction it starts for the submit (YOY-171 AC-7), which a capped
+  // search makes too.
   const guarded = !preview && !classic;
   const throttle = getPlaygroundIpThrottle();
   // Keyed by the last trusted X-Forwarded-For hop; the connection address is

@@ -818,6 +818,76 @@ describe("wishes on Engine v2 (on the database)", () => {
     }
   });
 
+  it("starts the extraction on a keystroke preview, so the submitted search finds it cached (YOY-171 AC-7)", async () => {
+    await seed(db, FOUR);
+    const extractor = fixedExtractor(STATED, 10);
+    const engine = orchestrator({ extractor, graceMs: 500 });
+    const preview = await search(engine, { query: "dress under 120", preview: true });
+    // The preview response is unchanged: classic, no chips, no extraction stage.
+    expect(preview).toMatchObject({ route: "classic", routeReason: "preview", chips: [] });
+    expect(Object.keys(preview.stages)).toEqual(["classic"]);
+    // Let the preview's call land in the cache.
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    expect(extractor.calls).toBe(1);
+
+    const submitted = await search(engine, { query: "dress under 120" });
+    expect(extractor.calls).toBe(1);
+    expect(submitted.extractionCached).toBe(true);
+    expect(submitted.extractionInTime).toBe(true);
+    expect(submitted.stages.extractLate).toBe(0);
+    expect(submitted.stages.extract).toBeLessThan(10);
+  });
+
+  it("joins the preview's extraction while it still runs instead of calling twice (YOY-171 AC-7)", async () => {
+    await seed(db, FOUR);
+    const extractor = fixedExtractor(STATED, 80);
+    const engine = orchestrator({ extractor, graceMs: 500 });
+    await search(engine, { query: "dress under 120", preview: true });
+    const submitted = await search(engine, { query: "dress under 120" });
+    expect(extractor.calls).toBe(1);
+    expect(submitted.extractionInTime).toBe(true);
+    expect(submitted.extractionCached).toBe(true);
+    expect(submitted.chips).not.toEqual([]);
+    // Settled, the call leaves the running set: a later sentence calls again.
+    await search(engine, { query: "another sentence entirely" });
+    expect(extractor.calls).toBe(2);
+  });
+
+  it("starts nothing on a preview under 3 characters, or with no extractor wired (YOY-171 AC-7)", async () => {
+    await seed(db, FOUR);
+    const extractor = fixedExtractor(STATED);
+    const engine = orchestrator({ extractor });
+    await search(engine, { query: "dr", preview: true });
+    await search(engine, { query: "  d ", preview: true });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(extractor.calls).toBe(0);
+    await search(engine, { query: "dre", preview: true });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(extractor.calls).toBe(1);
+    const none = await search(orchestrator({}), { query: "dress under 120", preview: true });
+    expect(none.routeReason).toBe("preview");
+  });
+
+  it("logs a failed preview extraction and leaves the preview whole (YOY-171 AC-7)", async () => {
+    await seed(db, FOUR);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const failing: WishExtractor = {
+        modelId: "fake-extract",
+        extract: () => Promise.reject(new Error("boom")),
+      };
+      const preview = await search(orchestrator({ extractor: failing }), {
+        query: "dress under 120",
+        preview: true,
+      });
+      expect(preview.routeReason).toBe("preview");
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(warn.mock.calls.some(([first]) => first === "[search] preview wish extraction failed")).toBe(true);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it("composes without a late extraction: no chips, no ordering, no labels, no exclusion — and records it (AC-3, AC-4)", async () => {
     await seed(db, FOUR);
     const late = fixedExtractor(STATED, 200);

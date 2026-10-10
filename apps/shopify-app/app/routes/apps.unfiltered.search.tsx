@@ -82,9 +82,11 @@ async function handleSearch(
     return emptyResponse(400);
   }
 
-  // Keystroke preview (YOY-68): classic-only, zero LLM calls, outside the
-  // throttle and outside the SearchEvent log — the submitted search is the
-  // shopper's actual query; previews are typing noise.
+  // Keystroke preview (YOY-68): classic-only, outside the throttle and
+  // outside the SearchEvent log — the submitted search is the shopper's
+  // actual query; previews are typing noise. Its only model call is the
+  // wish extraction it starts for the submit (YOY-171 AC-7), once per
+  // sentence through the extraction cache.
   const preview = body.mode === "preview";
   // The classic rescue (YOY-96 AC-9): the widget's SUBMITTED search timed
   // out on its side and it re-asks the same query down the classic path —
