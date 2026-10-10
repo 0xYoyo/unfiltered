@@ -736,7 +736,9 @@ runs one page.
   land, the label is `fact-differs` with the picked option's values from the
   variants (joined, at most three words) and the picked words; otherwise
   `close-match`, as is a pick off its list or an asked value the product
-  offers. `JUDGE_PROMPT_VERSION` 4 keys the answer cache past the change.
+  offers — a value holding the asked words whole ("Charcoal Grey" for
+  "grey") or the asked words holding a whole value, never a sub-word
+  (YOY-171 AC-10). `JUDGE_PROMPT_VERSION` 4 keys the answer cache past the change.
 - **Order and labels.** `orderByVerdict`: verdict rank, ties in find order.
   A "not relevant" product is dropped from a page that has anything better
   (YOY-163), as an excluded one is, so a page can come out short (no

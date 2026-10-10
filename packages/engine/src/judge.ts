@@ -704,12 +704,30 @@ function picked(answer: unknown, offered: readonly string[]): string | null {
     : null;
 }
 
+/** A value's words, lower-cased, without punctuation. */
+function wordsOf(text: string): string[] {
+  return oneLine(text).toLowerCase().split(" ").map(bareWord).filter((word) => word !== "");
+}
+
+/** Whether `inner`'s words appear in `outer`'s, whole and in order (YOY-171 AC-10). */
+function containsWords(outer: string, inner: string): boolean {
+  const haystack = wordsOf(outer);
+  const needle = wordsOf(inner);
+  return (
+    needle.length > 0 &&
+    haystack.some((_, start) => needle.every((word, offset) => haystack[start + offset] === word))
+  );
+}
+
 /**
  * The `fact-differs` label the fact picks give (YOY-158 AC-3): the
  * product's value of the picked option, read from its options, and the
  * picked words of the sentence. Null — the caller keeps `close-match` —
  * when a pick is "none", missing or off the list, when a value runs past
- * three words, or when the product offers the asked value after all.
+ * three words, or when the product offers the asked value after all: a
+ * value holding the asked words whole ("Charcoal Grey" for "grey"), or the
+ * asked words holding a whole value (YOY-171 AC-10). A sub-word is no
+ * match: "Grey" is not in "greyhound print".
  */
 function factLabel(
   candidate: JudgeCandidate,
@@ -727,7 +745,7 @@ function factLabel(
   if (
     wordCount(product) > JUDGE_LABEL_MAX_WORDS ||
     wordCount(asked) > JUDGE_LABEL_MAX_WORDS ||
-    option.values.some((value) => value.toLowerCase() === asked.toLowerCase())
+    option.values.some((value) => containsWords(value, asked) || containsWords(asked, value))
   ) {
     return null;
   }

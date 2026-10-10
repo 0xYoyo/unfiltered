@@ -729,6 +729,16 @@ describe("the decision judge (YOY-152 AC-2, AC-3)", () => {
     ] as const) {
       expect((await judged(scripted, product)).label, why).toEqual(closeMatch);
     }
+    // A value that holds the asked words whole is the asked value (YOY-171 AC-10).
+    for (const values of [["Grey Melange"], ["Black", "Charcoal Grey"]]) {
+      expect((await judged(differs, coloured("a", values))).label, values.join(", ")).toEqual(closeMatch);
+    }
+    expect((await judged({ ...differs, askedValue: "light grey" }, coloured("a", ["Grey"]), "light grey dress")).label).toEqual(closeMatch);
+    expect((await judged(differs, coloured("a", ["Black"]))).label).toEqual({ template: "fact-differs", values: ["Black", "grey"] });
+    // Whole words only: "Grey" is not in "greyhound print".
+    expect(
+      (await judged({ ...differs, askedValue: "greyhound print" }, coloured("a", ["Grey"]), "greyhound print dress")).label,
+    ).toEqual({ template: "fact-differs", values: ["Grey", "greyhound print"] });
     // An exact or excluded product carries no label, picks or not.
     expect((await judged({ ...differs, verdict: "exact" })).label).toBeNull();
     expect((await judged({ ...differs, excluded: 0.9 })).label).toBeNull();
