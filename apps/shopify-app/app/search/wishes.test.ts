@@ -17,7 +17,7 @@ import {
   type StructuredCompletionRequest,
   type WishExtractor,
 } from "@unfiltered/engine";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { serializePlaygroundSearchResponse } from "../playground/api.server";
 import { createTestDb } from "../testing/helpers.server";
@@ -794,6 +794,28 @@ describe("wishes on Engine v2 (on the database)", () => {
     expect(none.stages).not.toHaveProperty("extract");
     expect(none.stages).not.toHaveProperty("extractLate");
     await new Promise((resolve) => setTimeout(resolve, 320));
+  });
+
+  it("logs a late extraction's own full time once it settles, and nothing for one in time (YOY-171 AC-11)", async () => {
+    await seed(db, FOUR);
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    try {
+      await search(orchestrator({ extractor: fixedExtractor(STATED, 10), graceMs: 500 }), {
+        query: "an in-time sentence",
+      });
+      const late = await search(orchestrator({ extractor: fixedExtractor(STATED, 150), graceMs: 20 }), {
+        query: "a late sentence",
+      });
+      // The page left at the grace; the call settles later and is logged then.
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      const lines = log.mock.calls.filter(([first]) => first === "[search] wish extraction late");
+      expect(lines).toHaveLength(1);
+      const entry = JSON.parse(String(lines[0]![1])) as { searchId: string; ms: number; failed: boolean };
+      expect(entry).toMatchObject({ searchId: late.searchId, failed: false });
+      expect(entry.ms).toBeGreaterThanOrEqual(140);
+    } finally {
+      log.mockRestore();
+    }
   });
 
   it("composes without a late extraction: no chips, no ordering, no labels, no exclusion — and records it (AC-3, AC-4)", async () => {
