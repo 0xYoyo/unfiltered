@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { PrismaClient } from "@prisma/client";
 import type {
   ClassicSearchStore,
+  ExtractRequest,
   Judge,
   JudgeLabel,
   JudgeVerdictCode,
@@ -10,7 +11,11 @@ import type {
 } from "@unfiltered/engine";
 
 import type { ClassicCardHit } from "./classic-store.server";
-import { extractThroughCache, type CachedExtraction } from "./extraction-cache.server";
+import {
+  extractionCacheKey,
+  extractThroughCache,
+  type CachedExtraction,
+} from "./extraction-cache.server";
 import type { FindStep } from "./find.server";
 import {
   DEFAULT_JUDGE_DEADLINE_MS,
@@ -92,6 +97,9 @@ export interface SearchPaging {
 
 /** The page size a request without valid page parameters gets (AC-4). */
 export const DEFAULT_PAGE_SIZE = 24;
+
+/** A preview starts the extraction only from this many characters (YOY-171 AC-7). */
+export const MIN_WARM_EXTRACTION_CHARS = 3;
 /** The largest page a request may ask for (AC-4). */
 export const MAX_PAGE_SIZE = 48;
 
@@ -137,8 +145,10 @@ export interface SearchRequest {
   forceClassicReason?: ForceClassicReason;
   /**
    * Keystroke preview (YOY-68 AC-1): classic-only results with zero model
-   * calls of any kind. Unlike the rescue, the response is NOT degraded: a
-   * preview is the intended shape. Takes precedence over every other mode.
+   * calls on its own path. Unlike the rescue, the response is NOT degraded:
+   * a preview is the intended shape. Takes precedence over every other mode.
+   * It starts the wish extraction for the sentence as typed in the
+   * background (YOY-171 AC-7), so the submit finds it cached or running.
    */
   preview?: boolean;
   /** Correlation ID to thread through every AI call; generated when absent. */
@@ -229,7 +239,8 @@ export interface SearchResponse {
   extractionInTime?: boolean;
   /**
    * Whether the extraction cache answered (YOY-149 AC-18): no extraction
-   * call was made. Present exactly when `extractionInTime` is.
+   * call was made for this search — also when it joined the call its
+   * preview started (YOY-171 AC-7). Present exactly when `extractionInTime` is.
    */
   extractionCached?: boolean;
   /**
@@ -371,6 +382,13 @@ export function createSearchOrchestrator(
     tierFrontSize = DEFAULT_TIER_FRONT_SIZE,
   } = options;
 
+  /**
+   * The extractions running now, by cache key (YOY-171 AC-7): a search
+   * submitted while its preview's call for the same sentence still runs
+   * joins that call instead of making a second one.
+   */
+  const extractionsInFlight = new Map<string, Promise<CachedExtraction>>();
+
   /** Hydrate ranked hits into display cards, preserving hit order. Hits
    * whose snapshot row vanished between ranking and hydration are dropped
    * rather than served as half-empty cards. */
@@ -422,7 +440,11 @@ export function createSearchOrchestrator(
         // Keystroke preview (YOY-68 AC-1): the shopper is still typing, so
         // the bar behaves like a normal search bar — classic keyword
         // results only, nothing degraded about it, and no paging (AC-9).
-        response = await classicSearch(request, "preview", false, stages);
+        // The extraction for the sentence as typed starts behind it (YOY-171
+        // AC-7); the preview neither waits for it nor reports it.
+        const searchId = request.searchId ?? randomUUID();
+        warmExtraction(request.query, request.shopDomain, searchId);
+        response = await classicSearch({ ...request, searchId }, "preview", false, stages);
       } else if (request.forceClassicReason === "client-timeout-rescue") {
         // The client-timeout rescue (YOY-96 AC-9): the widget's submitted
         // search timed out on its side and it re-asks down the zero-model
@@ -683,6 +705,49 @@ export function createSearchOrchestrator(
   }
 
   /**
+   * One extraction per cache key at a time (YOY-171 AC-7), through the
+   * extraction cache. A search joining a running call makes no call of its
+   * own, so it reads as cached.
+   */
+  function extractShared(extractor: WishExtractor, request: ExtractRequest): Promise<CachedExtraction> {
+    const key = extractionCacheKey({
+      sentence: request.sentence,
+      ...(request.previousSentence !== undefined ? { previousSentence: request.previousSentence } : {}),
+      modelId: extractor.modelId ?? "unknown",
+    });
+    const running = extractionsInFlight.get(key);
+    if (running !== undefined) {
+      return running.then(({ wishes }) => ({ wishes, cached: true }));
+    }
+    const call = extractThroughCache(db, extractor, request).finally(() => {
+      extractionsInFlight.delete(key);
+    });
+    extractionsInFlight.set(key, call);
+    return call;
+  }
+
+  /**
+   * Start the extraction a keystroke preview's sentence will need once it
+   * is submitted (YOY-171 AC-7): the sentence as typed, no refinement chain
+   * (a preview carries none), nothing for under 3 characters. Never awaited;
+   * a failure is only logged.
+   */
+  function warmExtraction(query: string, shopDomain: string, searchId: string): void {
+    const sentence = query.trim();
+    if (wishExtractor === undefined || [...sentence].length < MIN_WARM_EXTRACTION_CHARS) {
+      return;
+    }
+    extractShared(wishExtractor, { sentence: query, storeId: shopDomain, searchId }).catch(
+      (error: unknown) => {
+        console.warn(
+          "[search] preview wish extraction failed",
+          JSON.stringify({ searchId, error: error instanceof Error ? error.name : String(error) }),
+        );
+      },
+    );
+  }
+
+  /**
    * Start the wish extraction (YOY-149 AC-1, AC-3, AC-18), through the
    * extraction cache. `settle` waits for it no longer than the grace after
    * the call to `settle` — made when find finishes — and answers the moment
@@ -705,7 +770,7 @@ export function createSearchOrchestrator(
     let settledAt: number | null = null;
     let missedGrace = false;
     let failed = false;
-    const answer = extractThroughCache(db, wishExtractor, {
+    const answer = extractShared(wishExtractor, {
       sentence: request.query,
       ...(previousQuery !== undefined ? { previousSentence: previousQuery } : {}),
       storeId: request.shopDomain,

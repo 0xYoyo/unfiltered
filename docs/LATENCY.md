@@ -12,7 +12,7 @@ judge (Jev since YOY-152) — whatever its length (YOY-153, 2026-10-04):
 | Path | Bar | Statistic |
 |---|---|---|
 | Submitted search (all three probe sets: the short `classic` set's queries are submitted searches too), EN and HE, each and combined | p50 **< 2000 ms** and p95 **< 3500 ms** | server-side `latencyMs` |
-| Keystroke preview (`mode=preview`, keyword only, zero model calls) | ceiling **≤ 800 ms** (a canary, not a percentile bar) | the daily smoke's preview probe, one sample a day (docs/SMOKE.md) |
+| Keystroke preview (`mode=preview`, keyword only, no model call on its path) | ceiling **≤ 800 ms** (a canary, not a percentile bar) | the daily smoke's preview probe, one sample a day (docs/SMOKE.md) |
 
 The bars are strict (`<`). A bar met on the combined set but missed in one
 language is missed. The keyword store behind the preview met its own
