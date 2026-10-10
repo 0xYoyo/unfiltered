@@ -266,6 +266,7 @@ line.
 | 5 (jev judge) | Engine v2 as run 4, judge `JUDGE_PROVIDER=jev` (YOY-152 branch) | 0.634 | 0.407 | 0.574 | 0.657 | 0.542 | 0.398 | — (not deployed) | $0.1053 |
 | 6 control | Engine v2 on `main` at `9843486`, before the delete (YOY-155 AC-8 reference, judge `jev`) | 0.657 | 0.361 | 0.495 | 0.648 | 0.477 | 0.361 | — (not deployed) | $0.1038 |
 | 6 | One engine after the delete (YOY-155 branch, judge `jev`) | 0.606 | 0.301 | 0.495 | 0.616 | 0.444 | 0.366 | — (not deployed) | $0.1043 |
+| 8 (stop: he outside its band) | AC-5 as amended: colour ordered after the judge, within the page's groups (`7ecb1e4`, judge `jev`) | 0.653 | 0.218 | 0.500 | 0.620 | 0.495 | 0.370 | — (not deployed) | $0.1336 |
 | 7 (stop: he outside its band) | Engine v2 + colour as a code-checked wish (YOY-171 AC-5 branch `662ebd8`, judge `jev`) | 0.625 | 0.259 | 0.472 | 0.676 | 0.477 | 0.347 | — (not deployed) | $0.1337 |
 | 5 replay | Run 5's code re-run on 2026-10-10 (`5c5adfe`, `engine=v2`, judge `jev`; YOY-171 AC-9) | 0.569 | 0.370 | 0.569 | 0.639 | 0.523 | 0.431 | — (not deployed) | $0.1055 |
 | 1b — v1 re-check | M5 engine on `main` before its deletion (YOY-155 AC-1) | 0.560 | 0.287 | 0.375 | 0.463 | 0.407 | 0.236 | — | $0.0552 |
@@ -426,6 +427,17 @@ the slice is **not merged** and the issue goes to `blocked`. One run cannot
 tell a colour effect from judge variance (the same code moved 0.037 between
 two days, and run 6 sat 0.060 under its control), but he is now 0.102 under
 and outside the band, so the decision is the founder's.
+
+Run 8 — colour after the judge only (YOY-171 AC-5 as amended 2026-10-11):
+[run 38089165550](https://github.com/0xYoyo/unfiltered/actions/runs/38089165550),
+2026-10-10, dispatched with `ref=7ecb1e4` and `judge=jev`. The colour no
+longer moved anything before the judge. After it, a stable sort put the
+asked colour first within each group of the judged page. Green, leak check
+clean (72 checked), **0 failed searches**, $0.1336 over 1,944 model calls.
+Against the run 6 control: en −0.004 (inside), **he −0.143 (band 0.090:
+outside)**, ar +0.005, ru −0.028, fr +0.018, es +0.009. By the AC's
+fallback, the in-page colour order is dropped. The extraction, the
+`color-differs` label and the chip stay, and run 9 is dispatched.
 
 One side reading for the M7 speed chain: the replay's "no extraction"
 column (8–25 %) shows run 5's code missed the extraction grace on some

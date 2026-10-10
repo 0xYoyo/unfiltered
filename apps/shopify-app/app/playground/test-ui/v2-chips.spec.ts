@@ -157,15 +157,16 @@ test("verify 6: under ?lang=he the chips come from the HE catalog and the row is
 
 /**
  * The colour wish (YOY-171 AC-5), against the `v2-color` fixture: a colour
- * chip as typed, the asked colour's card first, the others labelled
- * `color-differs`; removing the chip re-asks with it in `removedChips` and
- * the cards return to the judged order with no colour label.
+ * chip as typed, the cards of another colour labelled `color-differs`;
+ * removing the chip re-asks with it in `removedChips` and
+ * the same cards stay in the same order with no colour label — the colour
+ * orders nothing (after hidden run 8).
  */
 test.describe("the colour chip (YOY-171 AC-5)", () => {
   const COLOR_QUERY = "red evening gown colour";
   const labels = (page: Page) => page.getByTestId("playground-card-label");
 
-  test("verify 4: the red Lace Dress leads, the chip reads red, the others say their colour", async ({
+  test("verify 4: the chip reads red, the cards of another colour say theirs", async ({
     page,
   }) => {
     await page.goto("/try");
@@ -174,25 +175,26 @@ test.describe("the colour chip (YOY-171 AC-5)", () => {
     await expect(color).toHaveCount(1);
     await expect(color).toContainText("red");
     await expect(color).not.toHaveClass(/chipNegated/);
-    await expect(cards(page).first()).toContainText("Lace Dress");
+    await expect(cards(page).last()).toContainText("Lace Dress");
     await expect(labels(page)).toHaveText([
       PLAYGROUND_STRING_CATALOG.en.labelColorDiffers.replace("{have}", "blue").replace("{asked}", "red"),
       PLAYGROUND_STRING_CATALOG.en.labelColorDiffers.replace("{have}", "black").replace("{asked}", "red"),
     ]);
   });
 
-  test("verify 4: removing the colour chip restores the judged order and drops the colour labels", async ({
+  test("verify 4: removing the colour chip keeps the order and drops the colour labels", async ({
     page,
   }) => {
     const urls = recordSearchRequests(page);
     await page.goto("/try");
     await submit(page, COLOR_QUERY);
-    await expect(cards(page).first()).toContainText("Lace Dress");
+    const before = await cards(page).allInnerTexts();
 
     await page.locator("[data-field='color']").click();
     await expect(page.locator("[data-field='color']")).toHaveCount(0);
-    await expect(cards(page).last()).toContainText("Lace Dress");
     await expect(labels(page)).toHaveCount(0);
+    const after = await cards(page).allInnerTexts();
+    expect(after.map((text) => text.split("\n")[0])).toEqual(before.map((text) => text.split("\n")[0]));
     await expect.poll(() => submitted(urls).length).toBe(2);
     expect(
       JSON.parse(submitted(urls)[1]!.searchParams.get("removedChips") ?? "null"),

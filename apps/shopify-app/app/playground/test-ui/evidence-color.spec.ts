@@ -3,10 +3,10 @@ import { mkdirSync } from "node:fs";
 
 /**
  * Design evidence for the colour wish (YOY-171 AC-5; verify 4): "red evening
- * gown" with its colour chip, the red Lace Dress first and the others
- * labelled `color-differs`, then the chip removed — the judged order back, no
- * colour label — desktop and mobile, EN and HE (RTL), plus the loading,
- * empty and error states, which this change leaves as they were. Tagged
+ * gown" with its colour chip, the cards of another colour labelled
+ * `color-differs`, then the chip removed — the same order, no colour
+ * label — desktop and mobile, EN and HE (RTL), plus the loading, empty and
+ * error states, which this change leaves as they were. Tagged
  * @evidence — off the default lane, captured with
  * `PLAYGROUND_EVIDENCE=1 npx playwright test --project=playground evidence-color`.
  */
@@ -40,7 +40,7 @@ test.describe("@evidence", () => {
         await page.setViewportSize(viewport);
         await page.goto(`/try${suffix}`);
         await submit(page, "red evening gown colour");
-        await expect(cards(page).first()).toContainText("Lace Dress");
+        await expect(cards(page).last()).toContainText("Lace Dress");
         await expect(page.getByTestId("playground-card-label")).toHaveCount(2);
         await shot(page, `playground-${device}-${locale}-color`);
         await page.locator("[data-field='color']").click();
