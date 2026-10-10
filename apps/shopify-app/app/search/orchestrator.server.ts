@@ -704,6 +704,7 @@ export function createSearchOrchestrator(
     const startedAt = performance.now();
     let settledAt: number | null = null;
     let missedGrace = false;
+    let failed = false;
     const answer = extractThroughCache(db, wishExtractor, {
       sentence: request.query,
       ...(previousQuery !== undefined ? { previousSentence: previousQuery } : {}),
@@ -713,6 +714,7 @@ export function createSearchOrchestrator(
       .then(
         (extraction): CachedExtraction | null => extraction,
         (error: unknown) => {
+          failed = true;
           console.warn(
             "[search] wish extraction failed; composing without it",
             JSON.stringify({ searchId, error: error instanceof Error ? error.name : String(error) }),
@@ -722,6 +724,14 @@ export function createSearchOrchestrator(
       )
       .finally(() => {
         settledAt = performance.now();
+        // A call that missed the grace runs on; its own time is known only
+        // here, after the page left (YOY-171 AC-11).
+        if (missedGrace) {
+          console.log(
+            "[search] wish extraction late",
+            JSON.stringify({ searchId, ms: Math.round(settledAt - startedAt), failed }),
+          );
+        }
       });
     return {
       timing: {

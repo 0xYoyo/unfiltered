@@ -132,13 +132,38 @@ The probe reports `extract-late` (the share that missed the grace) and the
 extraction's p50/p95 per set, beside `no-extraction` (missed the grace or
 failed).
 
-**How often the grace is missed today:** at most **8 %** of AI searches — the
-`no-extraction` share of the 2026-10-06 bar run (50 searches, `main` at
-`bb9f80f`, the last full run on the deployment), which counts a missed grace
-and a failed call alike, so it bounds the late share from above. The
-`extract-late` share and the extraction's own p50/p95 come from the first
-probe after this slice deploys: the deployment answers without the `extract`
-stage until then. No grace change in this AC.
+**How often the grace is missed (YOY-171 AC-11), measured 2026-10-10 on the
+deployment** (a build at or after `d8e48ba`, the merge that added `extract`): one
+probe of the two AI sets, 25 searches each, 0 limited, every search judged.
+
+| Set | `extract-late` | `extract` p50 | `extract` p95 | `no-extraction` |
+|---|---|---|---|---|
+| ai-en | **8 %** (2 of 25) | 745 ms | 1,098 ms | 8 % |
+| ai-he | **0 %** (0 of 25) | 728 ms | 892 ms | 0 % |
+| both | **4 %** (2 of 50) | — | — | 4 % |
+
+Every miss was a late call, not a failure (`no-extraction` equals
+`extract-late`). The p50 sits about 70 ms under the 800 ms grace, so the
+grace is tight rather than missed often; a late search counts in the p95
+at the page's wait, a lower bound (AC-6). It replaces the earlier "at most 8 %"
+upper bound from the 2026-10-06 bar run.
+
+**A late call's own time.** On a missed grace the call runs on to fill the
+extraction cache, and when it settles the server logs one line:
+`[search] wish extraction late {"searchId":…,"ms":…,"failed":…}` — the
+call's full time and whether it failed. Read it in the Render service's
+logs (filter on `wish extraction late`), joined to a probe sample by its
+`searchId`.
+
+**How this was run.** `npx tsx scripts/latency-probe.mts --url
+https://unfiltered-eu.onrender.com --set ai-en --runs 5`, then the same with
+`--set ai-he`. Not `--set all`: since Engine v2 is the default, the probe's
+`classic` set also runs the AI path, and the probe paces only the AI sets,
+so with `--set all` the classic set spends the per-IP AI budget (10 a
+minute) and every later request is served classic (`limited=ip`). The first
+attempt hit exactly that and was stopped. Cost of the whole measurement,
+attempt included, from the cost ledger: **$0.085** (63 extractions, 1,303
+judge calls, 68 embeddings).
 
 ## Recorded measurements
 
