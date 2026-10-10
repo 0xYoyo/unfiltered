@@ -725,6 +725,18 @@ runs one page.
   not one known code per candidate, or whose side list names a candidate
   twice or out of range, is asked once more, then fails
   (`JudgeAnswerError`).
+- **Jev's fact picks (YOY-158).** The decision judge writes no text, so it
+  asks per product, in the same request as the verdict, two pick-one
+  questions over closed lists (`decisionFactQuestions`): which of the
+  product's option names the asked fact concerns, and which word or
+  adjacent word pair of the sentence (`sentencePhrases`, as typed) names the
+  asked value — each plus `none`. A product with no option (or only
+  Shopify's `Title: Default Title`) is not asked them. When the verdict is
+  labelled (`close`, `other-variant`), the `fact` flag is up and both picks
+  land, the label is `fact-differs` with the picked option's values from the
+  variants (joined, at most three words) and the picked words; otherwise
+  `close-match`, as is a pick off its list or an asked value the product
+  offers. `JUDGE_PROMPT_VERSION` 4 keys the answer cache past the change.
 - **Order and labels.** `orderByVerdict`: verdict rank, ties in find order.
   A "not relevant" product is dropped from a page that has anything better
   (YOY-163), as an excluded one is, so a page can come out short (no
@@ -744,8 +756,8 @@ runs one page.
   `closeMatches`, under the "Close matches" divider (`splitCloseVerdicts`,
   YOY-166). A match is `exact`, and `other-variant` too only under a judge that writes the
   merchant-fact label (Flash-Lite): under Jev an `other-variant` card carries
-  the generic `close-match` and goes under the divider with the close ones
-  (YOY-157 AC-27).
+  `close-match` — or `fact-differs` when its fact picks land (YOY-158) — and
+  goes under the divider with the close ones (YOY-157 AC-27).
 - **Fallbacks.** The deadline serves find order (`judge-timeout`) without
   aborting the call (YOY-148, below); a failed call or an answer invalid twice serves find
   order (`judge-error`); a throttled session or a playground cap — the

@@ -14,6 +14,7 @@
  *   npx tsx scripts/evidence.mts attributes ID...   # enrichment of given products
  *   npx tsx scripts/evidence.mts variants ID        # one product's variants
  *   npx tsx scripts/evidence.mts judge SINCE_ISO    # judge log since a time
+ *   npx tsx scripts/evidence.mts facts SINCE_ISO    # `fact` flag share per language
  */
 
 import { dirname, resolve } from "node:path";
@@ -285,6 +286,63 @@ async function judge(since: Date): Promise<void> {
   }
 }
 
+/**
+ * The search's language, read from its script (YOY-158 AC-1). The log keeps
+ * no language, so Latin-script sentences (en, fr, es) share one bucket.
+ */
+function scriptOf(query: string): string {
+  if (/[֐-׿]/.test(query)) return "he";
+  if (/[؀-ۿ]/.test(query)) return "ar";
+  if (/[Ѐ-ӿ]/.test(query)) return "ru";
+  return "latin";
+}
+
+/**
+ * The share of judged products carrying the `fact` missed-wish flag since a
+ * time, per language (YOY-158 AC-1), across every store on the deployment.
+ * Each product counts once per search — its first verdict row — so a page
+ * scrolled or re-served does not count twice. A search is "judged" when it
+ * wrote at least one verdict row; its language comes from its SearchEvent.
+ */
+async function facts(since: Date): Promise<void> {
+  const verdicts = await db.judgeVerdict.findMany({
+    where: { createdAt: { gte: since } },
+    select: { searchId: true, productId: true, missed: true },
+    orderBy: { createdAt: "asc" },
+  });
+  const searchIds = [...new Set(verdicts.map((row) => row.searchId))];
+  const events = await db.searchEvent.findMany({
+    where: { searchId: { in: searchIds } },
+    select: { searchId: true, query: true },
+  });
+  const queryOf = new Map(events.map((event) => [event.searchId, event.query]));
+  const seen = new Set<string>();
+  const buckets = new Map<string, { searches: Set<string>; products: number; fact: number }>();
+  for (const row of verdicts) {
+    const key = `${row.searchId}:${row.productId}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const query = queryOf.get(row.searchId);
+    const language = query === undefined ? "unlogged" : scriptOf(query);
+    for (const name of [language, "all"]) {
+      const bucket = buckets.get(name) ?? { searches: new Set(), products: 0, fact: 0 };
+      bucket.searches.add(row.searchId);
+      bucket.products += 1;
+      if (row.missed.includes("fact")) bucket.fact += 1;
+      buckets.set(name, bucket);
+    }
+  }
+  console.table(
+    [...buckets].map(([language, bucket]) => ({
+      language,
+      searches: bucket.searches.size,
+      products: bucket.products,
+      fact: bucket.fact,
+      share: bucket.products === 0 ? "—" : `${((100 * bucket.fact) / bucket.products).toFixed(1)} %`,
+    })),
+  );
+}
+
 const [mode, argument, ...rest] = process.argv.slice(2);
 try {
   switch (mode) {
@@ -326,9 +384,17 @@ try {
       await judge(since);
       break;
     }
+    case "facts": {
+      const since = new Date(argument ?? "");
+      if (Number.isNaN(since.getTime())) {
+        throw new Error("usage: evidence.mts facts SINCE_ISO");
+      }
+      await facts(since);
+      break;
+    }
     default:
       throw new Error(
-        "usage: evidence.mts counts | searches [limit] | costs SEARCH_ID | clicks [limit] | vision | attributes PRODUCT_ID... | variants PRODUCT_ID | judge SINCE_ISO",
+        "usage: evidence.mts counts | searches [limit] | costs SEARCH_ID | clicks [limit] | vision | attributes PRODUCT_ID... | variants PRODUCT_ID | judge SINCE_ISO | facts SINCE_ISO",
       );
   }
 } finally {

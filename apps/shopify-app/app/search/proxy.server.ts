@@ -486,9 +486,9 @@ function serializeCard(card: {
 /**
  * Whether a judge provider writes the merchant-fact label ("in grey, not
  * black") on an `other-variant` product (YOY-157 AC-27). The Flash-Lite
- * judge does. The Jev decision judge writes no text, so its `other-variant`
- * card carries the generic `close-match` label (PRD v3.4 §3) and reads to a
- * shopper exactly like a `close` one.
+ * judge does. The Jev decision judge writes it only when its two fact picks
+ * land (YOY-158 AC-3) and otherwise the generic `close-match` (PRD v3.4 §3),
+ * so its `other-variant` card still reads to a shopper like a `close` one.
  */
 export function judgeWritesFactLabel(provider: JudgeProvider): boolean {
   return provider === "gemini";
