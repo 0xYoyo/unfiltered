@@ -180,6 +180,7 @@ const WISH_CHIP_FIELDS: ReadonlySet<string> = new Set<WishChipField>([
   "priceMax",
   "priceMin",
   "size",
+  "color",
   "availability",
   "exclude",
 ]);

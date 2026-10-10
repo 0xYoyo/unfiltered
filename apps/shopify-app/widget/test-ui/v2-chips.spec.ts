@@ -299,3 +299,59 @@ test.describe("theme-native path", () => {
     expect(requests[1]!.page).toBe(1);
   });
 });
+
+/**
+ * The colour wish on both widget paths (YOY-171 AC-5): `?fixture=color`.
+ * While the colour chip stands the asked colour leads and the others carry
+ * `color-differs`; removing it re-asks with it in `removedChips`, and find
+ * order comes back with no colour label.
+ */
+test.describe("the colour chip (YOY-171 AC-5)", () => {
+  const labels = (page: Page) => page.getByTestId("unfiltered-widget-label");
+  const differs = (locale: "en" | "he", have: string, asked: string) =>
+    STRING_CATALOG[locale].labelColorDiffers.replace("{have}", have).replace("{asked}", asked);
+
+  test("overlay: the asked colour leads, the chip reads it as typed, removal restores find order", async ({
+    page,
+  }) => {
+    await page.goto("/?fixture=color&debounce=30000");
+    await submitQuery(page, "red evening gown");
+    const color = page.locator("[data-field='color']");
+    await expect(color).toHaveCount(1);
+    await expect(color).toContainText("red");
+    await expect(color).not.toHaveAttribute("data-chip-negated", "true");
+    await expect(overlayCards(page).first()).toContainText("Lace Dress");
+    await expect(labels(page)).toHaveText([differs("en", "blue", "red"), differs("en", "black", "red")]);
+
+    await color.click();
+    await expect(page.locator("[data-field='color']")).toHaveCount(0);
+    await expect(overlayCards(page).last()).toContainText("Lace Dress");
+    await expect(labels(page)).toHaveCount(0);
+    const requests = await submitted(page);
+    expect(requests[1]!.removedChips).toEqual([{ field: "color", value: "red" }]);
+  });
+
+  test("overlay, Hebrew: the colour as the shopper typed it and the HE label", async ({ page }) => {
+    await page.goto("/?fixture=color&locale=he&debounce=30000");
+    await submitQuery(page, "שמלת ערב אדומה");
+    await expect(page.locator("[data-field='color']")).toContainText("אדומה");
+    await expect(labels(page).first()).toHaveText(differs("he", "blue", "אדומה"));
+  });
+
+  test("theme-native: the colour chip in the owned row, the asked colour first, labels on the others", async ({
+    page,
+  }) => {
+    await page.goto("/theme-native.html?native=A&fixture=color&debounce=30000");
+    await submitQuery(page, "red evening gown");
+    const color = page.locator("[data-testid='unfiltered-native-chips'] > [data-field='color']");
+    await expect(color).toHaveCount(1);
+    await expect(color).toContainText("red");
+    await expect(nativeItems(page).first()).toContainText("Lace Dress");
+    await expect(labels(page)).toHaveText([differs("en", "blue", "red"), differs("en", "black", "red")]);
+
+    await color.click();
+    await expect(nativeChips(page)).toHaveCount(0);
+    await expect(nativeItems(page).last()).toContainText("Lace Dress");
+    await expect(labels(page)).toHaveCount(0);
+  });
+});

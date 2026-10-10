@@ -38,6 +38,7 @@ import {
   convertAmount,
   CURRENCY_RATES,
   extractionGraceMsFromEnv,
+  hasAppliedWishes,
   holdsWholeWord,
   keepUnremoved,
   priceNearPercentFromEnv,
@@ -60,6 +61,8 @@ const wishes = (overrides: Partial<ExtractedWishes>): ExtractedWishes => ({ ...N
 describe("the extraction keeps only what the sentence states (AC-1, AC-2)", () => {
   it("asks for the stated fields only, every one nullable, under operation extract", async () => {
     expect(Object.keys(EXTRACT_SCHEMA.properties as object).sort()).toEqual([
+      "color",
+      "colorEnglish",
       "currency",
       "excluded",
       "inStock",
@@ -213,7 +216,7 @@ describe("the extraction keeps only what the sentence states (AC-1, AC-2)", () =
     expect(
       parseExtractAnswer({ excluded: [{ typed: "wool", english: "wool" }] }, "sweater no wool")!.excluded,
     ).toEqual([{ typed: "wool", english: "wool" }]);
-    expect(EXTRACT_PROMPT_VERSION).toBe(7);
+    expect(EXTRACT_PROMPT_VERSION).toBeGreaterThanOrEqual(7);
   });
 
   it("drops a negated currency from the excluded terms and keeps the price (YOY-157 AC-16)", () => {
@@ -255,6 +258,99 @@ describe("the extraction keeps only what the sentence states (AC-1, AC-2)", () =
     )!;
     expect(parsed.excluded).toEqual([{ typed: "שחור", english: "black" }]);
     expect(buildExtractPrompt("x")).toContain("excluded");
+  });
+});
+
+describe("colour as a code-checked wish (YOY-171 AC-5)", () => {
+  it("extracts the asked colour as typed and in English, and nothing the sentence does not ask", () => {
+    expect(parseExtractAnswer({ color: "red", colorEnglish: "red" }, "red dress")!.color).toEqual({
+      typed: "red",
+      en: "red",
+    });
+    expect(parseExtractAnswer({ color: "אדומה", colorEnglish: "Red" }, "שמלה אדומה")!.color).toEqual({
+      typed: "אדומה",
+      en: "red",
+    });
+    expect(parseExtractAnswer({ color: null, colorEnglish: null }, "dress")!.color).toBeNull();
+    // A colour the sentence does not carry, or negates, or excludes, is no colour.
+    expect(parseExtractAnswer({ color: "red", colorEnglish: "red" }, "dress")!.color).toBeNull();
+    expect(parseExtractAnswer({ color: "red", colorEnglish: "red" }, "dress not red")!.color).toBeNull();
+    expect(
+      parseExtractAnswer(
+        { color: "שחורה", colorEnglish: "black", excluded: [{ typed: "שחורה", english: "black" }] },
+        "שמלה לא שחורה",
+      )!.color,
+    ).toBeNull();
+    // No English form: the typed one stands in.
+    expect(parseExtractAnswer({ color: "Navy" }, "navy coat")!.color).toEqual({ typed: "Navy", en: "navy" });
+    expect(buildExtractPrompt("x")).toContain("colorEnglish");
+    expect(EXTRACT_PROMPT_VERSION).toBe(8);
+  });
+
+  const red = wishes({ color: { typed: "red", en: "red" } });
+
+  it("moves the asked colour to the front of its tier, find order kept within", () => {
+    const products = new Map([
+      ["blue", product("blue", 80, { primaryColor: "blue" })],
+      ["black", product("black", 80, { primaryColor: "black" })],
+      ["dark-red", product("dark-red", 80, { primaryColor: "dark red" })],
+      ["unknown", product("unknown", 80)],
+      ["red", product("red", 80, { primaryColor: "red" })],
+    ]);
+    const ids = ["blue", "black", "dark-red", "unknown", "red"];
+    const composed = composeWishes(ids, ids.length, products, red);
+    expect(composed.productIds).toEqual(["dark-red", "red", "blue", "black", "unknown"]);
+  });
+
+  it("keeps the price tiers above the colour: a matching colour leads its own tier only", () => {
+    const capped = wishes({ priceMax: { amount: 100, raw: "100" }, color: { typed: "red", en: "red" } });
+    const products = new Map([
+      ["blue-in", product("blue-in", 80, { primaryColor: "blue" })],
+      ["red-far", product("red-far", 300, { primaryColor: "red" })],
+      ["blue-far", product("blue-far", 200, { primaryColor: "blue" })],
+      ["red-in", product("red-in", 90, { primaryColor: "red" })],
+    ]);
+    const ids = ["blue-in", "red-far", "blue-far", "red-in"];
+    expect(composeWishes(ids, ids.length, products, capped).productIds).toEqual([
+      "red-in",
+      "blue-in",
+      // The far tier: the asked colour first, then cheapest first (YOY-171 AC-4).
+      "red-far",
+      "blue-far",
+    ]);
+  });
+
+  it("labels a card of another known colour color-differs, only when no other code label applies", () => {
+    const capped = wishes({ priceMax: { amount: 100, raw: "100" }, color: { typed: "אדומה", en: "red" } });
+    const products = new Map([
+      ["red", product("red", 80, { primaryColor: "red" })],
+      ["blue", product("blue", 80, { primaryColor: "blue" })],
+      ["blue-far", product("blue-far", 300, { primaryColor: "blue" })],
+      ["unknown", product("unknown", 80)],
+    ]);
+    const { labels } = composeWishes(["red", "blue", "blue-far", "unknown"], 4, products, capped);
+    expect(labels.get("red")).toBeUndefined();
+    expect(labels.get("blue")).toEqual({ template: "color-differs", values: ["blue", "אדומה"] });
+    // The price label wins on a card that misses both.
+    expect(labels.get("blue-far")?.template).toBe("price-far");
+    // An unknown colour is never said to differ.
+    expect(labels.get("unknown")).toBeUndefined();
+  });
+
+  it("carries a removable colour chip, and a removed one drops the order and the label", () => {
+    expect(wishChips(red)).toEqual([{ field: "color", value: "red" }]);
+    const kept = keepUnremoved(red, [{ field: "color", value: "RED" }]);
+    expect(kept.color).toBeNull();
+    expect(wishChips(kept)).toEqual([]);
+    expect(hasAppliedWishes(red)).toBe(true);
+    expect(hasAppliedWishes(kept)).toBe(false);
+    const products = new Map([
+      ["blue", product("blue", 80, { primaryColor: "blue" })],
+      ["red", product("red", 80, { primaryColor: "red" })],
+    ]);
+    const composed = composeWishes(["blue", "red"], 2, products, kept);
+    expect(composed.productIds).toEqual(["blue", "red"]);
+    expect(composed.labels.size).toBe(0);
   });
 });
 
@@ -353,6 +449,7 @@ function product(
     available: true,
     variants: [],
     facts: "",
+    primaryColor: null,
     ...overrides,
   };
 }
@@ -591,6 +688,8 @@ interface Seeded {
   available?: boolean;
   facts?: string;
   sizes?: Array<[string, boolean]>;
+  /** The enrichment's primary colour (YOY-171 AC-5). */
+  color?: string;
 }
 
 async function seed(db: PrismaClient, products: Seeded[]): Promise<void> {
@@ -634,6 +733,21 @@ async function seed(db: PrismaClient, products: Seeded[]): Promise<void> {
           cardVersion: 1,
           modelId: "m",
           writtenAt: new Date(),
+        },
+      });
+    }
+    if (entry.color !== undefined) {
+      await db.productEnrichment.create({
+        data: {
+          shopDomain: SHOP,
+          productId: entry.productId,
+          contentHash: `hash-${entry.productId}`,
+          status: "enriched",
+          colors: [entry.color],
+          occasions: [],
+          styleTags: [],
+          seasons: [],
+          primaryColor: entry.color,
         },
       });
     }
@@ -684,6 +798,7 @@ describe("wishes on Engine v2 (on the database)", () => {
   beforeEach(async () => {
     await db.$executeRawUnsafe(`DELETE FROM "CardEmbedding"`);
     await db.productCard.deleteMany();
+    await db.productEnrichment.deleteMany();
     await db.productVariant.deleteMany();
     await db.catalogProduct.deleteMany();
     await db.judgeAnswer.deleteMany();
@@ -1028,6 +1143,44 @@ describe("wishes on Engine v2 (on the database)", () => {
     expect(capped.routeReason).toBe("capped");
     expect(capped.hits.find((hit) => hit.productId === "p2")?.label?.template).toBe("price-far");
     expect(capped.chips).toEqual([{ field: "priceMax", value: "100" }]);
+  });
+
+  it("leads with the asked colour, chips it, and says color-differs only where the judge gave no label (YOY-171 AC-5)", async () => {
+    await seed(db, [
+      { productId: "blue1", title: "Blue Gown", y: 0.1, color: "blue" },
+      { productId: "blue2", title: "Blue Dress", y: 0.2, color: "blue" },
+      { productId: "red", title: "Lace Dress", y: 0.3, color: "red" },
+      { productId: "plain", title: "Plain Dress", y: 0.4 },
+    ]);
+    const asked = wishes({ color: { typed: "red", en: "red" } });
+    // The judge sees the composed page: red (front of its tier), blue1, blue2, plain.
+    const response = await search(
+      orchestrator({ extractor: fixedExtractor(asked), judge: judgeLlm(["E-X", "E-X", "CDC", "E-X"]) }),
+      { query: "red evening gown" },
+    );
+    expect(response.hits[0]!.productId).toBe("red");
+    expect(response.chips).toEqual([{ field: "color", value: "red" }]);
+    const label = (id: string) => response.hits.find((hit) => hit.productId === id)?.label ?? null;
+    expect(label("red")).toBeNull();
+    // No judge label: the code says the colour differs.
+    expect(label("blue1")).toEqual({ template: "color-differs", values: ["blue", "red"] });
+    // The judge's own label stands.
+    expect(label("blue2")?.template).toBe("close-match");
+    // No known colour: nothing said.
+    expect(label("plain")).toBeNull();
+
+    // The chip removed: find order back, no colour label.
+    const removed = await search(orchestrator({ extractor: fixedExtractor(asked) }), {
+      query: "red evening gown",
+      removedChips: [{ field: "color", value: "red" }],
+    });
+    expect(removed.hits.map((hit) => hit.productId)).toEqual(["blue1", "blue2", "red", "plain"]);
+    expect(removed.chips).toEqual([]);
+    expect(removed.hits.every((hit) => hit.label === null)).toBe(true);
+    expect(
+      parseProxySearchBody({ query: "q", sessionId: "s", removedChips: [{ field: "color", value: "red" }] })!
+        .removedChips,
+    ).toEqual([{ field: "color", value: "red" }]);
   });
 
   it("keeps a code label in the late labels after a judge timeout, the judge's label on the rest (YOY-160 AC-1, AC-2)", async () => {

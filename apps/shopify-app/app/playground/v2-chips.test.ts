@@ -213,3 +213,14 @@ describe("the v2-budget playground fixture", () => {
     ).toEqual([{ field: "size", value: "M" }]);
   });
 });
+
+describe("the colour chip (YOY-171 AC-5)", () => {
+  it("shows the colour as the shopper typed it, in either chrome language, and is removable", () => {
+    expect(chipLabel({ field: "color", value: "red" })).toBe("red");
+    expect(chipLabel({ field: "color", value: "אדומה" }, { locale: "he" })).toBe("אדומה");
+    expect(isNegationChip({ field: "color" })).toBe(false);
+    expect(parseFixtureRemovedChips(JSON.stringify([{ field: "color", value: "red" }]))).toEqual([
+      { field: "color", value: "red" },
+    ]);
+  });
+});

@@ -66,6 +66,11 @@ export interface WidgetStrings {
   labelCloseMatch: string;
   /** A product the judge never answered for (YOY-171 AC-2). */
   labelUnchecked: string;
+  /**
+   * A product of another colour than the one asked (YOY-171 AC-5): {have}
+   * its primary colour, {asked} the shopper's as typed.
+   */
+  labelColorDiffers: string;
 }
 
 export const STRING_CATALOG: Record<WidgetLocale, WidgetStrings> = {
@@ -93,6 +98,7 @@ export const STRING_CATALOG: Record<WidgetLocale, WidgetStrings> = {
     labelPriceFar: "over budget",
     labelSizeMissing: "size {size} not in stock",
     labelFactDiffers: "in {have}, not {asked}",
+    labelColorDiffers: "in {have}, not {asked}",
     labelCloseMatch: "close match",
     labelUnchecked: "not checked yet",
   },
@@ -120,6 +126,7 @@ export const STRING_CATALOG: Record<WidgetLocale, WidgetStrings> = {
     labelPriceFar: "מעל התקציב",
     labelSizeMissing: "מידה {size} לא במלאי",
     labelFactDiffers: "ב{have}, לא {asked}",
+    labelColorDiffers: "צבע {have}, לא {asked}",
     labelCloseMatch: "התאמה קרובה",
     labelUnchecked: "עוד לא נבדק",
   },

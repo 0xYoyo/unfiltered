@@ -102,6 +102,9 @@ export function chipLabelParts(
     case "size":
       // Engine v2 (YOY-149): the shopper's size, exactly as typed.
       return bare(strings.chipSize.replace("{value}", chip.value));
+    case "color":
+      // The asked colour as the shopper typed it (YOY-171 AC-5).
+      return bare(chip.value);
     case "availability":
       return bare(strings.chipInStock);
     case "exclude":

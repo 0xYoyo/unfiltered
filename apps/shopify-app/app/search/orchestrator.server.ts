@@ -614,8 +614,9 @@ export function createSearchOrchestrator(
     const tail = cards.filter((card) => !inFindSet.has(card.productId));
 
     // A judged part's cards, then the keyword tail, each with its label: a
-    // code-computed label replaces the judge's on the same card (AC-12).
-    // The late page is composed the same way (YOY-171 AC-1).
+    // code-computed label replaces the judge's on the same card (AC-12) —
+    // except `color-differs`, which shows only where the judge gave none
+    // (YOY-171 AC-5). The late page is composed the same way (YOY-171 AC-1).
     const withLabels = (judgedItems: readonly JudgeStepItem<ProductCard>[] | null) =>
       [
         ...(judgedItems === null
@@ -633,7 +634,10 @@ export function createSearchOrchestrator(
         // A stand-in keeps `unchecked` (YOY-171 AC-2): the judge never
         // answered for it, whatever else is known about it.
         const codeLabel = card.standIn === true ? undefined : codeLabels.get(card.productId);
-        return codeLabel === undefined ? card : { ...card, label: codeLabel };
+        if (codeLabel === undefined || (codeLabel.template === "color-differs" && card.label !== null)) {
+          return card;
+        }
+        return { ...card, label: codeLabel };
       });
     const respond = (
       routeReason: V2RouteReason,

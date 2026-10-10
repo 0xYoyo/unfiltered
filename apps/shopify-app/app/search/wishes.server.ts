@@ -72,7 +72,7 @@ export function priceNearPercentFromEnv(
 }
 
 /** The chip fields Engine v2 answers with (AC-14). */
-export type WishChipField = "priceMax" | "priceMin" | "size" | "availability" | "exclude";
+export type WishChipField = "priceMax" | "priceMin" | "size" | "color" | "availability" | "exclude";
 
 /**
  * One chip per kept fact (AC-14). A price chip's value is the shopper's own
@@ -91,8 +91,11 @@ export interface RemovedChip {
   value: string;
 }
 
-/** The code-computed labels (AC-12). */
-export type CodeLabelTemplate = "price-near" | "price-far" | "size-missing";
+/**
+ * The code-computed labels (AC-12). `color-differs` (YOY-171 AC-5) is the
+ * weakest: it shows only where the judge gave the card no label.
+ */
+export type CodeLabelTemplate = "price-near" | "price-far" | "size-missing" | "color-differs";
 
 export interface CodeLabel {
   template: CodeLabelTemplate;
@@ -119,6 +122,7 @@ export function keepUnremoved(
     priceMin,
     currency: priceMax !== null || priceMin !== null ? wishes.currency : null,
     size,
+    color: wishes.color !== null && !gone("color", wishes.color.typed) ? wishes.color : null,
     inStock: wishes.inStock && !gone("availability", AVAILABILITY_CHIP_VALUE),
     excluded: wishes.excluded.filter((term) => !gone("exclude", term.typed)),
     priceFirm: wishes.priceFirm && (priceMax !== null || priceMin !== null),
@@ -141,6 +145,10 @@ export function wishChips(wishes: ExtractedWishes): WishChip[] {
   if (wishes.size !== null) {
     chips.push({ field: "size", value: wishes.size });
   }
+  if (wishes.color !== null) {
+    // The colour as the shopper typed it (YOY-171 AC-5).
+    chips.push({ field: "color", value: wishes.color.typed });
+  }
   if (wishes.inStock) {
     chips.push({ field: "availability", value: AVAILABILITY_CHIP_VALUE });
   }
@@ -156,6 +164,7 @@ export function hasAppliedWishes(wishes: ExtractedWishes): boolean {
     wishes.priceMax !== null ||
     wishes.priceMin !== null ||
     wishes.size !== null ||
+    wishes.color !== null ||
     wishes.inStock ||
     wishes.excluded.length > 0
   );
@@ -211,6 +220,8 @@ export interface WishProduct {
   variants: WishVariant[];
   /** The written card's facts; "" with no card. */
   facts: string;
+  /** The enrichment's primary colour, lower-case English (YOY-171 AC-5); null when unknown. */
+  primaryColor: string | null;
 }
 
 /** Read the rows the wishes need for these products (any order). */
@@ -223,7 +234,7 @@ export async function loadWishProducts(
     return new Map();
   }
   const ids = [...productIds];
-  const [products, variants, cards] = await Promise.all([
+  const [products, variants, cards, enrichments] = await Promise.all([
     db.catalogProduct.findMany({
       where: { shopDomain, productId: { in: ids } },
       select: { productId: true, priceMin: true, priceMax: true, currencyCode: true, available: true },
@@ -236,6 +247,11 @@ export async function loadWishProducts(
     db.productCard.findMany({
       where: { shopDomain, productId: { in: ids }, status: "written" },
       select: { productId: true, facts: true },
+    }),
+    // The primary colour (YOY-171 AC-5): read, never filtered on.
+    db.productEnrichment.findMany({
+      where: { shopDomain, productId: { in: ids } },
+      select: { productId: true, primaryColor: true },
     }),
   ]);
   const variantsOf = new Map<string, WishVariant[]>();
@@ -251,6 +267,7 @@ export async function loadWishProducts(
     list.push({ options, available: variant.available });
   }
   const factsOf = new Map(cards.map((card) => [card.productId, card.facts]));
+  const colorOf = new Map(enrichments.map((row) => [row.productId, row.primaryColor]));
   return new Map(
     products.map((product) => [
       product.productId,
@@ -258,6 +275,7 @@ export async function loadWishProducts(
         ...product,
         variants: variantsOf.get(product.productId) ?? [],
         facts: factsOf.get(product.productId) ?? "",
+        primaryColor: colorOf.get(product.productId) ?? null,
       },
     ]),
   );
@@ -385,6 +403,21 @@ interface Standing {
   label: CodeLabel | null;
   /** The price is beyond the near band over the cap (YOY-171 AC-4). */
   farOverCap: boolean;
+  /** The primary colour is the asked one (YOY-171 AC-5): front of its tier. */
+  colorMatch: boolean;
+}
+
+/**
+ * Whether the product's primary colour is the asked one (YOY-171 AC-5):
+ * the colour's English or typed form as a whole word of it, ignoring case.
+ * No colour family list survives in the engine, so "crimson" is not "red".
+ */
+function colorMatches(product: WishProduct, wishes: ExtractedWishes): boolean | null {
+  if (wishes.color === null || product.primaryColor === null || product.primaryColor.trim() === "") {
+    return null;
+  }
+  const color = product.primaryColor;
+  return [wishes.color.en, wishes.color.typed].some((form) => holdsWholeWord(color, form));
 }
 
 function formatAmount(amount: number, currency: string): string {
@@ -432,7 +465,11 @@ function standingOf(
   } else if (sizeMissed && wishes.size !== null) {
     label = { template: "size-missing", values: [wishes.size, ...nearestInStockSizes(product, wishes.size)] };
   }
-  return { removed, tier, label, farOverCap: overCap && !nearCap };
+  const colorMatch = colorMatches(product, wishes);
+  if (label === null && colorMatch === false && wishes.color !== null && product.primaryColor !== null) {
+    label = { template: "color-differs", values: [product.primaryColor, wishes.color.typed] };
+  }
+  return { removed, tier, label, farOverCap: overCap && !nearCap, colorMatch: colorMatch === true };
 }
 
 export interface ComposedResults {
@@ -450,7 +487,8 @@ export interface ComposedResults {
  * front — the first `tierFront` surviving candidates in find order — is
  * sorted into number tiers before pages are cut, each tier in find order —
  * except the far-over-budget products, which take their tier's places in
- * price order, cheapest first (YOY-171 AC-4); the rest of the find set and
+ * price order, cheapest first (YOY-171 AC-4), and the asked colour leads
+ * its tier (YOY-171 AC-5); the rest of the find set and
  * the keyword tail keep their order after it.
  * Within a page the judge then orders by verdict, ties in this order
  * (verdict, then tier, then find order). A product with no catalog row is
@@ -473,7 +511,7 @@ export function composeWishes(
     ids.flatMap((productId, index) => {
       const product = products.get(productId);
       if (product === undefined) {
-        return [{ productId, tier: 0, index, far: false, price: 0 }];
+        return [{ productId, tier: 0, index, far: false, price: 0, color: false }];
       }
       const standing = standingOf(product, wishes, resolved);
       if (standing.removed) {
@@ -483,19 +521,29 @@ export function composeWishes(
         labels.set(productId, standing.label);
       }
       return [
-        { productId, tier: standing.tier, index, far: standing.farOverCap, price: product.priceMin },
+        {
+          productId,
+          tier: standing.tier,
+          index,
+          far: standing.farOverCap,
+          price: product.priceMin,
+          color: standing.colorMatch,
+        },
       ];
     });
   const findSet = rank(productIds.slice(0, findSetCount));
+  // The asked colour leads its tier (YOY-171 AC-5).
+  const colorFirst = (a: { color: boolean }, b: { color: boolean }) => Number(b.color) - Number(a.color);
   const front = findSet
     .slice(0, resolved.tierFront)
-    .sort((a, b) => a.tier - b.tier || a.index - b.index);
+    .sort((a, b) => a.tier - b.tier || colorFirst(a, b) || a.index - b.index);
   // The far-over-budget products, cheapest first, in the places they hold
-  // (YOY-171 AC-4): every other product stays where its tier put it.
+  // (YOY-171 AC-4) — the asked colour still first among them (AC-5): every
+  // other product stays where its tier put it.
   const farSlots = front.flatMap((entry, slot) => (entry.far ? [slot] : []));
   const farByPrice = farSlots
     .map((slot) => front[slot]!)
-    .sort((a, b) => a.price - b.price || a.index - b.index);
+    .sort((a, b) => colorFirst(a, b) || a.price - b.price || a.index - b.index);
   farSlots.forEach((slot, order) => {
     front[slot] = farByPrice[order]!;
   });

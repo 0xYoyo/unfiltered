@@ -208,3 +208,16 @@ describe("one label for the whole page (YOY-171 AC-3)", () => {
     expect(sharedLabel([])).toBeNull();
   });
 });
+
+describe("the colour label (YOY-171 AC-5)", () => {
+  it("names the product's colour and the asked one, on both surfaces and in both languages", () => {
+    const blue = { template: "color-differs", values: ["blue", "red"] };
+    for (const strings of [STRING_CATALOG.en, PLAYGROUND_STRING_CATALOG.en]) {
+      expect(labelText(strings, blue)).toBe("in blue, not red");
+    }
+    const hebrew = { template: "color-differs", values: ["blue", "אדומה"] };
+    for (const strings of [STRING_CATALOG.he, PLAYGROUND_STRING_CATALOG.he]) {
+      expect(labelText(strings, hebrew)).toBe("צבע blue, לא אדומה");
+    }
+  });
+});

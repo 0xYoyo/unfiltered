@@ -92,6 +92,11 @@ export interface PlaygroundStrings {
   labelCloseMatch: string;
   /** A product the judge never answered for (YOY-171 AC-2). */
   labelUnchecked: string;
+  /**
+   * A product of another colour than the one asked (YOY-171 AC-5): {have}
+   * its primary colour, {asked} the shopper's as typed.
+   */
+  labelColorDiffers: string;
   /** The engine-details toggle (P-4), off by default. */
   engineDetailsToggle: string;
   /** Field labels inside the engine-details panel. */
@@ -163,6 +168,7 @@ export const PLAYGROUND_STRING_CATALOG: Record<
     labelPriceFar: "over budget",
     labelSizeMissing: "size {size} not in stock",
     labelFactDiffers: "in {have}, not {asked}",
+    labelColorDiffers: "in {have}, not {asked}",
     labelCloseMatch: "close match",
     labelUnchecked: "not checked yet",
     engineDetailsToggle: "How it understood you",
@@ -218,6 +224,7 @@ export const PLAYGROUND_STRING_CATALOG: Record<
     labelPriceFar: "מעל התקציב",
     labelSizeMissing: "מידה {size} לא במלאי",
     labelFactDiffers: "ב{have}, לא {asked}",
+    labelColorDiffers: "צבע {have}, לא {asked}",
     labelCloseMatch: "התאמה קרובה",
     labelUnchecked: "עוד לא נבדק",
     engineDetailsToggle: "איך זה הבין אתכם",

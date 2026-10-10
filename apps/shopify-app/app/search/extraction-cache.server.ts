@@ -6,6 +6,7 @@ import {
   type ExcludedTerm,
   type ExtractedWishes,
   type ExtractRequest,
+  type StatedColor,
   type StatedPrice,
   type WishExtractor,
 } from "@unfiltered/engine";
@@ -65,6 +66,14 @@ function storedPrice(value: unknown): StatedPrice | null | undefined {
   return typeof amount === "number" && typeof raw === "string" ? { amount, raw } : undefined;
 }
 
+/** A stored colour (YOY-171 AC-5); a row written before it has none, read as null. */
+function storedColor(value: unknown): StatedColor | null | undefined {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== "object") return undefined;
+  const { typed, en } = value as Record<string, unknown>;
+  return typeof typed === "string" && typeof en === "string" ? { typed, en } : undefined;
+}
+
 /** A stored row read back; null when it no longer fits the shape (a miss). */
 function storedWishes(value: Prisma.JsonValue): ExtractedWishes | null {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
@@ -73,9 +82,11 @@ function storedWishes(value: Prisma.JsonValue): ExtractedWishes | null {
   const record = value as Record<string, unknown>;
   const priceMax = storedPrice(record.priceMax);
   const priceMin = storedPrice(record.priceMin);
+  const color = storedColor(record.color);
   if (
     priceMax === undefined ||
     priceMin === undefined ||
+    color === undefined ||
     !(record.currency === null || typeof record.currency === "string") ||
     !(record.size === null || typeof record.size === "string") ||
     typeof record.inStock !== "boolean" ||
@@ -99,6 +110,7 @@ function storedWishes(value: Prisma.JsonValue): ExtractedWishes | null {
     priceMin,
     currency: record.currency as string | null,
     size: record.size as string | null,
+    color,
     inStock: record.inStock,
     excluded,
     priceFirm: record.priceFirm,

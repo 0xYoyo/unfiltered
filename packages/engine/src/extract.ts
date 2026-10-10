@@ -2,7 +2,8 @@
  * The wish extraction (YOY-149; PRD §3 Engine v2): one small structured call
  * that starts with the search, in parallel with the find step, and reads
  * only what the shopper STATED as a number or a fact — a price cap or floor
- * with its currency, a size, "in stock", and terms the shopper excluded —
+ * with its currency, a size, a colour (YOY-171 AC-5), "in stock", and terms
+ * the shopper excluded —
  * plus whether a price or size was stated as firm ("max", "no more than",
  * "only", "must be"). Nothing is inferred into a wish: every value the model
  * returns is checked against the sentence and discarded when the sentence
@@ -20,12 +21,18 @@ import type { JsonSchema, LlmClient } from "./index.js";
  * Bump it with every change to `buildExtractPrompt`, `EXTRACT_SCHEMA` or
  * `parseExtractAnswer`.
  */
-export const EXTRACT_PROMPT_VERSION = 7;
+export const EXTRACT_PROMPT_VERSION = 8;
 
 /** One term the shopper excluded, as typed and in English (AC-1). */
 export interface ExcludedTerm {
   typed: string;
   english: string;
+}
+
+/** A colour the shopper asked for (YOY-171 AC-5): as typed, and in English, lower case. */
+export interface StatedColor {
+  typed: string;
+  en: string;
 }
 
 /** A stated price bound: the shopper's own number (AC-1, AC-14). */
@@ -42,6 +49,8 @@ export interface ExtractedWishes {
   /** ISO 4217 code the shopper stated or wrote in (e.g. "ILS"), upper case; null when none. */
   currency: string | null;
   size: string | null;
+  /** The colour the shopper asked for (YOY-171 AC-5); null when none. */
+  color: StatedColor | null;
   /** True when the shopper asked for in-stock products only. */
   inStock: boolean;
   excluded: ExcludedTerm[];
@@ -61,6 +70,7 @@ export const NO_WISHES: ExtractedWishes = {
   priceMin: null,
   currency: null,
   size: null,
+  color: null,
   inStock: false,
   excluded: [],
   priceFirm: false,
@@ -77,6 +87,9 @@ export const EXTRACT_SCHEMA: JsonSchema = {
     priceMin: { type: ["number", "null"] },
     currency: { type: ["string", "null"] },
     size: { type: ["string", "null"] },
+    // YOY-171 AC-5: the asked colour as typed, and in English.
+    color: { type: ["string", "null"] },
+    colorEnglish: { type: ["string", "null"] },
     inStock: { type: ["boolean", "null"] },
     excluded: {
       type: "array",
@@ -96,6 +109,8 @@ export const EXTRACT_SCHEMA: JsonSchema = {
     "priceMin",
     "currency",
     "size",
+    "color",
+    "colorEnglish",
     "inStock",
     "excluded",
     "priceFirm",
@@ -149,6 +164,9 @@ export function buildExtractPrompt(sentence: string, previousSentence?: string):
     "\"₪\" or \"שקל\" is ILS, \"€\" is EUR, \"£\" is GBP); for a price written in Hebrew with no",
     "currency, ILS; otherwise null.",
     "size: a clothing or shoe size the shopper asked for, exactly as written (\"M\", \"38\"), or null.",
+    "color: the one colour the shopper asked for, exactly as written (\"red\", \"אדומה\"), or null; a",
+    "colour the shopper does NOT want is an exclusion, never a color. colorEnglish: that colour in",
+    "English, one lower-case word (\"אדומה\" -> \"red\"), or null.",
     "inStock: true only when the shopper asked for items in stock or available now; else null.",
     "excluded: every thing the shopper said they do NOT want: typed is the excluded word",
     "exactly as written, WITHOUT the negation (\"not black\" -> \"black\"; \"no wool\" -> \"wool\";",
@@ -279,7 +297,8 @@ export function sentenceNegates(sentence: string, term: string): boolean {
  * its digits appear in the sentence; a size only when it appears as a whole
  * token, ignoring case (YOY-157 AC-15); an excluded term only when the
  * sentence negates it (YOY-162 AC-1) and it is not a currency (YOY-157
- * AC-16). Anything else is discarded. Null when the answer is not
+ * AC-16); a colour only when it appears as a whole token, is not negated
+ * and is not excluded (YOY-171 AC-5). Anything else is discarded. Null when the answer is not
  * the schema's shape at all.
  */
 export function parseExtractAnswer(
@@ -333,6 +352,16 @@ export function parseExtractAnswer(
     }
   }
   const size = sizeRaw !== "" && sentenceHasToken(text, sizeRaw) ? sizeRaw : null;
+  const colorTyped = typeof record.color === "string" ? withoutNegation(record.color) : "";
+  const colorEnglish =
+    typeof record.colorEnglish === "string" ? record.colorEnglish.trim().toLowerCase() : "";
+  const color =
+    colorTyped !== "" &&
+    sentenceHasToken(text, colorTyped) &&
+    !sentenceNegates(text, colorTyped) &&
+    !excluded.some((term) => term.typed.toLowerCase() === colorTyped.toLowerCase())
+      ? { typed: colorTyped, en: colorEnglish !== "" ? colorEnglish : colorTyped.toLowerCase() }
+      : null;
   return {
     priceMax,
     priceMin,
@@ -343,6 +372,7 @@ export function parseExtractAnswer(
           ? currencyRaw
           : statedCurrency(text),
     size,
+    color,
     inStock: record.inStock === true,
     excluded,
     priceFirm: record.priceFirm === true && (priceMax !== null || priceMin !== null),
