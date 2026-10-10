@@ -21,6 +21,7 @@ import {
 } from "@unfiltered/engine";
 
 import { normalizeReuseQuery } from "./events.server";
+import type { SearchResponse } from "./orchestrator.server";
 import type { CodeLabel } from "./wishes.server";
 
 /**
@@ -242,9 +243,16 @@ export interface JudgeStepResult<T> {
   started: boolean;
   /**
    * True when the deadline passed while the call runs on (YOY-148 AC-7):
-   * its labels arrive through the labels endpoint.
+   * its page arrives through the labels endpoint (YOY-171 AC-1).
    */
   labelsPending: boolean;
+  /**
+   * On a deadline miss, the late answer's page (YOY-171 AC-1): the step's
+   * result as the in-time path would have served it — verdict order,
+   * not-relevant dropped, labels, the second reading — or null when the
+   * call failed or was given up. Absent on every other outcome.
+   */
+  late?: Promise<JudgeStepResult<T> | null>;
   /** The page in verdict order when judged or cached; otherwise in find order. */
   items: JudgeStepItem<T>[];
   /**
@@ -325,12 +333,6 @@ export interface JudgeStepRequest<T extends { productId: string }> {
    * cached — are ignored for the request.
    */
   applyExcluded?: boolean;
-  /**
-   * The page's code-computed labels by product id (YOY-149 AC-12). A late
-   * answer delivers them in place of the judge's on the same product
-   * (YOY-160), the rule the first response applies.
-   */
-  codeLabels?: ReadonlyMap<string, CodeLabel>;
 }
 
 /**
@@ -553,22 +555,33 @@ async function writeVerdictRows<T extends { productId: string }>(
 }
 
 /**
- * The labels a late answer delivers (AC-8): one per product id, null for
- * none — the code-computed label where the page had one (YOY-160).
+ * A page served on a deadline miss, as it would have been served had the
+ * judge answered in time (YOY-171 AC-1): the whole search response, and
+ * the ms from the search's start until it was composed.
+ */
+export interface LatePage {
+  response: SearchResponse;
+  latencyMs: number;
+}
+
+/**
+ * The labels a late page carries (YOY-148 AC-8), one per product id, null
+ * for none: the late page flattened, kept for one release beside it
+ * (YOY-171 AC-1).
  */
 export type PendingLabels = Record<string, JudgeLabel | CodeLabel | null>;
 
 interface PendingEntry {
   shopDomain: string;
-  labels: Promise<PendingLabels>;
+  page: Promise<LatePage | null>;
 }
 
 /**
- * Late answers in flight and just settled, by search and page (AC-8). A
+ * Late pages in flight and just settled, by search and page (AC-8). A
  * settled entry stays readable for `SETTLED_LABELS_TTL_MS`, then is dropped;
  * the labels endpoint answers an empty set for anything it no longer holds.
  */
-const pendingLabels = new Map<string, PendingEntry>();
+const pendingPages = new Map<string, PendingEntry>();
 const SETTLED_LABELS_TTL_MS = 60_000;
 
 function pendingKey(searchId: string, page: number): string {
@@ -576,26 +589,63 @@ function pendingKey(searchId: string, page: number): string {
 }
 
 /**
- * The labels of a page served on a deadline miss (AC-8, AC-9): held until
- * the judge answers or gives up, then one label per product id — or an
- * empty set when it gave up, failed, or nothing is pending for this shop's
- * search and page. Never an order.
+ * Hold a page served on a deadline miss until its late page lands
+ * (YOY-171 AC-1); it stays readable for a minute after.
  */
+export function parkLatePage(
+  shopDomain: string,
+  searchId: string,
+  page: number,
+  late: Promise<LatePage | null>,
+): void {
+  const key = pendingKey(searchId, page);
+  const held = late.catch(() => null);
+  pendingPages.set(key, { shopDomain, page: held });
+  void held.then(() => {
+    setTimeout(() => {
+      if (pendingPages.get(key)?.page === held) {
+        pendingPages.delete(key);
+      }
+    }, SETTLED_LABELS_TTL_MS).unref?.();
+  });
+}
+
+/**
+ * The late page of a page served on a deadline miss (YOY-171 AC-1): held
+ * until the judge answers or gives up — null when it gave up, failed, or
+ * nothing is pending for this shop's search and page.
+ */
+export async function awaitLatePage(
+  shopDomain: string,
+  searchId: string,
+  page: number,
+): Promise<LatePage | null> {
+  const entry = pendingPages.get(pendingKey(searchId, page));
+  if (entry === undefined || entry.shopDomain !== shopDomain) {
+    return null;
+  }
+  return entry.page;
+}
+
+/** A late page's labels by product id (AC-8, AC-9); an empty set for none. */
+export function latePageLabels(late: LatePage | null): PendingLabels {
+  return late === null
+    ? {}
+    : Object.fromEntries(late.response.hits.map((hit) => [hit.productId, hit.label ?? null]));
+}
+
+/** The labels of a late page (AC-8, AC-9): `latePageLabels` of `awaitLatePage`. */
 export async function awaitPendingLabels(
   shopDomain: string,
   searchId: string,
   page: number,
 ): Promise<PendingLabels> {
-  const entry = pendingLabels.get(pendingKey(searchId, page));
-  if (entry === undefined || entry.shopDomain !== shopDomain) {
-    return {};
-  }
-  return entry.labels;
+  return latePageLabels(await awaitLatePage(shopDomain, searchId, page));
 }
 
-/** Test seam: forget every pending and settled late answer. */
+/** Test seam: forget every pending and settled late page. */
 export function resetPendingLabels(): void {
-  pendingLabels.clear();
+  pendingPages.clear();
 }
 
 /**
@@ -603,7 +653,8 @@ export function resetPendingLabels(): void {
  * the page with no call. Otherwise the deadline starts with the call: when
  * it passes first, the page is served in find order with labels pending,
  * and the call runs on until it answers or the give-up time aborts it
- * (YOY-148 AC-6). A failed call or an answer invalid twice serves find
+ * (YOY-148 AC-6); its answer is served as `late`, exactly as an in-time
+ * answer is (YOY-171 AC-1). A failed call or an answer invalid twice serves find
  * order (AC-4, AC-7). Never rejects.
  */
 export async function runJudgeStep<T extends { productId: string }>(
@@ -768,30 +819,19 @@ export async function runJudgeStep<T extends { productId: string }>(
 
   if (settled.kind === "timeout") {
     warnJudgeFailure(searchId, "judge-timeout", new Error(`no answer within ${deadlineMs}ms`));
-    const key = pendingKey(searchId, page);
-    const labels = call.then((late): PendingLabels => {
-      if (late.kind === "failed") {
-        warnJudgeFailure(searchId, "judge-timeout", late.error);
-        return {};
-      }
-      // A code-computed label replaces the judge's on the same card
-      // (YOY-149 AC-12), late as on the first response (YOY-160).
-      return Object.fromEntries(
-        order(late.answer.verdicts).map(({ item, label }) => [
-          item.productId,
-          request.codeLabels?.get(item.productId) ?? label,
-        ]),
-      );
-    });
-    pendingLabels.set(key, { shopDomain, labels });
-    void labels.then(() => {
-      setTimeout(() => {
-        if (pendingLabels.get(key)?.labels === labels) {
-          pendingLabels.delete(key);
+    // The late answer is served as an in-time one is (YOY-171 AC-1):
+    // ordered, not-relevant dropped, logged — a partial one too, with its
+    // stand-ins.
+    const late = call.then(
+      async (answered): Promise<JudgeStepResult<T> | null> => {
+        if (answered.kind === "failed") {
+          warnJudgeFailure(searchId, "judge-timeout", answered.error);
+          return null;
         }
-      }, SETTLED_LABELS_TTL_MS).unref?.();
-    });
-    return findOrder("judge-timeout", true, true);
+        return serve(answered.answer, "judged");
+      },
+    );
+    return { ...findOrder("judge-timeout", true, true), late };
   }
   if (settled.kind === "failed") {
     warnJudgeFailure(searchId, "judge-error", settled.error);

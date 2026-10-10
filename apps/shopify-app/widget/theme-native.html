@@ -687,6 +687,14 @@
           { labelsPending: true },
         ),
       };
+      // The pending search's late page (YOY-171 AC-1): the judged order,
+      // the not-relevant Jersey Midi Dress gone, the close products under
+      // the heading, each card with its label.
+      const LATE_PAGE = labelResponse(
+        "harness-labels-pending-1",
+        [LABEL_RESULTS[5], LABEL_RESULTS[1]],
+        { closeMatches: [LABEL_RESULTS[3], LABEL_RESULTS[0], LABEL_RESULTS[4]] },
+      );
       // How long the labels endpoint holds a pending page's answer.
       const LABELS_DELAY_MS = 600;
       window.__labelsRequests = [];
@@ -859,22 +867,29 @@
           );
         }
         if (url.startsWith("/apps/unfiltered/labels")) {
-          // The late labels (YOY-151 AC-8): logged, then answered after a
-          // hold — the `labels` fixture's labels by product id for the
-          // pending search, an empty set for any other.
+          // The late answer (YOY-151 AC-8; YOY-171 AC-1): logged, then
+          // answered after a hold — for the pending search its judged page
+          // and that page's labels by product id, an empty set for any other.
           const request = {
             searchId: parsed.searchParams.get("searchId"),
             page: Number(parsed.searchParams.get("page")),
           };
           window.__labelsRequests.push(request);
-          const labels =
-            request.searchId === LABEL_FIXTURES["labels-pending"].searchId
-              ? Object.fromEntries(
-                  LABEL_RESULTS.map((result) => [result.productId, result.label]),
-                )
-              : {};
+          const pending =
+            request.searchId === LABEL_FIXTURES["labels-pending"].searchId;
+          const labels = pending
+            ? Object.fromEntries(
+                [...LATE_PAGE.results, ...LATE_PAGE.closeMatches].map((result) => [
+                  result.productId,
+                  result.label,
+                ]),
+              )
+            : {};
           return new Promise((resolve) =>
-            setTimeout(() => resolve(jsonResponse({ labels })), LABELS_DELAY_MS),
+            setTimeout(
+              () => resolve(jsonResponse(pending ? { labels, page: LATE_PAGE } : { labels })),
+              LABELS_DELAY_MS,
+            ),
           );
         }
         if (url.startsWith("/apps/unfiltered/click")) {

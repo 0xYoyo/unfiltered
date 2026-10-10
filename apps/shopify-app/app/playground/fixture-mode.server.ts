@@ -381,8 +381,12 @@ export function fixtureOutcome(
       return { delayMs: 0, status: 200, body: asResponse(labelTooLongFixture) };
     case "label-overflow":
       return { delayMs: 0, status: 200, body: asResponse(labelOverflowFixture) };
-    case "labels-pending":
-      return { delayMs: 0, status: 200, body: asResponse(labelsPendingFixture) };
+    case "labels-pending": {
+      // The late page is the labels endpoint's answer, never the search's.
+      const pending: Record<string, unknown> = { ...labelsPendingFixture };
+      delete pending.latePage;
+      return { delayMs: 0, status: 200, body: asResponse(pending) };
+    }
     case "images":
       return { delayMs: 0, status: 200, body: imagesFixture() };
     case "v2-close":
@@ -506,27 +510,31 @@ export function withFixtureCarry(
 }
 
 /**
- * The labels endpoint in fixture mode (YOY-151 AC-8): the `labels-pending`
- * search's late labels — the `labels` fixture's, by product id — after a
- * delay long enough to observe the reserved lines first; every other
- * searchId answers an empty set, as the real endpoint does for a search
- * it holds nothing for.
+ * The labels endpoint in fixture mode (YOY-151 AC-8; YOY-171 AC-1): for the
+ * `labels-pending` search, its judged late page — reordered, a not-relevant
+ * card dropped, close cards under the heading — and that page's labels by
+ * product id, after a delay long enough to observe the find-order page
+ * first; every other searchId answers an empty set and no page, as the real
+ * endpoint does for a search it holds nothing for.
  */
 export function fixtureLabels(searchId: string): {
   delayMs: number;
   labels: Record<string, ProxyLabel | null>;
+  page: PlaygroundSearchResponse | null;
 } {
-  if (searchId !== asResponse(labelsPendingFixture).searchId) {
-    return { delayMs: 0, labels: {} };
+  if (searchId !== labelsPendingFixture.searchId) {
+    return { delayMs: 0, labels: {}, page: null };
   }
+  const page = asResponse(labelsPendingFixture.latePage);
   return {
     delayMs: FIXTURE_DELAY_MS,
     labels: Object.fromEntries(
-      asResponse(labelsFixture).results.map((card) => [
+      [...page.results, ...(page.closeMatches ?? [])].map((card) => [
         card.productId,
         card.label ?? null,
       ]),
     ),
+    page,
   };
 }
 

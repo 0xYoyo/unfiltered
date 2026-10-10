@@ -67,10 +67,18 @@ export interface ResponseHandlers {
   onPickReading?: (reading: string) => void;
   pages?: PageLoader;
   /**
-   * One page's late labels (YOY-151 AC-8), asked for once for each page
-   * whose response has `labelsPending`. Absent means no page waits for any.
+   * One page's late answer (YOY-151 AC-8; YOY-171 AC-1), asked for once for
+   * each page whose response has `labelsPending`: the judged page that
+   * replaces it, or — from an endpoint that answers labels only — its
+   * labels by product id. Absent means no page waits for any.
    */
-  labels?: (page: number) => Promise<Record<string, ProxyLabel | null>>;
+  labels?: (page: number) => Promise<LateAnswer>;
+}
+
+/** A page's late answer (YOY-171 AC-1): its labels, and the judged page once it landed. */
+export interface LateAnswer {
+  labels: Record<string, ProxyLabel | null>;
+  page: ProxySearchResponse | null;
 }
 
 export interface Overlay {
@@ -224,6 +232,9 @@ export function createOverlay(options: OverlayOptions): Overlay {
    */
   let generation = 0;
   let observer: IntersectionObserver | null = null;
+  // Re-watch the grid's last card after a late page swapped the one being
+  // watched out (YOY-171 AC-1); a no-op while a page loads or once done.
+  let rewatchLast = (): void => {};
   const stopAppending = (): void => {
     observer?.disconnect();
     observer = null;
@@ -243,6 +254,14 @@ export function createOverlay(options: OverlayOptions): Overlay {
     let shown =
       response.results.length + inlineCloseMatches(response).length;
     let nextPage = (response.page ?? 1) + 1;
+    let loadingPage = false;
+    rewatchLast = () => {
+      if (mine === generation && !loadingPage && observer !== null) {
+        observer.disconnect();
+        observer = null;
+        watchLast();
+      }
+    };
     const watchLast = (): void => {
       const last = grid.lastElementChild;
       if (shown >= total || last === null) {
@@ -256,11 +275,13 @@ export function createOverlay(options: OverlayOptions): Overlay {
         observer = null;
         loadingMore.hidden = false;
         const page = nextPage;
+        loadingPage = true;
         pages.load(page).then(
           (next) => {
             if (mine !== generation) {
               return;
             }
+            loadingPage = false;
             loadingMore.hidden = true;
             const offset = (page - 1) * pages.pageSize;
             const pending = waitsForLabels(next, handlers);
@@ -268,7 +289,7 @@ export function createOverlay(options: OverlayOptions): Overlay {
             grid.append(...appended.elements);
             settleLabels(appended.cards);
             if (pending) {
-              fillLateLabels(appended.cards, page, handlers, mine);
+              fillLateLabels(appended, page, offset, handlers, mine);
             }
             shown += appended.cards.length;
             nextPage = page + 1;
@@ -279,6 +300,7 @@ export function createOverlay(options: OverlayOptions): Overlay {
           () => {
             // AC-9: the shown cards stay, and no error reaches the shopper.
             if (mine === generation) {
+              loadingPage = false;
               loadingMore.hidden = true;
             }
           },
@@ -354,21 +376,36 @@ export function createOverlay(options: OverlayOptions): Overlay {
   }
 
   /**
-   * Ask once for a page's late labels and fill the reserved lines in place
-   * (YOY-151 AC-8, AC-9): the lines already hold their height, so no card
-   * moves, and nothing is re-ordered — a label only ever lands on the card
-   * whose product it names. A failed or superseded request leaves the
-   * lines empty and says nothing.
+   * Ask once for a page's late answer (YOY-151 AC-8; YOY-171 AC-1). The
+   * judged page replaces the page's cards in one swap — its order, the
+   * not-relevant cards gone, the close ones under the heading — with the
+   * panel's scroll held. An endpoint that answers labels only fills the
+   * reserved lines in place instead, so no card moves. A failed or
+   * superseded request leaves the lines empty and says nothing.
    */
   function fillLateLabels(
-    cards: readonly HTMLElement[],
+    shown: { elements: HTMLElement[]; cards: HTMLElement[] },
     page: number,
+    offset: number,
     handlers: ResponseHandlers,
     mine: number,
   ): void {
+    const { cards } = shown;
     handlers.labels?.(page).then(
-      (labels) => {
+      ({ labels, page: late }) => {
         if (mine !== generation) {
+          return;
+        }
+        if (late !== null) {
+          const scrolled = overlay.scrollTop;
+          const replaced = pageCards(late, offset, handlers, false);
+          shown.elements[0]?.before(...replaced.elements);
+          for (const element of shown.elements) {
+            element.remove();
+          }
+          settleLabels(replaced.cards);
+          overlay.scrollTop = scrolled;
+          rewatchLast();
           return;
         }
         for (const element of cards) {
@@ -634,12 +671,12 @@ export function createOverlay(options: OverlayOptions): Overlay {
       const offset =
         ((response.page ?? 1) - 1) * (handlers.pages?.pageSize ?? 0);
       const pending = waitsForLabels(response, handlers);
-      const { elements, cards } = pageCards(response, offset, handlers, pending);
-      grid.replaceChildren(...elements);
-      settleLabels(cards);
+      const first = pageCards(response, offset, handlers, pending);
+      grid.replaceChildren(...first.elements);
+      settleLabels(first.cards);
       appendPages(response, handlers);
       if (pending) {
-        fillLateLabels(cards, response.page ?? 1, handlers, generation);
+        fillLateLabels(first, response.page ?? 1, offset, handlers, generation);
       }
 
       // Empty states: an AI zero-hit keeps the session alive with its chips

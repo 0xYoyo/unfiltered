@@ -342,14 +342,21 @@ export function parseLabelsParams(params: URLSearchParams): LabelsRequest | null
   return { searchId, page: parsed };
 }
 
-/** The labels endpoint's body (YOY-148 AC-8, AC-9): labels by product id, never an order. */
-export interface ProxyLabelsResponse {
+/**
+ * The labels endpoint's body (YOY-148 AC-8, AC-9; YOY-171 AC-1): once the
+ * late answer has landed, the judged page under `page` in the search
+ * response's own shape — the client replaces its grid with it — and
+ * `labels`, the same page flattened to one label per product id, kept for
+ * one release. An empty `labels` and no `page` when nothing landed.
+ */
+export interface ProxyLabelsResponse<Page = ProxySearchResponse> {
   labels: Record<string, ProxyLabel | null>;
+  page?: Page;
 }
 
 export function serializeLabels(
   labels: Record<string, { template: ProxyLabel["template"]; values: readonly string[] } | null>,
-): ProxyLabelsResponse {
+): Pick<ProxyLabelsResponse, "labels"> {
   return {
     labels: Object.fromEntries(
       Object.entries(labels).map(([productId, label]) => [

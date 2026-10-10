@@ -43,6 +43,7 @@ import {
   DEFAULT_JUDGE_DEADLINE_MS,
   judgeDeadlineMsFromEnv,
   judgeRowCharsFromEnv,
+  awaitLatePage,
   awaitPendingLabels,
   judgeCacheKey,
   judgeCallTimeoutMsFromEnv,
@@ -1922,14 +1923,13 @@ describe("the judge on Engine v2 (on the database)", () => {
     // Another shop's request for the same search gets nothing.
     expect(await awaitPendingLabels("other-shop.myshopify.com", response.searchId, 1)).toEqual({});
     const labels = await awaitPendingLabels(SHOP, response.searchId, 1);
-    // Labels only (NG-4): a product the late answer reads as not relevant
-    // gets no entry, so the card keeps the label it was served with.
+    // The late page flattened (YOY-171 AC-1): a product the late answer
+    // reads as not relevant is off the page, so it has no entry.
     expect(labels).toEqual({
       p1: { template: "fact-differs", values: ["navy", "black"] },
       p3: null,
       p4: { template: "close-match", values: [] },
     });
-    // Labels only, never an order (AC-9).
     expect(serializeLabels(labels)).toEqual({ labels });
     expect(JSON.stringify(serializeLabels(labels))).not.toMatch(/position|order|verdict/);
 
@@ -1937,6 +1937,87 @@ describe("the judge on Engine v2 (on the database)", () => {
     expect(again).toMatchObject({ routeReason: "judge-cached", route: "ai" });
     expect(again).not.toHaveProperty("labelsPending");
     expect(calls).toBe(1);
+  });
+
+  it("hands over the late answer's whole page, composed exactly as the in-time path serves it (YOY-171 AC-1)", async () => {
+    await seed(db, FOUR);
+    const slow: LlmClient = {
+      completeStructured: () =>
+        new Promise((resolve) =>
+          setTimeout(
+            () => resolve(answer(["VFF", "N-X", "E-X", "CDC"], [{ n: 1, p: "navy", a: "black" }])),
+            80,
+          ),
+        ),
+    };
+    const engine = orchestrator(slow, { deadlineMs: 20, giveUpMs: 2_000 });
+    const response = await search(engine);
+    expect(response.hits.map((hit) => hit.productId)).toEqual(["p1", "p2", "p3", "p4"]);
+
+    expect(await awaitLatePage("other-shop.myshopify.com", response.searchId, 1)).toBeNull();
+    const late = await awaitLatePage(SHOP, response.searchId, 1);
+    expect(late).not.toBeNull();
+    // The judged order, the not-relevant product gone, the labels on.
+    expect(late!.response.hits.map((hit) => [hit.productId, hit.verdict])).toEqual([
+      ["p3", "exact"],
+      ["p1", "other-variant"],
+      ["p4", "close"],
+    ]);
+    expect(late!.response).toMatchObject({ searchId: response.searchId, routeReason: "judge-timeout", page: 1 });
+    expect(late!.response).not.toHaveProperty("labelsPending");
+    expect(late!.latencyMs).toBeGreaterThanOrEqual(80);
+    // On the wire, the same shape as the search response: close products
+    // under the heading (YOY-166), the in-time path's split.
+    const wire = serializeProxySearchResponse(late!.response, "gemini");
+    expect(wire.results.map((card) => card.productId)).toEqual(["p3", "p1"]);
+    expect(wire.closeMatches?.map((card) => card.productId)).toEqual(["p4"]);
+
+    // Exactly what the in-time path serves for the same answer: the next
+    // identical search reads it from the answer cache.
+    const cached = await search(engine);
+    expect(cached.routeReason).toBe("judge-cached");
+    // Everything but the timing, the outcome and the search's own id.
+    const page = (response: Record<string, unknown>) =>
+      Object.fromEntries(
+        Object.entries(response).filter(
+          ([key]) => !["routeReason", "stages", "judgeCalls", "searchId"].includes(key),
+        ),
+      );
+    expect(page({ ...late!.response })).toEqual(page({ ...cached }));
+    // The late page is logged as an in-time one is: one verdict row per product.
+    expect(await db.judgeVerdict.count({ where: { searchId: response.searchId, cached: false } })).toBe(4);
+  });
+
+  it("serves a partial late answer the same way, its stand-ins included (YOY-171 AC-1)", async () => {
+    await seed(db, FOUR);
+    const decisions: DecisionClient = {
+      async decide(request) {
+        await new Promise((resolve) => setTimeout(resolve, 60));
+        if (JSON.stringify(request.state).includes("Beach Sandal")) {
+          throw new Error("one call failed");
+        }
+        return {
+          verdict: { type: "choice", choice: "exact" },
+          fact: { type: "yes-no", yes: 0.1 },
+          description: { type: "yes-no", yes: 0.1 },
+          excluded: { type: "yes-no", yes: 0.1 },
+        };
+      },
+    };
+    const engine = orchestrator(undefined, {
+      judge: createDecisionJudge({ identity: "jev:test", decisions }),
+      deadlineMs: 20,
+      giveUpMs: 2_000,
+    });
+    const response = await search(engine);
+    expect(response.labelsPending).toBe(true);
+    const late = await awaitLatePage(SHOP, response.searchId, 1);
+    expect(late!.response.hits.map((hit) => [hit.productId, hit.verdict, hit.standIn ?? false])).toEqual([
+      ["p1", "exact", false],
+      ["p3", "exact", false],
+      ["p4", "exact", false],
+      ["p2", "not-relevant", true],
+    ]);
   });
 
   it("answers an empty set for a page with nothing pending, and when the judge fails late", async () => {
@@ -1949,6 +2030,7 @@ describe("the judge on Engine v2 (on the database)", () => {
     const response = await search(orchestrator(failing, { deadlineMs: 10 }));
     expect(response.labelsPending).toBe(true);
     expect(await awaitPendingLabels(SHOP, response.searchId, 1)).toEqual({});
+    expect(await awaitLatePage(SHOP, response.searchId, 1)).toBeNull();
     expect(await db.judgeAnswer.count()).toBe(0);
   });
 

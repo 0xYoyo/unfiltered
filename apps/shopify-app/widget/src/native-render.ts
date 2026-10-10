@@ -21,12 +21,12 @@ import {
 import {
   inlineCloseMatches,
   LABEL_TESTID,
+  type LateAnswer,
   type Overlay,
   type ResponseHandlers,
 } from "./overlay";
 import type {
   ProxyChip,
-  ProxyLabel,
   ProxyResult,
   ProxySearchResponse,
 } from "./search-client";
@@ -498,8 +498,8 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
     pages: Map<number, Promise<HeldPage>>;
     /** Pages whose response had `labelsPending` (YOY-151 AC-8). */
     pendingLabels: Set<number>;
-    /** Each pending page's labels, asked for once and held. */
-    labelFetches: Map<number, Promise<Record<string, ProxyLabel | null>>>;
+    /** Each pending page's late answer, asked for once and held. */
+    labelFetches: Map<number, Promise<LateAnswer>>;
   }
   /**
    * One page's cards: its results, and the close products that sit under
@@ -602,7 +602,9 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
             }
             list.append(...built.elements);
             settleLabels(built.items);
-            fillLateLabels(held, next, built.items, token);
+            fillLateLabels(held, next, built, token, () =>
+              watchLastRow(held, token, next, pageCount, true),
+            );
             if (built.items.length > 0) {
               watchLastRow(held, token, next, pageCount, true);
             }
@@ -735,16 +737,23 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
   }
 
   /**
-   * A pending page's late labels (YOY-151 AC-8, AC-9): asked for once per
-   * page and held, then filled into the lines its cards reserved — no card
-   * moves and nothing re-orders. A failed request leaves the lines empty.
+   * A pending page's late answer (YOY-151 AC-8, AC-9; YOY-171 AC-1): asked
+   * for once per page and held. The judged page replaces the page's items
+   * in one swap — its order, the not-relevant cards gone, the close ones
+   * under the heading — with the window's scroll held, and is held as the
+   * page from then on. An endpoint that answers labels only fills the lines
+   * its cards reserved instead, so no card moves. A failed request leaves
+   * the lines empty. `rearm` re-watches the last row when the swap replaced
+   * it.
    */
   function fillLateLabels(
     held: HeldSearch,
     page: number,
-    items: readonly HTMLElement[],
+    shown: { elements: readonly HTMLElement[]; items: readonly HTMLElement[] },
     token: number,
+    rearm: () => void,
   ): void {
+    const { items } = shown;
     const loader = held.handlers.labels;
     if (loader === undefined || labellingFor(held, page)?.pending !== true) {
       return;
@@ -755,8 +764,39 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
       held.labelFetches.set(page, request);
     }
     request.then(
-      (labels) => {
+      ({ labels, page: late }) => {
         if (token !== renderToken || current !== held) {
+          return;
+        }
+        if (late !== null) {
+          const pageData: HeldPage = {
+            results: late.results,
+            closeMatches: inlineCloseMatches(late).map(underCloseHeading),
+          };
+          held.pages.set(page, Promise.resolve(pageData));
+          held.pendingLabels.delete(page);
+          void buildPage(
+            pageData,
+            held.handlers,
+            (page - 1) * held.pageSize,
+            labellingFor(held, page),
+          ).then((replaced) => {
+            const first = shown.elements[0];
+            if (token !== renderToken || current !== held || first?.isConnected !== true) {
+              return;
+            }
+            const wasLast = shown.elements.includes(list.lastElementChild as HTMLElement);
+            const scrolled = window.scrollY;
+            first.before(...replaced.elements);
+            for (const element of shown.elements) {
+              element.remove();
+            }
+            settleLabels(replaced.items);
+            window.scrollTo(0, scrolled);
+            if (wasLast) {
+              rearm();
+            }
+          });
           return;
         }
         for (const item of items) {
@@ -1116,7 +1156,9 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
     chipsRow.hidden = chips.length === 0 && reading === null;
     list.replaceChildren(...built.elements);
     settleLabels(built.items);
-    fillLateLabels(held, target, built.items, token);
+    fillLateLabels(held, target, built, token, () =>
+      watchLastRow(held, token, target, pageCount, !paged),
+    );
     zeroHit.hidden = !(!preview && empty && response.route === "ai");
     noResults.hidden = !(!preview && empty && response.route === "classic");
     previewEmpty.hidden = !(preview && empty);

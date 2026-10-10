@@ -162,7 +162,17 @@ test("AC-6: a dropped label stays dropped when the page re-renders", async ({
   await expect(card(page, "Satin Slip Dress").getByTestId("playground-card-label")).toBeVisible();
 });
 
-test("verify 6: late labels fill reserved lines — one request, no card moves, order unchanged", async ({
+test("verify 6: every card reserves its line while the late answer is pending", async ({
+  page,
+}) => {
+  await open(page, "en");
+  await submit(page, "labels pending");
+  await expect(cards(page)).toHaveCount(6);
+  await expect(labels(page)).toHaveCount(0);
+  await expect(page.locator("[data-label-slot]")).toHaveCount(6);
+});
+
+test("YOY-171 AC-1: the late judged page replaces the find-order grid after one poll — judged order, not-relevant gone, close under the heading, scroll kept", async ({
   page,
 }) => {
   const requests: URL[] = [];
@@ -171,35 +181,51 @@ test("verify 6: late labels fill reserved lines — one request, no card moves, 
       requests.push(new URL(request.url()));
     }
   });
+  // Short enough that the page scrolls, so a kept position is observable.
+  await page.setViewportSize({ width: 420, height: 480 });
   await open(page, "en");
   await submit(page, "labels pending");
+  const titles = () => cards(page).locator(".cardTitle").allTextContents();
   await expect(cards(page)).toHaveCount(6);
-  await expect(labels(page)).toHaveCount(0);
-  // Every card on the page reserves its line while the labels are pending.
-  await expect(page.locator("[data-label-slot]")).toHaveCount(6);
+  expect(await titles()).toEqual([
+    "Satin Slip Dress",
+    "Silk Evening Dress",
+    "Jersey Midi Dress",
+    "Linen Wrap Dress",
+    "Cotton Shirt Dress",
+    "Crepe Shift Dress",
+  ]);
+  await page.evaluate(() => window.scrollTo({ top: 160 }));
+  const scrolled = await page.evaluate(() => window.scrollY);
+  expect(scrolled).toBeGreaterThan(0);
 
-  const snapshot = () =>
-    cards(page).evaluateAll((elements) =>
-      elements.map((element) => {
-        const box = element.getBoundingClientRect();
-        return {
-          title: element.querySelector(".cardTitle")?.textContent,
-          box: [box.x, box.y, box.width, box.height],
-        };
-      }),
-    );
-  const before = await snapshot();
-
-  await expect(labels(page)).toHaveCount(5);
-  const after = await snapshot();
-  expect(after).toEqual(before);
+  // One render: the judged page, the not-relevant card gone.
+  await expect(cards(page)).toHaveCount(5);
+  expect(await titles()).toEqual([
+    "Crepe Shift Dress",
+    "Silk Evening Dress",
+    "Linen Wrap Dress",
+    "Satin Slip Dress",
+    "Cotton Shirt Dress",
+  ]);
+  await expect(card(page, "Jersey Midi Dress")).toHaveCount(0);
+  // The close products sit under the heading, the first of them right after it.
+  const divider = page.getByTestId("playground-close-matches-divider");
+  await expect(divider).toHaveCount(1);
+  await expect(
+    page.locator("[data-testid='playground-close-matches-divider'] + [data-testid='playground-card']"),
+  ).toContainText("Linen Wrap Dress");
+  // Labels come with the page; under the heading `close-match` says nothing (YOY-168).
+  await expect(card(page, "Silk Evening Dress").getByTestId("playground-card-label")).toHaveText("over budget");
+  await expect(card(page, "Linen Wrap Dress").getByTestId("playground-card-label")).toHaveText(
+    "in linen, not silk",
+  );
+  await expect(card(page, "Cotton Shirt Dress").getByTestId("playground-card-label")).toHaveCount(0);
+  expect(await page.evaluate(() => window.scrollY)).toBe(scrolled);
 
   expect(requests).toHaveLength(1);
   expect(requests[0]!.searchParams.get("searchId")).toBe("fixture-labels-pending");
   expect(requests[0]!.searchParams.get("page")).toBe("1");
-  await expect(card(page, "Satin Slip Dress").getByTestId("playground-card-label")).toHaveText(
-    "slightly over budget",
-  );
 });
 
 test.describe("visual baselines", () => {
