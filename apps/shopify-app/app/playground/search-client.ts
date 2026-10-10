@@ -153,16 +153,20 @@ export async function searchPlayground(
 }
 
 /**
- * One page's late labels (YOY-148 AC-8, YOY-151 AC-8): the endpoint holds
- * until the judge answers or gives up, then answers a label (or null) per
- * product id — never an order. Throws on a non-200; the caller leaves the
- * reserved lines empty.
+ * One page's late answer (YOY-148 AC-8, YOY-151 AC-8; YOY-171 AC-1): the
+ * endpoint holds until the judge answers or gives up, then answers the
+ * judged page under `page` — the caller replaces its grid with it — and a
+ * label (or null) per product id beside it. Throws on a non-200; the
+ * caller leaves the reserved lines empty.
  */
 export async function fetchPlaygroundLabels(request: {
   searchId: string;
   page: number;
   catalog?: string;
-}): Promise<Record<string, ProxyLabel | null>> {
+}): Promise<{
+  labels: Record<string, ProxyLabel | null>;
+  page: PlaygroundSearchResponse | null;
+}> {
   const params = new URLSearchParams({
     searchId: request.searchId,
     page: String(request.page),
@@ -174,7 +178,8 @@ export async function fetchPlaygroundLabels(request: {
   if (!response.ok) {
     throw new Error(`playground labels failed: ${response.status}`);
   }
-  return ((await response.json()) as ProxyLabelsResponse).labels;
+  const body = (await response.json()) as ProxyLabelsResponse<PlaygroundSearchResponse>;
+  return { labels: body.labels, page: body.page ?? null };
 }
 
 /**

@@ -84,16 +84,12 @@ const EXPECTED = {
   ],
 } as const;
 
-/** Every card's box and the product order, for the no-move assertions. */
-async function layout(cards: Locator): Promise<unknown> {
+const labelId = (index: number): string => `gid://shopify/Product/label-${index}`;
+
+/** The cards' product ids, in grid order. */
+async function productOrder(cards: Locator): Promise<(string | null)[]> {
   return cards.evaluateAll((elements) =>
-    elements.map((element) => {
-      const box = element.getBoundingClientRect();
-      return {
-        productId: element.getAttribute("data-product-id"),
-        box: [box.x, box.y, box.width, box.height],
-      };
-    }),
+    elements.map((element) => element.getAttribute("data-product-id")),
   );
 }
 
@@ -179,23 +175,31 @@ test.describe("overlay path", () => {
     await expect(overlayLabels(page)).toHaveCount(1);
   });
 
-  test("verify 6: late labels — one request, every card reserves its line, no card moves, order unchanged", async ({
+  test("YOY-171 AC-1: the late judged page replaces the find-order cards after one request — judged order, not-relevant gone, close under the heading", async ({
     page,
   }) => {
     await openOverlay(page, "labels-pending", "en");
     await expect(overlayCards(page)).toHaveCount(6);
+    // Every card reserves its line while the late answer is pending.
     await expect(page.locator("[data-testid='unfiltered-widget-root']").locator("[data-label-slot]")).toHaveCount(6);
     await expect(overlayLabels(page)).toHaveCount(0);
-    const before = await layout(overlayCards(page));
+    expect(await productOrder(overlayCards(page))).toEqual([1, 2, 3, 4, 5, 6].map(labelId));
 
-    await expect(overlayLabels(page)).toHaveCount(5);
-    expect(await layout(overlayCards(page))).toEqual(before);
+    await expect(overlayCards(page)).toHaveCount(5);
+    expect(await productOrder(overlayCards(page))).toEqual([6, 2, 4, 1, 5].map(labelId));
+    await expect(overlayCard(page, 3)).toHaveCount(0);
+    const divider = page.getByTestId("unfiltered-widget-close-matches-divider");
+    await expect(divider).toHaveCount(1);
+    expect(
+      await divider.evaluate((element) => element.nextElementSibling?.getAttribute("data-product-id")),
+    ).toBe(labelId(4));
+    await expect(overlayCard(page, 2).getByTestId("unfiltered-widget-label")).toHaveText(EXPECTED.en[1]);
+    await expect(overlayCard(page, 4).getByTestId("unfiltered-widget-label")).toHaveText(EXPECTED.en[3]);
+    // Under the heading, `close-match` says nothing (YOY-168).
+    await expect(overlayCard(page, 5).getByTestId("unfiltered-widget-label")).toHaveCount(0);
     expect(await labelsRequests(page)).toEqual([
       { searchId: "harness-labels-pending-1", page: 1 },
     ]);
-    await expect(overlayCard(page, 2).getByTestId("unfiltered-widget-label")).toHaveText(
-      EXPECTED.en[1],
-    );
   });
 
   test("verify 7: a storefront locale with no templates shows no label", async ({
@@ -381,17 +385,29 @@ test.describe("theme-native path", () => {
     await expect(nativeItem(page, 5).getByTestId("unfiltered-widget-label")).toBeVisible();
   });
 
-  test("late labels — one request, no item moves, order unchanged", async ({
+  test("YOY-171 AC-1: the late judged page replaces the find-order items after one request — judged order, not-relevant gone, close under the heading, scroll kept", async ({
     page,
   }) => {
+    await page.setViewportSize({ width: 420, height: 480 });
     await openNative(page, "labels-pending");
     await expect(nativeItems(page)).toHaveCount(6);
     await expect(page.locator(".unfiltered-native__label[data-label-slot]")).toHaveCount(6);
     await expect(page.getByTestId("unfiltered-widget-label")).toHaveCount(0);
-    const before = await layout(nativeItems(page));
+    expect(await productOrder(nativeItems(page))).toEqual([1, 2, 3, 4, 5, 6].map(labelId));
+    await page.evaluate(() => window.scrollTo(0, 200));
+    const scrolled = await page.evaluate(() => window.scrollY);
+    expect(scrolled).toBeGreaterThan(0);
 
-    await expect(page.getByTestId("unfiltered-widget-label")).toHaveCount(5);
-    expect(await layout(nativeItems(page))).toEqual(before);
+    await expect(nativeItems(page)).toHaveCount(5);
+    expect(await productOrder(nativeItems(page))).toEqual([6, 2, 4, 1, 5].map(labelId));
+    await expect(nativeItem(page, 3)).toHaveCount(0);
+    const divider = page.getByTestId("unfiltered-native-close-matches-divider");
+    await expect(divider).toHaveCount(1);
+    expect(
+      await divider.evaluate((element) => element.nextElementSibling?.getAttribute("data-product-id")),
+    ).toBe(labelId(4));
+    await expect(nativeItem(page, 2).getByTestId("unfiltered-widget-label")).toHaveText(EXPECTED.en[1]);
+    expect(await page.evaluate(() => window.scrollY)).toBe(scrolled);
     expect(await labelsRequests(page)).toEqual([
       { searchId: "harness-labels-pending-1", page: 1 },
     ]);

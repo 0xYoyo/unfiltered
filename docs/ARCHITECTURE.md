@@ -824,16 +824,22 @@ runs one page.
   response served on a deadline miss carries `labelsPending: true` (absent
   otherwise). `GET /apps/unfiltered/labels` (proxy-signed; alias `/labels`)
   and `GET /api/playground/labels` take `searchId` and `page`, hold until
-  the judge answers or gives up, and answer `{ labels: { productId: label |
-  null } }` — or `{ labels: {} }` when it gave up, failed, or nothing is held
-  for that shop's search and page. The endpoint merges code labels first
-  (YOY-160): a product the page served with a code-computed label
-  (`price-near`, `price-far`, `size-missing`) keeps it, and the judge's
-  label answers for the rest — the first response's rule (YOY-149 AC-12),
-  so a late answer never turns "slightly over your price" into "close
-  match". Never an order: positions already served stand. The pending answers live in process memory
-  (`app/search/judge-step.server.ts`), kept 60 s after they settle. No
-  client calls the endpoint yet.
+  the judge answers or gives up, and answer the late page (YOY-171 AC-1):
+  `{ page, labels }`, where `page` is the judged page in the search
+  response's own shape — the proxy's `ProxySearchResponse`, the playground's
+  `PlaygroundSearchResponse` with its details timed from the search's start
+  — composed exactly as the in-time path composes it: the step's `serve`
+  (verdict order, not-relevant dropped, the verdict log written; a partial
+  answer's stand-ins included), the keyword tail, code labels over the
+  judge's (YOY-149 AC-12, YOY-160), the `closeMatches` split and the second
+  reading. `labels` is the same page flattened to `{ productId: label | null
+  }`, kept for one release. When the judge gave up or failed, or nothing is
+  held for that shop's search and page, the answer is `{ labels: {} }` with
+  no `page`. The playground, the overlay and the theme-native grid replace
+  the page's cards with `page` in one render, scroll held; a `labels`-only
+  answer still fills the reserved lines in place. The pending pages live in
+  process memory (`parkLatePage` in `app/search/judge-step.server.ts`, parked
+  by the orchestrator), kept 60 s after they settle.
 - **Costs.** `/internal/costs` shows judge calls (ledger rows under
   operation `judge`), cache hits (searches served `judge-cached`) and the
   hit rate, hits over hits plus calls.

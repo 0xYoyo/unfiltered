@@ -287,15 +287,20 @@ export interface SearchClient {
     position: number;
   }): void;
   /**
-   * One page's late labels (YOY-148 AC-8, YOY-151 AC-8): the labels
-   * endpoint holds until the judge answers or gives up, then answers a
-   * label (or null) per product id — never an order. Rejects on any
+   * One page's late answer (YOY-148 AC-8, YOY-151 AC-8; YOY-171 AC-1): the
+   * labels endpoint holds until the judge answers or gives up, then answers
+   * the judged page under `page` — the caller replaces that page with it —
+   * and a label (or null) per product id beside it. `page` is null when
+   * none landed or the endpoint answers labels only. Rejects on any
    * failure; the caller leaves the reserved lines empty.
    */
   fetchLabels(
     searchId: string,
     page: number,
-  ): Promise<Record<string, ProxyLabel | null>>;
+  ): Promise<{
+    labels: Record<string, ProxyLabel | null>;
+    page: ProxySearchResponse | null;
+  }>;
 }
 
 export function createSearchClient(
@@ -379,11 +384,19 @@ export function createSearchClient(
       }
       const body = (await response.json()) as {
         labels?: Record<string, ProxyLabel | null>;
+        page?: unknown;
       };
       if (typeof body !== "object" || body === null || typeof body.labels !== "object" || body.labels === null) {
         throw new Error("labels response not contract-shaped");
       }
-      return body.labels;
+      // A page that is not search-response-shaped is ignored: the labels
+      // still land in place (YOY-171 AC-1).
+      const late = body.page as Partial<ProxySearchResponse> | undefined;
+      const judged =
+        typeof late === "object" && late !== null && Array.isArray(late.results)
+          ? (late as ProxySearchResponse)
+          : null;
+      return { labels: body.labels, page: judged };
     },
 
     sendClickBeacon(beacon) {

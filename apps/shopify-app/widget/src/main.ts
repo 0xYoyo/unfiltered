@@ -5,13 +5,17 @@ import {
   resolveNativeRender,
 } from "./native-render";
 import type { NativeRenderOverrides } from "./native-render.config";
-import { createOverlay, ROOT_TESTID, type PageLoader } from "./overlay";
+import {
+  createOverlay,
+  ROOT_TESTID,
+  type LateAnswer,
+  type PageLoader,
+} from "./overlay";
 import {
   createSearchClient,
   SearchTimeoutError,
   type PageRequest,
   type ProxyChip,
-  type ProxyLabel,
   type ProxySearchResponse,
   type RemovedChip,
   type SearchRequestContext,
@@ -450,14 +454,14 @@ export function init(config: WidgetConfig): void {
     });
 
     /**
-     * The late labels of one submitted search (YOY-151 AC-8): one request
-     * per page whose response has `labelsPending`, refused once the search
-     * was superseded or dismissed, so a late answer never lands on a newer
-     * search's cards.
+     * The late answers of one submitted search (YOY-151 AC-8; YOY-171
+     * AC-1): one request per page whose response has `labelsPending`,
+     * refused once the search was superseded or dismissed, so a late page
+     * never lands on a newer search's cards.
      */
     const labelLoader =
       (sequence: number, searchId: string) =>
-      async (page: number): Promise<Record<string, ProxyLabel | null>> => {
+      async (page: number): Promise<LateAnswer> => {
         const current = (): boolean => !inert && sequence === requestSequence;
         if (!current()) {
           throw new Error("search superseded");

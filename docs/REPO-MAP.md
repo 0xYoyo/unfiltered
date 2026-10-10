@@ -211,6 +211,7 @@ apps/
           evidence-label-line.spec.ts
           evidence-labels.spec.ts
           evidence-landing-ctas.spec.ts
+          evidence-late-page.spec.ts
           evidence-latency.spec.ts
           evidence-paging.spec.ts
           evidence-refinement.spec.ts
@@ -544,6 +545,7 @@ apps/
         evidence-hardening.spec.ts
         evidence-label-line.spec.ts
         evidence-labels.spec.ts
+        evidence-late-page.spec.ts
         evidence-negation-chips.spec.ts
         evidence-refinement.spec.ts
         evidence-server-pages.spec.ts
@@ -1279,6 +1281,55 @@ docs/
       widget-overlay-mobile-he-loading.png
       widget-overlay-mobile-he-results.png
       widget-overlay-mobile-he-sized-images.png
+    YOY-171/
+      playground-desktop-en-empty.png
+      playground-desktop-en-error.png
+      playground-desktop-en-late-page.png
+      playground-desktop-en-loading.png
+      playground-desktop-en-pending-find-order.png
+      playground-desktop-he-empty.png
+      playground-desktop-he-error.png
+      playground-desktop-he-late-page.png
+      playground-desktop-he-loading.png
+      playground-desktop-he-pending-find-order.png
+      playground-mobile-en-empty.png
+      playground-mobile-en-error.png
+      playground-mobile-en-late-page.png
+      playground-mobile-en-loading.png
+      playground-mobile-en-pending-find-order.png
+      playground-mobile-he-empty.png
+      playground-mobile-he-error.png
+      playground-mobile-he-late-page.png
+      playground-mobile-he-loading.png
+      playground-mobile-he-pending-find-order.png
+      widget-native-desktop-en-late-page.png
+      widget-native-desktop-en-pending-find-order.png
+      widget-native-desktop-he-late-page.png
+      widget-native-desktop-he-pending-find-order.png
+      widget-native-mobile-en-late-page.png
+      widget-native-mobile-en-pending-find-order.png
+      widget-native-mobile-he-late-page.png
+      widget-native-mobile-he-pending-find-order.png
+      widget-overlay-desktop-en-empty.png
+      widget-overlay-desktop-en-error.png
+      widget-overlay-desktop-en-late-page.png
+      widget-overlay-desktop-en-loading.png
+      widget-overlay-desktop-en-pending-find-order.png
+      widget-overlay-desktop-he-empty.png
+      widget-overlay-desktop-he-error.png
+      widget-overlay-desktop-he-late-page.png
+      widget-overlay-desktop-he-loading.png
+      widget-overlay-desktop-he-pending-find-order.png
+      widget-overlay-mobile-en-empty.png
+      widget-overlay-mobile-en-error.png
+      widget-overlay-mobile-en-late-page.png
+      widget-overlay-mobile-en-loading.png
+      widget-overlay-mobile-en-pending-find-order.png
+      widget-overlay-mobile-he-empty.png
+      widget-overlay-mobile-he-error.png
+      widget-overlay-mobile-he-late-page.png
+      widget-overlay-mobile-he-loading.png
+      widget-overlay-mobile-he-pending-find-order.png
     YOY-64/
       desktop-en-intent-reuse.png
       desktop-he-intent-reuse.png
@@ -1625,7 +1676,7 @@ vitest.setup.ts
 - apps/shopify-app/app/search/find.server.ts → apps/shopify-app/app/search/card-retrieval.server.ts
 - apps/shopify-app/app/search/judge-compare.server.ts → apps/shopify-app/app/ai/cost-recorder.server.ts, apps/shopify-app/app/score/cli.server.ts, apps/shopify-app/app/score/fixture.server.ts, apps/shopify-app/app/score/set.server.ts, apps/shopify-app/app/search/orchestrator.server.ts, apps/shopify-app/app/search/playground-search.server.ts, apps/shopify-app/app/search/proxy.server.ts, apps/shopify-app/app/testing/helpers.server.ts
 - apps/shopify-app/app/search/judge-compare.test.ts → apps/shopify-app/app/search/judge-compare.server.ts
-- apps/shopify-app/app/search/judge-step.server.ts → apps/shopify-app/app/search/events.server.ts, apps/shopify-app/app/search/wishes.server.ts
+- apps/shopify-app/app/search/judge-step.server.ts → apps/shopify-app/app/search/events.server.ts, apps/shopify-app/app/search/orchestrator.server.ts, apps/shopify-app/app/search/wishes.server.ts
 - apps/shopify-app/app/search/judge.test.ts → apps/shopify-app/app/ai/cost-aggregates.server.ts, apps/shopify-app/app/ai/openrouter.server.ts, apps/shopify-app/app/eval/replay.server.ts, apps/shopify-app/app/playground/api.server.ts, apps/shopify-app/app/search/classic-store.server.ts, apps/shopify-app/app/search/events.server.ts, apps/shopify-app/app/search/find.server.ts, apps/shopify-app/app/search/judge-step.server.ts, apps/shopify-app/app/search/orchestrator.server.ts, apps/shopify-app/app/search/proxy.server.ts, apps/shopify-app/app/testing/helpers.server.ts
 - apps/shopify-app/app/search/orchestrator.server.ts → apps/shopify-app/app/search/classic-store.server.ts, apps/shopify-app/app/search/extraction-cache.server.ts, apps/shopify-app/app/search/find.server.ts, apps/shopify-app/app/search/judge-step.server.ts, apps/shopify-app/app/search/stages.ts, apps/shopify-app/app/search/wishes.server.ts
 - apps/shopify-app/app/search/orchestrator.test.ts → apps/shopify-app/app/ai/cost-recorder.server.ts, apps/shopify-app/app/search/classic-store.server.ts, apps/shopify-app/app/search/find.server.ts, apps/shopify-app/app/search/orchestrator.server.ts, apps/shopify-app/app/testing/helpers.server.ts

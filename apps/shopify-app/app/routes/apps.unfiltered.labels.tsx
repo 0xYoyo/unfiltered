@@ -1,17 +1,23 @@
 import type { LoaderFunctionArgs } from "react-router";
 
-import { awaitPendingLabels } from "../search/judge-step.server";
-import { parseLabelsParams, serializeLabels } from "../search/proxy.server";
+import { awaitLatePage, latePageLabels } from "../search/judge-step.server";
+import {
+  parseLabelsParams,
+  serializeLabels,
+  serializeProxySearchResponse,
+  type ProxyLabelsResponse,
+} from "../search/proxy.server";
 import { authenticate } from "../shopify.server";
 
 /**
- * Late labels (YOY-148 AC-8, AC-9): `GET /apps/unfiltered/labels?searchId=…
- * &page=…` under the same app proxy as the search endpoint. When a search
- * was served on a judge deadline miss (`labelsPending: true`), this holds
- * until the judge answers or gives up, then answers one label per product
- * id — or an empty set. It never answers an order: positions served earlier
- * stand. No client calls it yet (NG-2). Also served at the remainder path
- * /labels (see routes/labels.tsx).
+ * The late page (YOY-148 AC-8, AC-9; YOY-171 AC-1): `GET
+ * /apps/unfiltered/labels?searchId=…&page=…` under the same app proxy as
+ * the search endpoint. When a search was served on a judge deadline miss
+ * (`labelsPending: true`), this holds until the judge answers or gives up,
+ * then answers the judged page under `page`, in the search response's
+ * shape, with `labels` — the page flattened to one label per product id —
+ * beside it; an empty `labels` and no `page` when it gave up. Also served
+ * at the remainder path /labels (see routes/labels.tsx).
  *
  * Auth mirrors the search route: proxy signature or 401, shop identity from
  * the LAST `shop` parameter (the signature-verified value). Labels are held
@@ -40,8 +46,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   if (params === null) {
     return emptyResponse(400);
   }
-  const labels = await awaitPendingLabels(shop, params.searchId, params.page);
-  return Response.json(serializeLabels(labels), {
-    headers: { "Cache-Control": "no-store" },
-  });
+  const late = await awaitLatePage(shop, params.searchId, params.page);
+  const body: ProxyLabelsResponse = {
+    ...serializeLabels(latePageLabels(late)),
+    ...(late !== null ? { page: serializeProxySearchResponse(late.response) } : {}),
+  };
+  return Response.json(body, { headers: { "Cache-Control": "no-store" } });
 };

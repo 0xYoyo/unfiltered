@@ -15,8 +15,10 @@ import type { FindStep } from "./find.server";
 import {
   DEFAULT_JUDGE_DEADLINE_MS,
   DEFAULT_JUDGE_GIVE_UP_MS,
+  parkLatePage,
   runJudgeStep,
   type JudgeCallTimes,
+  type JudgeStepItem,
 } from "./judge-step.server";
 import { SEARCH_STAGES, type SearchStage, type SearchStages } from "./stages";
 import {
@@ -507,6 +509,7 @@ export function createSearchOrchestrator(
     request: SearchRequest,
     stages: ReturnType<typeof createStageLedger>,
   ): Promise<StagelessResponse> {
+    const startedAt = performance.now();
     const searchId = request.searchId ?? randomUUID();
     const { page, pageSize } = request.paging ?? { page: 1, pageSize: DEFAULT_PAGE_SIZE };
     // The extraction starts with the search, in parallel with find (YOY-149
@@ -560,72 +563,108 @@ export function createSearchOrchestrator(
     const judgedPart = cards.filter((card) => inFindSet.has(card.productId));
     const tail = cards.filter((card) => !inFindSet.has(card.productId));
 
-    let routeReason: V2RouteReason;
-    let labelsPending = false;
-    let judgeCalls: JudgeCallTimes | null = null;
-    let otherReading: string | null = null;
-    let hits = cards;
-    if (request.forceClassic === true) {
-      routeReason = "capped";
-    } else if (judge === undefined || judgedPart.length === 0) {
-      routeReason = "find-only";
-    } else {
-      const judgeStartedAt = performance.now();
-      const judged = await runJudgeStep({
-          judge,
-          db,
-          shopDomain: request.shopDomain,
-          sentence: request.query,
-          ...(previousQuery !== undefined ? { previousSentence: previousQuery } : {}),
-          items: judgedPart,
-          searchId,
-          deadlineMs: judgeDeadlineMs,
-          giveUpMs: judgeGiveUpMs,
-          page,
-          positionOffset: pageStart,
-          // A removed `exclude` chip is not applied through the judge either (AC-15).
-          applyExcluded: !removedChips.some((chip) => chip.field === "exclude"),
-          codeLabels,
-        });
-      // The step's database time apart from its call's (YOY-159 AC-1).
-      stages.add("judgeRows", judged.rowsMs);
-      stages.add("judge", Math.max(0, performance.now() - judgeStartedAt - judged.rowsMs));
-      judgeCalls = judged.calls;
-      routeReason = judged.outcome;
-      labelsPending = judged.labelsPending;
+    // A judged part's cards, then the keyword tail, each with its label: a
+    // code-computed label replaces the judge's on the same card (AC-12).
+    // The late page is composed the same way (YOY-171 AC-1).
+    const withLabels = (judgedItems: readonly JudgeStepItem<ProductCard>[] | null) =>
+      [
+        ...(judgedItems === null
+          ? cards
+          : [
+              ...judgedItems.map(({ item, verdict, label, standIn }) => ({
+                ...item,
+                label,
+                ...(verdict !== null ? { verdict } : {}),
+                ...(standIn === true ? { standIn } : {}),
+              })),
+              ...tail,
+            ]),
+      ].map((card) => {
+        const codeLabel = codeLabels.get(card.productId);
+        return codeLabel === undefined ? card : { ...card, label: codeLabel };
+      });
+    const respond = (
+      routeReason: V2RouteReason,
+      hits: ProductCard[],
+      judged: {
+        labelsPending?: boolean;
+        otherReading?: string | null;
+        calls?: JudgeCallTimes | null;
+      } = {},
+    ): StagelessResponse => {
       // The second reading is offered on page 1 only (AC-7).
-      otherReading = page === 1 ? judged.otherReading : null;
-      hits = [
-        ...judged.items.map(({ item, verdict, label, standIn }) => ({
-          ...item,
-          label,
-          ...(verdict !== null ? { verdict } : {}),
-          ...(standIn === true ? { standIn } : {}),
-        })),
-        ...tail,
-      ];
-    }
-    // A code-computed label replaces the judge's on the same card (AC-12).
-    hits = hits.map((card) => {
-      const codeLabel = codeLabels.get(card.productId);
-      return codeLabel === undefined ? card : { ...card, label: codeLabel };
-    });
-    return {
-      searchId,
-      route: request.forceClassic === true ? "classic" : "ai",
-      routeReason,
-      hits,
-      chips: wishes === null ? [] : wishChips(wishes),
-      degraded: found.degraded,
-      page,
-      totalCount: ordered.productIds.length,
-      ...(labelsPending ? { labelsPending: true as const } : {}),
-      extractionInTime: extracted !== null,
-      extractionCached: settled?.cached === true,
-      carry: nextCarry(request.query, previousQuery, extracted?.refines ?? null),
-      ...(otherReading !== null ? { otherReading } : {}),
-      ...(judgeCalls !== null ? { judgeCalls } : {}),
+      const otherReading = page === 1 ? (judged.otherReading ?? null) : null;
+      return {
+        searchId,
+        route: request.forceClassic === true ? "classic" : "ai",
+        routeReason,
+        hits,
+        chips: wishes === null ? [] : wishChips(wishes),
+        degraded: found.degraded,
+        page,
+        totalCount: ordered.productIds.length,
+        ...(judged.labelsPending === true ? { labelsPending: true as const } : {}),
+        extractionInTime: extracted !== null,
+        extractionCached: settled?.cached === true,
+        carry: nextCarry(request.query, previousQuery, extracted?.refines ?? null),
+        ...(otherReading !== null ? { otherReading } : {}),
+        ...(judged.calls !== undefined && judged.calls !== null ? { judgeCalls: judged.calls } : {}),
+      };
     };
+
+    if (request.forceClassic === true) {
+      return respond("capped", withLabels(null));
+    }
+    if (judge === undefined || judgedPart.length === 0) {
+      return respond("find-only", withLabels(null));
+    }
+    const judgeStartedAt = performance.now();
+    const judged = await runJudgeStep({
+      judge,
+      db,
+      shopDomain: request.shopDomain,
+      sentence: request.query,
+      ...(previousQuery !== undefined ? { previousSentence: previousQuery } : {}),
+      items: judgedPart,
+      searchId,
+      deadlineMs: judgeDeadlineMs,
+      giveUpMs: judgeGiveUpMs,
+      page,
+      positionOffset: pageStart,
+      // A removed `exclude` chip is not applied through the judge either (AC-15).
+      applyExcluded: !removedChips.some((chip) => chip.field === "exclude"),
+    });
+    // The step's database time apart from its call's (YOY-159 AC-1).
+    stages.add("judgeRows", judged.rowsMs);
+    stages.add("judge", Math.max(0, performance.now() - judgeStartedAt - judged.rowsMs));
+    if (judged.late !== undefined) {
+      // The late answer's page, composed as the in-time one would have been
+      // (YOY-171 AC-1), for the labels endpoint to hand over.
+      parkLatePage(
+        request.shopDomain,
+        searchId,
+        page,
+        judged.late.then((late) =>
+          late === null
+            ? null
+            : {
+                response: {
+                  ...respond("judge-timeout", withLabels(late.items), {
+                    otherReading: late.otherReading,
+                    calls: late.calls,
+                  }),
+                  stages: stages.snapshot(),
+                },
+                latencyMs: Math.round(performance.now() - startedAt),
+              },
+        ),
+      );
+    }
+    return respond(
+      judged.outcome,
+      withLabels(judged.items),
+      { labelsPending: judged.labelsPending, otherReading: judged.otherReading, calls: judged.calls },
+    );
   }
 
   /**

@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import { underCloseHeading } from "../../widget/src/labels";
 import type { ProxyChip, ProxyLabel } from "../search/proxy.server";
@@ -24,6 +31,8 @@ import { getPlaygroundStrings, type PlaygroundLocale } from "./strings";
 
 /** One shown page's cards: its results, then its close products (YOY-166). */
 interface ShownPage {
+  /** The page number it answered (YOY-146), so a late page can replace it. */
+  page: number;
   results: PlaygroundCard[];
   close: PlaygroundCard[];
 }
@@ -110,10 +119,12 @@ export function PlaygroundPage({
   const [more, setMore] = useState<ShownPage[]>([]);
   const [loadingMore, setLoadingMore] = useState(false);
   const pagingRef = useRef<PagingState | null>(null);
-  // Late labels (YOY-151 AC-8): the cards whose page answered with
-  // `labelsPending` reserve their label line, and the labels endpoint's
-  // answer lands here by product id — never re-ordering a card (AC-9).
-  // `labelsGenRef` counts responses, so an answer for a replaced one drops.
+  // Late answers (YOY-151 AC-8; YOY-171 AC-1): the cards whose page
+  // answered with `labelsPending` reserve their label line; the labels
+  // endpoint's judged page then replaces that page in one render, scroll
+  // kept. An endpoint that answers labels only fills the lines by product
+  // id instead. `labelsGenRef` counts responses, so an answer for a
+  // replaced one drops.
   const [labelsPending, setLabelsPending] = useState<ReadonlySet<string>>(
     () => new Set(),
   );
@@ -121,6 +132,8 @@ export function PlaygroundPage({
     Record<string, ProxyLabel | null>
   >({});
   const labelsGenRef = useRef(0);
+  // The scroll position to hold across a late page's render (AC-1).
+  const holdScrollRef = useRef<number | null>(null);
   // The searchId a click beacon may carry: the last SUBMITTED response's,
   // or null while the cards on screen belong to a keystroke preview. A
   // preview writes no SearchEvent row (YOY-68 AC-3), so its searchId is not
@@ -183,10 +196,39 @@ export function PlaygroundPage({
         page: page.page ?? 1,
         ...(catalog === undefined ? {} : { catalog }),
       }).then(
-        (labels) => {
-          if (labelsGenRef.current === generation) {
-            setLateLabels((held) => ({ ...held, ...labels }));
+        ({ labels, page: late }) => {
+          if (labelsGenRef.current !== generation) {
+            return;
           }
+          if (late === null) {
+            setLateLabels((held) => ({ ...held, ...labels }));
+            return;
+          }
+          // The judged page replaces the find-order one (YOY-171 AC-1).
+          holdScrollRef.current = window.scrollY;
+          const number = late.page ?? 1;
+          const close = inlineCloseMatches(late);
+          const paging = pagingRef.current;
+          if (number === 1) {
+            if (paging !== null) {
+              paging.shown += late.results.length + close.length - ids.length;
+            }
+            setResponse(late);
+          } else {
+            setMore((shown) =>
+              shown.map((entry) => {
+                if (entry.page !== number) {
+                  return entry;
+                }
+                if (paging !== null) {
+                  paging.shown +=
+                    late.results.length + close.length - entry.results.length - entry.close.length;
+                }
+                return { page: number, results: late.results, close };
+              }),
+            );
+          }
+          setLabelsPending((held) => new Set([...held].filter((id) => !ids.includes(id))));
         },
         () => {
           // The reserved lines stay empty; nothing is said (F-6).
@@ -334,7 +376,10 @@ export function PlaygroundPage({
       if (next.results.length === 0) {
         state.stopped = true;
       }
-      setMore((shown) => [...shown, { results: next.results, close }]);
+      setMore((shown) => [
+        ...shown,
+        { page: next.page ?? state.nextPage - 1, results: next.results, close },
+      ]);
       awaitLabels(next, false);
     } catch {
       if (pagingRef.current === state) {
@@ -488,7 +533,14 @@ export function PlaygroundPage({
     const pages: ShownPage[] =
       response === null
         ? []
-        : [{ results: response.results, close: inlineCloseMatches(response) }, ...more];
+        : [
+            {
+              page: response.page ?? 1,
+              results: response.results,
+              close: inlineCloseMatches(response),
+            },
+            ...more,
+          ];
     return {
       cards: pages
         .flatMap((page) => [...page.results, ...page.close])
@@ -504,6 +556,14 @@ export function PlaygroundPage({
       ),
     };
   }, [response, more, lateLabels, previewCards]);
+  // A late page's render keeps the visitor where they were (YOY-171 AC-1).
+  useLayoutEffect(() => {
+    if (holdScrollRef.current !== null) {
+      window.scrollTo({ top: holdScrollRef.current });
+      holdScrollRef.current = null;
+    }
+  }, [response, more]);
+
   const zeroHit =
     response !== null &&
     response.route === "ai" &&
