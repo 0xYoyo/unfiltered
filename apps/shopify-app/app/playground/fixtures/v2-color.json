@@ -1,0 +1,75 @@
+{
+  "searchId": "fixture-v2-color",
+  "route": "ai",
+  "degraded": false,
+  "results": [
+    {
+      "productId": "p-color-red",
+      "title": "Lace Dress",
+      "url": "https://example.test/products/p-color-red",
+      "imageUrl": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 4'><rect width='4' height='4' fill='%23b23a3a'/></svg>",
+      "priceMin": 140,
+      "priceMax": 140,
+      "currencyCode": "USD",
+      "available": true,
+      "label": null
+    },
+    {
+      "productId": "p-color-blue",
+      "title": "Satin Evening Gown",
+      "url": "https://example.test/products/p-color-blue",
+      "imageUrl": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 4'><rect width='4' height='4' fill='%233a5bb2'/></svg>",
+      "priceMin": 180,
+      "priceMax": 180,
+      "currencyCode": "USD",
+      "available": true,
+      "label": {
+        "template": "color-differs",
+        "values": [
+          "blue",
+          "red"
+        ]
+      }
+    },
+    {
+      "productId": "p-color-black",
+      "title": "Velvet Evening Gown",
+      "url": "https://example.test/products/p-color-black",
+      "imageUrl": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 4'><rect width='4' height='4' fill='%23222222'/></svg>",
+      "priceMin": 210,
+      "priceMax": 210,
+      "currencyCode": "USD",
+      "available": true,
+      "label": {
+        "template": "color-differs",
+        "values": [
+          "black",
+          "red"
+        ]
+      }
+    }
+  ],
+  "chips": [
+    {
+      "field": "color",
+      "value": "red"
+    }
+  ],
+  "details": {
+    "routeReason": "judged",
+    "latencyMs": 905,
+    "limited": null,
+    "stages": {
+      "extract": 402,
+      "extractLate": 0,
+      "find": 70,
+      "compose": 6,
+      "hydrate": 9,
+      "judgeRows": 12,
+      "judge": 690
+    },
+    "judge": null
+  },
+  "page": 1,
+  "totalCount": 3
+}

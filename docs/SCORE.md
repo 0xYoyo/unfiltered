@@ -266,6 +266,10 @@ line.
 | 5 (jev judge) | Engine v2 as run 4, judge `JUDGE_PROVIDER=jev` (YOY-152 branch) | 0.634 | 0.407 | 0.574 | 0.657 | 0.542 | 0.398 | — (not deployed) | $0.1053 |
 | 6 control | Engine v2 on `main` at `9843486`, before the delete (YOY-155 AC-8 reference, judge `jev`) | 0.657 | 0.361 | 0.495 | 0.648 | 0.477 | 0.361 | — (not deployed) | $0.1038 |
 | 6 | One engine after the delete (YOY-155 branch, judge `jev`) | 0.606 | 0.301 | 0.495 | 0.616 | 0.444 | 0.366 | — (not deployed) | $0.1043 |
+| control C2 | `main` at `7a4d716` after the ten YOY-171 merges of 2026-10-10 (judge `jev`); the AC-5 reference from here on | 0.644 | 0.264 | 0.523 | 0.593 | 0.500 | 0.375 | — (not deployed) | $0.1295 |
+| 9 (stop: he outside its band) | AC-5 fallback: colour orders nothing — extraction, label, chip only (`b33298b`, judge `jev`) | 0.630 | 0.255 | 0.532 | 0.653 | 0.454 | 0.347 | — (not deployed) | $0.1341 |
+| 8 (stop: he outside its band) | AC-5 as amended: colour ordered after the judge, within the page's groups (`7ecb1e4`, judge `jev`) | 0.653 | 0.218 | 0.500 | 0.620 | 0.495 | 0.370 | — (not deployed) | $0.1336 |
+| 7 (stop: he outside its band) | Engine v2 + colour as a code-checked wish (YOY-171 AC-5 branch `662ebd8`, judge `jev`) | 0.625 | 0.259 | 0.472 | 0.676 | 0.477 | 0.347 | — (not deployed) | $0.1337 |
 | 5 replay | Run 5's code re-run on 2026-10-10 (`5c5adfe`, `engine=v2`, judge `jev`; YOY-171 AC-9) | 0.569 | 0.370 | 0.569 | 0.639 | 0.523 | 0.431 | — (not deployed) | $0.1055 |
 | 1b — v1 re-check | M5 engine on `main` before its deletion (YOY-155 AC-1) | 0.560 | 0.287 | 0.375 | 0.463 | 0.407 | 0.236 | — | $0.0552 |
 | 3 (first, superseded) | Engine v2 find step + judge reading the summary (`ENGINE_V2=1`, deadline 1,500 ms) | 0.597 | 0.292 | 0.556 | 0.648 | 0.542 | 0.403 | — (not deployed) | $0.0928 |
@@ -412,6 +416,55 @@ searches that lost the most cannot be read from any artifact. Producing
 them would need a runner change under `app/score/` (a sensitive path)
 printing per-entry grades by index. The variance result made that
 unnecessary.
+
+Run 7 — colour as a code-checked wish (YOY-171 AC-5):
+[run 38087016294](https://github.com/0xYoyo/unfiltered/actions/runs/38087016294),
+2026-10-10, dispatched with `ref=662ebd8` (the AC-5 branch) and
+`judge=jev`. Green, leak check clean (72 checked), **0 failed searches**,
+$0.1337 over 1,944 model calls, 72 extraction calls. Against the run 6
+control (the reference YOY-171 names), with each band `max(M5 band, 0.03)`:
+en −0.032 (band 0.111, inside), **he −0.102 (band 0.090: outside)**,
+ar −0.023, ru +0.028, fr 0.000, es −0.014. By YOY-171's stop condition
+the slice is **not merged** and the issue goes to `blocked`. One run cannot
+tell a colour effect from judge variance (the same code moved 0.037 between
+two days, and run 6 sat 0.060 under its control), but he is now 0.102 under
+and outside the band, so the decision is the founder's.
+
+Run 8 — colour after the judge only (YOY-171 AC-5 as amended 2026-10-11):
+[run 38089165550](https://github.com/0xYoyo/unfiltered/actions/runs/38089165550),
+2026-10-10, dispatched with `ref=7ecb1e4` and `judge=jev`. The colour no
+longer moved anything before the judge. After it, a stable sort put the
+asked colour first within each group of the judged page. Green, leak check
+clean (72 checked), **0 failed searches**, $0.1336 over 1,944 model calls.
+Against the run 6 control: en −0.004 (inside), **he −0.143 (band 0.090:
+outside)**, ar +0.005, ru −0.028, fr +0.018, es +0.009. By the AC's
+fallback, the in-page colour order is dropped. The extraction, the
+`color-differs` label and the chip stay, and run 9 is dispatched.
+
+Run 9 — the fallback: colour orders nothing (YOY-171 AC-5):
+[run 38089808730](https://github.com/0xYoyo/unfiltered/actions/runs/38089808730),
+2026-10-10, dispatched with `ref=b33298b` and `judge=jev`. The colour
+changes no order anywhere; the branch differs from `main` only by the
+extraction's colour fields (prompt version 8), the `color-differs` label
+and the chip. Green, leak check clean (72 checked), **0 failed searches**,
+$0.1341 over 1,943 model calls. Against the run 6 control: en −0.027
+(inside), **he −0.106 (band 0.090: outside)**, ar +0.037, ru +0.005,
+fr −0.023, es −0.014. By the AC, the slice is **not merged** and YOY-171
+goes to `blocked`. Runs 7–9 put he at 0.259, 0.218 and 0.255 across three
+different colour behaviours, the last of which moves nothing. Either the
+extraction prompt change itself costs he, or the 0.361 control sits high
+(run 6 on the same code scored 0.301).
+
+Control C2 — the re-base (YOY-171 AC-5, co-manager decision 2026-10-11):
+[run 38090753274](https://github.com/0xYoyo/unfiltered/actions/runs/38090753274),
+2026-10-10, dispatched on `main` at `7a4d716` with `judge=jev`. Green, leak
+check clean (72 checked), **0 failed searches**, $0.1295 over 1,944 model
+calls. **he 0.264**, 0.097 under the run 6 control, on `main` without the colour
+work. By the decision's Case B, the colour work is not what moved he; one of
+the day's merges did. C2 becomes AC-5's reference. Against it, run 8 is en
++0.009 and he −0.046, both inside the band, so the run-8 version (the colour
+first within its group after the judge) is the one that ships. Run 9 is en
+−0.014 and he −0.009. Finding the merge that moved he is YOY-171 AC-16.
 
 One side reading for the M7 speed chain: the replay's "no extraction"
 column (8–25 %) shows run 5's code missed the extraction grace on some

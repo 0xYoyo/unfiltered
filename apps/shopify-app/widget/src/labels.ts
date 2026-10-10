@@ -11,7 +11,8 @@
 
 /**
  * The templates the server can name (YOY-151 AC-1), with `unchecked` — a
- * product the judge never answered for (YOY-171 AC-2).
+ * product the judge never answered for (YOY-171 AC-2) — and `color-differs`,
+ * a product of another colour than the one asked (YOY-171 AC-5).
  */
 export const LABEL_TEMPLATES = [
   "price-near",
@@ -20,6 +21,7 @@ export const LABEL_TEMPLATES = [
   "fact-differs",
   "close-match",
   "unchecked",
+  "color-differs",
 ] as const;
 export type LabelTemplate = (typeof LABEL_TEMPLATES)[number];
 
@@ -37,6 +39,7 @@ export interface LabelStrings {
   labelFactDiffers: string;
   labelCloseMatch: string;
   labelUnchecked: string;
+  labelColorDiffers: string;
 }
 
 const TEMPLATE_KEYS: Record<LabelTemplate, keyof LabelStrings> = {
@@ -46,6 +49,7 @@ const TEMPLATE_KEYS: Record<LabelTemplate, keyof LabelStrings> = {
   "fact-differs": "labelFactDiffers",
   "close-match": "labelCloseMatch",
   unchecked: "labelUnchecked",
+  "color-differs": "labelColorDiffers",
 };
 
 /**
@@ -64,6 +68,7 @@ export const LABEL_MAX_CHARS: Record<LabelTemplate, number> = {
   "fact-differs": 34,
   "close-match": 16,
   unchecked: 16,
+  "color-differs": 34,
 };
 
 /**

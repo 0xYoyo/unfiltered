@@ -100,6 +100,7 @@ export {
   type ExcludedTerm,
   type ExtractedWishes,
   type ExtractRequest,
+  type StatedColor,
   type StatedPrice,
   type WishExtractor,
 } from "./extract.js";

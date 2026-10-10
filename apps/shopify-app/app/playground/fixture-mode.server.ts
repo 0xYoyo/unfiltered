@@ -23,6 +23,7 @@ import labelsFixture from "./fixtures/labels.json";
 import previewFixture from "./fixtures/preview.json";
 import resultsFixture from "./fixtures/results.json";
 import v2BudgetFixture from "./fixtures/v2-budget.json";
+import v2ColorFixture from "./fixtures/v2-color.json";
 import v2RefineFixture from "./fixtures/v2-refine.json";
 import v2TwoMeaningsFixture from "./fixtures/v2-two-meanings.json";
 
@@ -52,6 +53,9 @@ export type PlaygroundFixtureName =
   // YOY-149: chips of every field (a price cap with its currency, size,
   // availability, exclude).
   | "v2-budget"
+  // YOY-171 AC-5: a colour chip, the asked colour first, the others
+  // labelled `color-differs`.
+  | "v2-color"
   // YOY-150: a response that carries `carry` (a refinement
   // chain), and one that also carries a second reading.
   | "v2-refine"
@@ -151,6 +155,10 @@ export function selectFixture(
       // Close products under the divider (YOY-166): "divider red gown";
       // the Jev-judged page (YOY-157 AC-27): "divider jev red evening gown".
       return has("jev") ? "v2-close-jev" : "v2-close";
+    }
+    if (has("colour") || has("color")) {
+      // The colour wish (YOY-171 AC-5): "red evening gown colour".
+      return "v2-color";
     }
     if (has("budget")) {
       // The chips (YOY-149): "budget dress under 400".
@@ -412,6 +420,8 @@ export function fixtureOutcome(
       return { delayMs: 0, status: 200, body: asResponse(degradedFixture) };
     case "v2-budget":
       return { delayMs: 0, status: 200, body: asResponse(v2BudgetFixture) };
+    case "v2-color":
+      return { delayMs: 0, status: 200, body: asResponse(v2ColorFixture) };
     case "v2-refine":
       return { delayMs: 0, status: 200, body: asResponse(v2RefineFixture) };
     case "v2-two-meanings":
@@ -515,9 +525,23 @@ export function withoutRemovedChips(
   const capRemoved = outcome.body.chips.some(
     (chip) => chip.field === "priceMax" && gone(chip),
   );
-  const results = capRemoved
+  const colorRemoved = outcome.body.chips.some(
+    (chip) => chip.field === "color" && gone(chip),
+  );
+  const capped: typeof outcome.body.results = capRemoved
     ? [...outcome.body.results, OVER_BUDGET_CARD]
     : outcome.body.results;
+  // The colour chip removed (YOY-171 AC-5): the judged order back — the asked
+  // colour, which led, returns to its place after the others — and no
+  // `color-differs` label.
+  const results = colorRemoved
+    ? [
+        ...capped.filter((card) => card.label?.template === "color-differs"),
+        ...capped.filter((card) => card.label?.template !== "color-differs"),
+      ].map((card) =>
+        card.label?.template === "color-differs" ? { ...card, label: null } : card,
+      )
+    : capped;
   return {
     ...outcome,
     body: {

@@ -47,8 +47,9 @@ export interface ProxyChip {
     | "priceMax"
     | "availability"
     // Engine v2 (YOY-149): the shopper's size as typed, and one exclusion
-    // field for any excluded term.
+    // field for any excluded term; the colour as typed (YOY-171 AC-5).
     | "size"
+    | "color"
     | "exclude";
   value: string;
   /**

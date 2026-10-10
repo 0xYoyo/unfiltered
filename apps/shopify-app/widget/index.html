@@ -138,11 +138,12 @@
       // Engine v2 fixtures (YOY-149): chips of the v2 fields only — a price chip carrying the shopper's number and its
       // ISO currency, the size as typed, availability, and an exclusion
       // carrying the excluded term as typed (Hebrew under `locale=he`, as a
-      // Hebrew shopper would type it). `?fixture=budget|exclude|size`
+      // Hebrew shopper would type it). `?fixture=budget|exclude|size|color`
       // selects one. Removal rides `removedChips` (every chip removed in
       // the chain): the answer is the same response minus those chips.
       const V2_LOCALE = new URLSearchParams(window.location.search).get("locale");
       const V2_EXCLUDED = V2_LOCALE === "he" ? "שחור" : "black";
+      const V2_COLOR = V2_LOCALE === "he" ? "אדומה" : "red";
       const V2_CHIPS = {
         budget: [{ field: "priceMax", value: "400", currency: "ILS" }],
         exclude: [
@@ -158,6 +159,8 @@
         // one — the request's `previousQuery` and the query, one per line.
         refine: [{ field: "size", value: "M" }],
         "two-meanings": [],
+        // YOY-171 AC-5: the colour wish (`color`), the colour as typed.
+        color: [{ field: "color", value: V2_COLOR }],
       };
       const v2Response = (name, results, request) => {
         const removed = request.removedChips ?? [];
@@ -170,6 +173,30 @@
         // The price cap holds while its chip stands; removed, dearer
         // products come back.
         const capped = chips.some((chip) => chip.field === "priceMax");
+        if (name === "color") {
+          // While the colour chip stands the asked colour leads and the
+          // others say `color-differs`; removed, the judged order is back with no
+          // colour label (YOY-171 AC-5).
+          const asked = chips.length > 0;
+          const card = (id, title, color) => ({
+            productId: `gid://shopify/Product/${id}`,
+            title,
+            url: `/products/${id}`,
+            imageUrl: results[0].imageUrl,
+            priceMin: 140,
+            priceMax: 140,
+            currencyCode: "ILS",
+            available: true,
+            label:
+              asked && color !== "red"
+                ? { template: "color-differs", values: [color, V2_COLOR] }
+                : null,
+          });
+          const red = card(31, "Lace Dress", "red");
+          const blue = card(32, "Satin Evening Gown", "blue");
+          const black = card(33, "Velvet Evening Gown", "black");
+          results = asked ? [red, blue, black] : [blue, black, red];
+        }
         return {
           searchId: `harness-v2-${name}-${removed.length}`,
           route: "ai",
