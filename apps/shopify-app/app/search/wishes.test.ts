@@ -386,6 +386,36 @@ describe("composing the wishes (AC-5 – AC-10, AC-12)", () => {
     expect(composed.labels.get("ok1")).toBeUndefined();
   });
 
+  it("orders the far-over-budget products cheapest first; within and near keep find order (YOY-171 AC-4)", () => {
+    const products = new Map(
+      [
+        product("far-300", 300),
+        product("ok-90", 90),
+        product("far-250", 250),
+        product("near-108", 108),
+        product("far-200", 200),
+        product("near-104", 104),
+        product("ok-80", 80),
+      ].map((entry) => [entry.productId, entry]),
+    );
+    const composed = composeWishes(
+      ["far-300", "ok-90", "far-250", "near-108", "far-200", "near-104", "ok-80"],
+      7,
+      products,
+      wishes({ priceMax: { amount: 100, raw: "100" } }),
+      { rates },
+    );
+    expect(composed.productIds).toEqual([
+      "ok-90",
+      "ok-80",
+      "near-108",
+      "near-104",
+      "far-200",
+      "far-250",
+      "far-300",
+    ]);
+  });
+
   it("tiers only the find front: a candidate past it keeps find order and never jumps ahead (AC-5, 2026-10-03)", () => {
     // Five over-budget dresses lead the find order; two cheap, unrelated
     // products sit past a front of 3.

@@ -653,6 +653,15 @@
         labelCard(5, "Cotton Shirt Dress", 290, LABELS[4], "e3ddd3"),
         labelCard(6, "Crepe Shift Dress", 350, LABELS[5], "d2ccc3"),
       ];
+      const SAME_LABEL_RESULTS = (mixed) =>
+        Array.from({ length: 24 }, (_, index) => ({
+          ...labelCard(20 + index, `Jacket ${index + 1}`, 45 + index, {
+            template: "price-far",
+            values: ["45 USD", "30 USD"],
+          }),
+          currencyCode: "USD",
+          ...(mixed && index === 23 ? { label: null } : {}),
+        }));
       const labelResponse = (searchId, results, extra = {}) => ({
         searchId,
         route: "ai",
@@ -681,6 +690,10 @@
           // A short label beside it, which fits even a phone-width card.
           LABEL_RESULTS[4],
         ]),
+        // One label for the whole page (YOY-171 AC-3): 24 jackets all over
+        // budget, and the same with the last one carrying no label.
+        "same-label": labelResponse("harness-same-label-1", SAME_LABEL_RESULTS(false)),
+        "same-label-mixed": labelResponse("harness-same-label-mixed-1", SAME_LABEL_RESULTS(true)),
         // A stand-in (YOY-171 AC-2): after the judged cards, before the
         // divider, labelled `unchecked`.
         "stand-in": labelResponse(
@@ -718,6 +731,7 @@
           // real cards rather than the fallback (YOY-107).
           ...manyResults(200),
           ...LABEL_RESULTS,
+          ...SAME_LABEL_RESULTS(false),
           ...LABEL_FIXTURES["label-too-long"].results,
           ...LABEL_FIXTURES["label-overflow"].results,
         ].map((product) => [handleOf(product), product]),

@@ -219,6 +219,27 @@ test.describe("overlay path", () => {
     });
   }
 
+  for (const locale of ["en", "he"] as const) {
+    test(`YOY-171 AC-3: 24 cards with one label say it once above the grid, no card line; one card without it keeps every line (${locale})`, async ({
+      page,
+    }) => {
+      const pageLabel = page.getByTestId("unfiltered-widget-page-label");
+      await openOverlay(page, "same-label", locale);
+      await expect(overlayCards(page)).toHaveCount(24);
+      await expect(pageLabel).toBeVisible();
+      await expect(pageLabel).toHaveText(STRING_CATALOG[locale].labelPriceFar);
+      await expect(overlayLabels(page)).toHaveCount(0);
+      expect(
+        await pageLabel.evaluate((element) => getComputedStyle(element).direction),
+      ).toBe(locale === "he" ? "rtl" : "ltr");
+
+      await openOverlay(page, "same-label-mixed", locale);
+      await expect(overlayCards(page)).toHaveCount(24);
+      await expect(pageLabel).toBeHidden();
+      await expect(overlayLabels(page)).toHaveCount(23);
+    });
+  }
+
   test("verify 7: a storefront locale with no templates shows no label", async ({
     page,
   }) => {
@@ -443,6 +464,22 @@ test.describe("theme-native path", () => {
     expect(
       await divider.evaluate((element) => element.previousElementSibling?.getAttribute("data-product-id")),
     ).toBe(labelId(3));
+  });
+
+  test("YOY-171 AC-3: items that all carry one label say it once above the grid, no item line; one item without it keeps every line", async ({
+    page,
+  }) => {
+    const pageLabel = page.getByTestId("unfiltered-native-page-label");
+    await openNative(page, "same-label", "he");
+    await expect(nativeItems(page).first()).toBeVisible();
+    await expect(pageLabel).toBeVisible();
+    await expect(pageLabel).toHaveText(STRING_CATALOG.he.labelPriceFar);
+    await expect(page.getByTestId("unfiltered-widget-label")).toHaveCount(0);
+
+    await openNative(page, "same-label-mixed", "he");
+    await expect(nativeItems(page).first()).toBeVisible();
+    await expect(pageLabel).toBeHidden();
+    await expect(page.getByTestId("unfiltered-widget-label").first()).toBeVisible();
   });
 
   test("a storefront locale with no templates shows no label", async ({

@@ -4,7 +4,9 @@ import {
   labelOverflows,
   labelSegments,
   renderLabel,
+  sharedLabel,
   underCloseHeading,
+  type LabelLike,
 } from "./labels";
 import {
   type NativeRenderConfig,
@@ -74,6 +76,8 @@ export const NATIVE_LOADING_TESTID = "unfiltered-native-loading";
 export const NATIVE_NO_RESULTS_TESTID = "unfiltered-native-no-results";
 export const NATIVE_ZERO_HIT_TESTID = "unfiltered-native-zero-hit";
 /** The "Close matches" divider inside a judged page's grid (YOY-166 AC-2). */
+/** The one label line above the grid (YOY-171 AC-3). */
+export const NATIVE_PAGE_LABEL_TESTID = "unfiltered-native-page-label";
 export const NATIVE_CLOSE_MATCHES_DIVIDER_TESTID =
   "unfiltered-native-close-matches-divider";
 export const NATIVE_STYLE_ATTR = "data-unfiltered-native-style";
@@ -450,6 +454,13 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
     strings.previewEmpty,
   );
 
+  // One label for the whole page (YOY-171 AC-3): when every card above the
+  // heading carries the same label, it is said once, here, above the grid.
+  const pageLabel = document.createElement("p");
+  pageLabel.className = "unfiltered-native__page-label";
+  pageLabel.setAttribute("data-testid", NATIVE_PAGE_LABEL_TESTID);
+  pageLabel.hidden = true;
+
   const list = document.createElement("ul");
   list.className = config.grid.listClass;
   list.setAttribute("role", "list");
@@ -461,6 +472,7 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
     noResults,
     zeroHit,
     previewEmpty,
+    pageLabel,
     list,
   );
 
@@ -602,6 +614,7 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
             }
             list.append(...built.elements);
             settleLabels(built.items);
+            refreshPageLabel();
             fillLateLabels(held, next, built, token, () =>
               watchLastRow(held, token, next, pageCount, true),
             );
@@ -792,6 +805,7 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
               element.remove();
             }
             settleLabels(replaced.items);
+            refreshPageLabel();
             window.scrollTo(0, scrolled);
             if (wasLast) {
               rearm();
@@ -809,6 +823,7 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
           }
           const segments = labelSegments(strings, labels[productId], options.locale);
           renderLabel(slot, segments ?? []);
+          item.setAttribute("data-label", JSON.stringify(labels[productId] ?? null));
           if (segments === null) {
             slot.removeAttribute("data-testid");
           } else {
@@ -816,6 +831,7 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
           }
         }
         settleLabels(items);
+        refreshPageLabel();
       },
       () => {
         // The reserved lines stay empty; no error reaches the shopper.
@@ -865,6 +881,11 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
         labelling,
       ),
     ]);
+    // Close items keep their own lines: the page label speaks for the
+    // items above the heading only (YOY-171 AC-3).
+    for (const item of close.items) {
+      item.setAttribute("data-close", "");
+    }
     const items = [...matched.items, ...close.items];
     const totals = {
       items,
@@ -882,6 +903,56 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
     heading.textContent = strings.closeMatchesHeading;
     divider.append(heading);
     return { elements: [...matched.items, divider, ...close.items], ...totals };
+  }
+
+  /** An item's label line, or null when it has none to show or reserve. */
+  function itemLabel(label: LabelLike | null | undefined, pending: boolean): HTMLElement | null {
+    const segments = labelSegments(strings, label, options.locale);
+    if (segments === null && !pending) {
+      return null;
+    }
+    const element = document.createElement("div");
+    element.className = "unfiltered-native__label";
+    if (pending) {
+      element.setAttribute("data-label-slot", "");
+    }
+    if (segments !== null) {
+      element.setAttribute("data-testid", LABEL_TESTID);
+      renderLabel(element, segments);
+    }
+    return element;
+  }
+
+  /**
+   * Say one shared label once (YOY-171 AC-3): when every item above the
+   * heading — on every page shown — carries the same label, it goes in the
+   * line above the grid and off the items; when an item differs, every
+   * item shows its own line again. Never while a page's labels are pending.
+   */
+  function refreshPageLabel(): void {
+    const items = [...list.querySelectorAll<HTMLElement>("[data-label]:not([data-close])")];
+    const pending = list.querySelector("[data-label-slot]") !== null;
+    const shared = pending
+      ? null
+      : sharedLabel(items.map((item) => JSON.parse(item.getAttribute("data-label") ?? "null") as LabelLike | null));
+    const segments = shared === null ? null : labelSegments(strings, shared, options.locale);
+    renderLabel(pageLabel, segments ?? []);
+    pageLabel.hidden = segments === null;
+    for (const item of items) {
+      if (segments !== null) {
+        item.querySelector(".unfiltered-native__label")?.remove();
+        item.setAttribute("data-label-shared", "");
+      } else if (item.hasAttribute("data-label-shared")) {
+        item.removeAttribute("data-label-shared");
+        const label = itemLabel(
+          JSON.parse(item.getAttribute("data-label") ?? "null") as LabelLike | null,
+          false,
+        );
+        if (label !== null) {
+          labelHost(item.firstElementChild ?? item).appendChild(label);
+        }
+      }
+    }
   }
 
   /** Build the grid items for a result list; resolves when every card is
@@ -926,17 +997,9 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
       // colour, no hue) — inside the card's own information block after the
       // price, so the theme's card grows to hold it (YOY-164 AC-1).
       if (labelling !== null && labelsShown) {
-        const segments = labelSegments(strings, result.label, options.locale);
-        if (segments !== null || labelling.pending) {
-          const label = document.createElement("div");
-          label.className = "unfiltered-native__label";
-          if (labelling.pending) {
-            label.setAttribute("data-label-slot", "");
-          }
-          if (segments !== null) {
-            label.setAttribute("data-testid", LABEL_TESTID);
-            renderLabel(label, segments);
-          }
+        item.setAttribute("data-label", JSON.stringify(result.label ?? null));
+        const label = itemLabel(result.label, labelling.pending);
+        if (label !== null) {
           labelHost(item.firstElementChild ?? item).appendChild(label);
         }
       }
@@ -1156,6 +1219,7 @@ export function createNativeSurface(options: NativeSurfaceOptions): Overlay {
     chipsRow.hidden = chips.length === 0 && reading === null;
     list.replaceChildren(...built.elements);
     settleLabels(built.items);
+    refreshPageLabel();
     fillLateLabels(held, target, built, token, () =>
       watchLastRow(held, token, target, pageCount, !paged),
     );

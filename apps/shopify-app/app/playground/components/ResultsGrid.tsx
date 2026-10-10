@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useRef } from "react";
 
+import type { LabelSegment } from "../../../widget/src/labels";
 import { Card, type PlaygroundCard } from "./Card";
 import type { PlaygroundStrings } from "../strings";
 
@@ -23,6 +24,7 @@ export function ResultsGrid({
   strings,
   skeleton = false,
   labelsPending,
+  pageLabel,
   closeStarts,
   closeHeading,
   onOpen,
@@ -36,6 +38,11 @@ export function ResultsGrid({
    * reserves its label line so the labels land without moving anything.
    */
   labelsPending?: ReadonlySet<string>;
+  /**
+   * The label every card above the heading carries (YOY-171 AC-3), said
+   * once as a line above the grid; null or absent when the cards differ.
+   */
+  pageLabel?: LabelSegment[] | null;
   /**
    * The cards each page's close products start at (YOY-166 AC-2, AC-3): a
    * full-row "Close matches" divider goes before each, so every appended
@@ -90,6 +97,15 @@ export function ResultsGrid({
 
   return (
     <div className="results">
+      {cards.length === 0 || pageLabel === null || pageLabel === undefined ? null : (
+        // A sentence in the chrome's language, so it takes the page's
+        // direction; each value isolated (X-7), as on the card.
+        <p className="pageLabel" data-testid="playground-page-label">
+          {pageLabel.map((segment, index) =>
+            segment.value ? <bdi key={index}>{segment.text}</bdi> : segment.text,
+          )}
+        </p>
+      )}
       {cards.length === 0 ? null : (
         <ul
           ref={listRef}

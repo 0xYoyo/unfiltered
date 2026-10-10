@@ -5,7 +5,9 @@ import {
   labelOverflows,
   labelSegments,
   renderLabel,
+  sharedLabel,
   underCloseHeading,
+  type LabelLike,
 } from "./labels";
 import type {
   ProxyChip,
@@ -37,6 +39,8 @@ export const CHIPS_TESTID = "unfiltered-widget-chips";
 export const CHIP_TESTID = "unfiltered-widget-chip";
 export const ZERO_HIT_TESTID = "unfiltered-widget-zero-hit";
 /** The "Close matches" divider inside a judged page's grid (YOY-166 AC-2). */
+/** The one label line above the grid (YOY-171 AC-3). */
+export const PAGE_LABEL_TESTID = "unfiltered-widget-page-label";
 export const CLOSE_MATCHES_DIVIDER_TESTID =
   "unfiltered-widget-close-matches-divider";
 export const NEW_SEARCH_TESTID = "unfiltered-widget-new-search";
@@ -197,6 +201,13 @@ export function createOverlay(options: OverlayOptions): Overlay {
   previewEmpty.textContent = strings.previewEmpty;
   previewEmpty.hidden = true;
 
+  // One label for the whole page (YOY-171 AC-3): when every card above the
+  // heading carries the same label, it is said once, here, above the grid.
+  const pageLabel = document.createElement("p");
+  pageLabel.className = "page-label";
+  pageLabel.setAttribute("data-testid", PAGE_LABEL_TESTID);
+  pageLabel.hidden = true;
+
   const grid = document.createElement("div");
   grid.className = "grid";
   grid.setAttribute("data-testid", RESULTS_TESTID);
@@ -217,6 +228,7 @@ export function createOverlay(options: OverlayOptions): Overlay {
     noResults,
     zeroHit,
     previewEmpty,
+    pageLabel,
     grid,
     loadingMore,
   );
@@ -288,6 +300,7 @@ export function createOverlay(options: OverlayOptions): Overlay {
             const appended = pageCards(next, offset, handlers, pending);
             grid.append(...appended.elements);
             settleLabels(appended.cards);
+            refreshPageLabel();
             if (pending) {
               fillLateLabels(appended, page, offset, handlers, mine);
             }
@@ -329,6 +342,11 @@ export function createOverlay(options: OverlayOptions): Overlay {
     const cards = [...page.results, ...close].map((result, index) =>
       card(result, offset + index, handlers.onCardClick, { pending }),
     );
+    // Close cards keep their own lines: the page label speaks for the
+    // cards above the heading only (YOY-171 AC-3).
+    for (const element of cards.slice(page.results.length)) {
+      element.setAttribute("data-close", "");
+    }
     if (close.length === 0) {
       return { elements: cards, cards };
     }
@@ -404,6 +422,7 @@ export function createOverlay(options: OverlayOptions): Overlay {
             element.remove();
           }
           settleLabels(replaced.cards);
+          refreshPageLabel();
           overlay.scrollTop = scrolled;
           rewatchLast();
           return;
@@ -416,6 +435,7 @@ export function createOverlay(options: OverlayOptions): Overlay {
           }
           const segments = labelSegments(strings, labels[productId], options.locale);
           renderLabel(slot, segments ?? []);
+          element.setAttribute("data-label", JSON.stringify(labels[productId] ?? null));
           if (segments === null) {
             slot.removeAttribute("data-testid");
           } else {
@@ -423,11 +443,62 @@ export function createOverlay(options: OverlayOptions): Overlay {
           }
         }
         settleLabels(cards);
+        refreshPageLabel();
       },
       () => {
         // The reserved lines stay empty; no error reaches the shopper.
       },
     );
+  }
+
+  /** A card's label line, or null when it has none to show or reserve. */
+  function cardLabel(label: LabelLike | null | undefined, pending: boolean): HTMLElement | null {
+    const segments = labelSegments(strings, label, options.locale);
+    if (segments === null && !pending) {
+      return null;
+    }
+    const element = document.createElement("div");
+    element.className = "card-label";
+    if (pending) {
+      element.setAttribute("data-label-slot", "");
+    }
+    if (segments !== null) {
+      element.setAttribute("data-testid", LABEL_TESTID);
+      renderLabel(element, segments);
+    }
+    return element;
+  }
+
+  /**
+   * Say one shared label once (YOY-171 AC-3): when every card above the
+   * heading — on every page shown — carries the same label, it goes in the
+   * line above the grid and off the cards; when a card differs, every card
+   * shows its own line again. Never while a page's labels are pending.
+   */
+  function refreshPageLabel(): void {
+    const cards = [...grid.querySelectorAll<HTMLElement>("[data-label]:not([data-close])")];
+    const pending = grid.querySelector("[data-label-slot]") !== null;
+    const shared = pending
+      ? null
+      : sharedLabel(cards.map((element) => JSON.parse(element.getAttribute("data-label") ?? "null") as LabelLike | null));
+    const segments = shared === null ? null : labelSegments(strings, shared, options.locale);
+    renderLabel(pageLabel, segments ?? []);
+    pageLabel.hidden = segments === null;
+    for (const element of cards) {
+      if (segments !== null) {
+        element.querySelector(".card-label")?.remove();
+        element.setAttribute("data-label-shared", "");
+      } else if (element.hasAttribute("data-label-shared")) {
+        element.removeAttribute("data-label-shared");
+        const label = cardLabel(
+          JSON.parse(element.getAttribute("data-label") ?? "null") as LabelLike | null,
+          false,
+        );
+        if (label !== null) {
+          element.querySelector(".card-price")?.after(label);
+        }
+      }
+    }
   }
 
   function card(
@@ -498,17 +569,9 @@ export function createOverlay(options: OverlayOptions): Overlay {
     // sentence in the chrome's language, so it takes the overlay's
     // direction; its values are isolated inside it (renderLabel).
     if (labelling !== null && labelsShown) {
-      const segments = labelSegments(strings, result.label, options.locale);
-      if (segments !== null || labelling.pending) {
-        const label = document.createElement("div");
-        label.className = "card-label";
-        if (labelling.pending) {
-          label.setAttribute("data-label-slot", "");
-        }
-        if (segments !== null) {
-          label.setAttribute("data-testid", LABEL_TESTID);
-          renderLabel(label, segments);
-        }
+      anchor.setAttribute("data-label", JSON.stringify(result.label ?? null));
+      const label = cardLabel(result.label, labelling.pending);
+      if (label !== null) {
         anchor.appendChild(label);
       }
     }
@@ -640,6 +703,7 @@ export function createOverlay(options: OverlayOptions): Overlay {
       chipsRow.hidden = true;
       chipsRow.replaceChildren();
       grid.replaceChildren();
+      pageLabel.hidden = true;
     },
     showFailure() {
       this.showIdle();
@@ -674,6 +738,7 @@ export function createOverlay(options: OverlayOptions): Overlay {
       const first = pageCards(response, offset, handlers, pending);
       grid.replaceChildren(...first.elements);
       settleLabels(first.cards);
+      refreshPageLabel();
       appendPages(response, handlers);
       if (pending) {
         fillLateLabels(first, response.page ?? 1, offset, handlers, generation);
@@ -705,6 +770,7 @@ export function createOverlay(options: OverlayOptions): Overlay {
           card(result, index, handlers.onCardClick, null),
         ),
       );
+      pageLabel.hidden = true;
       previewEmpty.hidden = response.results.length !== 0;
     },
     destroy() {

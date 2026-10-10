@@ -7,7 +7,11 @@ import {
   useState,
 } from "react";
 
-import { underCloseHeading } from "../../widget/src/labels";
+import {
+  labelSegments,
+  sharedLabel,
+  underCloseHeading,
+} from "../../widget/src/labels";
 import type { ProxyChip, ProxyLabel } from "../search/proxy.server";
 import type { PlaygroundSearchResponse } from "./api.server";
 import type { PlaygroundCard } from "./components/Card";
@@ -529,7 +533,7 @@ export function PlaygroundPage({
   const previewCards = attributableSearchId === null;
   // A judged page's close products follow its results under a divider
   // inside the grid (YOY-166 AC-2): `closeStarts` names each page's first.
-  const { cards, closeStarts } = useMemo(() => {
+  const { cards, closeStarts, pageLabel } = useMemo(() => {
     const pages: ShownPage[] =
       response === null
         ? []
@@ -541,19 +545,28 @@ export function PlaygroundPage({
             },
             ...more,
           ];
+    const labelled = (card: PlaygroundCard): PlaygroundCard =>
+      previewCards
+        ? { ...card, label: null }
+        : card.productId in lateLabels
+          ? { ...card, label: lateLabels[card.productId] ?? null }
+          : card;
+    const shown = pages.map((page) => ({
+      results: page.results.map(labelled),
+      close: page.close.map(labelled),
+    }));
+    // One label on every card above the heading is said once, above the
+    // grid, and not under each card (YOY-171 AC-3).
+    const pageLabel = sharedLabel(shown.flatMap((page) => page.results.map((card) => card.label)));
     return {
-      cards: pages
-        .flatMap((page) => [...page.results, ...page.close])
-        .map((card) =>
-          previewCards
-            ? { ...card, label: null }
-            : card.productId in lateLabels
-              ? { ...card, label: lateLabels[card.productId] ?? null }
-              : card,
-        ),
+      cards: shown.flatMap((page) => [
+        ...(pageLabel === null ? page.results : page.results.map((card) => ({ ...card, label: null }))),
+        ...page.close,
+      ]),
       closeStarts: new Set(
         pages.flatMap((page) => (page.close.length === 0 ? [] : [page.close[0]!.productId])),
       ),
+      pageLabel,
     };
   }, [response, more, lateLabels, previewCards]);
   // A late page's render keeps the visitor where they were (YOY-171 AC-1).
@@ -708,6 +721,7 @@ export function PlaygroundPage({
           strings={strings}
           skeleton={phase === "loading" && cards.length === 0}
           labelsPending={labelsPending}
+          pageLabel={pageLabel === null ? null : labelSegments(strings, pageLabel)}
           closeStarts={closeStarts}
           closeHeading={strings.closeMatchesHeading}
           onOpen={openCard}

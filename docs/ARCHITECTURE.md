@@ -894,7 +894,9 @@ The three kinds of wishes (docs/PRD.md §3) applied by code. Packages:
   - Number tiers sort the find front only — the first `TIER_FRONT_SIZE`
     (48) surviving candidates in find order: every number wish met, then
     the price within `PRICE_NEAR_PERCENT` (10) over the cap with the rest
-    met, then other misses, each tier in find order. Candidates past the
+    met, then other misses, each tier in find order — except the products
+    far over the cap, which take their places in the last tier cheapest
+    first (YOY-171 AC-4). Candidates past the
     front and the keyword tail keep their order and never jump ahead
     (2026-10-03: a soft budget never outranks relevance). Within a page the
     judge orders by verdict, then tier, then find order; on a judge
@@ -1226,7 +1228,13 @@ held chain, removed chips, input, and results. A submitted search with no
 results renders a "Nothing matches all of these" message and the
 still-removable chip row; a judged page's `closeMatches` render as
 standard cards under a "Close matches" divider after its matches (YOY-166).
-Each card shows its label line (DESIGN W-11). Degraded responses render
+Each card shows its label line (DESIGN W-11) — unless every card above the
+heading, on every page shown, carries the same label (`sharedLabel` in
+`widget/src/labels.ts`): then the label is said once, as a line above the
+grid, and the cards above the heading carry none; a card that differs (one
+with no label, a later page's) brings every card's line back. The
+playground, the overlay and the theme-native grid apply the same rule
+(YOY-171 AC-3). Degraded responses render
 plain cards with no error messaging.
 
 UI tests are a separate lane from Vitest: Playwright

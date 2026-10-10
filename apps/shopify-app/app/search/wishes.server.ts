@@ -383,6 +383,8 @@ interface Standing {
   /** 0: every number wish met; 1: only the price, within the near band over the cap; 2: other misses (AC-5). */
   tier: 0 | 1 | 2;
   label: CodeLabel | null;
+  /** The price is beyond the near band over the cap (YOY-171 AC-4). */
+  farOverCap: boolean;
 }
 
 function formatAmount(amount: number, currency: string): string {
@@ -430,7 +432,7 @@ function standingOf(
   } else if (sizeMissed && wishes.size !== null) {
     label = { template: "size-missing", values: [wishes.size, ...nearestInStockSizes(product, wishes.size)] };
   }
-  return { removed, tier, label };
+  return { removed, tier, label, farOverCap: overCap && !nearCap };
 }
 
 export interface ComposedResults {
@@ -446,8 +448,10 @@ export interface ComposedResults {
  * Apply the kept wishes to the find step's merged order (AC-5 – AC-10,
  * AC-12): walls remove products from the results and the count; the find
  * front — the first `tierFront` surviving candidates in find order — is
- * sorted into number tiers before pages are cut, each tier in find order;
- * the rest of the find set and the keyword tail keep their order after it.
+ * sorted into number tiers before pages are cut, each tier in find order —
+ * except the far-over-budget products, which take their tier's places in
+ * price order, cheapest first (YOY-171 AC-4); the rest of the find set and
+ * the keyword tail keep their order after it.
  * Within a page the judge then orders by verdict, ties in this order
  * (verdict, then tier, then find order). A product with no catalog row is
  * kept where it stands, unlabelled.
@@ -469,7 +473,7 @@ export function composeWishes(
     ids.flatMap((productId, index) => {
       const product = products.get(productId);
       if (product === undefined) {
-        return [{ productId, tier: 0, index }];
+        return [{ productId, tier: 0, index, far: false, price: 0 }];
       }
       const standing = standingOf(product, wishes, resolved);
       if (standing.removed) {
@@ -478,12 +482,23 @@ export function composeWishes(
       if (standing.label !== null) {
         labels.set(productId, standing.label);
       }
-      return [{ productId, tier: standing.tier, index }];
+      return [
+        { productId, tier: standing.tier, index, far: standing.farOverCap, price: product.priceMin },
+      ];
     });
   const findSet = rank(productIds.slice(0, findSetCount));
   const front = findSet
     .slice(0, resolved.tierFront)
     .sort((a, b) => a.tier - b.tier || a.index - b.index);
+  // The far-over-budget products, cheapest first, in the places they hold
+  // (YOY-171 AC-4): every other product stays where its tier put it.
+  const farSlots = front.flatMap((entry, slot) => (entry.far ? [slot] : []));
+  const farByPrice = farSlots
+    .map((slot) => front[slot]!)
+    .sort((a, b) => a.price - b.price || a.index - b.index);
+  farSlots.forEach((slot, order) => {
+    front[slot] = farByPrice[order]!;
+  });
   const tail = rank(productIds.slice(findSetCount));
   return {
     productIds: [...front, ...findSet.slice(resolved.tierFront), ...tail].map(

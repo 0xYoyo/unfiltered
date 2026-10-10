@@ -214,6 +214,7 @@ apps/
           evidence-landing-ctas.spec.ts
           evidence-late-page.spec.ts
           evidence-latency.spec.ts
+          evidence-one-label.spec.ts
           evidence-paging.spec.ts
           evidence-refinement.spec.ts
           evidence-site-copy.spec.ts
@@ -549,6 +550,7 @@ apps/
         evidence-labels.spec.ts
         evidence-late-page.spec.ts
         evidence-negation-chips.spec.ts
+        evidence-one-label.spec.ts
         evidence-refinement.spec.ts
         evidence-server-pages.spec.ts
         evidence-stand-in.spec.ts
@@ -1289,60 +1291,80 @@ docs/
       playground-desktop-en-error.png
       playground-desktop-en-late-page.png
       playground-desktop-en-loading.png
+      playground-desktop-en-one-label-mixed.png
+      playground-desktop-en-one-label.png
       playground-desktop-en-pending-find-order.png
       playground-desktop-en-stand-in.png
       playground-desktop-he-empty.png
       playground-desktop-he-error.png
       playground-desktop-he-late-page.png
       playground-desktop-he-loading.png
+      playground-desktop-he-one-label-mixed.png
+      playground-desktop-he-one-label.png
       playground-desktop-he-pending-find-order.png
       playground-desktop-he-stand-in.png
       playground-mobile-en-empty.png
       playground-mobile-en-error.png
       playground-mobile-en-late-page.png
       playground-mobile-en-loading.png
+      playground-mobile-en-one-label-mixed.png
+      playground-mobile-en-one-label.png
       playground-mobile-en-pending-find-order.png
       playground-mobile-en-stand-in.png
       playground-mobile-he-empty.png
       playground-mobile-he-error.png
       playground-mobile-he-late-page.png
       playground-mobile-he-loading.png
+      playground-mobile-he-one-label-mixed.png
+      playground-mobile-he-one-label.png
       playground-mobile-he-pending-find-order.png
       playground-mobile-he-stand-in.png
       widget-native-desktop-en-late-page.png
+      widget-native-desktop-en-one-label.png
       widget-native-desktop-en-pending-find-order.png
       widget-native-desktop-en-stand-in.png
       widget-native-desktop-he-late-page.png
+      widget-native-desktop-he-one-label.png
       widget-native-desktop-he-pending-find-order.png
       widget-native-desktop-he-stand-in.png
       widget-native-mobile-en-late-page.png
+      widget-native-mobile-en-one-label.png
       widget-native-mobile-en-pending-find-order.png
       widget-native-mobile-en-stand-in.png
       widget-native-mobile-he-late-page.png
+      widget-native-mobile-he-one-label.png
       widget-native-mobile-he-pending-find-order.png
       widget-native-mobile-he-stand-in.png
       widget-overlay-desktop-en-empty.png
       widget-overlay-desktop-en-error.png
       widget-overlay-desktop-en-late-page.png
       widget-overlay-desktop-en-loading.png
+      widget-overlay-desktop-en-one-label-mixed.png
+      widget-overlay-desktop-en-one-label.png
       widget-overlay-desktop-en-pending-find-order.png
       widget-overlay-desktop-en-stand-in.png
       widget-overlay-desktop-he-empty.png
       widget-overlay-desktop-he-error.png
       widget-overlay-desktop-he-late-page.png
       widget-overlay-desktop-he-loading.png
+      widget-overlay-desktop-he-one-label-mixed.png
+      widget-overlay-desktop-he-one-label.png
       widget-overlay-desktop-he-pending-find-order.png
       widget-overlay-desktop-he-stand-in.png
       widget-overlay-mobile-en-empty.png
       widget-overlay-mobile-en-error.png
       widget-overlay-mobile-en-late-page.png
       widget-overlay-mobile-en-loading.png
+      widget-overlay-mobile-en-one-label-mixed.png
+      widget-overlay-mobile-en-one-label.png
       widget-overlay-mobile-en-pending-find-order.png
       widget-overlay-mobile-en-stand-in.png
       widget-overlay-mobile-he-empty.png
       widget-overlay-mobile-he-error.png
       widget-overlay-mobile-he-late-page.png
       widget-overlay-mobile-he-loading.png
+      widget-overlay-mobile-he-one-label-mixed.png
+      widget-overlay-mobile-he-one-label.png
       widget-overlay-mobile-he-pending-find-order.png
       widget-overlay-mobile-he-stand-in.png
     YOY-64/
@@ -1605,7 +1627,7 @@ vitest.setup.ts
 - apps/shopify-app/app/playground/components/ExampleQueries.tsx → apps/shopify-app/app/playground/strings.ts
 - apps/shopify-app/app/playground/components/LanguageToggle.tsx → apps/shopify-app/app/playground/strings.ts
 - apps/shopify-app/app/playground/components/NewSearch.tsx → apps/shopify-app/app/playground/strings.ts
-- apps/shopify-app/app/playground/components/ResultsGrid.tsx → apps/shopify-app/app/playground/components/Card.tsx, apps/shopify-app/app/playground/strings.ts
+- apps/shopify-app/app/playground/components/ResultsGrid.tsx → apps/shopify-app/app/playground/components/Card.tsx, apps/shopify-app/app/playground/strings.ts, apps/shopify-app/widget/src/labels.ts
 - apps/shopify-app/app/playground/components/SearchBar.tsx → apps/shopify-app/app/playground/strings.ts
 - apps/shopify-app/app/playground/components/StoreLine.tsx → apps/shopify-app/app/playground/strings.ts
 - apps/shopify-app/app/playground/fixture-mode.server.ts → apps/shopify-app/app/playground/api.server.ts, apps/shopify-app/app/playground/fixtures/ai.json (unresolved), apps/shopify-app/app/playground/fixtures/degraded.json (unresolved), apps/shopify-app/app/playground/fixtures/empty.json (unresolved), apps/shopify-app/app/playground/fixtures/label-overflow.json (unresolved), apps/shopify-app/app/playground/fixtures/label-too-long.json (unresolved), apps/shopify-app/app/playground/fixtures/labels-pending.json (unresolved), apps/shopify-app/app/playground/fixtures/labels.json (unresolved), apps/shopify-app/app/playground/fixtures/preview.json (unresolved), apps/shopify-app/app/playground/fixtures/results.json (unresolved), apps/shopify-app/app/playground/fixtures/stand-in.json (unresolved), apps/shopify-app/app/playground/fixtures/v2-budget.json (unresolved), apps/shopify-app/app/playground/fixtures/v2-refine.json (unresolved), apps/shopify-app/app/playground/fixtures/v2-two-meanings.json (unresolved), apps/shopify-app/app/search/proxy.server.ts
