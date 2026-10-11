@@ -333,8 +333,19 @@ describe("one statement per classic search, cards included (YOY-115 AC-1)", () =
   const statements: string[] = [];
   /** Prisma emits query events after the query resolves; drain them. */
   const settle = () => new Promise<void>((done) => setTimeout(done, 0));
+  /**
+   * Wait until no query event has arrived for 50 ms (at most 2 s), then
+   * clear: a previous test's search, uncounted, can still be emitting its
+   * events on a loaded CI runner, and they must not land in this count
+   * (YOY-171 AC-18).
+   */
   const startCounting = async (): Promise<void> => {
-    await settle();
+    const deadline = Date.now() + 2000;
+    let seen = -1;
+    while (seen !== statements.length && Date.now() < deadline) {
+      seen = statements.length;
+      await new Promise<void>((done) => setTimeout(done, 50));
+    }
     statements.length = 0;
   };
   /**
