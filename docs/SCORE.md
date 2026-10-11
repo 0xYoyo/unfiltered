@@ -105,6 +105,18 @@ the cost line and the failure lines excepted: each is matched by its exact
 shape and holds only language codes, numbers, a stage or a class name),
 printing a count and never the query. It exits with the run's own status.
 
+**A score run waits for the extraction (YOY-171 AC-17, 2026-10-11).** The
+workflow sets `EXTRACTION_GRACE_MS=4000` next to `JUDGE_DEADLINE_MS=4000`
+and echoes it with the other settings: a hidden run measures judgment, not
+the wish extraction's latency, so a slow Flash-Lite call never scores a
+search composed without wishes (no price tier, no size, no exclusion).
+Production keeps its 800 ms grace; the extraction's speed is the latency
+probe's (docs/LATENCY.md). Before this rule a run's "no extraction" share
+varied with the day's Flash-Lite latency — 0 % on the AC-16 bisect runs,
+he 17 % on its fix run — which alone can move he by the width of its band.
+Under the table the runner prints one `no-extraction <language> N%` line
+per language, and every Results row from AC-17 on carries that share.
+
 A run with more than 2 failed searches of 72 is not a baseline: its cause
 is fixed first and the run is dispatched again. Only a
 clean output is printed to the log and written to the job summary.

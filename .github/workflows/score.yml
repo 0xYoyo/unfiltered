@@ -70,6 +70,10 @@ jobs:
           # (YOY-147 AC-18): speed is the latency probe's, on the deployment.
           # Production keeps its 1,500 ms deadline.
           JUDGE_DEADLINE_MS: "4000"
+          # The same for the wish extraction (YOY-171 AC-17): a score run
+          # waits for it, so a slow Flash-Lite call never scores a search
+          # composed without wishes. Production keeps its 800 ms grace.
+          EXTRACTION_GRACE_MS: "4000"
         run: |
           # Which env settings the run has (AC-13): names only, never values.
           echo "env settings present:"
@@ -77,6 +81,7 @@ jobs:
           # The judge is a choice input, not a secret: printed as-is.
           echo "judge: JUDGE_PROVIDER=$JUDGE_PROVIDER"
           echo "judge deadline: JUDGE_DEADLINE_MS=$JUDGE_DEADLINE_MS"
+          echo "extraction grace: EXTRACTION_GRACE_MS=$EXTRACTION_GRACE_MS"
           set +e
           npx tsx scripts/score-run.mts --hidden-set "$RUNNER_TEMP/hidden.b64" \
             > "$RUNNER_TEMP/score-output.txt" 2>&1

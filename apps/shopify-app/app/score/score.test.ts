@@ -561,14 +561,21 @@ describe("the runner (AC-6, AC-7)", () => {
     expect(output).not.toContain(marker);
     // Progress lines go to stderr as the run goes; stdout starts with the table.
     expect(output.replace(/^\[\d+\/\d+\] .*\n/gm, "")).toMatch(/^language\s+score/);
-    // The header, three language rows, the cost line, the extract-call line —
-    // plus one progress line per search on stderr (YOY-149 runner guard).
+    // The header, three language rows, the cost line, the extract-call line,
+    // one no-extraction line per language (YOY-171 AC-17) — plus one
+    // progress line per search on stderr (YOY-149 runner guard).
     const onePass = output.trim().split("\n");
     const progressLines = onePass.filter((line) => /^\[\d+\/\d+\] /.test(line));
     expect(progressLines.length).toBeGreaterThan(0);
     expect(progressLines.every((line) => / ok$/.test(line))).toBe(true);
-    expect(onePass.filter((line) => !/^\[\d+\/\d+\] /.test(line))).toHaveLength(6);
-    expect(output.trim().split("\n").at(-1)).toBe("extract calls 0");
+    const tableLines = onePass.filter((line) => !/^\[\d+\/\d+\] /.test(line));
+    expect(tableLines).toHaveLength(9);
+    expect(tableLines.slice(-4)).toEqual([
+      "extract calls 0",
+      expect.stringMatching(/^no-extraction [a-z]{2} \d+%$/),
+      expect.stringMatching(/^no-extraction [a-z]{2} \d+%$/),
+      expect.stringMatching(/^no-extraction [a-z]{2} \d+%$/),
+    ]);
 
     written.length = 0;
     vi.spyOn(process.stdout, "write").mockImplementation(record);
@@ -867,10 +874,12 @@ describe("failures by stage and class (YOY-141 AC-13)", () => {
       set,
     });
     expect(report.failures).toEqual([]);
-    // The cost line, then the extract-call line (YOY-149 AC-18), and no failure line.
-    expect(formatScoreTable(report).split("\n").slice(-2)).toEqual([
+    // The cost line, the extract-call line (YOY-149 AC-18), the language's
+    // no-extraction line (YOY-171 AC-17), and no failure line.
+    expect(formatScoreTable(report).split("\n").slice(-3)).toEqual([
       expect.stringMatching(/^cost /),
       "extract calls 0",
+      expect.stringMatching(/^no-extraction en \d+%$/),
     ]);
   });
 });
@@ -972,9 +981,23 @@ describe("the hidden run's leak check (YOY-141 AC-3)", () => {
     );
   });
 
+  it("prints one no-extraction line per language that reports a share, and the leak check admits only that shape (YOY-171 AC-17)", () => {
+    // en reports 25 %; he reports none (an em dash in the table), so no line.
+    expect(table.split("\n").filter((line) => line.startsWith("no-extraction"))).toEqual([
+      "no-extraction en 25%",
+    ]);
+    const hiddenWord: ScoreSetEntry[] = [
+      { query: "no-extraction", language: "en", source: "model", modelWritten: false },
+    ];
+    expect(findLeaks("no-extraction en 25%\nno-extraction he 0%\n", hiddenWord)).toEqual({ leaked: 0 });
+    expect(findLeaks("no-extraction for linen 25%\n", hiddenWord)).toEqual({ leaked: 1 });
+    expect(findLeaks("no-extraction xx 25%\n", hiddenWord)).toEqual({ leaked: 1 });
+  });
+
   it("passes a clean score table, even when hidden searches are table words", () => {
-    expect(table.split("\n").slice(-3)).toEqual([
+    expect(table.split("\n").slice(-4)).toEqual([
       "cost $0.0812 over 96 model calls",
+      "no-extraction en 25%",
       "failed search GeminiTimeoutError 2",
       "failed grade Error 1",
     ]);
