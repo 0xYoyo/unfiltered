@@ -401,7 +401,11 @@ interface Standing {
   /** 0: every number wish met; 1: only the price, within the near band over the cap; 2: other misses (AC-5). */
   tier: 0 | 1 | 2;
   label: CodeLabel | null;
-  /** The price is beyond the near band over the cap (YOY-171 AC-4). */
+  /**
+   * The price is beyond the near band over the cap (YOY-171 AC-4). Never an
+   * order here: the judged page orders by price, within its groups, after
+   * the judge.
+   */
   farOverCap: boolean;
   /**
    * The primary colour is the asked one (YOY-171 AC-5). Never an order here:
@@ -488,16 +492,22 @@ export interface ComposedResults {
    * page or the judge; the judged page orders by it within its groups.
    */
   colorMatches: Set<string>;
+  /**
+   * The far-over-budget products and their lowest price (YOY-171 AC-4, as
+   * amended 2026-10-11). The price moves nothing here either; the judged
+   * page orders them cheapest first within its groups.
+   */
+  farOverBudget: Map<string, number>;
 }
 
 /**
  * Apply the kept wishes to the find step's merged order (AC-5 – AC-10,
  * AC-12): walls remove products from the results and the count; the find
  * front — the first `tierFront` surviving candidates in find order — is
- * sorted into number tiers before pages are cut, each tier in find order —
- * except the far-over-budget products, which take their tier's places in
- * price order, cheapest first (YOY-171 AC-4); the rest of the find set and
- * the keyword tail keep their order after it.
+ * sorted into number tiers before pages are cut, each tier in find order
+ * (the far-over-budget products too: their price orders them only after the
+ * judge, inside the judged page — YOY-171 AC-4 as amended); the rest of the
+ * find set and the keyword tail keep their order after it.
  * Within a page the judge then orders by verdict, ties in this order
  * (verdict, then tier, then find order). A product with no catalog row is
  * kept where it stands, unlabelled.
@@ -516,11 +526,12 @@ export function composeWishes(
   };
   const labels = new Map<string, CodeLabel>();
   const colorMatches = new Set<string>();
+  const farOverBudget = new Map<string, number>();
   const rank = (ids: readonly string[]) =>
     ids.flatMap((productId, index) => {
       const product = products.get(productId);
       if (product === undefined) {
-        return [{ productId, tier: 0, index, far: false, price: 0 }];
+        return [{ productId, tier: 0, index }];
       }
       const standing = standingOf(product, wishes, resolved);
       if (standing.removed) {
@@ -532,23 +543,15 @@ export function composeWishes(
       if (standing.colorMatch) {
         colorMatches.add(productId);
       }
-      return [
-        { productId, tier: standing.tier, index, far: standing.farOverCap, price: product.priceMin },
-      ];
+      if (standing.farOverCap) {
+        farOverBudget.set(productId, product.priceMin);
+      }
+      return [{ productId, tier: standing.tier, index }];
     });
   const findSet = rank(productIds.slice(0, findSetCount));
   const front = findSet
     .slice(0, resolved.tierFront)
     .sort((a, b) => a.tier - b.tier || a.index - b.index);
-  // The far-over-budget products, cheapest first, in the places they hold
-  // (YOY-171 AC-4): every other product stays where its tier put it.
-  const farSlots = front.flatMap((entry, slot) => (entry.far ? [slot] : []));
-  const farByPrice = farSlots
-    .map((slot) => front[slot]!)
-    .sort((a, b) => a.price - b.price || a.index - b.index);
-  farSlots.forEach((slot, order) => {
-    front[slot] = farByPrice[order]!;
-  });
   const tail = rank(productIds.slice(findSetCount));
   return {
     productIds: [...front, ...findSet.slice(resolved.tierFront), ...tail].map(
@@ -557,5 +560,6 @@ export function composeWishes(
     findSetCount: findSet.length,
     labels,
     colorMatches,
+    farOverBudget,
   };
 }

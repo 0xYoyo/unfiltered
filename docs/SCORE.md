@@ -466,6 +466,31 @@ the day's merges did. C2 becomes AC-5's reference. Against it, run 8 is en
 first within its group after the judge) is the one that ships. Run 9 is en
 −0.014 and he −0.009. Finding the merge that moved he is YOY-171 AC-16.
 
+AC-16 — the bisect of 2026-10-10's merges (YOY-171 AC-16): four hidden
+runs on `main` commits, judge `jev`, all green, leak check clean (72
+checked), 0 failed searches, $0.5166 together. "Merged up to" is the last
+YOY-171 PR on `main` at the scored commit.
+
+| Run | `main` at | Merged up to | en | he | ar | ru | fr | es | Cost |
+|-----|-----------|--------------|----|----|----|----|----|----|------|
+| 6 control | `9843486` | before #221 | 0.657 | 0.361 | 0.495 | 0.648 | 0.477 | 0.361 | $0.1038 |
+| B2 ([run](https://github.com/0xYoyo/unfiltered/actions/runs/38092455416)) | `acc62fb` | #224 (AC-1) | 0.597 | 0.329 | 0.523 | 0.630 | 0.477 | 0.366 | $0.1286 |
+| B3 ([run](https://github.com/0xYoyo/unfiltered/actions/runs/38092929326)) | `85c48dd` | #225 (AC-2) | 0.662 | **0.361** | 0.519 | 0.597 | 0.468 | 0.394 | $0.1295 |
+| B4 ([run](https://github.com/0xYoyo/unfiltered/actions/runs/38093443735)) | `0dc4618` | **#226 (AC-3, AC-4)** | 0.630 | **0.250** | 0.495 | 0.620 | 0.463 | 0.398 | $0.1289 |
+| B1 ([run](https://github.com/0xYoyo/unfiltered/actions/runs/38092011490)) | `d8e48ba` | #227 (AC-6) | 0.648 | 0.259 | 0.500 | 0.616 | 0.500 | 0.361 | $0.1296 |
+| control C2 | `7a4d716` | #233 (AC-15) | 0.644 | 0.264 | 0.523 | 0.593 | 0.500 | 0.375 | $0.1295 |
+
+Every `main` up to #225 scores he 0.33–0.36; from #226 on, 0.25–0.26, a
+−0.111 step between B3 and B4 (over twice the 0.05 variance line). en
+stays inside its band throughout. #226's only ranking change was AC-4:
+`composeWishes` re-sorted the far-over-budget products cheapest first
+across the whole 48-product find front before the pages were cut, so a
+cheap, low-relevance product could take a page-1 slot before the judge saw
+the page — the mechanism of colour run 7. AC-3 is display only. The fix
+(AC-4 as amended 2026-10-11): the far tier keeps find order before the
+judge and is ordered cheapest first only inside the judged page, inside
+each group, after the judge.
+
 One side reading for the M7 speed chain: the replay's "no extraction"
 column (8–25 %) shows run 5's code missed the extraction grace on some
 searches on 2026-10-10, where today's code (0 %) did not.
