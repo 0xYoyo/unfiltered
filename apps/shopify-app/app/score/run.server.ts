@@ -414,11 +414,23 @@ export function formatScoreTable(report: ScoreReport): string {
     ...rows.map((row) => row.map((cell, column) => cell.padEnd(widths[column]!)).join("  ").trimEnd()),
     formatCostLine(report.cost),
     ...(report.extractCalls !== undefined ? [`extract calls ${report.extractCalls}`] : []),
+    ...report.languages.flatMap((row) =>
+      row.withoutExtraction === null ? [] : [formatNoExtractionLine(row.language, row.withoutExtraction)],
+    ),
     ...(report.abortedAfter !== undefined
       ? [`aborted after ${report.abortedAfter} consecutive failures`]
       : []),
     ...report.failures.map(formatFailureLine),
   ].join("\n");
+}
+
+/**
+ * One line per language under the cost line (YOY-171 AC-17): the share of its
+ * searches composed without the wish extraction, so every recorded run
+ * carries it next to the score.
+ */
+export function formatNoExtractionLine(language: string, share: number): string {
+  return `no-extraction ${language} ${Math.round(share * 100)}%`;
 }
 
 /** One line per (stage, class) under the cost line (YOY-141 AC-13). */

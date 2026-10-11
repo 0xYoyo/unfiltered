@@ -30,6 +30,8 @@ const PASS_LINE = /^pass \d+$/;
 const PROGRESS_LINE = new RegExp(`^\\[\\d+/\\d+\\] ${LANGUAGE} (?:ok|fail (?:search|grade))$`);
 const ABORT_LINE = /^aborted after \d+ consecutive failures$/;
 const EXTRACT_LINE = /^extract calls \d+$/;
+// The per-language share composed without wishes (YOY-171 AC-17).
+const NO_EXTRACTION_LINE = new RegExp(`^no-extraction ${LANGUAGE} \\d+%$`);
 const STRICT_LINES = [
   TABLE_HEADER,
   TABLE_ROW,
@@ -37,6 +39,7 @@ const STRICT_LINES = [
   FAILURE_LINE,
   PASS_LINE,
   EXTRACT_LINE,
+  NO_EXTRACTION_LINE,
   PROGRESS_LINE,
   ABORT_LINE,
 ];
