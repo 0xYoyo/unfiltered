@@ -331,11 +331,25 @@ describe("the full match set, uncapped (YOY-107 AC-1)", () => {
 describe("one statement per classic search, cards included (YOY-115 AC-1)", () => {
   let db: PrismaClient;
   const statements: string[] = [];
+  /** The bound parameters of each entry of `statements`, as Prisma logs them. */
+  const params: string[] = [];
   /** Prisma emits query events after the query resolves; drain them. */
   const settle = () => new Promise<void>((done) => setTimeout(done, 0));
+  /**
+   * Wait until no query event has arrived for 50 ms (at most 2 s), then
+   * clear: a previous test's search, uncounted, can still be emitting its
+   * events on a loaded CI runner, and they must not land in this count
+   * (YOY-171 AC-18).
+   */
   const startCounting = async (): Promise<void> => {
-    await settle();
+    const deadline = Date.now() + 2000;
+    let seen = -1;
+    while (seen !== statements.length && Date.now() < deadline) {
+      seen = statements.length;
+      await new Promise<void>((done) => setTimeout(done, 50));
+    }
     statements.length = 0;
+    params.length = 0;
   };
   /**
    * Bounded wait for the query events of the statements just run: Prisma
@@ -352,9 +366,17 @@ describe("one statement per classic search, cards included (YOY-115 AC-1)", () =
     }
     await settle();
   };
+  /** The statements whose parameters carry `query`: the search under test's own (YOY-171 AC-18). */
+  const statementsFor = (query: string): string[] =>
+    statements.filter((_, index) => params[index]!.includes(query));
 
   beforeAll(async () => {
-    db = await createTestDb({ onQuery: (sql) => statements.push(sql) });
+    db = await createTestDb({
+      onQuery: (sql, bound) => {
+        statements.push(sql);
+        params.push(bound);
+      },
+    });
     await seed(db, [
       {
         productId: "nike",
@@ -376,9 +398,10 @@ describe("one statement per classic search, cards included (YOY-115 AC-1)", () =
     await startCounting();
     await createPgTrgmClassicStore(db).search({ storeId: SHOP, query: "nkie air max" });
     await drained(1);
-    expect(statements).toHaveLength(1);
-    expect(statements[0]).toContain("set_config('pg_trgm.word_similarity_threshold', '0.3', true)");
-    expect(statements[0]).toContain("<%");
+    const own = statementsFor("nkie air max");
+    expect(own).toHaveLength(1);
+    expect(own[0]).toContain("set_config('pg_trgm.word_similarity_threshold', '0.3', true)");
+    expect(own[0]).toContain("<%");
     expect(statements.some((sql) => /^\s*(BEGIN|COMMIT)/i.test(sql))).toBe(false);
   });
 
@@ -400,7 +423,7 @@ describe("one statement per classic search, cards included (YOY-115 AC-1)", () =
     await startCounting();
     const result = await createPgTrgmClassicStore(db).search({ storeId: SHOP, query: "nike air max" });
     await drained(1);
-    expect(statements).toHaveLength(1);
+    expect(statementsFor("nike air max")).toHaveLength(1);
     expect(result.hits[0]).toMatchObject({
       productId: "nike",
       card: {

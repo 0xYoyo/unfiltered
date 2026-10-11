@@ -23,7 +23,8 @@ export async function createTestDb(
      * Statement listener (YOY-115 AC-1): called once per SQL statement the
      * client sends, with its text. Lets a test count round trips.
      */
-    onQuery?: (sql: string) => void;
+    /** Each statement Prisma runs, with its bound parameters as Prisma logs them (JSON text). */
+    onQuery?: (sql: string, params: string) => void;
   } = {},
 ): Promise<PrismaClient> {
   const pglite = new PGlite({ extensions: { vector, pg_trgm } });
@@ -44,7 +45,7 @@ export async function createTestDb(
     const onQuery = options.onQuery;
     (client as PrismaClient<{ log: [{ level: "query"; emit: "event" }] }>).$on(
       "query",
-      (event) => onQuery(event.query),
+      (event) => onQuery(event.query, event.params),
     );
   }
 

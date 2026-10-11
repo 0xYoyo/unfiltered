@@ -942,7 +942,10 @@ describe("wishes on Engine v2 (on the database)", () => {
     expect(submitted.extractionCached).toBe(true);
     expect(submitted.extractionInTime).toBe(true);
     expect(submitted.stages.extractLate).toBe(0);
-    expect(submitted.stages.extract).toBeLessThan(10);
+    // The cache hit is the evidence above (no second extractor call,
+    // `extractionCached`); the stage is only bounded loosely, so a slow CI
+    // runner cannot fail it (YOY-171 AC-18).
+    expect(submitted.stages.extract).toBeLessThan(100);
   });
 
   it("joins the preview's extraction while it still runs instead of calling twice (YOY-171 AC-7)", async () => {
