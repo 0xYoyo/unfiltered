@@ -912,11 +912,11 @@ The three kinds of wishes (docs/PRD.md §3) applied by code. Packages:
   - Number tiers sort the find front only — the first `TIER_FRONT_SIZE`
     (48) surviving candidates in find order: every number wish met, then
     the price within `PRICE_NEAR_PERCENT` (10) over the cap with the rest
-    met, then other misses, each tier in find order — except the products
-    far over the cap, which take their places in the last tier cheapest
-    first (YOY-171 AC-4). A stated colour (YOY-171 AC-5) moves nothing
-    here: the find front, the pages and what the judge sees are as without
-    it. It is never a wall and never a store predicate: `primaryColor` is
+    met, then other misses, each tier in find order — the products far
+    over the cap too: their price orders them only after the judge (YOY-171
+    AC-4, amended 2026-10-11 by AC-16's bisect). A stated colour (YOY-171
+    AC-5) moves nothing here either: the find front, the pages and what the
+    judge sees are as without it. It is never a wall and never a store predicate: `primaryColor` is
     read from `ProductEnrichment`, never filtered on. Candidates past the
     front and the keyword tail keep their order and never jump ahead
     (2026-10-03: a soft budget never outranks relevance). Within a page the
@@ -930,7 +930,17 @@ The three kinds of wishes (docs/PRD.md §3) applied by code. Packages:
     match (`colorFirstInGroups`, grouped as `splitCloseVerdicts` groups the
     wire). Never across groups, never past a stand-in, never on a page the
     judge did not order, so the page's products are the same as without
-    the colour (YOY-171 AC-5, amended 2026-10-11 after run 7).
+    the colour (YOY-171 AC-5, amended 2026-10-11 after run 7). In the same
+    groups, and before the colour, the products far over the cap take the
+    places they hold cheapest first by `priceMin` (`farCheapestFirstInGroups`,
+    YOY-171 AC-4); every other card keeps its place.
+  - **Rule (binding for every future wish, YOY-171 AC-16):** a code-checked
+    wish may order cards only after the judge and only inside the judged
+    page; nothing moves across the page cut before the judge. Two runs
+    showed why: a colour (run 7) and a price (AC-4 as first shipped) that
+    re-sorted the 48-product find front each pulled low-relevance products
+    onto page 1 before the judge saw it, and cost he ≈ 0.1 on the hidden
+    score (docs/SCORE.md).
   - A size matches a variant option value, ignoring case: offered and in
     stock is met, offered and sold out a miss, not offered met.
   - A cap in a currency other than the product's converts through USD with

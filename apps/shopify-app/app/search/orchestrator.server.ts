@@ -597,6 +597,7 @@ export function createSearchOrchestrator(
     let ordered = { productIds: found.productIds, findSetCount: found.findSetCount };
     let codeLabels = new Map<string, CodeLabel>();
     let colorMatches = new Set<string>();
+    let farOverBudget = new Map<string, number>();
     if (wishes !== null && hasAppliedWishes(wishes)) {
       const composed = await stages.time("compose", async () =>
         composeWishes(
@@ -610,6 +611,7 @@ export function createSearchOrchestrator(
       ordered = composed;
       codeLabels = composed.labels;
       colorMatches = composed.colorMatches;
+      farOverBudget = composed.farOverBudget;
     }
     const pageStart = (page - 1) * pageSize;
     const pageIds = ordered.productIds.slice(pageStart, pageStart + pageSize);
@@ -627,19 +629,25 @@ export function createSearchOrchestrator(
     // A judged part's cards, then the keyword tail, each with its label: a
     // code-computed label replaces the judge's on the same card (AC-12) —
     // except `color-differs`, which shows only where the judge gave none
-    // (YOY-171 AC-5). The late page is composed the same way (YOY-171 AC-1).
+    // (YOY-171 AC-5). Within each group of the judged part the far-over-budget
+    // cards go cheapest first (AC-4), then the asked colour first (AC-5 (c)).
+    // The late page is composed the same way (YOY-171 AC-1).
     const withLabels = (judgedItems: readonly JudgeStepItem<ProductCard>[] | null) =>
       [
         ...(judgedItems === null
           ? cards
           : [
               ...colorFirstInGroups(
-                judgedItems.map(({ item, verdict, label, standIn }) => ({
-                  ...item,
-                  label,
-                  ...(verdict !== null ? { verdict } : {}),
-                  ...(standIn === true ? { standIn } : {}),
-                })),
+                farCheapestFirstInGroups(
+                  judgedItems.map(({ item, verdict, label, standIn }) => ({
+                    ...item,
+                    label,
+                    ...(verdict !== null ? { verdict } : {}),
+                    ...(standIn === true ? { standIn } : {}),
+                  })),
+                  farOverBudget,
+                  judgeProvider,
+                ),
                 colorMatches,
                 judgeProvider,
               ),
@@ -883,21 +891,18 @@ export function createSearchOrchestrator(
 }
 
 /**
- * The asked colour first within each group of a judged page (YOY-171 AC-5
- * (c)): a stable sort, after the judge, that moves the cards whose primary
- * colour is the asked one to the front of their own group — the matches,
- * the "Close matches" group, or the whole judged part when the page has no
- * match (as `splitCloseVerdicts` groups them). A card never crosses into
- * another group, never moves past a stand-in (which keeps its place), and
- * a card with no verdict (a judge timeout's find order) is never moved, so
- * the colour never changes which products are on the page.
+ * Reorder each group of a judged page in place, after the judge: the
+ * matches, the "Close matches" group, or the whole judged part when the page
+ * has no match (as `splitCloseVerdicts` groups them). A card never crosses
+ * into another group, never moves past a stand-in (which keeps its place),
+ * and a card with no verdict (a judge timeout's find order) is never moved,
+ * so no code-checked wish changes which products are on the page.
  */
-export function colorFirstInGroups<
-  T extends { productId: string; verdict?: string; standIn?: true },
->(cards: readonly T[], colorMatches: ReadonlySet<string>, provider: JudgeProvider): T[] {
-  if (colorMatches.size === 0) {
-    return [...cards];
-  }
+function reorderWithinGroups<T extends { productId: string; verdict?: string; standIn?: true }>(
+  cards: readonly T[],
+  provider: JudgeProvider,
+  reorder: (run: T[]) => T[],
+): T[] {
   const split = splitCloseVerdicts(cards, provider);
   const close = new Set(split?.close ?? []);
   const groupOf = (card: T): string | null =>
@@ -911,14 +916,51 @@ export function colorFirstInGroups<
     }
     if (group !== null) {
       const run = out.slice(start, end);
-      out.splice(
-        start,
-        run.length,
-        ...run.filter((card) => colorMatches.has(card.productId)),
-        ...run.filter((card) => !colorMatches.has(card.productId)),
-      );
+      out.splice(start, run.length, ...reorder(run));
     }
     start = end;
   }
   return out;
+}
+
+/**
+ * The asked colour first within each group of a judged page (YOY-171 AC-5
+ * (c)): a stable sort, after the judge, that moves the cards whose primary
+ * colour is the asked one to the front of their own group.
+ */
+export function colorFirstInGroups<
+  T extends { productId: string; verdict?: string; standIn?: true },
+>(cards: readonly T[], colorMatches: ReadonlySet<string>, provider: JudgeProvider): T[] {
+  if (colorMatches.size === 0) {
+    return [...cards];
+  }
+  return reorderWithinGroups(cards, provider, (run) => [
+    ...run.filter((card) => colorMatches.has(card.productId)),
+    ...run.filter((card) => !colorMatches.has(card.productId)),
+  ]);
+}
+
+/**
+ * The far-over-budget cards cheapest first within each group of a judged
+ * page (YOY-171 AC-4, as amended 2026-10-11): after the judge, they take
+ * the places they hold in their group in price order, ties in their judged
+ * order; every other card keeps its place.
+ */
+export function farCheapestFirstInGroups<
+  T extends { productId: string; verdict?: string; standIn?: true },
+>(cards: readonly T[], farPrices: ReadonlyMap<string, number>, provider: JudgeProvider): T[] {
+  if (farPrices.size === 0) {
+    return [...cards];
+  }
+  return reorderWithinGroups(cards, provider, (run) => {
+    const slots = run.flatMap((card, slot) => (farPrices.has(card.productId) ? [slot] : []));
+    const byPrice = slots
+      .map((slot) => run[slot]!)
+      .sort((a, b) => farPrices.get(a.productId)! - farPrices.get(b.productId)!);
+    const out = [...run];
+    slots.forEach((slot, order) => {
+      out[slot] = byPrice[order]!;
+    });
+    return out;
+  });
 }

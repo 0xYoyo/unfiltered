@@ -279,6 +279,9 @@ line.
 | 6 control | Engine v2 on `main` at `9843486`, before the delete (YOY-155 AC-8 reference, judge `jev`) | 0.657 | 0.361 | 0.495 | 0.648 | 0.477 | 0.361 | — (not deployed) | $0.1038 |
 | 6 | One engine after the delete (YOY-155 branch, judge `jev`) | 0.606 | 0.301 | 0.495 | 0.616 | 0.444 | 0.366 | — (not deployed) | $0.1043 |
 | control C2 | `main` at `7a4d716` after the ten YOY-171 merges of 2026-10-10 (judge `jev`); the AC-5 reference from here on | 0.644 | 0.264 | 0.523 | 0.593 | 0.500 | 0.375 | — (not deployed) | $0.1295 |
+| AC-16 fix' | AC-4 as amended, on `main` with AC-17 and AC-18 (`86a5e22`, judge `jev`, extraction grace 4,000 ms); no-extraction 0 % in every language | 0.606 | 0.199 | 0.495 | 0.616 | 0.454 | 0.329 | — (not deployed) | $0.1330 |
+| control C3 | `main` at `505ccef` (judge `jev`, extraction grace 4,000 ms); the AC-16 reference; no-extraction 0 % in every language | 0.644 | 0.218 | 0.481 | 0.634 | 0.509 | 0.370 | — (not deployed) | $0.1337 |
+| AC-16 fix (stop: he outside its band) | AC-4 as amended: far-over-budget cheapest first after the judge, within the page's groups (`45a9e50`, judge `jev`) | 0.630 | 0.245 | 0.481 | 0.662 | 0.500 | 0.338 | — (not deployed) | $0.1334 |
 | 9 (stop: he outside its band) | AC-5 fallback: colour orders nothing — extraction, label, chip only (`b33298b`, judge `jev`) | 0.630 | 0.255 | 0.532 | 0.653 | 0.454 | 0.347 | — (not deployed) | $0.1341 |
 | 8 (stop: he outside its band) | AC-5 as amended: colour ordered after the judge, within the page's groups (`7ecb1e4`, judge `jev`) | 0.653 | 0.218 | 0.500 | 0.620 | 0.495 | 0.370 | — (not deployed) | $0.1336 |
 | 7 (stop: he outside its band) | Engine v2 + colour as a code-checked wish (YOY-171 AC-5 branch `662ebd8`, judge `jev`) | 0.625 | 0.259 | 0.472 | 0.676 | 0.477 | 0.347 | — (not deployed) | $0.1337 |
@@ -477,6 +480,61 @@ the day's merges did. C2 becomes AC-5's reference. Against it, run 8 is en
 +0.009 and he −0.046, both inside the band, so the run-8 version (the colour
 first within its group after the judge) is the one that ships. Run 9 is en
 −0.014 and he −0.009. Finding the merge that moved he is YOY-171 AC-16.
+
+AC-16 — the bisect of 2026-10-10's merges (YOY-171 AC-16): four hidden
+runs on `main` commits, judge `jev`, all green, leak check clean (72
+checked), 0 failed searches, $0.5166 together. "Merged up to" is the last
+YOY-171 PR on `main` at the scored commit.
+
+| Run | `main` at | Merged up to | en | he | ar | ru | fr | es | Cost |
+|-----|-----------|--------------|----|----|----|----|----|----|------|
+| 6 control | `9843486` | before #221 | 0.657 | 0.361 | 0.495 | 0.648 | 0.477 | 0.361 | $0.1038 |
+| B2 ([run](https://github.com/0xYoyo/unfiltered/actions/runs/38092455416)) | `acc62fb` | #224 (AC-1) | 0.597 | 0.329 | 0.523 | 0.630 | 0.477 | 0.366 | $0.1286 |
+| B3 ([run](https://github.com/0xYoyo/unfiltered/actions/runs/38092929326)) | `85c48dd` | #225 (AC-2) | 0.662 | **0.361** | 0.519 | 0.597 | 0.468 | 0.394 | $0.1295 |
+| B4 ([run](https://github.com/0xYoyo/unfiltered/actions/runs/38093443735)) | `0dc4618` | **#226 (AC-3, AC-4)** | 0.630 | **0.250** | 0.495 | 0.620 | 0.463 | 0.398 | $0.1289 |
+| B1 ([run](https://github.com/0xYoyo/unfiltered/actions/runs/38092011490)) | `d8e48ba` | #227 (AC-6) | 0.648 | 0.259 | 0.500 | 0.616 | 0.500 | 0.361 | $0.1296 |
+| control C2 | `7a4d716` | #233 (AC-15) | 0.644 | 0.264 | 0.523 | 0.593 | 0.500 | 0.375 | $0.1295 |
+
+Every `main` up to #225 scores he 0.33–0.36; from #226 on, 0.25–0.26, a
+−0.111 step between B3 and B4 (over twice the 0.05 variance line). en
+stays inside its band throughout. #226's only ranking change was AC-4:
+`composeWishes` re-sorted the far-over-budget products cheapest first
+across the whole 48-product find front before the pages were cut, so a
+cheap, low-relevance product could take a page-1 slot before the judge saw
+the page — the mechanism of colour run 7. AC-3 is display only. The fix
+(AC-4 as amended 2026-10-11): the far tier keeps find order before the
+judge and is ordered cheapest first only inside the judged page, inside
+each group, after the judge.
+
+AC-16 fix run — the far tier after the judge only (YOY-171 AC-4 as
+amended): [run 38127006913](https://github.com/0xYoyo/unfiltered/actions/runs/38127006913),
+2026-10-11, dispatched with `ref=45a9e50` (branch `YOY-171-far-after-judge`)
+and `judge=jev`. Green, leak check clean (72 checked), **0 failed
+searches**, $0.1334 over 1,943 model calls, 72 extraction calls. en 0.630,
+**he 0.245**, ar 0.481, ru 0.662, fr 0.500, es 0.338; no extraction en 8 %,
+he 17 %. Against the run 6 control: en −0.027 (inside), **he −0.116 (band
+0.090: outside; the gate is he ≥ 0.271)**. The slice is **not merged** and
+YOY-171 goes to `blocked`. The fix removes the only ranking change #226
+made before the judge, yet he sits where B4 (0.250) and C2 (0.264) sit, so
+the pre-judge price sort alone does not explain the B3 → B4 step. (A first
+dispatch, run 38126940734, failed at checkout on a short SHA before any
+model call; $0.)
+
+AC-16 under the AC-17 rule — control C3 and fix' (2026-10-11): with
+`EXTRACTION_GRACE_MS=4000` both runs composed every search with its wishes
+(no-extraction 0 % in every language), so the 17 % he share that clouded
+the first fix run is gone. Control C3,
+[run 38135081700](https://github.com/0xYoyo/unfiltered/actions/runs/38135081700),
+`main` at `505ccef`: en 0.644, he 0.218, $0.1337. fix',
+[run 38135086450](https://github.com/0xYoyo/unfiltered/actions/runs/38135086450),
+the branch at `86a5e22` (AC-4 as amended, merged up to `main`): en 0.606,
+he 0.199, $0.1330. Both green, leak check clean (72 checked), 0 failed
+searches. Against C3: en −0.038 (band 0.111, inside), he −0.019 (band
+0.090, inside). By AC-16 step (3) the fix ships. Note that `main` itself
+scores he 0.218 today, below the 0.33–0.36 of the bisect's early runs, so
+the after-judge price order is within the noise of today's `main`; the
+B3 → B4 step is not reproduced by these two runs. AC-16 spend: bisect
+$0.5166, first fix run $0.1334, C3 and fix' $0.2667; $0.92 in all.
 
 One side reading for the M7 speed chain: the replay's "no extraction"
 column (8–25 %) shows run 5's code missed the extraction grace on some

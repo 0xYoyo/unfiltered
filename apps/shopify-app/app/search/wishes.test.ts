@@ -25,7 +25,12 @@ import { createPgTrgmClassicStore } from "./classic-store.server";
 import { createFindStep } from "./find.server";
 import { extractionCacheKey, sentenceLanguage } from "./extraction-cache.server";
 import { awaitPendingLabels, resetPendingLabels } from "./judge-step.server";
-import { colorFirstInGroups, createSearchOrchestrator, type SearchRequest } from "./orchestrator.server";
+import {
+  colorFirstInGroups,
+  createSearchOrchestrator,
+  farCheapestFirstInGroups,
+  type SearchRequest,
+} from "./orchestrator.server";
 import { createSessionThrottle, previewExtractionAllowance } from "./throttle.server";
 import {
   parseProxySearchBody,
@@ -307,8 +312,8 @@ describe("colour as a code-checked wish (YOY-171 AC-5)", () => {
       ["blue-far", product("blue-far", 200, { primaryColor: "blue" })],
       ["red-far", product("red-far", 300, { primaryColor: "red" })],
     ]);
-    // The far tier is cheapest first (AC-4), the colour aside.
-    expect(composeWishes(["red-far", "blue-far"], 2, far, capped).productIds).toEqual(["blue-far", "red-far"]);
+    // The far tier keeps find order before the judge (AC-4 as amended), the colour aside.
+    expect(composeWishes(["red-far", "blue-far"], 2, far, capped).productIds).toEqual(["red-far", "blue-far"]);
   });
 
   it("labels a card of another known colour color-differs, only when no other code label applies", () => {
@@ -475,7 +480,7 @@ describe("composing the wishes (AC-5 – AC-10, AC-12)", () => {
     expect(composed.labels.get("ok1")).toBeUndefined();
   });
 
-  it("orders the far-over-budget products cheapest first; within and near keep find order (YOY-171 AC-4)", () => {
+  it("moves no far-over-budget product for its price before the judge; reports each with its price (YOY-171 AC-4, amended)", () => {
     const products = new Map(
       [
         product("far-300", 300),
@@ -494,15 +499,24 @@ describe("composing the wishes (AC-5 – AC-10, AC-12)", () => {
       wishes({ priceMax: { amount: 100, raw: "100" } }),
       { rates },
     );
+    // Tiers in find order, the far tier unsorted: the page cut sees find order.
     expect(composed.productIds).toEqual([
       "ok-90",
       "ok-80",
       "near-108",
       "near-104",
-      "far-200",
-      "far-250",
       "far-300",
+      "far-250",
+      "far-200",
     ]);
+    // The judged page orders them by this price, within its groups.
+    expect(composed.farOverBudget).toEqual(
+      new Map([
+        ["far-300", 300],
+        ["far-250", 250],
+        ["far-200", 200],
+      ]),
+    );
   });
 
   it("tiers only the find front: a candidate past it keeps find order and never jumps ahead (AC-5, 2026-10-03)", () => {
@@ -1181,6 +1195,79 @@ describe("wishes on Engine v2 (on the database)", () => {
       parseProxySearchBody({ query: "q", sessionId: "s", removedChips: [{ field: "color", value: "red" }] })!
         .removedChips,
     ).toEqual([{ field: "color", value: "red" }]);
+  });
+
+  it("orders far-over-budget cards cheapest first inside their group after the judge, the page's product set unchanged (YOY-171 AC-4, AC-16)", async () => {
+    // 3 matches within budget, then 5 close: two within budget and three far
+    // over it, which compose leaves in find order (most expensive first).
+    await seed(db, [
+      { productId: "e1", title: "Jacket One", y: 0.1, price: 80 },
+      { productId: "e2", title: "Jacket Two", y: 0.2, price: 90 },
+      { productId: "e3", title: "Jacket Three", y: 0.3, price: 85 },
+      { productId: "c1", title: "Coat One", y: 0.4, price: 70 },
+      { productId: "c2", title: "Coat Two", y: 0.5, price: 95 },
+      { productId: "f300", title: "Parka 300", y: 0.6, price: 300 },
+      { productId: "f250", title: "Parka 250", y: 0.7, price: 250 },
+      { productId: "f200", title: "Parka 200", y: 0.8, price: 200 },
+    ]);
+    const capped = wishes({ priceMax: { amount: 100, raw: "100" } });
+    const codes = ["E-X", "E-X", "E-X", "CDC", "CDC", "CDC", "CDC", "CDC"];
+    const response = await search(orchestrator({ extractor: fixedExtractor(capped), judge: judgeLlm(codes) }), {
+      query: "jacket under 100",
+    });
+    const ids = response.hits.map((hit) => hit.productId);
+    // The matches unchanged; the far cards ascending in the close group's far places.
+    expect(ids).toEqual(["e1", "e2", "e3", "c1", "c2", "f200", "f250", "f300"]);
+    expect(response.hits.find((hit) => hit.productId === "f200")?.label?.template).toBe("price-far");
+
+    // The chip removed: no price wish, the judged order is find order.
+    await db.judgeAnswer.deleteMany();
+    const removed = await search(orchestrator({ extractor: fixedExtractor(capped), judge: judgeLlm(codes) }), {
+      query: "jacket under 100",
+      removedChips: [{ field: "priceMax", value: "100" }],
+    });
+    expect(removed.hits.map((hit) => hit.productId)).toEqual(["e1", "e2", "e3", "c1", "c2", "f300", "f250", "f200"]);
+    expect(new Set(removed.hits.map((hit) => hit.productId))).toEqual(new Set(ids));
+  });
+
+  it("never moves a far card past a stand-in, across groups, or on a page the judge did not order (YOY-171 AC-4)", () => {
+    const card = (productId: string, verdict?: string, standIn?: true) => ({
+      productId,
+      ...(verdict !== undefined ? { verdict } : {}),
+      ...(standIn === true ? { standIn } : {}),
+    });
+    const far = new Map([
+      ["x300", 300],
+      ["x200", 200],
+      ["s250", 250],
+      ["s150", 150],
+      ["y400", 400],
+      ["y100", 100],
+    ]);
+    const order = (cards: ReturnType<typeof card>[]) =>
+      farCheapestFirstInGroups(cards, far, "jev").map((entry) => entry.productId);
+    // Matches, stand-ins, then the close group: each far card moves within its
+    // own group, only into the places far cards hold; the rest stay put.
+    expect(
+      order([
+        card("x300", "exact"),
+        card("e1", "exact"),
+        card("x200", "exact"),
+        card("s250", "close", true),
+        card("s150", "close", true),
+        card("y400", "close"),
+        card("c1", "close"),
+        card("y100", "close"),
+      ]),
+    ).toEqual(["x200", "e1", "x300", "s250", "s150", "y100", "c1", "y400"]);
+    // No match on the page: the whole judged grid is one group.
+    expect(order([card("y400", "close"), card("v1", "other-variant"), card("y100", "close")])).toEqual([
+      "y100",
+      "v1",
+      "y400",
+    ]);
+    // No verdicts (a judge timeout's find order): nothing moves.
+    expect(order([card("x300"), card("x200")])).toEqual(["x300", "x200"]);
   });
 
   it("never moves a colour card past a stand-in, across groups, or on a page the judge did not order (YOY-171 AC-5)", () => {
