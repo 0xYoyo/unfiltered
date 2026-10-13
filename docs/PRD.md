@@ -91,7 +91,7 @@ Numbered capabilities, each observable behavior:
 6. **Instant fallback.** If the judge misses its deadline or errors, or a
    store exceeds caps, the search bar silently serves the find-stage results
    with the code-computed price, size and stock labels and without the judge's
-   labels — never a failure state (amended 2026-10-01). The shopper never sees
+   labels, and the judged page replaces them once the answer lands (§3 Refinement 17) — never a failure state (amended 2026-10-01). The shopper never sees
    an error state caused by us.
 7. **Merchant dashboard.** Shows: total searches, searches where the
    judge missed its deadline, zero-result searches, top queries,
@@ -291,8 +291,7 @@ the judge may compare images. Milestone 8.
 - **Decided 2026-10-04 (YOY-152, hidden run 5, measured):** quality tied inside the noise bands (en 0.667 Flash-Lite vs 0.634 Jev, band 0.111; he 0.389 vs 0.407, band 0.090). Jev judged in 469 ms median against Flash-Lite's 1,504 ms (at the 1,500 ms deadline), gave identical verdicts 95.8 % vs 75.8 % of the time, and cost $0.82 vs $2.27 per 1,000 uncached searches (judge only). **Jev is the default judge (`JUDGE_PROVIDER` unset); Flash-Lite stays selectable.** Accepted with it at the time: under Jev the merchant-fact label and the two-meanings chip were dormant; the label returned on 2026-10-10 from closed-list picks (YOY-158), the chip is still dormant. Details: docs/SCORE.md "Decision — Jev is the default judge".
 - Speed fallback: if the judge misses ~1.5 s, page 1 shows the find-stage
   ranking with the code-computed price, size and stock labels at once; the
-  judge's labels are added when it answers (amended 2026-10-01); positions
-  never move.
+  judge's labels are added when it answers (amended 2026-10-01); when the answer lands, the whole judged page replaces the find order (Refinement 17).
 
 #### Refinements (2026-09-30, binding; override the Engine v2 text above where they differ)
 
