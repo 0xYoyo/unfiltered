@@ -13,7 +13,7 @@ v3.2 (2026-10-03, YOY-149): the 2026-10-01 amendments are version-bound —
 labels.
 v3.3 (2026-10-04, YOY-152): the judge comparison was measured and decided — Jev (TypeSafe, via OpenRouter) is the default judge and Gemini 3.5 Flash-Lite the selectable fallback; measured judge costs replace the estimates in §3 and §8; the merchant-fact label and the two-meanings chip are dormant under Jev (YOY-158).
 v3.4 (2026-10-06, M6 live run; YOY-163, YOY-166, YOY-168, YOY-156): §3 Refinement 4 — price labels carry no numbers and the size label is short; §3 Refinements 17–18 — a "not relevant" product is dropped from a page that has anything better, and "close" products sit under the "Close matches" heading when the page has real matches, with no label of their own; §8 and §10 — the tiers were re-validated after the judge comparison and stand unchanged.
-v3.5 (2026-10-13, M6 hardening tail YOY-171; YOY-155, YOY-158): the old engine is deleted (tag `engine-v1-last`); §3 Refinements 4 and 17 amended and 19–21 added (one shared label line, cheapest-first inside the page, stand-ins marked, the late judged page replaces the find-order page, colour as a code-checked wish, the order-after-judge rule, extraction on the typing pause with spend guards); the merchant-fact label is back under Jev from closed-list picks (YOY-158); Quality gate — a score run waits for the extraction, the reference-run rule, the measured level on 2026-10-11 and the Hebrew set's size; §13 — milestone 7 opens with measurement, then the speed chain, then Run alone.
+v3.5 (2026-10-13, M6 hardening tail YOY-171; YOY-155, YOY-158): the old engine is deleted (tag `engine-v1-last`); §3 Refinements 4 and 17 amended and 19–21 added (one shared label line, cheapest-first inside the page, stand-ins marked, the late judged page replaces the find-order page, colour as a code-checked wish, the order-after-judge rule, extraction on the typing pause with spend guards); the merchant-fact label is back under Jev from closed-list picks (YOY-158); Quality gate — a score run waits for the extraction, the reference-run rule, the measured level on 2026-10-11 and the Hebrew set's size; §13 — milestone 7 opens with measurement, then the speed chain, then Run alone. Round 2 (same day): the shop-assistant bullets, Refinements 10, 15 and 18 and the 2026-10-04 decision paragraph brought in line with the above.
 
 Product type: B2B web SaaS, delivered first as a native Shopify app
 (self-serve). The engine is catalog-agnostic by design: a universal script
@@ -252,9 +252,8 @@ Topics are infinite; kinds are three. A new topic never adds code.
   thing the shopper asked for. Brown pants never answer "brown shirt".
 - Merchant facts decide whether it comes in what they asked; misses on
   colour/size/stock are shown on the same item with a label.
-- Under the Jev judge (default since 2026-10-04) the two-value merchant-fact label is dormant: such a product shows the generic "close match" line until YOY-158 lands. The code-computed price, size and stock labels are unaffected.
-- "Only black" / "must be M" moves that wish into the firm set for this
-  search.
+- Under the Jev judge the two-value merchant-fact label is produced from closed-list picks since 2026-10-10 (YOY-158): the judge picks which of the product's option names the asked fact concerns and which word of the shopper's sentence names the asked value; the product's value is read from the variants table, never written by the model; a value that contains the asked word as a whole word suppresses the label (YOY-171 AC-10). The code-computed price, size and stock labels are unaffected.
+- "Must be M" moves the size into the firm set for this search. "Only black" does not filter (Refinement 19): colour is never a wall; the judge marks the other colours as the same item in another colour and they fall under the "Close matches" heading, which is the firm effect for colour.
 
 **Two meanings.**
 - Most ambiguity resolves from what the store sells (no bridal gowns →
@@ -262,7 +261,7 @@ Topics are infinite; kinds are three. A new topic never adds code.
 - When both meanings have stock: show the likelier meaning; one tappable
   chip at the top switches ("Bridal gowns instead?"). No popup, no
   blocking question.
-- Under the Jev judge (default since 2026-10-04) the chip is dormant: a decision model writes no phrase. The Flash-Lite judge still produces it; a Jev version is assessed in YOY-158.
+- Under the Jev judge the two-meanings chip stays dormant: a decision model writes no phrase. YOY-158's design note (AC-6) proposes a pick-one over the page's distinct product types in its place; the founder decides in M7.
 
 **Scale and server-side pages.**
 - Vector find is sub-100 ms at millions of products.
@@ -289,7 +288,7 @@ the judge may compare images. Milestone 8.
 - Measured on the hidden score: quality, per-language quality, speed,
   stability (same search ×5). Winner takes page 1; the other is fallback.
   One swap point in code.
-- **Decided 2026-10-04 (YOY-152, hidden run 5, measured):** quality tied inside the noise bands (en 0.667 Flash-Lite vs 0.634 Jev, band 0.111; he 0.389 vs 0.407, band 0.090). Jev judged in 469 ms median against Flash-Lite's 1,504 ms (at the 1,500 ms deadline), gave identical verdicts 95.8 % vs 75.8 % of the time, and cost $0.82 vs $2.27 per 1,000 uncached searches (judge only). **Jev is the default judge (`JUDGE_PROVIDER` unset); Flash-Lite stays selectable.** Accepted with it: under Jev the merchant-fact label ("in grey, not black") and the two-meanings chip are dormant; a Jev version built from closed-list picks is YOY-158. Details: docs/SCORE.md "Decision — Jev is the default judge".
+- **Decided 2026-10-04 (YOY-152, hidden run 5, measured):** quality tied inside the noise bands (en 0.667 Flash-Lite vs 0.634 Jev, band 0.111; he 0.389 vs 0.407, band 0.090). Jev judged in 469 ms median against Flash-Lite's 1,504 ms (at the 1,500 ms deadline), gave identical verdicts 95.8 % vs 75.8 % of the time, and cost $0.82 vs $2.27 per 1,000 uncached searches (judge only). **Jev is the default judge (`JUDGE_PROVIDER` unset); Flash-Lite stays selectable.** Accepted with it at the time: under Jev the merchant-fact label and the two-meanings chip were dormant; the label returned on 2026-10-10 from closed-list picks (YOY-158), the chip is still dormant. Details: docs/SCORE.md "Decision — Jev is the default judge".
 - Speed fallback: if the judge misses ~1.5 s, page 1 shows the find-stage
   ranking with the code-computed price, size and stock labels at once; the
   judge's labels are added when it answers (amended 2026-10-01); positions
@@ -347,8 +346,7 @@ Agreed in the co-manager plan review of 29–30 Sep 2026. Numbers marked
    merchant's raw text, so search works from the first minute of onboarding
    and improves as cards land.
 10. **Speed knobs, in order, before any new vendor.** Judge 24 candidates on
-    page 1; if the judge passes 1.5 s, show the find order at once and add
-    labels when they arrive — positions never move. First-build estimate:
+    page 1; if the judge passes 1.5 s, show the find order at once; when the answer lands, the whole judged page replaces it (Refinement 17, YOY-171 AC-1). First-build estimate:
     median 1.1–1.3 s; the "half under 1 s" gate is measured, then decided.
 11. **Cache key.** Judge answers are cached per (normalized search text,
     candidate product ids, card versions). Merchant facts are outside the
@@ -362,16 +360,12 @@ Agreed in the co-manager plan review of 29–30 Sep 2026. Numbers marked
 14. **Multi-vector index.** The one-card-per-colourway-family collapse and
     the small-tenant recall fix (iterative HNSW scan) are re-verified for
     several vectors per product before the index ships.
-15. **Old engine recoverable.** The score is measured on the current (M5)
-    engine first, as the baseline to beat. `main` is tagged `engine-v1-last`
-    before the delete issue merges. The delete issue is last in the engine
-    chain and ships only after Engine v2 beats the baseline on the same
-    hidden score.
+15. **Old engine recoverable.** The old engine was deleted on 2026-10-10 (YOY-155, PR #221) after Engine v2 beat the M5 baseline on the hidden score in every language (run 1b on the old engine: en 0.560 · he 0.287; the run-6 control on v2: en 0.657 · he 0.361). `main` before the delete is tagged `engine-v1-last`; the tag is the only way back.
 16. **Theme-native label placement** is a docs/DESIGN.md decision inside M6
     (a small muted line under the price, inheriting the theme; nothing when
     it does not fit).
 17. **Not relevant is dropped (2026-10-06, YOY-163).** A product the judge marks "not relevant" is dropped from a page that holds anything better, as an excluded product is; the page may come out short, and the count still counts the find order. Refinement 8 stands for the page where every candidate is "not relevant": all shown, in find order, with the generic label. A product whose judge call failed or timed out (a stand-in) is never dropped: it sits after every judged card of the page, before the "Close matches" heading, and carries the line "not checked yet" (YOY-171 AC-2). When the judge misses its deadline the page is served in find order and the whole judged page replaces it once the late answer lands — dropped not-relevant, close under the heading, labels — on the playground and in the widget (YOY-171 AC-1).
-18. **Close matches under a heading (founder decision 2026-10-06, YOY-166).** When a page holds at least one product the judge marks exact or the same item in another colour or size, the "close" products sit below the existing "Close matches" heading, not inline, in their verdict order, and carry no label of their own: the heading is the label (YOY-168). A page with no exact product is unchanged (every card inline, labelled).
+18. **Close matches under a heading (founder decision 2026-10-06, YOY-166).** When a page holds at least one product the judge marks exact or the same item in another colour or size, the "close" products sit below the existing "Close matches" heading, not inline, in their verdict order — then, inside the group, far-over-budget cards cheapest first and cards of the asked colour first (Refinements 4 and 19) — and carry no label of their own: the heading is the label (YOY-168). A page with no exact product is unchanged (every card inline, labelled).
 19. **Colour is a code-checked wish (YOY-171 AC-5).** The extraction reads an asked colour as a fact next to price, size, stock and exclusions; it shows as a removable chip; after the judge, inside the judged page, cards of the asked colour lead their own group; a card of another colour carries "in <colour>, not <asked>" only when the judge gave it no label. Colour never filters and never changes which products are found or judged.
 20. **A code-checked wish orders cards only after the judge and only inside the judged page (binding, 2026-10-11).** Nothing moves across the page cut before the judge sees the page. Measured: ordering across the find front before the judge cost the Hebrew hidden score 0.10 twice (colour run 7, price run B4).
 21. **The extraction starts on the typing pause (YOY-171 AC-7) and its spend is bounded (AC-13, AC-15).** A preview of three or more characters warms the extraction cache; a submit joins a running call instead of paying twice. Previews draw on their own allowance (per IP on the playground, per session and per shop on the proxy); a capped or throttled search makes no extraction call; the proxy's AI budgets hold against a rotated session id.
