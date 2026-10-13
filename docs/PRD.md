@@ -1,5 +1,5 @@
 # Unfiltered — PRD
-Version: 3.4 · Date: 2026-10-06
+Version: 3.5 · Date: 2026-10-13
 Supersedes v2; decisions in docs/RESET-2026-09-27.md. Refinements of
 2026-09-30 in §3 Engine v2 (binding where they differ from the text above
 them). Amendments of 2026-10-01 (budget rules, hidden-set home, label values,
@@ -13,6 +13,7 @@ v3.2 (2026-10-03, YOY-149): the 2026-10-01 amendments are version-bound —
 labels.
 v3.3 (2026-10-04, YOY-152): the judge comparison was measured and decided — Jev (TypeSafe, via OpenRouter) is the default judge and Gemini 3.5 Flash-Lite the selectable fallback; measured judge costs replace the estimates in §3 and §8; the merchant-fact label and the two-meanings chip are dormant under Jev (YOY-158).
 v3.4 (2026-10-06, M6 live run; YOY-163, YOY-166, YOY-168, YOY-156): §3 Refinement 4 — price labels carry no numbers and the size label is short; §3 Refinements 17–18 — a "not relevant" product is dropped from a page that has anything better, and "close" products sit under the "Close matches" heading when the page has real matches, with no label of their own; §8 and §10 — the tiers were re-validated after the judge comparison and stand unchanged.
+v3.5 (2026-10-13, M6 hardening tail YOY-171; YOY-155, YOY-158): the old engine is deleted (tag `engine-v1-last`); §3 Refinements 4 and 17 amended and 19–21 added (one shared label line, cheapest-first inside the page, stand-ins marked, the late judged page replaces the find-order page, colour as a code-checked wish, the order-after-judge rule, extraction on the typing pause with spend guards); the merchant-fact label is back under Jev from closed-list picks (YOY-158); Quality gate — a score run waits for the extraction, the reference-run rule, the measured level on 2026-10-11 and the Hebrew set's size; §13 — milestone 7 opens with measurement, then the speed chain, then Run alone.
 
 Product type: B2B web SaaS, delivered first as a native Shopify app
 (self-serve). The engine is catalog-agnostic by design: a universal script
@@ -317,7 +318,7 @@ Agreed in the co-manager plan review of 29–30 Sep 2026. Numbers marked
    price labels are computed by code from the variants table, never by the
    judge. The judge judges the description side only. A stock or price
    change therefore does not invalidate a cached judge answer.
-4. **Label templates per kind of miss.** About five templates in total: a number missed — a price label carries no numbers ("slightly over budget" within the near band, "over budget" beyond it; the shopper's cap is on the chip and the product's price is on the card), a size label is short ("size M not in stock") — a merchant fact missed ("in grey, not black"), a description missed (one generic "close match" line). A label is one line, always, and is hidden entirely when it does not fit (founder design call 2026-10-06, YOY-168). Exclusions are filtered out, never labelled.
+4. **Label templates per kind of miss.** About five templates in total: a number missed — a price label carries no numbers ("slightly over budget" within the near band, "over budget" beyond it; the shopper's cap is on the chip and the product's price is on the card), a size label is short ("size M not in stock") — a merchant fact missed ("in grey, not black"), a description missed (one generic "close match" line). A label is one line, always, and is hidden entirely when it does not fit (founder design call 2026-10-06, YOY-168). When every card above the heading carries the same label, the page says it once in a line above the grid and the per-card lines are hidden (YOY-171 AC-3). Inside a judged page, within each group, far-over-budget cards take the places they hold cheapest first (YOY-171 AC-4, as amended 2026-10-11). Exclusions are filtered out, never labelled.
    Templates are translated once per shipped language and are the one
    permitted per-language asset (amends "no per-language code"); a language
    without templates shows no label.
@@ -369,8 +370,11 @@ Agreed in the co-manager plan review of 29–30 Sep 2026. Numbers marked
 16. **Theme-native label placement** is a docs/DESIGN.md decision inside M6
     (a small muted line under the price, inheriting the theme; nothing when
     it does not fit).
-17. **Not relevant is dropped (2026-10-06, YOY-163).** A product the judge marks "not relevant" is dropped from a page that holds anything better, as an excluded product is; the page may come out short, and the count still counts the find order. Refinement 8 stands for the page where every candidate is "not relevant": all shown, in find order, with the generic label. A product whose judge call failed or timed out is never dropped: it stays on the page, last, with no label.
+17. **Not relevant is dropped (2026-10-06, YOY-163).** A product the judge marks "not relevant" is dropped from a page that holds anything better, as an excluded product is; the page may come out short, and the count still counts the find order. Refinement 8 stands for the page where every candidate is "not relevant": all shown, in find order, with the generic label. A product whose judge call failed or timed out (a stand-in) is never dropped: it sits after every judged card of the page, before the "Close matches" heading, and carries the line "not checked yet" (YOY-171 AC-2). When the judge misses its deadline the page is served in find order and the whole judged page replaces it once the late answer lands — dropped not-relevant, close under the heading, labels — on the playground and in the widget (YOY-171 AC-1).
 18. **Close matches under a heading (founder decision 2026-10-06, YOY-166).** When a page holds at least one product the judge marks exact or the same item in another colour or size, the "close" products sit below the existing "Close matches" heading, not inline, in their verdict order, and carry no label of their own: the heading is the label (YOY-168). A page with no exact product is unchanged (every card inline, labelled).
+19. **Colour is a code-checked wish (YOY-171 AC-5).** The extraction reads an asked colour as a fact next to price, size, stock and exclusions; it shows as a removable chip; after the judge, inside the judged page, cards of the asked colour lead their own group; a card of another colour carries "in <colour>, not <asked>" only when the judge gave it no label. Colour never filters and never changes which products are found or judged.
+20. **A code-checked wish orders cards only after the judge and only inside the judged page (binding, 2026-10-11).** Nothing moves across the page cut before the judge sees the page. Measured: ordering across the find front before the judge cost the Hebrew hidden score 0.10 twice (colour run 7, price run B4).
+21. **The extraction starts on the typing pause (YOY-171 AC-7) and its spend is bounded (AC-13, AC-15).** A preview of three or more characters warms the extraction cache; a submit joins a running call instead of paying twice. Previews draw on their own allowance (per IP on the playground, per session and per shop on the proxy); a capped or throttled search makes no extraction call; the proxy's AI budgets hold against a rotated session id.
 
 ### Quality gate (v3, 2026-09-28, binding)
 
@@ -407,6 +411,8 @@ a repository folder. The first real queries come from the live search log
 (every submitted playground search since August), weighted most; model-written
 filler fills the rest. Arabic, Russian, French and Spanish scores are marked
 model-written until real queries in those languages exist.
+
+**Measurement rules (2026-10-11, binding; YOY-171 AC-9, AC-16, AC-17).** A score run waits for the wish extraction (`EXTRACTION_GRACE_MS=4000`, as it waits for the judge) and prints the no-extraction share per language; a run before this rule could score a sixth of its Hebrew searches with no wishes read. A gate compares a branch only to a reference run taken the same day on the branch's base; an older reference is not a reference. Same-code Hebrew runs differ by up to 0.06 because the Hebrew half is 25 searches, so the 0.090 band is the floor of what it can see. Measured level on 2026-10-11 (control C3, main, Jev): en 0.644 · he 0.218; the Hebrew level fell from 0.407 (2026-10-04) over the M6 tail and the cause is not found. Both numbers are far from the 90 % rule.
 
 ### Amendment (2026-08-22) — Colour exclusion, close matches, colourway families (binding; capabilities 2 and 3)
 
@@ -697,7 +703,10 @@ sketched in v2. From v3 the plan is:
    score; variants table + dossiers + multi-vector index; find-then-judge
    behind the current API; shop-assistant labels; server-side pages and counts (page 2 judged when the shopper nears it, never pre-judged); judge comparison (Gemini vs Jev); delete the old switch and
    ladder; copy pass on the site (tiers) once the PRD fixes them.
-7. **Run alone** — requirements:
+7. **Measure, then run alone** — three parts, in this order, one spec session each or one chain with blocked-by relations:
+   a. *Measure first (no feature until these report).* Grow the Hebrew set to at least 75 real or realistic searches and add a second, harder set in both languages (reference-to-a-person or a look, brand look-alikes the catalog does not carry, occasion and vagueness), each with its grader rule; explain or restore the Hebrew level (the judge reading a Hebrew sentence against English cards, extraction prompt v8, the small set); run one structured baseline on the same hidden sets — extraction → filter and rank on the enriched attributes, no judge — and report its score, cost and latency next to Engine v2's, so the founder decides whether the judge is the default or a router for the long tail.
+   b. *Speed chain.* Database writes off the hot path (one write per search, after the response), full overlap of the extraction, find and judge where the contracts allow, the repeat-share measured on the deployment; target median ≈ 1.1–1.3 s fresh; a paid instance only after the first paying customer; judge fan-out parked.
+   c. *Run alone* — requirements:
    - Automatic re-analysis on product change: webhook sync re-enriches
      and re-embeds changed products; retrieval checks content freshness
      so edited products are never served with stale vectors or
