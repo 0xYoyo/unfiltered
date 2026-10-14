@@ -58,6 +58,8 @@ import {
   HARD_KINDS,
   hardFillerPrompt,
   reproduceOldSet,
+  RepositoryText,
+  repositoryText,
   type LogQuery,
   detectLanguage,
   encodeHiddenSet,
@@ -1680,6 +1682,48 @@ describe("Hebrew 75, the hard set and per-set tables (YOY-175)", () => {
     expect(queries(old.publicSet, "he").some((query) => loose.has(query))).toBe(true);
   });
 
+  it("drops an added search whose text is already in the repository, so it never enters the hidden half (AC-1, amended)", async () => {
+    const cutoff = new Date(Date.UTC(2026, 9, 1, 17, 0));
+    const before = log(30, new Date(Date.UTC(2026, 8, 20)), "old");
+    const after = log(60, new Date(Date.UTC(2026, 9, 5)), "new");
+    const oldSet = (["en", "he"] as const).flatMap((language) =>
+      before
+        .filter((entry) => detectLanguage(entry.query) === language)
+        .sort((a, b) => b.date.getTime() - a.date.getTime())
+        .slice(0, 25)
+        .map((entry) => ({ query: entry.query, language, source: "log" as const, modelWritten: false })),
+    );
+    const logQueries = [...before, ...after];
+    const results = reproduceOldSet({ logQueries, previousPublic: splitScoreSet(oldSet).publicSet, before: cutoff });
+    const keep = Object.fromEntries(results.map((result) => [result.language, result.entries!]));
+    const pinned = Object.fromEntries(results.map((result) => [result.language, result.halves!]));
+    // The newest added Hebrew search, as a test file would quote it, in upper case and odd spacing.
+    const repoKnown = "חיפוש new 59";
+    const known = new RepositoryText(`expect(search("  חיפוש   NEW 59 ")).toBe(true);`.toLowerCase().replace(/\s+/g, " "));
+    const set = await buildScoreSet({ logQueries, llm: createSyntheticFillerLlm(), keep, known });
+    const { publicSet, hiddenSet } = splitScoreSet(set, undefined, pinned);
+    const he = set.filter((entry) => entry.language === "he");
+
+    expect(he.some((entry) => entry.query === repoKnown)).toBe(false);
+    expect(hiddenSet.some((entry) => known.excludes("probe", entry.query))).toBe(false);
+    // The next log search takes its place: he stays 75, all from the log, 38 / 37.
+    expect(he).toHaveLength(75);
+    expect(he.every((entry) => entry.source === "log")).toBe(true);
+    expect(he.some((entry) => entry.query === "חיפוש new 9")).toBe(true);
+    expect(publicSet.filter((entry) => entry.language === "he")).toHaveLength(38);
+    expect(hiddenSet.filter((entry) => entry.language === "he")).toHaveLength(37);
+    expect(known.excluded.get("simple he")).toBeGreaterThanOrEqual(1);
+    expect(known.excluded.has("simple en")).toBe(false);
+  });
+
+  it("reads every tracked file as normalized text for the repository check (AC-1, amended)", () => {
+    const known = repositoryText(REPO_ROOT);
+    expect(known.excludes("probe", "The GROWN set and   the hard set")).toBe(true);
+    // Built at run time: this test file is tracked too, so a literal would be found in it.
+    expect(known.excludes("probe", ["zqx", "never", "written", String(175 * 7)].join(" "))).toBe(false);
+    expect(known.excluded.get("probe")).toBe(1);
+  });
+
   it("builds both sets offline, writes `set` on every public entry, and reports counts only (verify step 1)", async () => {
     const dir = mkdtempSync(join(tmpdir(), "score-set-175-"));
     const publicPath = join(dir, "public.json");
@@ -1700,6 +1744,8 @@ describe("Hebrew 75, the hard set and per-set tables (YOY-175)", () => {
     expect(hiddenSet).toHaveLength(12 * 5 + 37 + 15 * 2);
     expect(hiddenSet.every((entry) => entry.set !== undefined)).toBe(true);
     expect(out).toContain("set simple he 75: 38 public, 37 hidden; 2 log, 73 filler");
+    // A synthetic build checks against no repository text, and says so as a count.
+    expect(out).toContain("excluded 0 repository-known searches");
     expect(out).toContain("set hard en 30: 15 public, 15 hidden; 0 log, 30 filler");
     // The summary never carries a query.
     expect(findLeaks(out.join("\n"), hiddenSet)).toEqual({ leaked: 0 });

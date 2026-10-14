@@ -41,6 +41,8 @@ import {
   decodeHiddenSet,
   exportLogQueries,
   reproduceOldSet,
+  RepositoryText,
+  repositoryText,
   SCORE_LANGUAGES,
   SCORE_SET_NAMES,
   ScoreSetRefusal,
@@ -198,8 +200,12 @@ export async function buildSetCommand(
         if (result.halves !== undefined) pinned[result.language] = result.halves;
       }
     }
-    const simple = await buildScoreSet({ logQueries, llm, keep });
-    const hard = await buildHardSet({ llm, avoid: simple });
+    // No search already in the repository may enter a hidden half (YOY-175
+    // AC-1, amended). The synthetic log and filler live in a tracked file,
+    // so a synthetic build checks against nothing.
+    const known = values.synthetic ? new RepositoryText("") : repositoryText(REPO_ROOT);
+    const simple = await buildScoreSet({ logQueries, llm, keep, known });
+    const hard = await buildHardSet({ llm, avoid: simple, known });
     const { publicSet, hiddenSet } = splitScoreSet([...simple, ...hard], seed, pinned);
     writeScoreSets({
       publicSet,
@@ -209,6 +215,10 @@ export async function buildSetCommand(
       repoRoot: REPO_ROOT,
     });
     out(`score set: ${publicSet.length} public, ${hiddenSet.length} hidden (seed ${seed})`);
+    // Counts only, never the text: searches dropped because the repository already holds them.
+    const excludedTotal = [...known.excluded.values()].reduce((sum, count) => sum + count, 0);
+    out(`excluded ${excludedTotal} repository-known searches`);
+    for (const [key, count] of known.excluded) out(`excluded ${key} ${count}`);
     // Per set and language (YOY-175 AC-1, AC-2): sizes and where the
     // searches came from, as counts — never a query.
     for (const entries of [simple, hard]) {

@@ -1,4 +1,5 @@
-import { mkdirSync, realpathSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 
 import type { PrismaClient } from "@prisma/client";
@@ -219,6 +220,7 @@ function fillShape(
   shape: FillerShape,
   count: number,
   taken: Set<string>,
+  known: RepositoryText | undefined,
 ): Promise<string[]> {
   return fillDistinct(
     llm,
@@ -226,6 +228,7 @@ function fillShape(
     `${language}/${shape}`,
     count,
     taken,
+    known && ((query) => known.excludes(`simple ${language}`, query)),
   );
 }
 
@@ -235,6 +238,7 @@ async function fillDistinct(
   label: string,
   count: number,
   taken: Set<string>,
+  excluded: ((query: string) => boolean) | undefined,
 ): Promise<string[]> {
   const written: string[] = [];
   // A model asked for N searches sometimes repeats itself or an existing
@@ -255,6 +259,7 @@ async function fillDistinct(
       const key = normalizeReuseQuery(value);
       if (key === "" || taken.has(key)) continue;
       taken.add(key);
+      if (excluded?.(value)) continue;
       written.push(value.trim());
       if (written.length === count) break;
     }
@@ -263,6 +268,54 @@ async function fillDistinct(
     throw new Error(`score filler: ${label} produced ${written.length} of ${count} distinct searches`);
   }
   return written;
+}
+
+/**
+ * The text of every tracked file in the repository, for the rule that no
+ * search already in the repository may enter a hidden half (YOY-175 AC-1,
+ * amended). A candidate for a half the shuffle decides — an added log
+ * search, or filler — is dropped when its normalized text appears in any
+ * tracked file, and the next log search or filler takes its place. Only
+ * counts are kept, per set and language: never the text.
+ */
+export class RepositoryText {
+  readonly excluded = new Map<string, number>();
+
+  constructor(private readonly text: string) {}
+
+  /** True when the query's text is in the repository; counted under `key` ("simple he"). */
+  excludes(key: string, query: string): boolean {
+    const normalized = normalizeReuseQuery(query);
+    if (normalized === "" || !this.text.includes(normalized)) return false;
+    this.excluded.set(key, (this.excluded.get(key) ?? 0) + 1);
+    return true;
+  }
+}
+
+/** Files larger than this are data dumps, not text a search could have been copied from. */
+const REPOSITORY_FILE_MAX_BYTES = 4 * 1024 * 1024;
+
+/**
+ * Read every tracked file under `repoRoot` (`git ls-files`), normalized the
+ * way searches are: case-folded, whitespace collapsed. Binary files are skipped.
+ */
+export function repositoryText(repoRoot: string): RepositoryText {
+  const paths = execFileSync("git", ["ls-files", "-z"], { cwd: repoRoot, maxBuffer: 64 * 1024 * 1024 })
+    .toString("utf8")
+    .split("\0")
+    .filter((path) => path !== "");
+  const parts: string[] = [];
+  for (const path of paths) {
+    let content: Buffer;
+    try {
+      content = readFileSync(resolve(repoRoot, path));
+    } catch {
+      continue;
+    }
+    if (content.length > REPOSITORY_FILE_MAX_BYTES || content.includes(0)) continue;
+    parts.push(normalizeReuseQuery(content.toString("utf8")));
+  }
+  return new RepositoryText(parts.join("\n"));
 }
 
 /** A language's shopper-shaped log searches, newest first. */
@@ -279,15 +332,20 @@ function logOf(logQueries: readonly LogQuery[], language: ScoreLanguage): LogQue
  * a set reproduced from an earlier build — then its shopper-shaped log
  * queries, newest first (YOY-141 AC-12), then model filler in the 60 / 30 /
  * 10 shape mix for the remainder. Every entry carries `set: "simple"`.
+ * With `known`, a log search or filler whose text is already in the
+ * repository is skipped; kept entries keep their old halves and are not
+ * checked.
  */
 export async function buildScoreSet({
   logQueries,
   llm,
   keep = {},
+  known,
 }: {
   logQueries: readonly LogQuery[];
   llm: LlmClient;
   keep?: Partial<Record<ScoreLanguage, readonly ScoreSetEntry[]>>;
+  known?: RepositoryText;
 }): Promise<ScoreSetEntry[]> {
   const entries: ScoreSetEntry[] = [];
   for (const language of SCORE_LANGUAGES) {
@@ -296,6 +354,7 @@ export async function buildScoreSet({
     const taken = new Set(kept.map((entry) => normalizeReuseQuery(entry.query)));
     const fromLog = logOf(logQueries, language)
       .filter((entry) => !taken.has(normalizeReuseQuery(entry.query)))
+      .filter((entry) => !known?.excludes(`simple ${language}`, entry.query))
       .slice(0, size - kept.length);
     for (const entry of fromLog) taken.add(normalizeReuseQuery(entry.query));
     const modelWritten = kept.every((entry) => entry.source === "model") && fromLog.length === 0;
@@ -308,7 +367,7 @@ export async function buildScoreSet({
     const shapes = fillerShapeCounts(size - kept.length - fromLog.length);
     for (const shape of ["short", "medium", "long"] as const) {
       if (shapes[shape] === 0) continue;
-      for (const query of await fillShape(llm, language, shape, shapes[shape], taken)) {
+      for (const query of await fillShape(llm, language, shape, shapes[shape], taken, known)) {
         entries.push({ query, language, source: "model", modelWritten, set: "simple" });
       }
     }
@@ -428,14 +487,17 @@ export function hardFillerPrompt(
  * The hard set (YOY-175 AC-2): 30 model-written searches per language in en
  * and he, the five kinds in equal parts (6 each), each entry carrying
  * `set: "hard"` and its `kind`. `avoid` holds searches already in the
- * simple set, so the two sets share none.
+ * simple set, so the two sets share none. With `known`, a search whose text
+ * is already in the repository is skipped and written again.
  */
 export async function buildHardSet({
   llm,
   avoid = [],
+  known,
 }: {
   llm: LlmClient;
   avoid?: readonly ScoreSetEntry[];
+  known?: RepositoryText;
 }): Promise<ScoreSetEntry[]> {
   const perKind = HARD_SEARCHES_PER_LANGUAGE / HARD_KINDS.length;
   const entries: ScoreSetEntry[] = [];
@@ -448,6 +510,7 @@ export async function buildHardSet({
         `${language}/hard ${kind}`,
         perKind,
         taken,
+        known && ((query) => known.excludes(`hard ${language}`, query)),
       );
       for (const query of written) {
         entries.push({ query, language, source: "model", modelWritten: true, set: "hard", kind });

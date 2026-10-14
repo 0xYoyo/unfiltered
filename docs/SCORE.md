@@ -319,7 +319,14 @@ exactly (YOY-175 AC-1, amended): the old 13 public stay public and the old
 12 hidden stay hidden, in their old order, and the seeded shuffle splits
 only the added searches, so he's 50 go 25 / 25 and he is 38 / 37 in all. A
 search that was public is already in the repository, so it never enters a
-hidden half. A language that does not reproduce is
+hidden half. The same holds for every search the shuffle places: a log
+search or filler whose normalized text (case-folded, whitespace collapsed)
+already appears in any tracked file (`git ls-files`) is dropped before the
+split, and the next log search or filler takes its place, so the sizes
+hold. The build prints `excluded <n> repository-known searches` and one
+`excluded <set> <lang> <n>` line per set and language that dropped any:
+counts, never the text. A synthetic build checks against no repository
+text, because its log and filler live in a tracked file. A language that does not reproduce is
 built fresh. The build prints `reproduce <lang> reproduced|not reproduced`
 and, per set and language, its public, hidden, log and filler counts.
 
