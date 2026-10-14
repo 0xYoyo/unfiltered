@@ -151,7 +151,10 @@ the index only, never the query** — the leak check admits exactly
 Two hidden runs compared index by index show which searches fell, without
 either output naming one. **A public line may carry the query:**
 `npm run score:public -- --per-search` prints
-`grade <lang> <index> <score> <query>` per public search after the table.
+`grade <lang> <index> <score> <query>` per public search after the table,
+each followed by one `title <lang> <index> <position> <title>` line per
+graded result (position 1–6 in served order; YOY-173), so two public runs
+can be compared page by page. A hidden run never prints a title line.
 `--per-search` with `--hidden-set` is refused (exit 1, before any call).
 
 **`judge=none`.** `JUDGE_PROVIDER=none` builds the engine with no judge:
@@ -596,6 +599,91 @@ $0.5166, first fix run $0.1334, C3 and fix' $0.2667; $0.92 in all.
 One side reading for the M7 speed chain: the replay's "no extraction"
 column (8–25 %) shows run 5's code missed the extraction grace on some
 searches on 2026-10-10, where today's code (0 %) did not.
+
+### M7 — current set: controls and baselines
+
+YOY-173, 2026-10-14: five hidden runs dispatched 11:52 UTC and completed
+12:00–12:02 UTC, all with `ref=d401bdf6e231c87cda0e89f3a38343799f75b1dd`
+(`main` after YOY-172), judge deadline and extraction grace 4,000 ms. Every
+run was green with a clean leak check (72 checked), **0 failed searches**,
+72 extraction calls and 72 `grade` lines. C4 a/b/c are the three-run
+reference (judge `jev`): [a](https://github.com/0xYoyo/unfiltered/actions/runs/38559686447),
+[b](https://github.com/0xYoyo/unfiltered/actions/runs/38559691020),
+[c](https://github.com/0xYoyo/unfiltered/actions/runs/38559695290).
+S1 is the engine with no judge (`judge=none`, every page the composed find
+order, reason `find-only`):
+[run 38559699502](https://github.com/0xYoyo/unfiltered/actions/runs/38559699502).
+G1 is the Flash-Lite judge (`judge=gemini`):
+[run 38559703962](https://github.com/0xYoyo/unfiltered/actions/runs/38559703962).
+Each band is `max(spread of C4 a/b/c, the language's M5 band, 0.03)`. A
+difference is from the C4 mean, and "inside" means its absolute value is
+at most the band.
+
+| | en | he | ar | ru | fr | es |
+|---|---|---|---|---|---|---|
+| C4 a | 0.639 | 0.255 | 0.500 | 0.644 | 0.458 | 0.384 |
+| C4 b | 0.602 | 0.241 | 0.523 | 0.625 | 0.407 | 0.380 |
+| C4 c | 0.620 | 0.218 | 0.481 | 0.657 | 0.463 | 0.361 |
+| C4 mean | 0.620 | 0.238 | 0.501 | 0.642 | 0.443 | 0.375 |
+| C4 spread | 0.037 | 0.037 | 0.042 | 0.032 | 0.056 | 0.023 |
+| Band | 0.111 | 0.090 | 0.042 | 0.055 | 0.056 | 0.060 |
+| S1 (`none`) | 0.657 | 0.315 | 0.537 | 0.611 | 0.625 | 0.361 |
+| S1 − C4 mean | +0.037 inside | +0.077 inside | +0.036 inside | −0.031 inside | **+0.182 outside** | −0.014 inside |
+| G1 (`gemini`) | 0.662 | 0.310 | 0.542 | 0.634 | 0.449 | 0.403 |
+| G1 − C4 mean | +0.042 inside | +0.072 inside | +0.041 inside | −0.008 inside | +0.006 inside | +0.028 inside |
+
+No-extraction share: 0 % in every language in all five runs. Cost lines:
+C4 a $0.1328 over 1,924 model calls, C4 b $0.1337 over 1,943, C4 c $0.1334
+over 1,942, S1 $0.0526 over 216, G1 $0.2097 over 289. Hidden total $0.6622.
+
+S1 lands above the C4 mean in en and he, but inside both bands. fr is the
+only language outside its band, and it is a tracked language, not a gated
+one. Under 1 s (local) is 50–67 % per language for S1 and 0–8 % for every
+judged run, because without the judge a search makes no second model
+call. That is a local timing only, never this table's latency claim.
+
+Per-index hidden Hebrew grades (index into the decoded hidden file, then
+the search's score; index and score only):
+
+| Index | C4 a | C4 b | C4 c | S1 |
+|---|---|---|---|---|
+| 12 | 0.000 | 0.000 | 0.000 | 0.167 |
+| 13 | 0.111 | 0.000 | 0.111 | 0.111 |
+| 14 | 0.167 | 0.278 | 0.167 | 0.167 |
+| 15 | 0.000 | 0.000 | 0.000 | 0.000 |
+| 16 | 0.000 | 0.000 | 0.000 | 0.389 |
+| 17 | 0.778 | 0.722 | 0.667 | 0.556 |
+| 18 | 0.000 | 0.000 | 0.000 | 0.000 |
+| 19 | 0.000 | 0.000 | 0.000 | 0.556 |
+| 20 | 0.000 | 0.000 | 0.000 | 0.000 |
+| 21 | 0.611 | 0.556 | 0.611 | 0.611 |
+| 22 | 0.667 | 0.611 | 0.333 | 0.500 |
+| 23 | 0.722 | 0.722 | 0.722 | 0.722 |
+
+Six of the twelve Hebrew searches (12, 15, 16, 18, 19, 20) score 0 in all
+three C4 runs. Three of those score above 0 with no judge: 12 at 0.167, 16
+at 0.389 and 19 at 0.556. On those three, the judge's page scores lower
+than the find order it was given. 15, 18 and 20 score 0 with or without the
+judge: their find order already scores 0.
+
+P1, the public half with per-search grades (`--per-search`, judge `jev`,
+judge deadline and extraction grace 4,000 ms), was run twice locally on
+2026-10-14 between 12:05 and 12:16 UTC. Both outputs are attached to YOY-173.
+The first ran on `main` at `d401bdf` with this issue's title lines. The second
+ran on a local throwaway at `5c5adfe` (run 5's code), carrying only the
+`--per-search` and title hunks of the score runner, with `ENGINE_V2=1`. Both
+had 78 searches and 0 failed.
+
+| | en | he | ar | ru | fr | es | Cost |
+|---|---|---|---|---|---|---|---|
+| P1 `main` (`d401bdf`) | 0.705 | 0.214 | 0.397 | 0.415 | 0.457 | 0.577 | $0.1468 over 2,095 model calls |
+| P1 `5c5adfe` throwaway | 0.709 | 0.231 | 0.491 | 0.474 | 0.462 | 0.504 | $0.1140 over 2,105 model calls |
+
+No public Hebrew search fell by 1.0 or more in mean grade (0–3 scale) from
+`5c5adfe` to `main`. The largest falls were he 14 (−0.50) and he 23
+(−0.34), and both served the same six titles in both runs, so those falls
+are the grader's own variation. 41 of the 78 public searches served an
+identical page in both runs.
 
 ### Judge comparison — Flash-Lite versus Jev (YOY-152, 2026-10-04)
 

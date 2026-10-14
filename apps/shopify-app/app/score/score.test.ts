@@ -721,6 +721,8 @@ describe("per-search lines (YOY-172 AC-1, AC-5, AC-7)", () => {
     expect(code).toBe(0);
     const grades = out.filter((line) => line.startsWith("grade "));
     expect(grades).toHaveLength(set.length);
+    // A hidden run never prints the served titles (YOY-173 AC-5).
+    expect(out.filter((line) => line.startsWith("title "))).toEqual([]);
     // After the table and its no-extraction lines, in set order.
     expect(out.slice(-set.length)).toEqual(grades);
     expect(out.indexOf(grades[0]!)).toBeGreaterThan(
@@ -747,6 +749,7 @@ describe("per-search lines (YOY-172 AC-1, AC-5, AC-7)", () => {
     const plain = await run(["--synthetic", "--set", setPath]);
     expect(plain.code).toBe(0);
     expect(plain.out.filter((line) => line.startsWith("grade "))).toEqual([]);
+    expect(plain.out.filter((line) => line.startsWith("title "))).toEqual([]);
 
     const perSearch = await run(["--synthetic", "--set", setPath, "--per-search"]);
     expect(perSearch.code).toBe(0);
@@ -756,7 +759,21 @@ describe("per-search lines (YOY-172 AC-1, AC-5, AC-7)", () => {
       expect.stringMatching(new RegExp(`^grade he 1 \\d\\.\\d{3} ${marker} black dress$`)),
       expect.stringMatching(new RegExp(`^grade fr 2 \\d\\.\\d{3} shirt ${marker}$`)),
     ]);
-    expect(perSearch.out.slice(-set.length)).toEqual(grades);
+    // Each grade line is followed by its search's served titles (YOY-173
+    // AC-5): `title <lang> <index> <position> <title>`, position 1-based.
+    const tail = perSearch.out.slice(perSearch.out.indexOf(grades[0]!));
+    expect(tail.every((line) => line.startsWith("grade ") || line.startsWith("title "))).toBe(true);
+    const titles = tail.filter((line) => line.startsWith("title "));
+    expect(titles.length).toBeGreaterThan(0);
+    for (const line of titles) expect(line).toMatch(/^title (en|he|fr) [0-2] [1-6] \S/);
+    for (const [index, grade] of grades.entries()) {
+      const own = tail.slice(tail.indexOf(grade) + 1);
+      const next = own.findIndex((line) => line.startsWith("grade "));
+      const block = next === -1 ? own : own.slice(0, next);
+      expect(block.map((line) => line.split(" ").slice(0, 4).join(" "))).toEqual(
+        block.map((_, position) => `title ${set[index]!.language} ${index} ${position + 1}`),
+      );
+    }
   });
 
   it("refuses --per-search with --hidden-set before reading or calling anything (AC-5)", async () => {
@@ -786,8 +803,8 @@ describe("per-search lines (YOY-172 AC-1, AC-5, AC-7)", () => {
       set: set.slice(0, 2),
     });
     expect(report.grades).toEqual([
-      { language: "en", index: 0, score: null },
-      { language: "he", index: 1, score: null },
+      { language: "en", index: 0, score: null, titles: [] },
+      { language: "he", index: 1, score: null, titles: [] },
     ]);
     expect(formatGradeLines(report.grades!)).toEqual(["grade en 0 failed", "grade he 1 failed"]);
     expect(formatGradeLines(report.grades!, set)).toEqual([
@@ -795,6 +812,14 @@ describe("per-search lines (YOY-172 AC-1, AC-5, AC-7)", () => {
       `grade he 1 failed ${marker} black dress`,
     ]);
     expect(formatGradeLines([{ language: "ru", index: 11, score: 2 / 3 }])).toEqual(["grade ru 11 0.667"]);
+    // Titles print with a set only (YOY-173 AC-5), never on the hidden path.
+    const titled = [{ language: "en" as const, index: 0, score: 1, titles: ["Linen shirt", "Oxford shirt"] }];
+    expect(formatGradeLines(titled)).toEqual(["grade en 0 1.000"]);
+    expect(formatGradeLines(titled, set)).toEqual([
+      `grade en 0 1.000 ${marker} linen shirt`,
+      "title en 0 1 Linen shirt",
+      "title en 0 2 Oxford shirt",
+    ]);
   });
 });
 
