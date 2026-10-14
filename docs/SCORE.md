@@ -666,6 +666,25 @@ at 0.389 and 19 at 0.556. On those three, the judge's page scores lower
 than the find order it was given. 15, 18 and 20 score 0 with or without the
 judge: their find order already scores 0.
 
+P1, the public half with per-search grades (`--per-search`, judge `jev`,
+judge deadline and extraction grace 4,000 ms), was run twice locally on
+2026-10-14 between 12:05 and 12:16 UTC. Both outputs are attached to YOY-173.
+The first ran on `main` at `d401bdf` with this issue's title lines. The second
+ran on a local throwaway at `5c5adfe` (run 5's code), carrying only the
+`--per-search` and title hunks of the score runner, with `ENGINE_V2=1`. Both
+had 78 searches and 0 failed.
+
+| | en | he | ar | ru | fr | es | Cost |
+|---|---|---|---|---|---|---|---|
+| P1 `main` (`d401bdf`) | 0.705 | 0.214 | 0.397 | 0.415 | 0.457 | 0.577 | $0.1468 over 2,095 model calls |
+| P1 `5c5adfe` throwaway | 0.709 | 0.231 | 0.491 | 0.474 | 0.462 | 0.504 | $0.1140 over 2,105 model calls |
+
+No public Hebrew search fell by 1.0 or more in mean grade (0–3 scale) from
+`5c5adfe` to `main`. The largest falls were he 14 (−0.50) and he 23
+(−0.34), and both served the same six titles in both runs, so those falls
+are the grader's own variation. 41 of the 78 public searches served an
+identical page in both runs.
+
 ### Judge comparison — Flash-Lite versus Jev (YOY-152, 2026-10-04)
 
 Per-language score: hidden run 5 above. Median latency, cost and stability:
