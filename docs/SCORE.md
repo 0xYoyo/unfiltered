@@ -230,7 +230,7 @@ grader that marks a title holding a query word as relevant. Without
 The truth was built on 2026-10-14 (12:55–13:00 UTC) on branch
 `YOY-174-find-recall` at `8baf481` (base `main` `96e8a17`), against
 the committed seed fixture (465 products, 413 families). All 26 searches
-were graded in 260 calls, and none was partial. **Measured cost /bin/zsh.4169**,
+were graded in 260 calls, and none was partial. **Measured cost $0.4169**,
 against the offline estimate of ≈ $0.403 and the $0.50 ledger cap. The
 truth was graded without descriptions. Recall was measured at the default
 find-set size (150). A re-run reading the committed truth makes no grading
