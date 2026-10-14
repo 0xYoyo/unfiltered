@@ -18,7 +18,9 @@ only if the hidden score goes up. The tooling lives in
    (the latency probe's marker), and not one of the probe's committed
    queries in `scripts/latency-probe-queries.json`. Each is filed under a language by script alone: Hebrew → `he`,
    Arabic → `ar`, Cyrillic → `ru`, everything else → `en`. French and Spanish
-   are never taken from the log.
+   are never taken from the log. The Hebrew log lives under the seed store
+   (`unfiltered-dev.myshopify.com`), so `PLAYGROUND_SEED_STORE_KEY` must be
+   given on the command line when the local `.env` lacks it.
 2. **Fill** — the simple set fills `he` to 75 searches and each of
    `en, ar, ru, fr, es` to 25 (YOY-175 AC-1; 25 everywhere before). Log
    queries come first, newest first, then Flash-Lite filler shaped 60 % one

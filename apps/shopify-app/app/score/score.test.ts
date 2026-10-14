@@ -1539,7 +1539,8 @@ describe("find recall (YOY-174)", () => {
     const out: string[] = [];
     const code = await runRecallCommand(["--synthetic"], { out: (text) => void out.push(text), err: () => {} });
     expect(code).toBe(0);
-    expect(out.join("\n")).toMatch(/^truth 26 searches, built .*, not written$/m);
+    // The committed public set's en and he: simple 13 + 38, hard 15 + 15 (YOY-175).
+    expect(out.join("\n")).toMatch(/^truth 81 searches, built .*, not written$/m);
   });
 });
 
