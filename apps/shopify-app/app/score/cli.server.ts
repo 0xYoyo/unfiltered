@@ -201,12 +201,13 @@ export async function buildSetCommand(
       }
     }
     // No search already in the repository may enter a hidden half (YOY-175
-    // AC-1, amended). The synthetic log and filler live in a tracked file,
-    // so a synthetic build checks against nothing.
+    // AC-1, amended): the split pins every such added search public. The
+    // synthetic log and filler live in a tracked file, so a synthetic build
+    // checks against nothing.
     const known = values.synthetic ? new RepositoryText("") : repositoryText(REPO_ROOT);
     const simple = await buildScoreSet({ logQueries, llm, keep, known });
     const hard = await buildHardSet({ llm, avoid: simple, known });
-    const { publicSet, hiddenSet } = splitScoreSet([...simple, ...hard], seed, pinned);
+    const { publicSet, hiddenSet } = splitScoreSet([...simple, ...hard], seed, pinned, known);
     writeScoreSets({
       publicSet,
       hiddenSet,
@@ -215,10 +216,8 @@ export async function buildSetCommand(
       repoRoot: REPO_ROOT,
     });
     out(`score set: ${publicSet.length} public, ${hiddenSet.length} hidden (seed ${seed})`);
-    // Counts only, never the text: searches dropped because the repository already holds them.
-    const excludedTotal = [...known.excluded.values()].reduce((sum, count) => sum + count, 0);
-    out(`excluded ${excludedTotal} repository-known searches`);
-    for (const [key, count] of known.excluded) out(`excluded ${key} ${count}`);
+    // Counts only, never the text: added searches pinned public because the repository already holds them.
+    for (const [key, count] of known.pinned) out(`pinned ${key} ${count}`);
     // Per set and language (YOY-175 AC-1, AC-2): sizes and where the
     // searches came from, as counts — never a query.
     for (const entries of [simple, hard]) {

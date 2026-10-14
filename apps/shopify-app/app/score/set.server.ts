@@ -220,7 +220,7 @@ function fillShape(
   shape: FillerShape,
   count: number,
   taken: Set<string>,
-  known: RepositoryText | undefined,
+  overflow: ((query: string) => boolean) | undefined,
 ): Promise<string[]> {
   return fillDistinct(
     llm,
@@ -228,8 +228,27 @@ function fillShape(
     `${language}/${shape}`,
     count,
     taken,
-    known && ((query) => known.excludes(`simple ${language}`, query)),
+    overflow,
   );
+}
+
+/**
+ * The filler check for repository-known searches (YOY-175 AC-1, amended): a
+ * known filler search is pinned public while the added public share has
+ * room; past it, the filler is written again, so the hidden half stays
+ * drawn only from searches in no tracked file.
+ */
+function publicRoom(
+  known: RepositoryText | undefined,
+  room: { left: number },
+): ((query: string) => boolean) | undefined {
+  if (known === undefined) return undefined;
+  return (query) => {
+    if (!known.has(query)) return false;
+    if (room.left === 0) return true;
+    room.left -= 1;
+    return false;
+  };
 }
 
 async function fillDistinct(
@@ -273,22 +292,24 @@ async function fillDistinct(
 /**
  * The text of every tracked file in the repository, for the rule that no
  * search already in the repository may enter a hidden half (YOY-175 AC-1,
- * amended). A candidate for a half the shuffle decides — an added log
- * search, or filler — is dropped when its normalized text appears in any
- * tracked file, and the next log search or filler takes its place. Only
- * counts are kept, per set and language: never the text.
+ * amended). An added search whose normalized text appears in any tracked
+ * file is pinned to the public half, never dropped; the split counts the
+ * pins per set and language — counts only, never the text.
  */
 export class RepositoryText {
-  readonly excluded = new Map<string, number>();
+  readonly pinned = new Map<string, number>();
 
   constructor(private readonly text: string) {}
 
-  /** True when the query's text is in the repository; counted under `key` ("simple he"). */
-  excludes(key: string, query: string): boolean {
+  /** True when the query's normalized text is in the repository. */
+  has(query: string): boolean {
     const normalized = normalizeReuseQuery(query);
-    if (normalized === "" || !this.text.includes(normalized)) return false;
-    this.excluded.set(key, (this.excluded.get(key) ?? 0) + 1);
-    return true;
+    return normalized !== "" && this.text.includes(normalized);
+  }
+
+  /** Count `n` searches pinned public under `key` ("simple he"). */
+  pin(key: string, n: number): void {
+    this.pinned.set(key, (this.pinned.get(key) ?? 0) + n);
   }
 }
 
@@ -332,9 +353,11 @@ function logOf(logQueries: readonly LogQuery[], language: ScoreLanguage): LogQue
  * a set reproduced from an earlier build — then its shopper-shaped log
  * queries, newest first (YOY-141 AC-12), then model filler in the 60 / 30 /
  * 10 shape mix for the remainder. Every entry carries `set: "simple"`.
- * With `known`, a log search or filler whose text is already in the
- * repository is skipped; kept entries keep their old halves and are not
- * checked.
+ * With `known`, a log search whose text is already in the repository is
+ * taken all the same — the split pins it public — so filler is needed only
+ * when the log runs out; more known log searches than the added public
+ * share holds is an error, since none may be dropped. Kept entries keep
+ * their old halves and are not checked.
  */
 export async function buildScoreSet({
   logQueries,
@@ -354,8 +377,16 @@ export async function buildScoreSet({
     const taken = new Set(kept.map((entry) => normalizeReuseQuery(entry.query)));
     const fromLog = logOf(logQueries, language)
       .filter((entry) => !taken.has(normalizeReuseQuery(entry.query)))
-      .filter((entry) => !known?.excludes(`simple ${language}`, entry.query))
       .slice(0, size - kept.length);
+    // The added searches' public share: a reproduced language's kept 25 hold 13 of it.
+    const room = { left: publicCount(size) - publicCount(kept.length) };
+    for (const entry of fromLog) {
+      if (!known?.has(entry.query)) continue;
+      if (room.left === 0) {
+        throw new Error(`score set: simple ${language} has more repository-known log searches than its public half holds`);
+      }
+      room.left -= 1;
+    }
     for (const entry of fromLog) taken.add(normalizeReuseQuery(entry.query));
     const modelWritten = kept.every((entry) => entry.source === "model") && fromLog.length === 0;
     for (const entry of kept) {
@@ -367,7 +398,7 @@ export async function buildScoreSet({
     const shapes = fillerShapeCounts(size - kept.length - fromLog.length);
     for (const shape of ["short", "medium", "long"] as const) {
       if (shapes[shape] === 0) continue;
-      for (const query of await fillShape(llm, language, shape, shapes[shape], taken, known)) {
+      for (const query of await fillShape(llm, language, shape, shapes[shape], taken, publicRoom(known, room))) {
         entries.push({ query, language, source: "model", modelWritten, set: "simple" });
       }
     }
@@ -488,7 +519,8 @@ export function hardFillerPrompt(
  * and he, the five kinds in equal parts (6 each), each entry carrying
  * `set: "hard"` and its `kind`. `avoid` holds searches already in the
  * simple set, so the two sets share none. With `known`, a search whose text
- * is already in the repository is skipped and written again.
+ * is already in the repository is kept while the public half has room (the
+ * split pins it public) and written again past that.
  */
 export async function buildHardSet({
   llm,
@@ -503,6 +535,7 @@ export async function buildHardSet({
   const entries: ScoreSetEntry[] = [];
   for (const language of HARD_LANGUAGES) {
     const taken = new Set(avoid.map((entry) => normalizeReuseQuery(entry.query)));
+    const room = { left: publicCount(HARD_SEARCHES_PER_LANGUAGE) };
     for (const kind of HARD_KINDS) {
       const written = await fillDistinct(
         llm,
@@ -510,7 +543,7 @@ export async function buildHardSet({
         `${language}/hard ${kind}`,
         perKind,
         taken,
-        known && ((query) => known.excludes(`hard ${language}`, query)),
+        publicRoom(known, room),
       );
       for (const query of written) {
         entries.push({ query, language, source: "model", modelWritten: true, set: "hard", kind });
@@ -550,11 +583,17 @@ function shuffleInPlace<T>(items: T[], random: () => number): void {
  * hidden, in their old order, and the shuffle splits only the searches added
  * after them — he 50 → 25 / 25, so 38 / 37 in all. An old public search is
  * already in the repository, so it can never enter a hidden half.
+ *
+ * With `known`, the same holds for every added search (YOY-175 AC-1,
+ * amended): one whose text is in any tracked file is pinned to the public
+ * half, never dropped, and the shuffle draws the hidden half only from the
+ * added searches in no tracked file. The pins are counted on `known`.
  */
 export function splitScoreSet(
   entries: readonly ScoreSetEntry[],
   seed: number = SCORE_SPLIT_SEED,
   pinned: Partial<Record<ScoreLanguage, OldHalves>> = {},
+  known?: RepositoryText,
 ): { publicSet: ScoreSetEntry[]; hiddenSet: ScoreSetEntry[] } {
   const publicSet: ScoreSetEntry[] = [];
   const hiddenSet: ScoreSetEntry[] = [];
@@ -563,11 +602,25 @@ export function splitScoreSet(
     for (const language of SCORE_LANGUAGES) {
       const own = entries.filter((entry) => setOf(entry) === name && entry.language === language);
       const halves = name === "simple" ? pinned[language] : undefined;
+      // The added searches, repository-known ones pinned public and the rest shuffled.
+      const splitAdded = (added: ScoreSetEntry[], addedPublic: number) => {
+        const repoKnown = added.filter((entry) => known?.has(entry.query) ?? false);
+        const free = added.filter((entry) => !(known?.has(entry.query) ?? false));
+        shuffleInPlace(free, random);
+        const freePublic = addedPublic - repoKnown.length;
+        if (freePublic < 0 || freePublic > free.length) {
+          throw new Error(`score set: ${name} ${language} cannot pin ${repoKnown.length} repository-known searches public`);
+        }
+        known?.pin(`${name} ${language}`, repoKnown.length);
+        return {
+          publicHalf: [...repoKnown, ...free.slice(0, freePublic)],
+          hiddenHalf: free.slice(freePublic),
+        };
+      };
       if (halves === undefined) {
-        shuffleInPlace(own, random);
-        const publicShare = publicCount(own.length);
-        publicSet.push(...own.slice(0, publicShare));
-        hiddenSet.push(...own.slice(publicShare));
+        const split = splitAdded(own, publicCount(own.length));
+        publicSet.push(...split.publicHalf);
+        hiddenSet.push(...split.hiddenHalf);
         continue;
       }
       const byQuery = new Map(own.map((entry) => [entry.query, entry]));
@@ -581,13 +634,13 @@ export function splitScoreSet(
       const keptPublic = take(halves.publicHalf);
       const keptHidden = take(halves.hiddenHalf);
       const added = [...byQuery.values()];
-      shuffleInPlace(added, random);
       const addedPublic = publicCount(own.length) - keptPublic.length;
       if (addedPublic < 0 || addedPublic > added.length) {
         throw new Error(`score set: ${language} cannot keep its old halves at ${own.length} searches`);
       }
-      publicSet.push(...keptPublic, ...added.slice(0, addedPublic));
-      hiddenSet.push(...keptHidden, ...added.slice(addedPublic));
+      const split = splitAdded(added, addedPublic);
+      publicSet.push(...keptPublic, ...split.publicHalf);
+      hiddenSet.push(...keptHidden, ...split.hiddenHalf);
     }
   }
   return { publicSet, hiddenSet };

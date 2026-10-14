@@ -1682,7 +1682,7 @@ describe("Hebrew 75, the hard set and per-set tables (YOY-175)", () => {
     expect(queries(old.publicSet, "he").some((query) => loose.has(query))).toBe(true);
   });
 
-  it("drops an added search whose text is already in the repository, so it never enters the hidden half (AC-1, amended)", async () => {
+  it("pins an added search whose text is already in the repository to the public half, never dropping it (AC-1, amended)", async () => {
     const cutoff = new Date(Date.UTC(2026, 9, 1, 17, 0));
     const before = log(30, new Date(Date.UTC(2026, 8, 20)), "old");
     const after = log(60, new Date(Date.UTC(2026, 9, 5)), "new");
@@ -1701,27 +1701,42 @@ describe("Hebrew 75, the hard set and per-set tables (YOY-175)", () => {
     const repoKnown = "חיפוש new 59";
     const known = new RepositoryText(`expect(search("  חיפוש   NEW 59 ")).toBe(true);`.toLowerCase().replace(/\s+/g, " "));
     const set = await buildScoreSet({ logQueries, llm: createSyntheticFillerLlm(), keep, known });
-    const { publicSet, hiddenSet } = splitScoreSet(set, undefined, pinned);
+    const { publicSet, hiddenSet } = splitScoreSet(set, undefined, pinned, known);
     const he = set.filter((entry) => entry.language === "he");
+    const queries = (entries: readonly ScoreSetEntry[]) =>
+      new Set(entries.filter((entry) => entry.language === "he").map((entry) => entry.query));
 
-    expect(he.some((entry) => entry.query === repoKnown)).toBe(false);
-    expect(hiddenSet.some((entry) => known.excludes("probe", entry.query))).toBe(false);
-    // The next log search takes its place: he stays 75, all from the log, 38 / 37.
+    // Kept, not dropped, and pinned public; no repository-known search is hidden.
+    expect(he.some((entry) => entry.query === repoKnown)).toBe(true);
+    expect(queries(publicSet).has(repoKnown)).toBe(true);
+    expect(queries(hiddenSet).has(repoKnown)).toBe(false);
+    expect(hiddenSet.some((entry) => known.has(entry.query))).toBe(false);
+    // An old public entry never lands in the hidden half either.
+    const oldPublic = splitScoreSet(oldSet).publicSet.filter((entry) => entry.language === "he");
+    expect(oldPublic.some((entry) => queries(hiddenSet).has(entry.query))).toBe(false);
+    // A log of 75 or more real Hebrew searches takes no filler: he is 75 from the log, 38 / 37.
     expect(he).toHaveLength(75);
     expect(he.every((entry) => entry.source === "log")).toBe(true);
-    expect(he.some((entry) => entry.query === "חיפוש new 9")).toBe(true);
-    expect(publicSet.filter((entry) => entry.language === "he")).toHaveLength(38);
-    expect(hiddenSet.filter((entry) => entry.language === "he")).toHaveLength(37);
-    expect(known.excluded.get("simple he")).toBeGreaterThanOrEqual(1);
-    expect(known.excluded.has("simple en")).toBe(false);
+    expect(he.some((entry) => entry.query === "חיפוש new 9")).toBe(false);
+    expect(queries(publicSet).size).toBe(38);
+    expect(queries(hiddenSet).size).toBe(37);
+    expect(known.pinned.get("simple he")).toBe(1);
+    expect(known.pinned.get("simple en")).toBe(0);
+  });
+
+  it("refuses rather than drops when more repository-known log searches arrive than the public half holds (AC-1, amended)", async () => {
+    const logQueries = log(60, new Date(Date.UTC(2026, 9, 5)), "new");
+    const known = new RepositoryText(logQueries.map((entry) => entry.query).join("\n"));
+    await expect(buildScoreSet({ logQueries, llm: createSyntheticFillerLlm(), known })).rejects.toThrow(
+      "more repository-known log searches than its public half holds",
+    );
   });
 
   it("reads every tracked file as normalized text for the repository check (AC-1, amended)", () => {
     const known = repositoryText(REPO_ROOT);
-    expect(known.excludes("probe", "The GROWN set and   the hard set")).toBe(true);
+    expect(known.has("The GROWN set and   the hard set")).toBe(true);
     // Built at run time: this test file is tracked too, so a literal would be found in it.
-    expect(known.excludes("probe", ["zqx", "never", "written", String(175 * 7)].join(" "))).toBe(false);
-    expect(known.excluded.get("probe")).toBe(1);
+    expect(known.has(["zqx", "never", "written", String(175 * 7)].join(" "))).toBe(false);
   });
 
   it("builds both sets offline, writes `set` on every public entry, and reports counts only (verify step 1)", async () => {
@@ -1745,7 +1760,8 @@ describe("Hebrew 75, the hard set and per-set tables (YOY-175)", () => {
     expect(hiddenSet.every((entry) => entry.set !== undefined)).toBe(true);
     expect(out).toContain("set simple he 75: 38 public, 37 hidden; 2 log, 73 filler");
     // A synthetic build checks against no repository text, and says so as a count.
-    expect(out).toContain("excluded 0 repository-known searches");
+    expect(out).toContain("pinned simple he 0");
+    expect(out).toContain("pinned hard en 0");
     expect(out).toContain("set hard en 30: 15 public, 15 hidden; 0 log, 30 filler");
     // The summary never carries a query.
     expect(findLeaks(out.join("\n"), hiddenSet)).toEqual({ leaked: 0 });
