@@ -1682,7 +1682,7 @@ describe("Hebrew 75, the hard set and per-set tables (YOY-175)", () => {
     expect(queries(old.publicSet, "he").some((query) => loose.has(query))).toBe(true);
   });
 
-  it("pins an added search whose text is already in the repository to the public half, never dropping it (AC-1, amended)", async () => {
+  it("draws the hidden added searches from the newest repository-unknown log searches, the public from the rest (AC-1, amended)", async () => {
     const cutoff = new Date(Date.UTC(2026, 9, 1, 17, 0));
     const before = log(30, new Date(Date.UTC(2026, 8, 20)), "old");
     const after = log(60, new Date(Date.UTC(2026, 9, 5)), "new");
@@ -1700,13 +1700,21 @@ describe("Hebrew 75, the hard set and per-set tables (YOY-175)", () => {
     // The newest added Hebrew search, as a test file would quote it, in upper case and odd spacing.
     const repoKnown = "חיפוש new 59";
     const known = new RepositoryText(`expect(search("  חיפוש   NEW 59 ")).toBe(true);`.toLowerCase().replace(/\s+/g, " "));
-    const set = await buildScoreSet({ logQueries, llm: createSyntheticFillerLlm(), keep, known });
+    const set = await buildScoreSet({ logQueries, llm: createSyntheticFillerLlm(), keep, known, halves: pinned });
     const { publicSet, hiddenSet } = splitScoreSet(set, undefined, pinned, known);
     const he = set.filter((entry) => entry.language === "he");
     const queries = (entries: readonly ScoreSetEntry[]) =>
       new Set(entries.filter((entry) => entry.language === "he").map((entry) => entry.query));
+    const range = (from: number, to: number) =>
+      Array.from({ length: from - to + 1 }, (_, index) => `חיפוש new ${from - index}`);
 
-    // Kept, not dropped, and pinned public; no repository-known search is hidden.
+    // Hidden added: the 25 newest unknown (58..34). Public added: the newest remaining (59, then 33..10).
+    expect(hiddenSet.filter((entry) => entry.language === "he").slice(12).map((entry) => entry.query)).toEqual(range(58, 34));
+    expect(publicSet.filter((entry) => entry.language === "he").slice(13).map((entry) => entry.query)).toEqual([
+      repoKnown,
+      ...range(33, 10),
+    ]);
+    // Kept, not dropped, and public; no repository-known search is hidden.
     expect(he.some((entry) => entry.query === repoKnown)).toBe(true);
     expect(queries(publicSet).has(repoKnown)).toBe(true);
     expect(queries(hiddenSet).has(repoKnown)).toBe(false);
@@ -1724,12 +1732,19 @@ describe("Hebrew 75, the hard set and per-set tables (YOY-175)", () => {
     expect(known.pinned.get("simple en")).toBe(0);
   });
 
-  it("refuses rather than drops when more repository-known log searches arrive than the public half holds (AC-1, amended)", async () => {
+  it("fills the hidden half with filler when the log holds no repository-unknown search, keeping 38 / 37 (AC-1, amended)", async () => {
     const logQueries = log(60, new Date(Date.UTC(2026, 9, 5)), "new");
     const known = new RepositoryText(logQueries.map((entry) => entry.query).join("\n"));
-    await expect(buildScoreSet({ logQueries, llm: createSyntheticFillerLlm(), known })).rejects.toThrow(
-      "more repository-known log searches than its public half holds",
-    );
+    const halves = {};
+    const set = await buildScoreSet({ logQueries, llm: createSyntheticFillerLlm(), known, halves });
+    const { publicSet, hiddenSet } = splitScoreSet(set, undefined, halves, known);
+    const ofHe = (entries: readonly ScoreSetEntry[]) => entries.filter((entry) => entry.language === "he");
+
+    expect(ofHe(publicSet)).toHaveLength(38);
+    expect(ofHe(hiddenSet)).toHaveLength(37);
+    expect(ofHe(publicSet).every((entry) => entry.source === "log")).toBe(true);
+    expect(ofHe(hiddenSet).every((entry) => entry.source === "model" && !known.has(entry.query))).toBe(true);
+    expect(known.pinned.get("simple he")).toBe(38);
   });
 
   it("reads every tracked file as normalized text for the repository check (AC-1, amended)", () => {

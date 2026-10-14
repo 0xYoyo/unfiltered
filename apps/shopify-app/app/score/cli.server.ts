@@ -201,11 +201,13 @@ export async function buildSetCommand(
       }
     }
     // No search already in the repository may enter a hidden half (YOY-175
-    // AC-1, amended): the split pins every such added search public. The
+    // AC-1, amended): the hidden added searches are drawn only from log
+    // searches in no tracked file, and known filler is pinned public. The
     // synthetic log and filler live in a tracked file, so a synthetic build
     // checks against nothing.
     const known = values.synthetic ? new RepositoryText("") : repositoryText(REPO_ROOT);
-    const simple = await buildScoreSet({ logQueries, llm, keep, known });
+    // The build draws each language's log searches into `pinned`: hidden from the repository-unknown ones.
+    const simple = await buildScoreSet({ logQueries, llm, keep, known, halves: pinned });
     const hard = await buildHardSet({ llm, avoid: simple, known });
     const { publicSet, hiddenSet } = splitScoreSet([...simple, ...hard], seed, pinned, known);
     writeScoreSets({

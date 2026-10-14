@@ -319,12 +319,14 @@ exactly (YOY-175 AC-1, amended): the old 13 public stay public and the old
 12 hidden stay hidden, in their old order, and the seeded shuffle splits
 only the added searches, so he's 50 go 25 / 25 and he is 38 / 37 in all. A
 search that was public is already in the repository, so it never enters a
-hidden half. The same holds for every added search: one whose normalized
-text (case-folded, whitespace collapsed) already appears in any tracked
-file (`git ls-files`) is pinned to the public half, never dropped, and the
-seeded shuffle draws the hidden half only from added searches in no tracked
-file. Filler is used only when the log runs out; a known filler search past
-the public share is written again. The build prints one
+hidden half. The same holds for every added search. The added log
+searches are drawn into halves rather than shuffled: the hidden added are
+the newest whose normalized text (case-folded, whitespace collapsed)
+appears in no tracked file (`git ls-files`), up to the hidden count (he:
+25); the public added are the newest remaining log searches, up to the
+public count (he: 25). Filler is used only when the log runs out; a known
+filler search is pinned public, or written again once the public share is
+full. The build prints one
 `pinned <set> <lang> <n>` line per set and language: counts, never the
 text. A synthetic build checks against no repository text, because its log
 and filler live in a tracked file. A language that does not reproduce is

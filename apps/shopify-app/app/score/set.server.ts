@@ -353,47 +353,70 @@ function logOf(logQueries: readonly LogQuery[], language: ScoreLanguage): LogQue
  * a set reproduced from an earlier build — then its shopper-shaped log
  * queries, newest first (YOY-141 AC-12), then model filler in the 60 / 30 /
  * 10 shape mix for the remainder. Every entry carries `set: "simple"`.
- * With `known`, a log search whose text is already in the repository is
- * taken all the same — the split pins it public — so filler is needed only
- * when the log runs out; more known log searches than the added public
- * share holds is an error, since none may be dropped. Kept entries keep
- * their old halves and are not checked.
+ *
+ * With `known` (YOY-175 AC-1, amended), the log searches are drawn into
+ * halves instead of split afterwards: the hidden added searches are the
+ * newest whose text appears in no tracked file, up to the added hidden
+ * count (he: 25); the public added are the newest remaining log searches,
+ * up to the added public count (he: 25). They are written into `halves` —
+ * a kept language's old halves, extended — for the split to keep. Filler
+ * is written only when the log runs out, and the split places it.
  */
 export async function buildScoreSet({
   logQueries,
   llm,
   keep = {},
   known,
+  halves = {},
 }: {
   logQueries: readonly LogQuery[];
   llm: LlmClient;
   keep?: Partial<Record<ScoreLanguage, readonly ScoreSetEntry[]>>;
   known?: RepositoryText;
+  halves?: Partial<Record<ScoreLanguage, OldHalves>>;
 }): Promise<ScoreSetEntry[]> {
   const entries: ScoreSetEntry[] = [];
   for (const language of SCORE_LANGUAGES) {
     const size = searchesPerLanguage(language);
     const kept = (keep[language] ?? []).slice(0, size);
     const taken = new Set(kept.map((entry) => normalizeReuseQuery(entry.query)));
-    const fromLog = logOf(logQueries, language)
-      .filter((entry) => !taken.has(normalizeReuseQuery(entry.query)))
-      .slice(0, size - kept.length);
+    const candidates = logOf(logQueries, language).filter((entry) => !taken.has(normalizeReuseQuery(entry.query)));
     // The added searches' public share: a reproduced language's kept 25 hold 13 of it.
-    const room = { left: publicCount(size) - publicCount(kept.length) };
-    for (const entry of fromLog) {
-      if (!known?.has(entry.query)) continue;
-      if (room.left === 0) {
-        throw new Error(`score set: simple ${language} has more repository-known log searches than its public half holds`);
-      }
-      room.left -= 1;
+    const addedPublic = publicCount(size) - publicCount(kept.length);
+    const addedHidden = size - kept.length - addedPublic;
+    let fromLog: LogQuery[];
+    let drawn: { publicAdded: LogQuery[]; hiddenAdded: LogQuery[] } | undefined;
+    if (known === undefined) {
+      fromLog = candidates.slice(0, size - kept.length);
+    } else {
+      const hiddenAdded = candidates.filter((entry) => !known.has(entry.query)).slice(0, addedHidden);
+      const publicAdded = candidates.filter((entry) => !hiddenAdded.includes(entry)).slice(0, addedPublic);
+      drawn = { publicAdded, hiddenAdded };
+      fromLog = candidates.filter((entry) => hiddenAdded.includes(entry) || publicAdded.includes(entry));
     }
     for (const entry of fromLog) taken.add(normalizeReuseQuery(entry.query));
     const modelWritten = kept.every((entry) => entry.source === "model") && fromLog.length === 0;
     for (const entry of kept) {
       entries.push({ query: entry.query, language, source: entry.source, modelWritten, set: "simple" });
     }
+    const added = new Map<LogQuery, ScoreSetEntry>();
     for (const entry of fromLog) {
-      entries.push({ query: entry.query, language, source: "log", modelWritten, set: "simple" });
+      const built: ScoreSetEntry = { query: entry.query, language, source: "log", modelWritten, set: "simple" };
+      added.set(entry, built);
+      entries.push(built);
+    }
+    // Filler past the drawn public added: a known one is written again, so the hidden half stays unknown.
+    const room = { left: addedPublic - (drawn?.publicAdded.length ?? 0) };
+    if (drawn !== undefined && known !== undefined) {
+      const old = halves[language];
+      if (kept.length > 0 && old === undefined) {
+        throw new Error(`score set: ${language} keeps searches without their old halves`);
+      }
+      halves[language] = {
+        publicHalf: [...(old?.publicHalf ?? []), ...drawn.publicAdded.map((entry) => added.get(entry)!)],
+        hiddenHalf: [...(old?.hiddenHalf ?? []), ...drawn.hiddenAdded.map((entry) => added.get(entry)!)],
+      };
+      known.pin(`simple ${language}`, drawn.publicAdded.filter((entry) => known.has(entry.query)).length);
     }
     const shapes = fillerShapeCounts(size - kept.length - fromLog.length);
     for (const shape of ["short", "medium", "long"] as const) {
