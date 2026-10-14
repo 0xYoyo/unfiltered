@@ -23,8 +23,9 @@ only if the hidden score goes up. The tooling lives in
    given on the command line when the local `.env` lacks it.
 2. **Fill** — the simple set fills each of `en, ar, ru, fr, es` to 25
    (YOY-175 AC-1; 25 everywhere before); `he` takes every shopper-shaped log
-   search, up to 75, and never filler, so a short log gives a smaller `he`
-   (67 on 2026-10-14) and the build prints `set simple he <n>`. Log
+   search, 75 in all (38 / 37; the log held 82 on 2026-10-14), and never
+   filler; only a log shorter than 75 gives a smaller `he`, and the build
+   prints `set simple he <n>`. Log
    queries come first, newest first, then Flash-Lite filler shaped 60 % one
    to three words, 30 % medium, 10 % long or vague. Each entry carries
    `source: "log" | "model"` and `set: "simple"`; a language with no log
@@ -316,7 +317,7 @@ language only when the old public half (`--previous-public`, the committed
 file by default) comes back exactly: same entries, same order. Then the
 hidden 12 are the rest of the same 25, so the old set is kept whole without
 the hidden file ever being read. A kept Hebrew language adds every later
-log search, up to 75 in all, and no filler: 67 on 2026-10-14, split 34 / 33. A kept language keeps its old halves
+log search, up to 75 in all, and no filler: 75 on 2026-10-14, split 38 / 37. A kept language keeps its old halves
 exactly (YOY-175 AC-1, amended): the old 13 public stay public and the old
 12 hidden stay hidden, in their old order, and the seeded shuffle splits
 only the added searches, so he's 50 go 25 / 25 and he is 38 / 37 in all. A
@@ -324,9 +325,11 @@ search that was public is already in the repository, so it never enters a
 hidden half. The same holds for every added search. The added log
 searches are drawn into halves rather than shuffled: the hidden added are
 the newest whose normalized text (case-folded, whitespace collapsed)
-appears in no tracked file (`git ls-files`), up to the hidden count (he:
+appears in no file tracked on `origin/main` (`git ls-tree`; never the
+branch's working tree, whose public set may be an earlier build), up to the hidden count (he:
 25); the public added are the newest remaining log searches, up to the
-public count (he: 25). Filler is used only when the log runs out; a known
+public count (he: 25). Filler is used only when the log runs out, and
+never for Hebrew: too few unknown Hebrew searches fail the build; a known
 filler search is pinned public, or written again once the public share is
 full. The build prints one
 `pinned <set> <lang> <n>` line per set and language: counts, never the

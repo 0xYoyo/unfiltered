@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -1734,10 +1735,10 @@ describe("Hebrew 75, the hard set and per-set tables (YOY-175)", () => {
     expect(known.pinned.get("simple en")).toBe(0);
   });
 
-  it("takes every Hebrew log search and no filler: old 25 + 42 new is 67, 34 / 33 (AC-1, amended)", async () => {
+  it("takes Hebrew's 75 from the log and no filler: old 25 + 57 new, 38 / 37 (AC-1, amended)", async () => {
     const cutoff = new Date(Date.UTC(2026, 9, 1, 17, 0));
     const before = log(25, new Date(Date.UTC(2026, 8, 20)), "old");
-    const after = log(42, new Date(Date.UTC(2026, 9, 5)), "new");
+    const after = log(57, new Date(Date.UTC(2026, 9, 5)), "new");
     const oldSet = (["en", "he"] as const).flatMap((language) =>
       before
         .filter((entry) => detectLanguage(entry.query) === language)
@@ -1749,7 +1750,7 @@ describe("Hebrew 75, the hard set and per-set tables (YOY-175)", () => {
     const results = reproduceOldSet({ logQueries, previousPublic: old.publicSet, before: cutoff });
     const keep = Object.fromEntries(results.map((result) => [result.language, result.entries!]));
     const pinned = Object.fromEntries(results.map((result) => [result.language, result.halves!]));
-    const known = new RepositoryText("חיפוש new 41");
+    const known = new RepositoryText("חיפוש new 56");
     const set = await buildScoreSet({ logQueries, llm: createSyntheticFillerLlm(), keep, known, halves: pinned });
     const { publicSet, hiddenSet } = splitScoreSet(set, undefined, pinned, known);
     const ofHe = (entries: readonly ScoreSetEntry[]) =>
@@ -1757,26 +1758,50 @@ describe("Hebrew 75, the hard set and per-set tables (YOY-175)", () => {
     const range = (from: number, to: number) =>
       Array.from({ length: from - to + 1 }, (_, index) => `חיפוש new ${from - index}`);
 
-    expect(set.filter((entry) => entry.language === "he")).toHaveLength(67);
+    expect(set.filter((entry) => entry.language === "he")).toHaveLength(75);
     expect(set.filter((entry) => entry.language === "he").every((entry) => entry.source === "log")).toBe(true);
-    expect(ofHe(publicSet)).toHaveLength(34);
-    expect(ofHe(hiddenSet)).toHaveLength(33);
-    // The old 13 / 12 stay; hidden added are the 21 newest unknown, public added the rest.
+    expect(ofHe(publicSet)).toHaveLength(38);
+    expect(ofHe(hiddenSet)).toHaveLength(37);
+    // The old 13 / 12 stay; hidden added are the 25 newest unknown, public added the 25 newest remaining.
     expect(ofHe(publicSet).slice(0, 13)).toEqual(ofHe(old.publicSet));
     expect(ofHe(hiddenSet).slice(0, 12)).toEqual(ofHe(old.hiddenSet));
-    expect(ofHe(hiddenSet).slice(12)).toEqual(range(40, 20));
-    expect(ofHe(publicSet).slice(13)).toEqual(["חיפוש new 41", ...range(19, 0)]);
-    // The check is on substrings, so "new 4" is known too: two public added searches are repository-known.
-    expect(known.pinned.get("simple he")).toBe(2);
+    expect(ofHe(hiddenSet).slice(12)).toEqual(range(55, 31));
+    expect(ofHe(publicSet).slice(13)).toEqual(["חיפוש new 56", ...range(30, 7)]);
+    expect(known.pinned.get("simple he")).toBe(1);
     // en is unchanged: its kept 25, 13 / 12.
     expect(publicSet.filter((entry) => entry.language === "en")).toHaveLength(13);
   });
 
-  it("reads every tracked file as normalized text for the repository check (AC-1, amended)", () => {
-    const known = repositoryText(REPO_ROOT);
-    expect(known.has("The GROWN set and   the hard set")).toBe(true);
-    // Built at run time: this test file is tracked too, so a literal would be found in it.
-    expect(known.has(["zqx", "never", "written", String(175 * 7)].join(" "))).toBe(false);
+  it("never writes Hebrew filler: too few repository-unknown log searches for the hidden half fail the build (AC-1, amended)", async () => {
+    const logQueries = log(80, new Date(Date.UTC(2026, 9, 5)), "new");
+    const known = new RepositoryText(logQueries.slice(10).map((entry) => entry.query).join("\n"));
+    const llm: LlmClient = {
+      async completeStructured(request) {
+        if (/^Query: filler he /m.test(request.prompt)) throw new Error("Hebrew filler was asked for");
+        return createSyntheticFillerLlm().completeStructured(request);
+      },
+    };
+    await expect(buildScoreSet({ logQueries, llm, known })).rejects.toThrow("Hebrew is never filler");
+  });
+
+  it("reads the files tracked on origin/main, never the working tree, for the repository check (AC-1, amended)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "score-repo-"));
+    const git = (...args: string[]) =>
+      execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", ...args], { cwd: dir });
+    git("init", "-q");
+    writeFileSync(join(dir, "doc.md"), "Alpha   BETA\n");
+    writeFileSync(join(dir, "blob.bin"), Buffer.from([0, 1, 2]));
+    git("add", ".");
+    git("commit", "-q", "-m", "main");
+    git("update-ref", "refs/remotes/origin/main", "HEAD");
+    // The branch's own later output: committed and in the working tree, but not on origin/main.
+    writeFileSync(join(dir, "public-set.json"), "gamma delta\n");
+    git("add", ".");
+    git("commit", "-q", "-m", "branch");
+
+    const known = repositoryText(dir);
+    expect(known.has("alpha beta")).toBe(true);
+    expect(known.has("gamma delta")).toBe(false);
   });
 
   it("builds both sets offline, writes `set` on every public entry, and reports counts only (verify step 1)", async () => {

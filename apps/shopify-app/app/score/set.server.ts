@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { mkdirSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 
 import type { PrismaClient } from "@prisma/client";
@@ -23,9 +23,9 @@ export const SEARCHES_PER_LANGUAGE = 25;
 export const PUBLIC_PER_LANGUAGE = 13;
 export const HIDDEN_PER_LANGUAGE = SEARCHES_PER_LANGUAGE - PUBLIC_PER_LANGUAGE;
 /**
- * Hebrew's most searches in the simple set (YOY-175 AC-1). Hebrew takes
- * every shopper-shaped log search up to it and no filler, so a short log
- * gives a smaller set (67 on 2026-10-14: 34 public, 33 hidden).
+ * Hebrew's size in the simple set (YOY-175 AC-1): 75 (38 public, 37
+ * hidden), all real log searches — the log held 82 on 2026-10-14. Hebrew is
+ * never filler, so only a log shorter than 75 gives a smaller set.
  */
 export const HEBREW_SEARCHES = 75;
 
@@ -294,9 +294,10 @@ async function fillDistinct(
 }
 
 /**
- * The text of every tracked file in the repository, for the rule that no
+ * The text of every file tracked on `origin/main`, for the rule that no
  * search already in the repository may enter a hidden half (YOY-175 AC-1,
- * amended). An added search whose normalized text appears in any tracked
+ * amended). Never the branch's working tree: a branch's committed public
+ * set may be an earlier build of the same set. An added search whose normalized text appears in any tracked
  * file is pinned to the public half, never dropped; the split counts the
  * pins per set and language — counts only, never the text.
  */
@@ -320,24 +321,33 @@ export class RepositoryText {
 /** Files larger than this are data dumps, not text a search could have been copied from. */
 const REPOSITORY_FILE_MAX_BYTES = 4 * 1024 * 1024;
 
+/** The ref the repository check reads (YOY-175 AC-1, amended). */
+export const REPOSITORY_REF = "origin/main";
+
 /**
- * Read every tracked file under `repoRoot` (`git ls-files`), normalized the
- * way searches are: case-folded, whitespace collapsed. Binary files are skipped.
+ * Read every file tracked on `ref` (`git ls-tree`, contents through `git
+ * cat-file --batch`), normalized the way searches are: case-folded,
+ * whitespace collapsed. Binary files are skipped.
  */
-export function repositoryText(repoRoot: string): RepositoryText {
-  const paths = execFileSync("git", ["ls-files", "-z"], { cwd: repoRoot, maxBuffer: 64 * 1024 * 1024 })
-    .toString("utf8")
-    .split("\0")
-    .filter((path) => path !== "");
+export function repositoryText(repoRoot: string, ref: string = REPOSITORY_REF): RepositoryText {
+  const git = (args: string[], input?: string) =>
+    execFileSync("git", args, { cwd: repoRoot, input, maxBuffer: 1024 * 1024 * 1024 });
+  const blobs: string[] = [];
+  for (const line of git(["ls-tree", "-r", "-l", "-z", ref]).toString("utf8").split("\0")) {
+    // "<mode> <type> <object> <size>\t<path>"
+    const [mode, type, object, size] = line.split("\t")[0]!.trim().split(/\s+/);
+    if (mode === undefined || type !== "blob" || Number(size) > REPOSITORY_FILE_MAX_BYTES) continue;
+    blobs.push(object!);
+  }
+  const batch = git(["cat-file", "--batch"], blobs.map((object) => `${object}\n`).join(""));
   const parts: string[] = [];
-  for (const path of paths) {
-    let content: Buffer;
-    try {
-      content = readFileSync(resolve(repoRoot, path));
-    } catch {
-      continue;
-    }
-    if (content.length > REPOSITORY_FILE_MAX_BYTES || content.includes(0)) continue;
+  let offset = 0;
+  while (offset < batch.length) {
+    const headerEnd = batch.indexOf(10, offset);
+    const length = Number(batch.subarray(offset, headerEnd).toString("utf8").split(" ")[2]);
+    const content = batch.subarray(headerEnd + 1, headerEnd + 1 + length);
+    offset = headerEnd + 1 + length + 1;
+    if (content.includes(0)) continue;
     parts.push(normalizeReuseQuery(content.toString("utf8")));
   }
   return new RepositoryText(parts.join("\n"));
@@ -385,7 +395,7 @@ export async function buildScoreSet({
     const kept = (keep[language] ?? []).slice(0, searchesPerLanguage(language));
     const taken = new Set(kept.map((entry) => normalizeReuseQuery(entry.query)));
     const candidates = logOf(logQueries, language).filter((entry) => !taken.has(normalizeReuseQuery(entry.query)));
-    // Hebrew is never filler: its size is the log's count, up to its most.
+    // Hebrew is never filler: 75 from the log, fewer only when the log is shorter.
     const size =
       language === "he"
         ? Math.min(searchesPerLanguage(language), kept.length + candidates.length)
@@ -427,7 +437,13 @@ export async function buildScoreSet({
       };
       known.pin(`simple ${language}`, drawn.publicAdded.filter((entry) => known.has(entry.query)).length);
     }
-    const shapes = fillerShapeCounts(size - kept.length - fromLog.length);
+    const remainder = size - kept.length - fromLog.length;
+    if (language === "he" && remainder > 0) {
+      throw new Error(
+        `score set: he has ${drawn?.hiddenAdded.length ?? 0} repository-unknown log searches for its ${addedHidden} hidden; Hebrew is never filler`,
+      );
+    }
+    const shapes = fillerShapeCounts(remainder);
     for (const shape of ["short", "medium", "long"] as const) {
       if (shapes[shape] === 0) continue;
       for (const query of await fillShape(llm, language, shape, shapes[shape], taken, publicRoom(known, room))) {
