@@ -29,6 +29,8 @@ export interface SearchOutcome {
   /** The search's 0-based position in the set (YOY-172 AC-1). */
   index: number;
   score: number;
+  /** The graded results' titles, in served order (YOY-173 AC-5); empty for a failed search. */
+  titles: string[];
   latencyMs: number;
   /**
    * Whether the wish extraction answered in time (YOY-149 AC-4); null when
@@ -104,6 +106,11 @@ export interface SearchGrade {
   language: ScoreLanguage;
   index: number;
   score: number | null;
+  /**
+   * The graded results' titles in served order (YOY-173 AC-5), printed by a
+   * public `--per-search` run only; never by a hidden run.
+   */
+  titles?: string[];
 }
 
 export interface ScoreReport {
@@ -296,7 +303,7 @@ export async function runScoreSet({
     let stage: FailureStage = "search";
     const position = `[${index + 1}/${set.length}] ${entry.language}`;
     try {
-      const { response, latencyMs, grades } = await withTimeout(
+      const { response, latencyMs, titles, grades } = await withTimeout(
         (async () => {
           const searched = await runPlaygroundSearch(orchestrator, {
             query: entry.query,
@@ -306,7 +313,11 @@ export async function runScoreSet({
           stage = "grade";
           const top = searched.response.hits.slice(0, GRADED_RESULTS).map((hit) => hit.productId);
           const results = await gradedResults(db, storeKey, top);
-          return { ...searched, grades: await gradeSearch({ llm: grader, query: entry.query, results }) };
+          return {
+            ...searched,
+            titles: results.map((result) => result.title),
+            grades: await gradeSearch({ llm: grader, query: entry.query, results }),
+          };
         })(),
         searchTimeoutMs,
       );
@@ -314,6 +325,7 @@ export async function runScoreSet({
         language: entry.language,
         index,
         score: searchScore(grades),
+        titles,
         latencyMs,
         extractionInTime: response.extractionInTime ?? null,
         extractionCached: response.extractionCached ?? null,
@@ -330,6 +342,7 @@ export async function runScoreSet({
         language: entry.language,
         index,
         score: 0,
+        titles: [],
         latencyMs: Infinity,
         extractionInTime: null,
         extractionCached: null,
@@ -362,10 +375,11 @@ export async function runScoreSet({
   await flushLedger();
   return {
     languages,
-    grades: outcomes.map(({ language, index, score, failed }) => ({
+    grades: outcomes.map(({ language, index, score, titles, failed }) => ({
       language,
       index,
       score: failed ? null : score,
+      titles,
     })),
     cost: await readRunCost(db),
     failures: countFailures(outcomes),
@@ -460,15 +474,20 @@ export function formatNoExtractionLine(language: string, share: number): string 
  * `grade <lang> <index> <score>`, or `failed` for a failed search. The one
  * code path for both halves: a hidden run passes no set, so its lines carry
  * the index alone; a public `--per-search` run passes its set, and each line
- * ends with the query.
+ * ends with the query, then one `title <lang> <index> <position> <title>`
+ * line per graded result, position 1-based in served order (YOY-173 AC-5).
  */
 export function formatGradeLines(
   grades: readonly SearchGrade[],
   set?: readonly ScoreSetEntry[],
 ): string[] {
-  return grades.map(({ language, index, score }) => {
+  return grades.flatMap(({ language, index, score, titles = [] }) => {
     const line = `grade ${language} ${index} ${score === null ? "failed" : score.toFixed(3)}`;
-    return set === undefined ? line : `${line} ${set[index]!.query}`;
+    if (set === undefined) return [line];
+    return [
+      `${line} ${set[index]!.query}`,
+      ...titles.map((title, position) => `title ${language} ${index} ${position + 1} ${title}`),
+    ];
   });
 }
 
