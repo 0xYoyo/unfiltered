@@ -10,7 +10,7 @@ import {
 } from "../eval/replay.server";
 import { runPlaygroundSearch } from "../search/playground-search.server";
 import { createPgTrgmClassicStore } from "../search/classic-store.server";
-import { createFindStep } from "../search/find.server";
+import { createFindStep, type FindStep } from "../search/find.server";
 import {
   createSearchOrchestrator,
   type SearchOrchestrator,
@@ -188,19 +188,46 @@ export function createSyntheticFillerLlm(): LlmClient {
  * search path with no model behind it. No judge and no extraction are wired.
  */
 export function createSyntheticOrchestrator(db: PrismaClient): SearchOrchestrator {
-  const classicStore = createPgTrgmClassicStore(db);
   return createSearchOrchestrator({
     db,
-    classicStore,
-    find: createFindStep({
-      db,
-      embeddings: createReplayEmbeddingClient({
-        recording: { modelId: SYNTHETIC_MODEL_ID, dimension: SYNTHETIC_DIMENSION, vectors: {} },
-        costRecorder: noCost,
-      }),
-      classicStore,
-    }),
+    classicStore: createPgTrgmClassicStore(db),
+    find: createSyntheticFindStep(db),
   });
+}
+
+/**
+ * The synthetic find step: replay embeddings with no recorded vector, so
+ * every search falls back to the keyword order (YOY-145 AC-8) and has no
+ * find set. It is also the find step `score-recall --synthetic` measures
+ * (YOY-174 AC-4).
+ */
+export function createSyntheticFindStep(db: PrismaClient): FindStep {
+  return createFindStep({
+    db,
+    embeddings: createReplayEmbeddingClient({
+      recording: { modelId: SYNTHETIC_MODEL_ID, dimension: SYNTHETIC_DIMENSION, vectors: {} },
+      costRecorder: noCost,
+    }),
+    classicStore: createPgTrgmClassicStore(db),
+  });
+}
+
+/**
+ * The recall truth grader for `--synthetic` (YOY-174 AC-4): no model behind
+ * it. Each result line of the prompt grades 3 when its title holds a word of
+ * the query, else 0, so the truth build runs offline at $0.
+ */
+export function createSyntheticRecallGrader(): LlmClient {
+  return {
+    async completeStructured({ prompt }) {
+      const query = /^Query: (.*)$/m.exec(prompt)?.[1] ?? "";
+      const words = query.toLowerCase().split(/\s+/).filter((word) => word.length > 2);
+      const titles = [...prompt.matchAll(/^\d+\. (.*)$/gm)].map((match) => match[1]!.toLowerCase());
+      return {
+        grades: titles.map((title) => (words.some((word) => title.includes(word)) ? 3 : 0)),
+      };
+    },
+  };
 }
 
 /**
