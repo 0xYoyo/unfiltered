@@ -30,6 +30,15 @@ export type JudgeProvider = (typeof JUDGE_PROVIDERS)[number];
 export const DEFAULT_JUDGE_PROVIDER: JudgeProvider = "jev";
 
 /**
+ * `JUDGE_PROVIDER=none` (YOY-172 AC-3): no judge at all — every page is the
+ * composed find order, route reason `find-only`. A score-run choice, never a
+ * default (NG-3): unset still means `DEFAULT_JUDGE_PROVIDER`.
+ */
+export const JUDGE_NONE = "none";
+/** What `JUDGE_PROVIDER` may name: a provider, or no judge. */
+export type JudgeChoice = JudgeProvider | typeof JUDGE_NONE;
+
+/**
  * The judge prompt's version (YOY-148 AC-1): part of the answer-cache key,
  * so a stored answer is never served for a prompt that has since changed.
  * Bump it with every change to `buildJudgePrompt`, `judgeRow`, the
@@ -261,21 +270,25 @@ export const JUDGE_SCHEMA: JsonSchema = {
   required: ["c", "d", "x", "r", "rn"],
 };
 
-/** The provider `JUDGE_PROVIDER` names; unset means jev, an unknown name fails. */
+/**
+ * The provider `JUDGE_PROVIDER` names, or `none` for no judge (YOY-172
+ * AC-3); unset means jev, an unknown name fails.
+ */
 export function judgeProviderFromEnv(
   env: Record<string, string | undefined>,
-): JudgeProvider {
+): JudgeChoice {
   const raw = env[JUDGE_PROVIDER_ENV];
   if (raw === undefined) {
     return DEFAULT_JUDGE_PROVIDER;
   }
   const provider = raw.trim();
-  if (!(JUDGE_PROVIDERS as readonly string[]).includes(provider)) {
+  const choices: readonly string[] = [...JUDGE_PROVIDERS, JUDGE_NONE];
+  if (!choices.includes(provider)) {
     throw new Error(
-      `${JUDGE_PROVIDER_ENV} must be one of ${JUDGE_PROVIDERS.join("|")}, got ${JSON.stringify(raw)}`,
+      `${JUDGE_PROVIDER_ENV} must be one of ${choices.join("|")}, got ${JSON.stringify(raw)}`,
     );
   }
-  return provider as JudgeProvider;
+  return provider as JudgeChoice;
 }
 
 function formatPrice(candidate: JudgeCandidate): string {

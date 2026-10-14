@@ -2,8 +2,9 @@ import type { PrismaClient } from "@prisma/client";
 import {
   createJudge,
   createWishExtractor,
+  JUDGE_NONE,
   judgeProviderFromEnv,
-  type JudgeProvider,
+  type JudgeChoice,
 } from "@unfiltered/engine";
 import {
   createGeminiEmbeddingClient,
@@ -507,7 +508,7 @@ export function serializeProxySearchResponse(
   response: SearchResponse,
   // The provider that judged the page: the one the orchestrator was built
   // with, unless a caller names it (YOY-157 AC-27).
-  judgeProvider: JudgeProvider = judgeProviderFromEnv(process.env),
+  judgeProvider: JudgeChoice = judgeProviderFromEnv(process.env),
 ): ProxySearchResponse {
   const body: ProxySearchResponse = {
     searchId: response.searchId,
@@ -564,6 +565,7 @@ export function createProxySearchOrchestrator(
 ): SearchOrchestrator {
   const models = geminiModelsFromEnv();
   const openRouterModels = openRouterModelsFromEnv();
+  const judgeChoice = judgeProviderFromEnv(process.env);
   const embeddings = createGeminiEmbeddingClient({
     modelId: models.embeddingModel,
     dimension: models.embeddingDimension,
@@ -587,9 +589,12 @@ export function createProxySearchOrchestrator(
     // OpenRouter (YOY-152 AC-1).
     // The judge's provider also decides which verdicts form the close group
     // the colour order keeps to (YOY-171 AC-5).
-    judgeProvider: judgeProviderFromEnv(process.env),
-    judge: createJudge({
-      provider: judgeProviderFromEnv(process.env),
+    // `none` builds no judge at all (YOY-172 AC-3): every page is the
+    // composed find order, route reason `find-only`, and no judge client is
+    // made — no OpenRouter key needed.
+    judgeProvider: judgeChoice,
+    judge: judgeChoice === JUDGE_NONE ? undefined : createJudge({
+      provider: judgeChoice,
       clients: {
         gemini: () =>
           createGeminiLlmClient({

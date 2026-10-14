@@ -56,7 +56,9 @@ only if the hidden score goes up. The tooling lives in
    is discarded — then, when any search failed, one line per distinct
    stage and error class, `failed <search|grade> <ClassName> <count>`. A
    failure is named by its error's class only, never its message, which can
-   carry the query. Query text never reaches the output.
+   carry the query. A hidden run then prints one line per search,
+   `grade <lang> <index> <score>` (see "Per-search lines" below). Query text
+   never reaches a hidden run's output.
 
 `npm run score:public` runs the public half against
 `app/score/data/seed-fixture.json.gz` (`--set`, `--fixture` and
@@ -78,8 +80,8 @@ gh workflow run score.yml -f ref=main   # ref: any branch, tag or SHA
 gh run view --log
 ```
 
-One choice input picks the judge: `judge` (`gemini` or `jev`, sets
-`JUDGE_PROVIDER`; YOY-152). It defaults to what production serves (YOY-157
+One choice input picks the judge: `judge` (`gemini`, `jev` or `none`, sets
+`JUDGE_PROVIDER`; YOY-152, YOY-172). It defaults to what production serves (YOY-157
 AC-19): `jev` (see "Decision — Jev is the default judge"), so a plain
 dispatch scores production; pass `-f judge=gemini` to score the
 alternative. There is one engine (YOY-155); the previous one is kept at the
@@ -101,8 +103,9 @@ then checks out the workflow's own commit (`github.sha`) only, never the
 scored ref (YOY-157 AC-2), decrypts the artifact, and runs
 `score-leak-check.mts`, which fails the job if
 any hidden query appears in that output as whole words (the score table,
-the cost line and the failure lines excepted: each is matched by its exact
-shape and holds only language codes, numbers, a stage or a class name),
+the cost line, the failure lines and the `grade` lines excepted: each is
+matched by its exact shape and holds only language codes, numbers, a stage
+or a class name),
 printing a count and never the query. It exits with the run's own status.
 
 **A score run waits for the extraction (YOY-171 AC-17, 2026-10-11).** The
@@ -130,6 +133,60 @@ run that must re-check it, and two consecutive hidden runs below the
 reference value in the same language make a fix issue before the next
 engine issue is picked. Run 4's fr (−0.069 against run 3) is the first
 such record; hidden run 5 re-checks fr against run 3's 0.569.
+
+## Per-search lines, the no-judge run and the control loop (YOY-172)
+
+**Per-search lines.** After the table and the `no-extraction` lines a
+hidden run prints one line per scored search:
+
+```
+grade <lang> <index> <score>
+grade <lang> <index> failed
+```
+
+`<index>` is the search's 0-based position in the decoded hidden file and
+`<score>` its score with three decimals. The rule: **a hidden line carries
+the index only, never the query** — the leak check admits exactly
+`^grade (en|he|ar|ru|fr|es) \d+ (\d\.\d{3}|failed)$` and nothing else new.
+Two hidden runs compared index by index show which searches fell, without
+either output naming one. **A public line may carry the query:**
+`npm run score:public -- --per-search` prints
+`grade <lang> <index> <score> <query>` per public search after the table.
+`--per-search` with `--hidden-set` is refused (exit 1, before any call).
+
+**`judge=none`.** `JUDGE_PROVIDER=none` builds the engine with no judge:
+every page is the composed find order — extraction, exclusions, stock
+filter, price and size tiers — served with route reason `find-only`, with
+no judge call, no OpenRouter key and no pending labels. Chips and the
+code-computed labels (price, size, colour) are still there. It measures
+the engine without its judge, so `jev` minus `none` on the same SHA, run
+on the same day, is the judge's own contribution. `none` is a choice only:
+an unset `JUDGE_PROVIDER` still means `jev`, everywhere.
+
+**The control loop.** A control is the same full SHA dispatched N times:
+
+```bash
+SHA=$(git rev-parse origin/main)   # the full 40-character SHA
+for i in 1 2 3; do gh workflow run score.yml -f ref=$SHA -f judge=jev; done
+```
+
+A short SHA fails at checkout: `actions/checkout` fetches `ref` by name,
+and an abbreviated SHA names nothing. List the N runs, newest first, then
+read each one's output once it is green:
+
+```bash
+gh run list --workflow=score.yml --limit 3
+gh run view <run id> --log | grep -E '^.*\s(language|en|he|ar|ru|fr|es|cost|no-extraction|grade|failed) '
+```
+
+The job summary of each run (`gh run view <run id>`, or the run's page)
+names the scored ref in its heading and holds the clean output.
+
+**The three-run reference (founder, 2026-10-14).** The reference for a
+gate is three runs of the branch's base on the same day. Each language's
+band is `max(spread of the three, the language's M5 band, 0.03)`, the
+spread being the highest of the three minus the lowest. A single control
+is not a reference.
 
 ## Rubric
 

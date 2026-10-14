@@ -6,12 +6,13 @@ import { SCORE_LANGUAGES, type ScoreSetEntry } from "./set.server";
  * appears in it — before anything is printed, and without ever printing the
  * query that leaked.
  *
- * Score-table lines, the cost line and the failure lines are matched strictly
- * and skipped: their every cell is a language code, a number, yes/no, a
- * stage or an error class name, so they cannot carry query text, and
- * skipping them keeps a one-word hidden search such as "score" from failing
- * a clean run on the table's own header. Elsewhere a query counts as found
- * when it appears as whole words, case-insensitively.
+ * Score-table lines, the cost line, the failure lines and the per-search
+ * grade lines are matched strictly and skipped: their every cell is a
+ * language code, a number, yes/no, a stage or an error class name, so they
+ * cannot carry query text, and skipping them keeps a one-word hidden search
+ * such as "score" from failing a clean run on the table's own header.
+ * Elsewhere a query counts as found when it appears as whole words,
+ * case-insensitively.
  */
 
 const LANGUAGE = `(?:${SCORE_LANGUAGES.join("|")})`;
@@ -32,6 +33,9 @@ const ABORT_LINE = /^aborted after \d+ consecutive failures$/;
 const EXTRACT_LINE = /^extract calls \d+$/;
 // The per-language share composed without wishes (YOY-171 AC-17).
 const NO_EXTRACTION_LINE = new RegExp(`^no-extraction ${LANGUAGE} \\d+%$`);
+// A hidden run's per-search line (YOY-172 AC-2): a language, an index and a
+// three-decimal score or `failed` — never a query.
+const GRADE_LINE = new RegExp(`^grade ${LANGUAGE} \\d+ (?:\\d\\.\\d{3}|failed)$`);
 const STRICT_LINES = [
   TABLE_HEADER,
   TABLE_ROW,
@@ -40,6 +44,7 @@ const STRICT_LINES = [
   PASS_LINE,
   EXTRACT_LINE,
   NO_EXTRACTION_LINE,
+  GRADE_LINE,
   PROGRESS_LINE,
   ABORT_LINE,
 ];

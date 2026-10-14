@@ -33,6 +33,7 @@ import {
   failureClassName,
   formatCostLine,
   formatFailureLine,
+  formatGradeLines,
   formatScoreTable,
   graderDetails,
   readRunCost,
@@ -691,6 +692,112 @@ describe("the runner (AC-6, AC-7)", () => {
   });
 });
 
+describe("per-search lines (YOY-172 AC-1, AC-5, AC-7)", () => {
+  const marker = "ZQX-MARKER-172";
+  const set: ScoreSetEntry[] = [
+    { query: `${marker} linen shirt`, language: "en", source: "log", modelWritten: false },
+    { query: `${marker} black dress`, language: "he", source: "log", modelWritten: false },
+    { query: `shirt ${marker}`, language: "fr", source: "model", modelWritten: true },
+  ];
+
+  /** Run the score command in-process; stdout and stderr lines apart. */
+  async function run(argv: string[]): Promise<{ code: number; out: string[]; err: string[] }> {
+    const out: string[] = [];
+    const err: string[] = [];
+    const code = await runScoreCommand(argv, {
+      out: (text) => void out.push(...text.split("\n")),
+      err: (text) => void err.push(text),
+    });
+    return { code, out, err };
+  }
+
+  it("ends a hidden run with one grade line per search, by index and never with query text (AC-1)", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "score-grades-"));
+    const hiddenPath = join(dir, "hidden.b64");
+    writeFileSync(hiddenPath, encodeHiddenSet(set));
+
+    const { code, out, err } = await run(["--synthetic", "--hidden-set", hiddenPath]);
+
+    expect(code).toBe(0);
+    const grades = out.filter((line) => line.startsWith("grade "));
+    expect(grades).toHaveLength(set.length);
+    // After the table and its no-extraction lines, in set order.
+    expect(out.slice(-set.length)).toEqual(grades);
+    expect(out.indexOf(grades[0]!)).toBeGreaterThan(
+      out.map((line) => line.startsWith("no-extraction ")).lastIndexOf(true),
+    );
+    expect(grades.map((line) => line.split(" ").slice(0, 3).join(" "))).toEqual([
+      "grade en 0",
+      "grade he 1",
+      "grade fr 2",
+    ]);
+    for (const line of grades) {
+      expect(line).toMatch(/^grade (en|he|ar|ru|fr|es) \d+ (\d\.\d{3}|failed)$/);
+    }
+    const output = [...err, ...out].join("\n");
+    expect(output).not.toContain(marker);
+    expect(findLeaks(`${output}\n`, set)).toEqual({ leaked: 0 });
+  });
+
+  it("prints public lines with the query only under --per-search (AC-5)", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "score-grades-"));
+    const setPath = join(dir, "set.json");
+    writeFileSync(setPath, JSON.stringify(set));
+
+    const plain = await run(["--synthetic", "--set", setPath]);
+    expect(plain.code).toBe(0);
+    expect(plain.out.filter((line) => line.startsWith("grade "))).toEqual([]);
+
+    const perSearch = await run(["--synthetic", "--set", setPath, "--per-search"]);
+    expect(perSearch.code).toBe(0);
+    const grades = perSearch.out.filter((line) => line.startsWith("grade "));
+    expect(grades).toEqual([
+      expect.stringMatching(new RegExp(`^grade en 0 \\d\\.\\d{3} ${marker} linen shirt$`)),
+      expect.stringMatching(new RegExp(`^grade he 1 \\d\\.\\d{3} ${marker} black dress$`)),
+      expect.stringMatching(new RegExp(`^grade fr 2 \\d\\.\\d{3} shirt ${marker}$`)),
+    ]);
+    expect(perSearch.out.slice(-set.length)).toEqual(grades);
+  });
+
+  it("refuses --per-search with --hidden-set before reading or calling anything (AC-5)", async () => {
+    const { code, out, err } = await run([
+      "--synthetic",
+      "--hidden-set",
+      "/nonexistent/hidden.b64",
+      "--per-search",
+    ]);
+    expect(code).toBe(1);
+    expect(out).toEqual([]);
+    // The refusal, not the unreadable-file message: nothing was read.
+    expect(err).toEqual(["score run: --per-search prints query text and is refused with --hidden-set"]);
+  });
+
+  it("prints a failed search as `failed`, from the one formatter both halves use (AC-1, AC-7)", async () => {
+    const db = await createTestDb();
+    await importScoreFixture(db, buildSyntheticFixture());
+    const failing = {
+      runSearch: () => Promise.reject(new TypeError(`fetch failed for ${marker}`)),
+    } as unknown as Parameters<typeof runScoreSet>[0]["orchestrator"];
+    const report = await runScoreSet({
+      db,
+      orchestrator: failing,
+      grader: fakeGrader().llm,
+      storeKey: SYNTHETIC_STORE_KEY,
+      set: set.slice(0, 2),
+    });
+    expect(report.grades).toEqual([
+      { language: "en", index: 0, score: null },
+      { language: "he", index: 1, score: null },
+    ]);
+    expect(formatGradeLines(report.grades!)).toEqual(["grade en 0 failed", "grade he 1 failed"]);
+    expect(formatGradeLines(report.grades!, set)).toEqual([
+      `grade en 0 failed ${marker} linen shirt`,
+      `grade he 1 failed ${marker} black dress`,
+    ]);
+    expect(formatGradeLines([{ language: "ru", index: 11, score: 2 / 3 }])).toEqual(["grade ru 11 0.667"]);
+  });
+});
+
 describe("the fixture (AC-8)", () => {
   it("exports and re-imports a synthetic tenant to identical rows", async () => {
     const source = await createTestDb();
@@ -1021,6 +1128,26 @@ describe("the hidden run's leak check (YOY-141 AC-3)", () => {
     expect(findLeaks("failed linen Error 1\n", hiddenWord)).toEqual({ leaked: 1 });
   });
 
+  it("skips only a strict grade line: the word grade as a hidden query neither false-fails nor leaks (YOY-172 AC-2)", () => {
+    const hiddenGrade: ScoreSetEntry[] = [
+      { query: "grade", language: "en", source: "model", modelWritten: false },
+    ];
+    const clean = "grade en 0 0.667\ngrade he 11 failed\ngrade es 3 1.000\n";
+    expect(findLeaks(clean, hiddenGrade)).toEqual({ leaked: 0 });
+    // The same word anywhere else is still found.
+    expect(findLeaks(`${clean}grade\n`, hiddenGrade)).toEqual({ leaked: 1 });
+    expect(findLeaks("grade en 0 0.667 grade\n", hiddenGrade)).toEqual({ leaked: 1 });
+    // Nothing but the exact shape is admitted: a query on the line, a
+    // two-decimal score, an unknown language.
+    const hiddenWord: ScoreSetEntry[] = [
+      { query: "linen", language: "en", source: "model", modelWritten: false },
+    ];
+    expect(findLeaks("grade en 0 0.667 linen\n", hiddenWord)).toEqual({ leaked: 1 });
+    expect(findLeaks("grade en 0 0.67\n", hiddenGrade)).toEqual({ leaked: 1 });
+    expect(findLeaks("grade xx 0 0.667\n", hiddenGrade)).toEqual({ leaked: 1 });
+    expect(findLeaks("grade linen 0 0.667\n", hiddenWord)).toEqual({ leaked: 1 });
+  });
+
   it("counts every hidden query found outside the table, case-insensitively", () => {
     const output = `${table}\n[search] intent extraction failed {"query":"zqx HIDDEN linen shirt"}\nשמלה סודית\n`;
     expect(findLeaks(output, hidden)).toEqual({ leaked: 2 });
@@ -1087,8 +1214,12 @@ describe("the score workflow (YOY-141 AC-1, AC-2)", () => {
     expect(workflow).not.toMatch(/ENGINE_V\d/);
   });
 
-  it("scores with the judge the dispatch names: gemini or jev into JUDGE_PROVIDER, jev by default (YOY-152 AC-6; YOY-157 AC-19)", () => {
-    expect(triggers).toMatch(/judge:\n(?:\s+.*\n)*?\s+default: jev\n\s+type: choice\n\s+options:\n\s+- gemini\n\s+- jev\n/);
+  it("scores with the judge the dispatch names: gemini, jev or none into JUDGE_PROVIDER, jev by default (YOY-152 AC-6; YOY-157 AC-19; YOY-172 AC-3)", () => {
+    expect(triggers).toMatch(
+      /judge:\n(?:\s+.*\n)*?\s+default: jev\n\s+type: choice\n\s+options:\n\s+- gemini\n\s+- jev\n\s+- none\n/,
+    );
+    // The settings echo names the choice as given, `none` included.
+    expect(workflow).toContain('echo "judge: JUDGE_PROVIDER=$JUDGE_PROVIDER"');
     expect(workflow).toContain("JUDGE_PROVIDER: ${{ inputs.judge }}");
     expect(workflow).toContain("OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}");
   });

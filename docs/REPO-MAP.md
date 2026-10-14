@@ -344,6 +344,7 @@ apps/
           seed-fixture.json.gz
         fixture.server.ts
         grade.server.ts
+        judge-none.test.ts
         leak.server.ts
         run-cost.test.ts
         run.server.ts
@@ -1748,6 +1749,7 @@ vitest.setup.ts
 - apps/shopify-app/app/routes/webhooks.shop.redact.tsx → apps/shopify-app/app/shopify.server.ts
 - apps/shopify-app/app/routes/webhooks.test.ts → apps/shopify-app/app/db.server.ts, apps/shopify-app/app/routes/webhooks.app.uninstalled.tsx, apps/shopify-app/app/routes/webhooks.customers.data_request.tsx, apps/shopify-app/app/routes/webhooks.customers.redact.tsx, apps/shopify-app/app/routes/webhooks.shop.redact.tsx, apps/shopify-app/app/testing/helpers.server.ts
 - apps/shopify-app/app/score/cli.server.ts → apps/shopify-app/app/ai/cost-recorder.server.ts, apps/shopify-app/app/db.server.ts, apps/shopify-app/app/playground/api.server.ts, apps/shopify-app/app/score/fixture.server.ts, apps/shopify-app/app/score/grade.server.ts, apps/shopify-app/app/score/leak.server.ts, apps/shopify-app/app/score/run.server.ts, apps/shopify-app/app/score/set.server.ts, apps/shopify-app/app/score/synthetic.server.ts, apps/shopify-app/app/search/orchestrator.server.ts, apps/shopify-app/app/search/proxy.server.ts, apps/shopify-app/app/testing/helpers.server.ts
+- apps/shopify-app/app/score/judge-none.test.ts → apps/shopify-app/app/ai/cost-recorder.server.ts, apps/shopify-app/app/ai/openrouter.server.ts, apps/shopify-app/app/score/cli.server.ts, apps/shopify-app/app/score/run.server.ts, apps/shopify-app/app/search/judge-step.server.ts, apps/shopify-app/app/search/playground-search.server.ts, apps/shopify-app/app/search/proxy.server.ts, apps/shopify-app/app/testing/helpers.server.ts
 - apps/shopify-app/app/score/leak.server.ts → apps/shopify-app/app/score/set.server.ts
 - apps/shopify-app/app/score/run-cost.test.ts → apps/shopify-app/app/score/cli.server.ts, apps/shopify-app/app/score/set.server.ts, apps/shopify-app/app/score/synthetic.server.ts
 - apps/shopify-app/app/score/run.server.ts → apps/shopify-app/app/score/grade.server.ts, apps/shopify-app/app/score/set.server.ts, apps/shopify-app/app/search/orchestrator.server.ts, apps/shopify-app/app/search/playground-search.server.ts
