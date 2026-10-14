@@ -1913,3 +1913,29 @@ describe("Hebrew 75, the hard set and per-set tables (YOY-175)", () => {
     expect(readFileSync(join(REPO_ROOT, "docs", "SCORE.md"), "utf8")).toContain(SCORE_RUBRIC);
   });
 });
+
+describe("the M7 reference (YOY-175 AC-6)", () => {
+  const dataDir = join(REPO_ROOT, "apps", "shopify-app", "app", "score", "data");
+  const read = (file: string) => JSON.parse(readFileSync(join(dataDir, file), "utf8"));
+  const round = (x: number) => Math.round(x * 1000) / 1000;
+
+  it("holds three runs on one full SHA, and each mean, spread and band follows from them", () => {
+    const reference = read("score-reference-m7.json");
+    const m5Band: Record<string, number> = read("score-baseline.json").noiseBand;
+    expect(reference.ref).toMatch(/^[0-9a-f]{40}$/);
+    expect(reference.runs).toHaveLength(3);
+    for (const set of ["simple", "hard"]) {
+      const languages = set === "simple" ? ["en", "he", "ar", "ru", "fr", "es"] : ["en", "he"];
+      expect(Object.keys(reference.band[set]).sort()).toEqual([...languages].sort());
+      for (const lang of languages) {
+        const scores: number[] = reference.runs.map(
+          (run: Record<string, Record<string, number>>) => run[set][lang],
+        );
+        const spread = round(Math.max(...scores) - Math.min(...scores));
+        expect(reference.mean[set][lang]).toBe(round(scores.reduce((a, b) => a + b, 0) / 3));
+        expect(reference.spread[set][lang]).toBe(spread);
+        expect(reference.band[set][lang]).toBe(round(Math.max(spread, m5Band[lang], 0.03)));
+      }
+    }
+  });
+});

@@ -358,6 +358,61 @@ searches per language, 12 hidden each. The M7 tables (Hebrew 75, the hard
 set, the M7 reference bands) are on a different set and are not comparable
 to them. A gate names the set its reference was taken on.
 
+**What the hidden halves do not hide (founder decision, 2026-10-14).** The hidden file is the only place the hidden queries are written, and the leak check keeps them out of every run output. Three exposures of their text exist anyway and are accepted, with their counts, rather than rebuilt again: (1) the 2026-10-01 hidden halves were already quoted in tracked files on `main` before YOY-175 (9 of the 12 old `en` and 7 of the 12 old `he`: `docs/M5-LIVE-RUN.md`, `app/playground/strings.ts`, fixtures); (2) PR #242's round-1 build committed a `public-set.json` that showed 23 searches now in the hidden half (21 `simple he`, 1 `simple ru`, 1 `simple es`) — readable in the branch's history and `refs/pull/242/head`, not on `main`; (3) two added `simple he` hidden searches are near-duplicates (one or two characters apart) of three public ones. None of this reaches a run's output; it only means that a builder who deliberately reads git history or the public file could recognise part of the hidden set. The gate's purpose — no tuning to the hidden searches — is enforced by the runner printing index and score only, and by the reviewer. A fully fresh hidden set is built from log searches newer than this file at the next milestone boundary (YOY-188).
+
+## M7 reference
+
+**Every gate from here on names
+`apps/shopify-app/app/score/data/score-reference-m7.json`.** It holds the
+three-run reference on the set built 2026-10-14: the simple set with
+Hebrew at 75 and the hard set. A gate's difference is from this file's
+mean, and "inside" means its absolute value is at most the band. The
+reference is the hidden half only. A test recomputes every mean, spread
+and band in the file from its three runs.
+
+2026-10-14, three hidden runs dispatched with
+`ref=9abf16ee04ecb6d5e3dab498facd2dfd8fd7b4eb` (`main` after the YOY-175
+set merge) and `judge=jev`. Run a was dispatched at 17:17 UTC and b and c
+at 17:27 UTC, all on one UTC day. Judge deadline and extraction grace were
+4,000 ms. The runs: [a](https://github.com/0xYoyo/unfiltered/actions/runs/38605346853),
+[b](https://github.com/0xYoyo/unfiltered/actions/runs/38606860802),
+[c](https://github.com/0xYoyo/unfiltered/actions/runs/38606873059). Every
+run was green with a clean leak check (127 checked) and **0 failed
+searches**. Each had 127 `grade` lines (97 simple, 30 hard) and 127
+extraction calls. Each band is `max(spread of the three, the language's M5
+band, 0.03)`, with the M5 band from `score-baseline.json` (`noiseBand`).
+The hard set has no M5 run of its own, so its en and he take their
+language's M5 band.
+
+`set simple` — hidden searches: en 12, he 37, ar 12, ru 12, fr 12, es 12.
+
+| | en | he | ar | ru | fr | es |
+|---|---|---|---|---|---|---|
+| a | 0.671 | 0.290 | 0.542 | 0.412 | 0.644 | 0.644 |
+| b | 0.620 | 0.302 | 0.472 | 0.421 | 0.657 | 0.634 |
+| c | 0.634 | 0.323 | 0.468 | 0.421 | 0.667 | 0.625 |
+| Mean | 0.642 | 0.305 | 0.494 | 0.418 | 0.656 | 0.634 |
+| Spread | 0.051 | 0.033 | 0.074 | 0.009 | 0.023 | 0.019 |
+| **Band** | **0.111** | **0.090** | **0.074** | **0.055** | **0.030** | **0.060** |
+
+`set hard` — hidden searches: en 15, he 15.
+
+| | en | he |
+|---|---|---|
+| a | 0.481 | 0.441 |
+| b | 0.444 | 0.385 |
+| c | 0.456 | 0.385 |
+| Mean | 0.460 | 0.404 |
+| Spread | 0.037 | 0.056 |
+| **Band** | **0.111** | **0.090** |
+
+Hebrew's spread on 37 hidden searches is 0.033, against 0.037 on 12 in
+the C4 runs. Its band is still the M5 floor of 0.090. No-extraction share:
+0 % in every set and language in all three runs, except hard en in run c
+at 7 % (1 of 15). Cost lines: a $0.1816 simple + $0.0572 hard = $0.2388
+(2,554 + 805 model calls); b $0.1843 + $0.0575 = $0.2418 (2,619 + 810); c
+$0.1837 + $0.0572 = $0.2409 (2,599 + 809). Total $0.7215.
+
 ## Rubric
 
 The grader's prompt carries this text verbatim (a test holds the two equal):

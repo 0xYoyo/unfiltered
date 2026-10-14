@@ -342,6 +342,7 @@ apps/
           public-set.json
           recall-truth.json
           score-baseline.json
+          score-reference-m7.json
           seed-fixture.json.gz
         fixture.server.ts
         grade.server.ts

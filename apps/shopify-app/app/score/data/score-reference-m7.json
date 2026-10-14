@@ -1,0 +1,48 @@
+{
+  "name": "M7 reference",
+  "ref": "9abf16ee04ecb6d5e3dab498facd2dfd8fd7b4eb",
+  "date": "2026-10-14",
+  "judge": "jev",
+  "half": "hidden",
+  "set": "built 2026-10-14 (YOY-175): simple he 75, hard en/he 30",
+  "bandRule": "max(spread of the three runs, the language's M5 band, 0.03)",
+  "runs": [
+    {
+      "run": 38605346853,
+      "simple": { "en": 0.671, "he": 0.290, "ar": 0.542, "ru": 0.412, "fr": 0.644, "es": 0.644 },
+      "hard": { "en": 0.481, "he": 0.441 },
+      "failed": 0,
+      "costUsd": 0.2388
+    },
+    {
+      "run": 38606860802,
+      "simple": { "en": 0.620, "he": 0.302, "ar": 0.472, "ru": 0.421, "fr": 0.657, "es": 0.634 },
+      "hard": { "en": 0.444, "he": 0.385 },
+      "failed": 0,
+      "costUsd": 0.2418
+    },
+    {
+      "run": 38606873059,
+      "simple": { "en": 0.634, "he": 0.323, "ar": 0.468, "ru": 0.421, "fr": 0.667, "es": 0.625 },
+      "hard": { "en": 0.456, "he": 0.385 },
+      "failed": 0,
+      "costUsd": 0.2409
+    }
+  ],
+  "hiddenSearches": {
+    "simple": { "en": 12, "he": 37, "ar": 12, "ru": 12, "fr": 12, "es": 12 },
+    "hard": { "en": 15, "he": 15 }
+  },
+  "mean": {
+    "simple": { "en": 0.642, "he": 0.305, "ar": 0.494, "ru": 0.418, "fr": 0.656, "es": 0.634 },
+    "hard": { "en": 0.460, "he": 0.404 }
+  },
+  "spread": {
+    "simple": { "en": 0.051, "he": 0.033, "ar": 0.074, "ru": 0.009, "fr": 0.023, "es": 0.019 },
+    "hard": { "en": 0.037, "he": 0.056 }
+  },
+  "band": {
+    "simple": { "en": 0.111, "he": 0.090, "ar": 0.074, "ru": 0.055, "fr": 0.030, "es": 0.060 },
+    "hard": { "en": 0.111, "he": 0.090 }
+  }
+}
