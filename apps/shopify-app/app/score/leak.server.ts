@@ -6,8 +6,8 @@ import { SCORE_LANGUAGES, type ScoreSetEntry } from "./set.server";
  * appears in it — before anything is printed, and without ever printing the
  * query that leaked.
  *
- * Score-table lines, the cost line, the failure lines and the per-search
- * grade lines are matched strictly and skipped: their every cell is a
+ * Score-table lines, the set line before each table, the cost line, the
+ * failure lines and the per-search grade lines are matched strictly and skipped: their every cell is a
  * language code, a number, yes/no, a stage or an error class name, so they
  * cannot carry query text, and skipping them keeps a one-word hidden search
  * such as "score" from failing a clean run on the table's own header.
@@ -36,7 +36,10 @@ const NO_EXTRACTION_LINE = new RegExp(`^no-extraction ${LANGUAGE} \\d+%$`);
 // A hidden run's per-search line (YOY-172 AC-2): a language, an index and a
 // three-decimal score or `failed` — never a query.
 const GRADE_LINE = new RegExp(`^grade ${LANGUAGE} \\d+ (?:\\d\\.\\d{3}|failed)$`);
+// The line before each set's table (YOY-175 AC-4): one of the two set names.
+const SET_LINE = /^set (?:simple|hard)$/;
 const STRICT_LINES = [
+  SET_LINE,
   TABLE_HEADER,
   TABLE_ROW,
   COST_LINE,

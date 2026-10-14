@@ -21,6 +21,29 @@ export type ScoreLanguage = (typeof SCORE_LANGUAGES)[number];
 export const SEARCHES_PER_LANGUAGE = 25;
 export const PUBLIC_PER_LANGUAGE = 13;
 export const HIDDEN_PER_LANGUAGE = SEARCHES_PER_LANGUAGE - PUBLIC_PER_LANGUAGE;
+/** Hebrew's size in the simple set (YOY-175 AC-1): 75, so its hidden half is 37, not 12. */
+export const HEBREW_SEARCHES = 75;
+
+/** A language's size in the simple set (YOY-175 AC-1): he 75, every other 25. */
+export function searchesPerLanguage(language: ScoreLanguage): number {
+  return language === "he" ? HEBREW_SEARCHES : SEARCHES_PER_LANGUAGE;
+}
+
+/** The public share of n searches (YOY-175 AC-1): ceil(n / 2) — 25 → 13, 75 → 38, 30 → 15. */
+export function publicCount(n: number): number {
+  return Math.ceil(n / 2);
+}
+
+/** The two score sets (YOY-175 AC-2): the current shape, and the hard searches. */
+export const SCORE_SET_NAMES = ["simple", "hard"] as const;
+export type ScoreSetName = (typeof SCORE_SET_NAMES)[number];
+
+/** The five kinds of hard search (YOY-175 AC-2), in equal parts. */
+export const HARD_KINDS = ["reference", "lookalike", "occasion", "vague", "two-wishes"] as const;
+export type HardKind = (typeof HARD_KINDS)[number];
+/** The hard set's languages and size (YOY-175 AC-2): en and he, 30 each. */
+export const HARD_LANGUAGES = ["en", "he"] as const satisfies readonly ScoreLanguage[];
+export const HARD_SEARCHES_PER_LANGUAGE = 30;
 /** The split's fixed seed: the same entries always land in the same half. */
 export const SCORE_SPLIT_SEED = 140;
 /** The encoded hidden file must stay under this many bytes (AC-3). */
@@ -41,6 +64,19 @@ export interface ScoreSetEntry {
   source: "log" | "model";
   /** The language had no log entry: every one of its searches is model-written. */
   modelWritten: boolean;
+  /**
+   * The set the entry belongs to (YOY-175 AC-2). Every entry the builder
+   * writes carries it; an entry without it — a set built before YOY-175 —
+   * is a `simple` entry.
+   */
+  set?: ScoreSetName;
+  /** A hard entry's kind (YOY-175 AC-2). */
+  kind?: HardKind;
+}
+
+/** The set an entry belongs to: `simple` when it predates the field. */
+export function setOf(entry: ScoreSetEntry): ScoreSetName {
+  return entry.set ?? "simple";
 }
 
 /**
@@ -177,10 +213,26 @@ export function fillerPrompt(
   ].join("\n");
 }
 
-async function fillShape(
+function fillShape(
   llm: LlmClient,
   language: ScoreLanguage,
   shape: FillerShape,
+  count: number,
+  taken: Set<string>,
+): Promise<string[]> {
+  return fillDistinct(
+    llm,
+    (needed, seen) => fillerPrompt(language, shape, needed, seen),
+    `${language}/${shape}`,
+    count,
+    taken,
+  );
+}
+
+async function fillDistinct(
+  llm: LlmClient,
+  prompt: (needed: number, avoid: readonly string[]) => string,
+  label: string,
   count: number,
   taken: Set<string>,
 ): Promise<string[]> {
@@ -190,13 +242,13 @@ async function fillShape(
   for (let attempt = 0; attempt < 3 && written.length < count; attempt += 1) {
     const needed = count - written.length;
     const answer = await llm.completeStructured({
-      prompt: fillerPrompt(language, shape, needed, attempt === 0 ? [] : written),
+      prompt: prompt(needed, attempt === 0 ? [] : written),
       schema: FILLER_SCHEMA,
       operation: SCORE_FILLER_OPERATION,
     });
     const searches = (answer as { searches?: unknown }).searches;
     if (!Array.isArray(searches)) {
-      throw new Error(`score filler: ${language}/${shape} answer has no searches array`);
+      throw new Error(`score filler: ${label} answer has no searches array`);
     }
     for (const value of searches) {
       if (typeof value !== "string") continue;
@@ -208,44 +260,181 @@ async function fillShape(
     }
   }
   if (written.length < count) {
-    throw new Error(
-      `score filler: ${language}/${shape} produced ${written.length} of ${count} distinct searches`,
-    );
+    throw new Error(`score filler: ${label} produced ${written.length} of ${count} distinct searches`);
   }
   return written;
 }
 
+/** A language's shopper-shaped log searches, newest first. */
+function logOf(logQueries: readonly LogQuery[], language: ScoreLanguage): LogQuery[] {
+  if (language === "fr" || language === "es") return [];
+  return logQueries
+    .filter((entry) => isShopperShaped(entry) && detectLanguage(entry.query) === language)
+    .sort((a, b) => b.date.getTime() - a.date.getTime());
+}
+
 /**
- * Fill every language to exactly 25 searches (AC-2): its shopper-shaped log
- * queries first (the newest 25 when there are more — YOY-141 AC-12), then
- * model filler in the 60 / 30 / 10 shape mix for the remainder.
+ * Fill every language of the simple set to its size (AC-2; YOY-175 AC-1:
+ * he 75, every other 25): the language's kept entries first, when given —
+ * a set reproduced from an earlier build — then its shopper-shaped log
+ * queries, newest first (YOY-141 AC-12), then model filler in the 60 / 30 /
+ * 10 shape mix for the remainder. Every entry carries `set: "simple"`.
  */
 export async function buildScoreSet({
   logQueries,
   llm,
+  keep = {},
 }: {
   logQueries: readonly LogQuery[];
   llm: LlmClient;
+  keep?: Partial<Record<ScoreLanguage, readonly ScoreSetEntry[]>>;
 }): Promise<ScoreSetEntry[]> {
   const entries: ScoreSetEntry[] = [];
   for (const language of SCORE_LANGUAGES) {
-    const fromLog =
-      language === "fr" || language === "es"
-        ? []
-        : logQueries
-            .filter((entry) => isShopperShaped(entry) && detectLanguage(entry.query) === language)
-            .sort((a, b) => b.date.getTime() - a.date.getTime())
-            .slice(0, SEARCHES_PER_LANGUAGE);
-    const modelWritten = fromLog.length === 0;
-    const taken = new Set(fromLog.map((entry) => normalizeReuseQuery(entry.query)));
-    for (const entry of fromLog) {
-      entries.push({ query: entry.query, language, source: "log", modelWritten });
+    const size = searchesPerLanguage(language);
+    const kept = (keep[language] ?? []).slice(0, size);
+    const taken = new Set(kept.map((entry) => normalizeReuseQuery(entry.query)));
+    const fromLog = logOf(logQueries, language)
+      .filter((entry) => !taken.has(normalizeReuseQuery(entry.query)))
+      .slice(0, size - kept.length);
+    for (const entry of fromLog) taken.add(normalizeReuseQuery(entry.query));
+    const modelWritten = kept.every((entry) => entry.source === "model") && fromLog.length === 0;
+    for (const entry of kept) {
+      entries.push({ query: entry.query, language, source: entry.source, modelWritten, set: "simple" });
     }
-    const shapes = fillerShapeCounts(SEARCHES_PER_LANGUAGE - fromLog.length);
+    for (const entry of fromLog) {
+      entries.push({ query: entry.query, language, source: "log", modelWritten, set: "simple" });
+    }
+    const shapes = fillerShapeCounts(size - kept.length - fromLog.length);
     for (const shape of ["short", "medium", "long"] as const) {
       if (shapes[shape] === 0) continue;
       for (const query of await fillShape(llm, language, shape, shapes[shape], taken)) {
-        entries.push({ query, language, source: "model", modelWritten });
+        entries.push({ query, language, source: "model", modelWritten, set: "simple" });
+      }
+    }
+  }
+  return entries;
+}
+
+/** The languages the reproduction check covers (YOY-175 AC-1): the two with log searches in the old set. */
+export const REPRODUCED_LANGUAGES = ["en", "he"] as const satisfies readonly ScoreLanguage[];
+
+/** One language's reproduction result: the 25 entries when the old public half came back exactly. */
+export interface Reproduction {
+  language: ScoreLanguage;
+  reproduced: boolean;
+  /** The old set's 25 entries, rebuilt from the log; present only when reproduced. */
+  entries?: ScoreSetEntry[];
+}
+
+/**
+ * Rebuild the old 25-search languages from the log as it stood before
+ * `before` (YOY-175 AC-1, founder 2026-10-14): each language's newest 25
+ * shopper-shaped searches, split by the old 13 / 12 seeded shuffle, must
+ * give back the old public half exactly — same entries, same order. When
+ * they do, the hidden 12 are the rest of the same 25 (same seed, same
+ * inputs), so the old set is kept whole without ever reading the hidden
+ * file. A language that does not reproduce is built fresh. Pure.
+ */
+export function reproduceOldSet({
+  logQueries,
+  previousPublic,
+  before,
+  seed = SCORE_SPLIT_SEED,
+}: {
+  logQueries: readonly LogQuery[];
+  previousPublic: readonly ScoreSetEntry[];
+  before: Date;
+  seed?: number;
+}): Reproduction[] {
+  const rebuilt: ScoreSetEntry[] = REPRODUCED_LANGUAGES.flatMap((language) =>
+    logOf(
+      logQueries.filter((entry) => entry.date.getTime() < before.getTime()),
+      language,
+    )
+      .slice(0, SEARCHES_PER_LANGUAGE)
+      .map((entry) => ({ query: entry.query, language, source: "log" as const, modelWritten: false })),
+  );
+  // The old split, exactly: one seeded shuffle over the languages in order,
+  // 13 public per language. en and he come first, so their shuffles do not
+  // depend on the languages after them.
+  const random = seededRandom(seed);
+  return REPRODUCED_LANGUAGES.map((language) => {
+    const shuffled = rebuilt.filter((entry) => entry.language === language);
+    shuffleInPlace(shuffled, random);
+    const oldPublic = previousPublic
+      .filter((entry) => entry.language === language && setOf(entry) === "simple")
+      .map((entry) => entry.query);
+    const mine = shuffled.slice(0, PUBLIC_PER_LANGUAGE).map((entry) => entry.query);
+    const reproduced =
+      shuffled.length === SEARCHES_PER_LANGUAGE &&
+      mine.length === oldPublic.length &&
+      mine.every((query, index) => query === oldPublic[index]);
+    return reproduced
+      ? { language, reproduced, entries: rebuilt.filter((entry) => entry.language === language) }
+      : { language, reproduced };
+  });
+}
+
+const HARD_KIND_TEXT: Record<HardKind, string> = {
+  reference:
+    "a reference to a person or a look rather than a product, e.g. dressing like a celebrity or a character, or a named style",
+  lookalike:
+    "a look-alike of a well-known fashion brand the shop does not carry, asking for something that looks like that brand",
+  occasion: "an occasion or event the outfit is for, without naming a product",
+  vague: "a vague or loose wish, a mood or a situation, rather than a product name",
+  "two-wishes": "one sentence holding two different wishes at once, such as a product and a separate constraint on it",
+};
+
+/**
+ * The hard-set filler prompt (YOY-175 AC-2): one kind per request. Its last
+ * line keys replay recordings, like the simple set's.
+ */
+export function hardFillerPrompt(
+  language: ScoreLanguage,
+  kind: HardKind,
+  count: number,
+  avoid: readonly string[],
+): string {
+  return [
+    `Write ${count} different searches a shopper might type into an online clothing and accessories store, in ${LANGUAGE_NAMES[language]}.`,
+    `Each search is ${HARD_KIND_TEXT[kind]}.`,
+    "Write them as real shoppers do: lower case is fine, no numbering, no quotation marks.",
+    ...(avoid.length > 0
+      ? ["Do not repeat any of these:", ...avoid.map((query) => `- ${query}`)]
+      : []),
+    "Answer as JSON: {\"searches\": [ ... ]}.",
+    `Query: hard ${language} ${kind} ${count}`,
+  ].join("\n");
+}
+
+/**
+ * The hard set (YOY-175 AC-2): 30 model-written searches per language in en
+ * and he, the five kinds in equal parts (6 each), each entry carrying
+ * `set: "hard"` and its `kind`. `avoid` holds searches already in the
+ * simple set, so the two sets share none.
+ */
+export async function buildHardSet({
+  llm,
+  avoid = [],
+}: {
+  llm: LlmClient;
+  avoid?: readonly ScoreSetEntry[];
+}): Promise<ScoreSetEntry[]> {
+  const perKind = HARD_SEARCHES_PER_LANGUAGE / HARD_KINDS.length;
+  const entries: ScoreSetEntry[] = [];
+  for (const language of HARD_LANGUAGES) {
+    const taken = new Set(avoid.map((entry) => normalizeReuseQuery(entry.query)));
+    for (const kind of HARD_KINDS) {
+      const written = await fillDistinct(
+        llm,
+        (needed, seen) => hardFillerPrompt(language, kind, needed, seen),
+        `${language}/hard ${kind}`,
+        perKind,
+        taken,
+      );
+      for (const query of written) {
+        entries.push({ query, language, source: "model", modelWritten: true, set: "hard", kind });
       }
     }
   }
@@ -264,25 +453,35 @@ function seededRandom(seed: number): () => number {
   };
 }
 
+function shuffleInPlace<T>(items: T[], random: () => number): void {
+  for (let index = items.length - 1; index > 0; index -= 1) {
+    const swap = Math.floor(random() * (index + 1));
+    [items[index], items[swap]] = [items[swap]!, items[index]!];
+  }
+}
+
 /**
- * Split each language 13 public / 12 hidden (AC-3) by a seeded shuffle: the
- * same set and seed always give the same halves.
+ * Split each set's languages public `ceil(n / 2)` / hidden `floor(n / 2)`
+ * (AC-3; YOY-175 AC-1: 25 → 13 / 12, 75 → 38 / 37, 30 → 15 / 15) by a
+ * seeded shuffle: the same set and seed always give the same halves. Each
+ * set has its own shuffle from the seed, the simple set first, so the
+ * simple set's shuffle is the one every earlier build used.
  */
 export function splitScoreSet(
   entries: readonly ScoreSetEntry[],
   seed: number = SCORE_SPLIT_SEED,
 ): { publicSet: ScoreSetEntry[]; hiddenSet: ScoreSetEntry[] } {
-  const random = seededRandom(seed);
   const publicSet: ScoreSetEntry[] = [];
   const hiddenSet: ScoreSetEntry[] = [];
-  for (const language of SCORE_LANGUAGES) {
-    const shuffled = entries.filter((entry) => entry.language === language);
-    for (let index = shuffled.length - 1; index > 0; index -= 1) {
-      const swap = Math.floor(random() * (index + 1));
-      [shuffled[index], shuffled[swap]] = [shuffled[swap]!, shuffled[index]!];
+  for (const name of SCORE_SET_NAMES) {
+    const random = seededRandom(seed);
+    for (const language of SCORE_LANGUAGES) {
+      const shuffled = entries.filter((entry) => setOf(entry) === name && entry.language === language);
+      shuffleInPlace(shuffled, random);
+      const publicShare = publicCount(shuffled.length);
+      publicSet.push(...shuffled.slice(0, publicShare));
+      hiddenSet.push(...shuffled.slice(publicShare));
     }
-    publicSet.push(...shuffled.slice(0, PUBLIC_PER_LANGUAGE));
-    hiddenSet.push(...shuffled.slice(PUBLIC_PER_LANGUAGE));
   }
   return { publicSet, hiddenSet };
 }

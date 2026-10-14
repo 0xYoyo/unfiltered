@@ -19,7 +19,9 @@ export const SCORE_RUBRIC = `Grade each result for the shopper's search, the way
 0 — no: unrelated, or it breaks something the shopper asked for or ruled out.
 
 Example, grade 1: search "black running shoes", result "Black leather dress shoes" — black shoes, but not for running.
-Example, grade 0: search "dress not in red", result "Red wrap dress" — the shopper ruled red out.`;
+Example, grade 0: search "dress not in red", result "Red wrap dress" — the shopper ruled red out.
+
+A brand or person reference is graded on the look it names, not on the brand: "shoes that look like Prada" grades 3 for a loafer with the same shape and finish and 0 for a sandal. A person reference is graded on the garment the sentence describes when it describes one, and on the category alone when it does not.`;
 
 /** One result as the grader sees it. */
 export interface GradedResult {
