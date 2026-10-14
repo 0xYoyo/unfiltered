@@ -1,0 +1,4029 @@
+{
+  "version": 1,
+  "storeKey": "unfiltered-dev.myshopify.com",
+  "builtAt": "2026-10-14T13:00:13.960Z",
+  "graded": 465,
+  "partial": false,
+  "searchesPlanned": 26,
+  "searches": [
+    {
+      "query": "long sleeve midi dress in black",
+      "language": "en",
+      "relevant": [
+        {
+          "productId": "gid://shopify/Product/8057379520587",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057380110411",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057380831307",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057381584971",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057381748811",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057385320523",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057385386059",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057386696779",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057386729547",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057390334027",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057391087691",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057391644747",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057391677515",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057391939659",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057392431179",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057392463947",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057392595019",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057392627787",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393086539",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393152075",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393479755",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057394069579",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057394102347",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057394856011",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057394888779",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057394921547",
+          "grade": 3
+        }
+      ]
+    },
+    {
+      "query": "beige boots in stock",
+      "language": "en",
+      "relevant": [
+        {
+          "productId": "gid://shopify/Product/8057380601931",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057383944267",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057384009803",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057384730699",
+          "grade": 2
+        }
+      ]
+    },
+    {
+      "query": "midi dress with long sleeves under 300",
+      "language": "en",
+      "relevant": [
+        {
+          "productId": "gid://shopify/Product/8057378996299",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380044875",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057380110411",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057380864075",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057381584971",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057385320523",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057391087691",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057391448139",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057391644747",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057391677515",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057392398411",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057392463947",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057392562251",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057392595019",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057392627787",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057392922699",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393021003",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393053771",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393086539",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393152075",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393479755",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393774667",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393840203",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393872971",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393938507",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057394036811",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057394069579",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057394102347",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057394593867",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057394921547",
+          "grade": 2
+        }
+      ]
+    },
+    {
+      "query": "black dress",
+      "language": "en",
+      "relevant": [
+        {
+          "productId": "gid://shopify/Product/8057377456203",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057377620043",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057377652811",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057377685579",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057379520587",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380110411",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380765771",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380831307",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380864075",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057381650507",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381716043",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381748811",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057385287755",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057385320523",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057385386059",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057385418827",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057386696779",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057386729547",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057387515979",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057390235723",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057390334027",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057391087691",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057391448139",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057391644747",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057391677515",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057391939659",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057393545291",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057393938507",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394004043",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394036811",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057394069579",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057394102347",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057394167883",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394266187",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394430027",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394462795",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057394593867",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394626635",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394724939",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394856011",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394888779",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394921547",
+          "grade": 3
+        }
+      ]
+    },
+    {
+      "query": "blue dress under 500",
+      "language": "en",
+      "relevant": [
+        {
+          "productId": "gid://shopify/Product/8057379291211",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057380044875",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057380208715",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057380798539",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381650507",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381683275",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381716043",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057383223371",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057387581515",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057387614283",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057391087691",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057392922699",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057393086539",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057393381451",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057393774667",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394069579",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394102347",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394135115",
+          "grade": 3
+        }
+      ]
+    },
+    {
+      "query": "a midi dress with long sleeves",
+      "language": "en",
+      "relevant": [
+        {
+          "productId": "gid://shopify/Product/8057377620043",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057377685579",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057378996299",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057380110411",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057385320523",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057390334027",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057391087691",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057391185995",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057391448139",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057391644747",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057391677515",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057392398411",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057392463947",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057392595019",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057392627787",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057392922699",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393021003",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393053771",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393086539",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393152075",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393479755",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057393840203",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393872971",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393938507",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057394036811",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057394069579",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057394102347",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057394593867",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057394856011",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057394921547",
+          "grade": 3
+        }
+      ]
+    },
+    {
+      "query": "dress for a wedding",
+      "language": "en",
+      "relevant": [
+        {
+          "productId": "gid://shopify/Product/8057377456203",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057377620043",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057377652811",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057377685579",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057378930763",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057378963531",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057378996299",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057379291211",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057379422283",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057379455051",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057379520587",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379881035",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057379913803",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057379946571",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057379979339",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057380012107",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057380044875",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380077643",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057380110411",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057380208715",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057380765771",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380798539",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057380831307",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380864075",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381191755",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057381650507",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057381683275",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381716043",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381748811",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057383223371",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057383485515",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057383518283",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057383682123",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057384239179",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057385320523",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057386008651",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057386270795",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057386467403",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057386696779",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057386729547",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057386762315",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057387515979",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057387581515",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057387614283",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057388171339",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057388204107",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057388236875",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057388269643",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057388302411",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057389056075",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057389875275",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057390235723",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057390334027",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057391087691",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057391185995",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057391448139",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057391644747",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057391677515",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057391939659",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057392267339",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057392398411",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057392463947",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057392922699",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057392955467",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057392988235",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393021003",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057393053771",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057393217611",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057393381451",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393446987",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393479755",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393545291",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393709131",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393840203",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393872971",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393905739",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057393938507",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393971275",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057394036811",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057394233419",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057394266187",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057394298955",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057394331723",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057394364491",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057394397259",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057394430027",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057394462795",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394561099",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057394593867",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057394626635",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057394692171",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057394724939",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057394823243",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394856011",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394888779",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394921547",
+          "grade": 3
+        }
+      ]
+    },
+    {
+      "query": "t-shirt",
+      "language": "en",
+      "relevant": [
+        {
+          "productId": "gid://shopify/Product/8057377488971",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057377521739",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057377554507",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057378242635",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057378406475",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057378504779",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057378603083",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057378635851",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057378668619",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379225675",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379356747",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057379389515",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379586123",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379618891",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381650507",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381683275",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381716043",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057383059531",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057384534091",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057384566859",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057384599627",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057384763467",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057385222219",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057385254987",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057385779275",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057386598475",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057386631243",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057387319371",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057388859467",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057393250379",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393512523",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393578059",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057394495563",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394528331",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394757707",
+          "grade": 3
+        }
+      ]
+    },
+    {
+      "query": "same but under 300",
+      "language": "en",
+      "relevant": [
+        {
+          "productId": "gid://shopify/Product/8057377783883",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057377816651",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057377849419",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057377882187",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057377914955",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057377947723",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057377980491",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057378111563",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057378144331",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057378209867",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057378242635",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057378275403",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057378373707",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057378406475",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057378504779",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057378603083",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057378635851",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057378668619",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057378734155",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057378766923",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057378799691",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057378832459",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057378930763",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057378963531",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057378996299",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379029067",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379061835",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379094603",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379127371",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379160139",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379192907",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379225675",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379258443",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379291211",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379323979",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379356747",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379389515",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379553355",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379586123",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379618891",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379651659",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379684427",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379717195",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379749963",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379782731",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379815499",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379848267",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380044875",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380077643",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380110411",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380143179",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380241483",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380274251",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380339787",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380372555",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380405323",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380438091",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380503627",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380765771",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380798539",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380962379",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380995147",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381027915",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381060683",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381257291",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381290059",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381322827",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381355595",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381388363",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381421131",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381453899",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381486667",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381519435",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381552203",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381584971",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381617739",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381683275",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381716043",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381748811",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381781579",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381814347",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381847115",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381879883",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381912651",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381978187",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057382043723",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057382109259",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057382273099",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057382404171",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057382568011",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057382633547",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057382830155",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057382862923",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057382928459",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057382961227",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057383026763",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057383059531",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057383092299",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057383125067",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057383157835",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057383387211",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057383419979",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057383452747",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057383485515",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057383518283",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057383583819",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057383616587",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057383747659",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057383780427",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057383813195",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057383845963",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057383911499",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057384075339",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057384140875",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057384337483",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057384370251",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057384403019",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057384534091",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057384566859",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057384599627",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057384665163",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057384763467",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057384796235",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057384861771",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057384894539",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057384927307",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057385025611",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057385091147",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057385123915",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057385156683",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057385222219",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057385254987",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057385353291",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057385386059",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057385418827",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057385713739",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057385779275",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057385844811",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057387843659",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057388630091",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057388662859",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057388695627",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057388728395",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057388761163",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057388793931",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057388826699",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057388859467",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057388925003",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057388990539",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057390039115",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057390137419",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057390235723",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057390432331",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057390530635",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057390596171",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057390858315",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057390891083",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057391087691",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057391120459",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057391153227",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057391185995",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057391218763",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057391317067",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057391349835",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057391448139",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057391480907",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057391513675",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057391546443",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057391579211",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057391611979",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057391710283",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057391775819",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057391808587",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057391841355",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057391874123",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057391906891",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057392005195",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057392169035",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057392201803",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057392234571",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057392300107",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057392332875",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057392365643",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057392562251",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057392595019",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057392627787",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057392726091",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057392758859",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057392824395",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057392857163",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057392889931",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057393184843",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057393217611",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057393250379",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057393512523",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057393578059",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057393610827",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057393643595",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057393774667",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057393971275",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394004043",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394069579",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394102347",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394135115",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394167883",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394430027",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394495563",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394528331",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394626635",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394757707",
+          "grade": 3
+        }
+      ]
+    },
+    {
+      "query": "summer dress, not black under 400 dollars",
+      "language": "en",
+      "relevant": [
+        {
+          "productId": "gid://shopify/Product/8057378996299",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057379291211",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057380044875",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057380110411",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057380798539",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380864075",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381650507",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057381683275",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057381716043",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057383223371",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057383682123",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057385418827",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057385648203",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057387581515",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057389056075",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057389645899",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057389744203",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057389875275",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057391087691",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057391185995",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057392398411",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057392463947",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393217611",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393840203",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393872971",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393905739",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393971275",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394036811",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057394069579",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057394135115",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057394233419",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394298955",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394331723",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394364491",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394397259",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394593867",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394626635",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394659403",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394692171",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394823243",
+          "grade": 3
+        }
+      ]
+    },
+    {
+      "query": "Mesh Over Dress",
+      "language": "en",
+      "relevant": [
+        {
+          "productId": "gid://shopify/Product/8057381650507",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057381683275",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381716043",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057385287755",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057385320523",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057385386059",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057385418827",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057392463947",
+          "grade": 3
+        }
+      ]
+    },
+    {
+      "query": "floral summer dress under 50, not black",
+      "language": "en",
+      "relevant": []
+    },
+    {
+      "query": "long sleeve midi dress",
+      "language": "en",
+      "relevant": [
+        {
+          "productId": "gid://shopify/Product/8057380110411",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057381584971",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057381748811",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057384730699",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057385320523",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057385517131",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057385582667",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057385648203",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057390334027",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057391087691",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057391644747",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057391677515",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057392431179",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057392463947",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057392595019",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057392627787",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057392922699",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057393021003",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057393053771",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057393086539",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393479755",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057393840203",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393872971",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393938507",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057394036811",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057394069579",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057394102347",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057394856011",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057394921547",
+          "grade": 3
+        }
+      ]
+    },
+    {
+      "query": "גינס",
+      "language": "he",
+      "relevant": [
+        {
+          "productId": "gid://shopify/Product/8057378996299",
+          "grade": 3
+        }
+      ]
+    },
+    {
+      "query": "מעיל אוברסייז שנופל יפה פחות מ1000 דולר אבל",
+      "language": "he",
+      "relevant": [
+        {
+          "productId": "gid://shopify/Product/8057378701387",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057379881035",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057379913803",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380536395",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381093451",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057381158987",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057381257291",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057381781579",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057381814347",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057382469707",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057383288907",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057383321675",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057383649355",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057384108107",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057384304715",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057384697931",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057384730699",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057385189451",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057385746507",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057386336331",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057386532939",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057387221067",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057387679819",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057388466251",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057388597323",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057389449291",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057389547595",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057389940811",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057390760011",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057390956619",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057392267339",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057392955467",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057392988235",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393807435",
+          "grade": 2
+        }
+      ]
+    },
+    {
+      "query": "שמלה לחתונה עד 400 שקל שקל לא דולר",
+      "language": "he",
+      "relevant": [
+        {
+          "productId": "gid://shopify/Product/8057392922699",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057392955467",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057392988235",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393021003",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393053771",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393217611",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393381451",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393446987",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393479755",
+          "grade": 2
+        }
+      ]
+    },
+    {
+      "query": "נעלי עקב שחורות לנשים",
+      "language": "he",
+      "relevant": [
+        {
+          "productId": "gid://shopify/Product/8057386270795",
+          "grade": 3
+        }
+      ]
+    },
+    {
+      "query": "אותו דבר אבל עד 400",
+      "language": "he",
+      "relevant": [
+        {
+          "productId": "gid://shopify/Product/8057378930763",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057378963531",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379291211",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379553355",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379651659",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379946571",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379979339",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380012107",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380044875",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380077643",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380110411",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380143179",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380241483",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380339787",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380405323",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380438091",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380503627",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380962379",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381290059",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381322827",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057381421131",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057381453899",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057381486667",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381519435",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381552203",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381584971",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057381617739",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381683275",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381716043",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381748811",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381847115",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381879883",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381912651",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057381978187",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057382109259",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057382273099",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057384304715",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057385418827",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057386893387",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057387286603",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057387319371",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057387384907",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057387647051",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057387778123",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057387843659",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057387876427",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057387909195",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057387941963",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057387974731",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057388007499",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057388040267",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057388531787",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057388630091",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057388662859",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057388695627",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057388728395",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057388761163",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057388793931",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057388826699",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057388859467",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057388925003",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057388990539",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057389056075",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057389154379",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057389252683",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057389350987",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057389645899",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057389875275",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057390235723",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057390334027",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057391087691",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057391185995",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057391448139",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057392300107",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057392332875",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057392365643",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393971275",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394004043",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394036811",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394069579",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394102347",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394135115",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394167883",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394298955",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394430027",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394593867",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394626635",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394659403",
+          "grade": 3
+        }
+      ]
+    },
+    {
+      "query": "מעיל אוברסייז שנופל יפה פחות מ100 דולר אבל",
+      "language": "he",
+      "relevant": [
+        {
+          "productId": "gid://shopify/Product/8057394495563",
+          "grade": 2
+        }
+      ]
+    },
+    {
+      "query": "ומתחת 600",
+      "language": "he",
+      "relevant": [
+        {
+          "productId": "gid://shopify/Product/8057377456203",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057378930763",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057378963531",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057378996299",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379029067",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379061835",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379094603",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379127371",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379160139",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379192907",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379225675",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379258443",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379291211",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379323979",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379356747",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379389515",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379422283",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379455051",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379487819",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379520587",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379553355",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379586123",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379618891",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379651659",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379684427",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379717195",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379749963",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379782731",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379815499",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379848267",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379881035",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379946571",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379979339",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380012107",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380044875",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380077643",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380110411",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380143179",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380208715",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380241483",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380274251",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380307019",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380339787",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380372555",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380405323",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380438091",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380503627",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380536395",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380569163",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380601931",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380634699",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380733003",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380765771",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380798539",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380831307",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380864075",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380929611",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380962379",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380995147",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381027915",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381060683",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381093451",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381158987",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381191755",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381224523",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381257291",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381290059",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381322827",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381355595",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381388363",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381421131",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381453899",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381486667",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381519435",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381552203",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381584971",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381617739",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381650507",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381683275",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381716043",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381748811",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381781579",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381814347",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381847115",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381879883",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381912651",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381978187",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057382043723",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057382109259",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057382207563",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057382273099",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057382371403",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057382404171",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057382469707",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057384730699",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057385943115",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057385975883",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057386008651",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057386041419",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057386074187",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057386106955",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057386139723",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057386205259",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057386238027",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057386434635",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057386467403",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057386500171",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057386532939",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057386565707",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057386598475",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057386631243",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057386664011",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057386729547",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057386762315",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057386795083",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057386827851",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057386860619",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057386893387",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057386926155",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057386958923",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057386991691",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057387024459",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057387057227",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057387089995",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057387122763",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057387188299",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057387221067",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057387253835",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057387286603",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057387319371",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057387352139",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057387384907",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057387417675",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057387450443",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057387483211",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057387515979",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057387581515",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057393840203",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057393872971",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057393905739",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057393938507",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057393971275",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394004043",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394036811",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394069579",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394102347",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394135115",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394167883",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394233419",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394266187",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394298955",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394331723",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394364491",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394397259",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394430027",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394462795",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394495563",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394528331",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394593867",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394626635",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394659403",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394692171",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394724939",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394757707",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394823243",
+          "grade": 3
+        }
+      ]
+    },
+    {
+      "query": "שמלה לחתונה עד 400 שקל",
+      "language": "he",
+      "relevant": [
+        {
+          "productId": "gid://shopify/Product/8057380765771",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380831307",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380864075",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381748811",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057387515979",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057392922699",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057392955467",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057392988235",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393021003",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393053771",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393086539",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393217611",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393381451",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393479755",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393545291",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393774667",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393840203",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057393905739",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057394036811",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057394233419",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057394298955",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057394462795",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394692171",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057394823243",
+          "grade": 2
+        }
+      ]
+    },
+    {
+      "query": "מגפיים חומים במלאי",
+      "language": "he",
+      "relevant": [
+        {
+          "productId": "gid://shopify/Product/8057378439243",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057378472011",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057380601931",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057383944267",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057384730699",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057385910347",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057386139723",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057386205259",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057388400715",
+          "grade": 3
+        }
+      ]
+    },
+    {
+      "query": "עזוב תביא לי בכלל מכנסיים ירוקים",
+      "language": "he",
+      "relevant": [
+        {
+          "productId": "gid://shopify/Product/8057378078795",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379455051",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057381814347",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057383452747",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057387974731",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057388925003",
+          "grade": 2
+        }
+      ]
+    },
+    {
+      "query": "שמלת מידי עם שרוולים ארוכים",
+      "language": "he",
+      "relevant": [
+        {
+          "productId": "gid://shopify/Product/8057378996299",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057379520587",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057380110411",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057380765771",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057380798539",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057380831307",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057380864075",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057381584971",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057381650507",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057381683275",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057381716043",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057381748811",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057384730699",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057385287755",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057385320523",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057385386059",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057385418827",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057385517131",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057385582667",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057385648203",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057389875275",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057390235723",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057390334027",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057391087691",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057391185995",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057391448139",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057391644747",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057391677515",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057391939659",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057392398411",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057392431179",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057392463947",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057392562251",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057392595019",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057392627787",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057392922699",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057393021003",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057393053771",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057393086539",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057393152075",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057393217611",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057393381451",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057393446987",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057393479755",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057393545291",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057393709131",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057393774667",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394856011",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394921547",
+          "grade": 3
+        }
+      ]
+    },
+    {
+      "query": "חולצת טריקו טריקו עם הדפסה",
+      "language": "he",
+      "relevant": [
+        {
+          "productId": "gid://shopify/Product/8057377488971",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057377521739",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057377554507",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057383059531",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057384566859",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057387319371",
+          "grade": 3
+        },
+        {
+          "productId": "gid://shopify/Product/8057394495563",
+          "grade": 3
+        }
+      ]
+    },
+    {
+      "query": "סנדל עקב שחור",
+      "language": "he",
+      "relevant": [
+        {
+          "productId": "gid://shopify/Product/8057385877579",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057385943115",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057386270795",
+          "grade": 2
+        },
+        {
+          "productId": "gid://shopify/Product/8057386762315",
+          "grade": 2
+        }
+      ]
+    }
+  ]
+}

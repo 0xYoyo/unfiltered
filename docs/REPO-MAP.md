@@ -340,6 +340,7 @@ apps/
         data/
           calibration.json
           public-set.json
+          recall-truth.json
           score-baseline.json
           seed-fixture.json.gz
         fixture.server.ts

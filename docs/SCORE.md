@@ -206,8 +206,9 @@ That separates a loss in find from a loss in the judge.
    grades unless `--rebuild-truth` is given.
    **The truth was graded without descriptions:** each product shows the
    grader's view minus its 300-character description excerpt, a decision
-   taken 2026-10-14 to fit the build under its $0.40 ledger cap. Once the
-   ledger passes the cap, the build stops and writes nothing.
+   taken 2026-10-14 to fit the build under its ledger cap, $0.50. If the
+   ledger passes the cap, the build stops and writes the searches graded so
+   far as a truth marked partial.
 2. **Recall.** The find step runs alone (no extraction, no judge) at the
    production find-set size, `FIND_SET_SIZE` (150 by default). It embeds each
    query live, as production does, so a re-run's cost line shows 26
@@ -223,6 +224,74 @@ That separates a loss in find from a loss in the judge.
 `--synthetic` runs the command offline against the synthetic tenant, with a
 grader that marks a title holding a query word as relevant. Without
 `--truth <file>` it writes nothing.
+
+### Find recall — the public en and he searches (2026-10-14)
+
+The truth was built on 2026-10-14 (12:55–13:00 UTC) on branch
+`YOY-174-find-recall` at `8baf481` (base `main` `96e8a17`), against
+the committed seed fixture (465 products, 413 families). All 26 searches
+were graded in 260 calls, and none was partial. **Measured cost /bin/zsh.4169**,
+against the offline estimate of ≈ $0.403 and the $0.50 ledger cap. The
+truth was graded without descriptions. Recall was measured at the default
+find-set size (150). A re-run reading the committed truth makes no grading
+call: `cost $0.0000 over 26 model calls`, the 26 query embeddings.
+
+Relevant, in-find-set and first-24 counts are families. "In first 24" counts
+the relevant families inside the first 24 of the find order, before any
+judge.
+
+| # | Lang | Search | Relevant | In find set | Recall | In first 24 |
+|---|---|---|---|---|---|---|
+| 0 | en | long sleeve midi dress in black | 24 | 24 | 1.000 | 13 |
+| 1 | en | beige boots in stock | 4 | 4 | 1.000 | 4 |
+| 2 | en | midi dress with long sleeves under 300 | 25 | 25 | 1.000 | 14 |
+| 3 | en | black dress | 40 | 40 | 1.000 | 23 |
+| 4 | en | blue dress under 500 | 16 | 16 | 1.000 | 12 |
+| 5 | en | a midi dress with long sleeves | 26 | 26 | 1.000 | 15 |
+| 6 | en | dress for a wedding | 89 | 77 | 0.865 | 22 |
+| 7 | en | t-shirt | 30 | 29 | 0.967 | 18 |
+| 8 | en | same but under 300 | 184 | 71 | 0.386 | 12 |
+| 9 | en | summer dress, not black under 400 dollars | 39 | 39 | 1.000 | 8 |
+| 10 | en | Mesh Over Dress | 7 | 7 | 1.000 | 4 |
+| 11 | en | floral summer dress under 50, not black | 0 | 0 | — | 0 |
+| 12 | en | long sleeve midi dress | 25 | 25 | 1.000 | 13 |
+| 13 | he | גינס | 1 | 1 | 1.000 | 1 |
+| 14 | he | מעיל אוברסייז שנופל יפה פחות מ1000 דולר אבל | 31 | 31 | 1.000 | 17 |
+| 15 | he | שמלה לחתונה עד 400 שקל שקל לא דולר | 7 | 7 | 1.000 | 3 |
+| 16 | he | נעלי עקב שחורות לנשים | 1 | 1 | 1.000 | 0 |
+| 17 | he | אותו דבר אבל עד 400 | 77 | 37 | 0.481 | 8 |
+| 18 | he | מעיל אוברסייז שנופל יפה פחות מ100 דולר אבל | 1 | 1 | 1.000 | 1 |
+| 19 | he | ומתחת 600 | 153 | 61 | 0.399 | 11 |
+| 20 | he | שמלה לחתונה עד 400 שקל | 21 | 21 | 1.000 | 6 |
+| 21 | he | מגפיים חומים במלאי | 8 | 8 | 1.000 | 7 |
+| 22 | he | עזוב תביא לי בכלל מכנסיים ירוקים | 6 | 6 | 1.000 | 2 |
+| 23 | he | שמלת מידי עם שרוולים ארוכים | 45 | 45 | 1.000 | 14 |
+| 24 | he | חולצת טריקו טריקו עם הדפסה | 6 | 6 | 1.000 | 4 |
+| 25 | he | סנדל עקב שחור | 4 | 4 | 1.000 | 3 |
+
+| | Mean recall | Searches scored | Under 0.5 | Nothing relevant |
+|---|---|---|---|---|
+| en | 0.935 | 12 of 13 | 1 | 1 |
+| he | 0.914 | 13 of 13 | 2 | 0 |
+
+The three searches under 0.5 are follow-up phrasings: en 8 "same but under
+300", he 17 "אותו דבר אבל עד 400" and he 19 "ומתחת 600". Graded alone,
+without the search they follow, almost anything under the price is
+relevant, so 184, 77 and 153 families are. The find set holds 150
+candidates, so those three cannot reach 1.0. en 11 "floral summer dress
+under 50, not black" has nothing relevant on the seed catalog.
+
+**en:** find reaches 0.935 of the relevant families, and every search but
+the one follow-up reaches at least 0.865. Against a public en score of
+0.705 and a hidden C4 mean of 0.620, the larger loss on this set is the
+judge, meaning the order and the page served after find, not find itself.
+
+**he:** find reaches 0.914, and every search that is not a follow-up reaches
+1.0. Against a public he score of 0.214 and a hidden C4 mean of 0.238, the
+larger loss on this set is the judge, not find. The relevant families are in
+the find set, and the page served does not show them. he 16 (black heels for
+women) is the clearest case: its one relevant family is inside the find set
+but not in the first 24.
 
 ## Rubric
 
