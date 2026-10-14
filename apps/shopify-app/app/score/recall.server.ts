@@ -17,7 +17,8 @@ import type { ScoreLanguage, ScoreSetEntry } from "./set.server";
  * product shows the grader's view minus its 300-character description
  * excerpt: title, type, vendor and price, then category, colours, occasions,
  * fit, style tags and the five vision attributes. That keeps the one-time
- * build under its cap.
+ * build under its cap. If the build stops at the cap anyway, the searches
+ * graded so far are written as a truth marked partial and measured.
  *
  * Recall counts families, not products (one family, one card). The find step
  * collapses colourways to their family's first product, so a relevant
@@ -33,8 +34,8 @@ export const RELEVANT_GRADE = 2;
 export const RECALL_FIRST_PAGE = 24;
 /** A search under this recall is counted per language (AC-2). */
 export const LOW_RECALL = 0.5;
-/** The truth build stops once its ledger passes this (founder, 2026-10-14). */
-export const RECALL_COST_CAP_USD = 0.4;
+/** The truth build stops once its ledger passes this (co-manager, 2026-10-14: $0.50). */
+export const RECALL_COST_CAP_USD = 0.5;
 /** The languages the truth covers (AC-1): the two with real log searches. */
 export const RECALL_LANGUAGES: readonly ScoreLanguage[] = ["en", "he"];
 
@@ -66,6 +67,12 @@ export interface RecallTruth {
   builtAt: string;
   /** Products graded per search: the whole fixture. */
   graded: number;
+  /**
+   * The build stopped at the cost cap: only the searches listed were graded,
+   * out of `searchesPlanned`.
+   */
+  partial: boolean;
+  searchesPlanned: number;
   searches: RecallTruthSearch[];
 }
 
@@ -122,15 +129,16 @@ export async function gradeRecallBatch(
   return grades as number[];
 }
 
-export type RecallTruthBuild =
-  | { complete: true; truth: RecallTruth; cost: ScoreReport["cost"] }
-  | { complete: false; searchesDone: number; cost: ScoreReport["cost"] };
+export interface RecallTruthBuild {
+  truth: RecallTruth;
+  cost: ScoreReport["cost"];
+}
 
 /**
  * Build the truth (AC-1): every product graded for every search, in batches
  * of `RECALL_BATCH_SIZE`. After each call the ledger is read, and once it
- * passes `capUsd` the build stops: nothing is written and the spend so far
- * is reported.
+ * passes `capUsd` the build stops. The searches fully graded so far form a
+ * truth marked `partial`; the search in progress is dropped.
  */
 export async function buildRecallTruth({
   db,
@@ -160,10 +168,11 @@ export async function buildRecallTruth({
     const relevant: RelevantProduct[] = [];
     for (let start = 0; start < catalog.length; start += batchSize) {
       const batch = catalog.slice(start, start + batchSize);
-      const grades = await gradeRecallBatch(
-        llm,
-        entry.query,
-        batch.map((item) => item.result),
+      const results = batch.map((item) => item.result);
+      // One retry on a failed or malformed answer: a lost batch would lose
+      // the whole paid build.
+      const grades = await gradeRecallBatch(llm, entry.query, results).catch(() =>
+        gradeRecallBatch(llm, entry.query, results),
       );
       batch.forEach((item, position) => {
         const grade = grades[position]!;
@@ -173,23 +182,25 @@ export async function buildRecallTruth({
       });
       const cost = await readCost();
       if (cost.usd > capUsd) {
-        return { complete: false, searchesDone: done.length, cost };
+        return { truth: truthOf(true), cost };
       }
     }
     done.push({ query: entry.query, language: entry.language, relevant });
     progress(`[${index + 1}/${searches.length}] ${entry.language} graded`);
   }
-  return {
-    complete: true,
-    truth: {
+  return { truth: truthOf(false), cost: await readCost() };
+
+  function truthOf(partial: boolean): RecallTruth {
+    return {
       version: 1,
       storeKey,
       builtAt: now().toISOString(),
       graded: catalog.length,
-      searches: done,
-    },
-    cost: await readCost(),
-  };
+      partial,
+      searchesPlanned: searches.length,
+      searches: [...done],
+    };
+  }
 }
 
 /** One search's recall (AC-2). */

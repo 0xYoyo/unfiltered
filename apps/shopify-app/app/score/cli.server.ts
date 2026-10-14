@@ -357,7 +357,7 @@ export async function runRecallCommand(
       if (reuse) {
         // The truth exists: no grading call (AC-4).
         truth = JSON.parse(readFileSync(truthPath, "utf8")) as RecallTruth;
-        lines.push(`truth ${truth.searches.length} searches, built ${truth.builtAt}, read from file`);
+        lines.push(`${truthLine(truth)}, read from file`);
       } else {
         const build = await buildRecallTruth({
           db,
@@ -369,22 +369,14 @@ export async function runRecallCommand(
           readCost: () => readRunCost(db),
           progress: (line) => err(line),
         });
-        if (!build.complete) {
-          // The cap stops the build (spend rule): nothing is written.
-          return {
-            code: 1,
-            lines: [
-              `stopped at the cost cap ($${RECALL_COST_CAP_USD.toFixed(2)}) after ${build.searchesDone} of ${searches.length} searches; no truth written`,
-              formatCostLine(build.cost),
-            ],
-          };
-        }
         truth = build.truth;
         if (truthPath !== undefined) {
           writeFileSync(truthPath, `${JSON.stringify(truth, null, 2)}\n`);
         }
         lines.push(
-          `truth ${truth.searches.length} searches, built ${truth.builtAt}${truthPath === undefined ? ", not written" : ", written"}`,
+          `${truthLine(truth)}${truthPath === undefined ? ", not written" : ", written"}`,
+          // The build's own spend, before the find step's embeddings.
+          `truth ${formatCostLine(build.cost)}`,
         );
       }
       const find = values.synthetic
@@ -407,6 +399,14 @@ export async function runRecallCommand(
   } finally {
     await db.$disconnect();
   }
+}
+
+/** The truth's first line: its size, and `partial` when the cost cap stopped the build. */
+function truthLine(truth: RecallTruth): string {
+  const partial = truth.partial
+    ? `, partial (cost cap $${RECALL_COST_CAP_USD.toFixed(2)}): ${truth.searches.length} of ${truth.searchesPlanned} searches graded`
+    : "";
+  return `truth ${truth.searches.length} searches, built ${truth.builtAt}${partial}`;
 }
 
 /** The find step as production builds it (YOY-174 AC-2): Gemini embeddings, the production find-set size. */

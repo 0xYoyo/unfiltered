@@ -1389,8 +1389,8 @@ describe("find recall (YOY-174)", () => {
       // The truth is graded without descriptions.
       expect(request.prompt).not.toContain("from the synthetic score catalog");
     }
-    expect(build.complete).toBe(true);
-    if (!build.complete) return;
+    expect(build.truth.partial).toBe(false);
+    expect(build.truth.searchesPlanned).toBe(2);
     expect(build.truth.graded).toBe(7);
     expect(build.truth.builtAt).toBe("2026-10-14T00:00:00.000Z");
     // Grade 1 is not relevant; grade 3 is.
@@ -1401,7 +1401,29 @@ describe("find recall (YOY-174)", () => {
     ]);
   });
 
-  it("stops at the cost cap and returns no truth (spend rule)", async () => {
+  it("retries a malformed batch answer once", async () => {
+    const db = await createTestDb();
+    await importScoreFixture(db, buildSyntheticFixture());
+    let calls = 0;
+    const llm: LlmClient = {
+      async completeStructured() {
+        calls += 1;
+        // The first answer is one grade short; the retry answers in full.
+        return { grades: calls === 1 ? [3] : Array.from({ length: 7 }, () => 2) };
+      },
+    };
+    const build = await buildRecallTruth({
+      db,
+      llm,
+      storeKey: SYNTHETIC_STORE_KEY,
+      searches: recallSearches(set).slice(0, 1),
+      readCost: async () => ({ usd: 0, calls }),
+    });
+    expect(calls).toBe(2);
+    expect(build.truth.searches[0]!.relevant).toHaveLength(7);
+  });
+
+  it("stops at the cost cap and keeps the searches graded so far, marked partial (spend rule)", async () => {
     const db = await createTestDb();
     await importScoreFixture(db, buildSyntheticFixture());
     const { llm, requests } = batchGrader();
@@ -1419,7 +1441,11 @@ describe("find recall (YOY-174)", () => {
       },
       batchSize: 3,
     });
-    expect(build).toEqual({ complete: false, searchesDone: 1, cost: { usd, calls: 4 } });
+    expect(build.cost).toEqual({ usd, calls: 4 });
+    expect(build.truth.partial).toBe(true);
+    expect(build.truth.searchesPlanned).toBe(2);
+    // The search in progress when the cap passed is dropped.
+    expect(build.truth.searches.map((search) => search.query)).toEqual(["linen shirt"]);
   });
 
   it("counts recall by family, inside the find set and the first page (AC-2)", () => {
@@ -1472,6 +1498,7 @@ describe("find recall (YOY-174)", () => {
     const first = await run(["--synthetic", "--set", setPath, "--truth", truthPath]);
     expect(first.code).toBe(0);
     expect(first.out[0]).toMatch(/^truth 2 searches, built .*, written$/);
+    expect(first.out[1]).toBe("truth cost $0.0000 over 0 model calls");
     expect(first.err.filter((line) => line.endsWith(" graded"))).toEqual(["[1/2] en graded", "[2/2] he graded"]);
     const truth = JSON.parse(readFileSync(truthPath, "utf8")) as RecallTruth;
     expect(truth.searches.map((search) => search.query)).toEqual(["linen shirt", "שמלה שחורה"]);
@@ -1492,7 +1519,7 @@ describe("find recall (YOY-174)", () => {
     expect(second.code).toBe(0);
     expect(second.out[0]).toBe(`truth 2 searches, built ${truth.builtAt}, read from file`);
     expect(second.err.filter((line) => line.endsWith(" graded"))).toEqual([]);
-    expect(second.out.slice(1)).toEqual(first.out.slice(1));
+    expect(second.out.slice(1)).toEqual(first.out.slice(2));
 
     const rebuilt = await run(["--synthetic", "--set", setPath, "--truth", truthPath, "--rebuild-truth"]);
     expect(rebuilt.code).toBe(0);
