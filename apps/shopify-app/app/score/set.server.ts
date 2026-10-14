@@ -22,10 +22,14 @@ export type ScoreLanguage = (typeof SCORE_LANGUAGES)[number];
 export const SEARCHES_PER_LANGUAGE = 25;
 export const PUBLIC_PER_LANGUAGE = 13;
 export const HIDDEN_PER_LANGUAGE = SEARCHES_PER_LANGUAGE - PUBLIC_PER_LANGUAGE;
-/** Hebrew's size in the simple set (YOY-175 AC-1): 75, so its hidden half is 37, not 12. */
+/**
+ * Hebrew's most searches in the simple set (YOY-175 AC-1). Hebrew takes
+ * every shopper-shaped log search up to it and no filler, so a short log
+ * gives a smaller set (67 on 2026-10-14: 34 public, 33 hidden).
+ */
 export const HEBREW_SEARCHES = 75;
 
-/** A language's size in the simple set (YOY-175 AC-1): he 75, every other 25. */
+/** A language's most searches in the simple set (YOY-175 AC-1): he 75, every other 25. */
 export function searchesPerLanguage(language: ScoreLanguage): number {
   return language === "he" ? HEBREW_SEARCHES : SEARCHES_PER_LANGUAGE;
 }
@@ -349,7 +353,8 @@ function logOf(logQueries: readonly LogQuery[], language: ScoreLanguage): LogQue
 
 /**
  * Fill every language of the simple set to its size (AC-2; YOY-175 AC-1:
- * he 75, every other 25): the language's kept entries first, when given —
+ * every other 25; he is every log search up to 75, never filler): the
+ * language's kept entries first, when given —
  * a set reproduced from an earlier build — then its shopper-shaped log
  * queries, newest first (YOY-141 AC-12), then model filler in the 60 / 30 /
  * 10 shape mix for the remainder. Every entry carries `set: "simple"`.
@@ -377,10 +382,14 @@ export async function buildScoreSet({
 }): Promise<ScoreSetEntry[]> {
   const entries: ScoreSetEntry[] = [];
   for (const language of SCORE_LANGUAGES) {
-    const size = searchesPerLanguage(language);
-    const kept = (keep[language] ?? []).slice(0, size);
+    const kept = (keep[language] ?? []).slice(0, searchesPerLanguage(language));
     const taken = new Set(kept.map((entry) => normalizeReuseQuery(entry.query)));
     const candidates = logOf(logQueries, language).filter((entry) => !taken.has(normalizeReuseQuery(entry.query)));
+    // Hebrew is never filler: its size is the log's count, up to its most.
+    const size =
+      language === "he"
+        ? Math.min(searchesPerLanguage(language), kept.length + candidates.length)
+        : searchesPerLanguage(language);
     // The added searches' public share: a reproduced language's kept 25 hold 13 of it.
     const addedPublic = publicCount(size) - publicCount(kept.length);
     const addedHidden = size - kept.length - addedPublic;

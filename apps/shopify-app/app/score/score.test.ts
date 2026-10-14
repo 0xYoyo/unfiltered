@@ -139,12 +139,14 @@ describe("the set builder (AC-1, AC-2)", () => {
     expect(await exportLogQueries(db, ["playground:other"])).toEqual([]);
   });
 
-  it("fills he to 75 and every other language to 25, log first, filler in the 60/30/10 shape (YOY-175 AC-1)", async () => {
+  it("fills every language but he to 25, log first, filler in the 60/30/10 shape; he is its log searches only (YOY-175 AC-1)", async () => {
     const set = await buildSyntheticSet();
-    expect(set).toHaveLength(200);
+    expect(set).toHaveLength(25 * 5 + 2);
     for (const language of SCORE_LANGUAGES) {
-      expect(set.filter((entry) => entry.language === language)).toHaveLength(language === "he" ? 75 : 25);
+      expect(set.filter((entry) => entry.language === language)).toHaveLength(language === "he" ? 2 : 25);
     }
+    // Hebrew is never filler: the synthetic log holds two Hebrew searches, so he is 2.
+    expect(set.filter((entry) => entry.language === "he").every((entry) => entry.source === "log")).toBe(true);
     expect(set.every((entry) => entry.set === "simple")).toBe(true);
     const en = set.filter((entry) => entry.language === "en");
     expect(en.slice(0, 3).map((entry) => entry.source)).toEqual(["log", "log", "log"]);
@@ -290,14 +292,14 @@ describe("the split (AC-3)", () => {
     const first = splitScoreSet(set);
     const second = splitScoreSet(set);
     expect(first).toEqual(second);
-    expect(first.publicSet).toHaveLength(13 * 5 + 38);
-    expect(first.hiddenSet).toHaveLength(12 * 5 + 37);
+    expect(first.publicSet).toHaveLength(13 * 5 + 1);
+    expect(first.hiddenSet).toHaveLength(12 * 5 + 1);
     for (const language of SCORE_LANGUAGES) {
-      expect(first.publicSet.filter((entry) => entry.language === language)).toHaveLength(language === "he" ? 38 : 13);
-      expect(first.hiddenSet.filter((entry) => entry.language === language)).toHaveLength(language === "he" ? 37 : 12);
+      expect(first.publicSet.filter((entry) => entry.language === language)).toHaveLength(language === "he" ? 1 : 13);
+      expect(first.hiddenSet.filter((entry) => entry.language === language)).toHaveLength(language === "he" ? 1 : 12);
     }
     const halves = new Set([...first.publicSet, ...first.hiddenSet].map((entry) => entry.query));
-    expect(halves.size).toBe(200);
+    expect(halves.size).toBe(25 * 5 + 2);
     expect(splitScoreSet(set, 7).publicSet).not.toEqual(first.publicSet);
   });
 
@@ -1732,19 +1734,42 @@ describe("Hebrew 75, the hard set and per-set tables (YOY-175)", () => {
     expect(known.pinned.get("simple en")).toBe(0);
   });
 
-  it("fills the hidden half with filler when the log holds no repository-unknown search, keeping 38 / 37 (AC-1, amended)", async () => {
-    const logQueries = log(60, new Date(Date.UTC(2026, 9, 5)), "new");
-    const known = new RepositoryText(logQueries.map((entry) => entry.query).join("\n"));
-    const halves = {};
-    const set = await buildScoreSet({ logQueries, llm: createSyntheticFillerLlm(), known, halves });
-    const { publicSet, hiddenSet } = splitScoreSet(set, undefined, halves, known);
-    const ofHe = (entries: readonly ScoreSetEntry[]) => entries.filter((entry) => entry.language === "he");
+  it("takes every Hebrew log search and no filler: old 25 + 42 new is 67, 34 / 33 (AC-1, amended)", async () => {
+    const cutoff = new Date(Date.UTC(2026, 9, 1, 17, 0));
+    const before = log(25, new Date(Date.UTC(2026, 8, 20)), "old");
+    const after = log(42, new Date(Date.UTC(2026, 9, 5)), "new");
+    const oldSet = (["en", "he"] as const).flatMap((language) =>
+      before
+        .filter((entry) => detectLanguage(entry.query) === language)
+        .sort((a, b) => b.date.getTime() - a.date.getTime())
+        .map((entry) => ({ query: entry.query, language, source: "log" as const, modelWritten: false })),
+    );
+    const old = splitScoreSet(oldSet);
+    const logQueries = [...before, ...after];
+    const results = reproduceOldSet({ logQueries, previousPublic: old.publicSet, before: cutoff });
+    const keep = Object.fromEntries(results.map((result) => [result.language, result.entries!]));
+    const pinned = Object.fromEntries(results.map((result) => [result.language, result.halves!]));
+    const known = new RepositoryText("חיפוש new 41");
+    const set = await buildScoreSet({ logQueries, llm: createSyntheticFillerLlm(), keep, known, halves: pinned });
+    const { publicSet, hiddenSet } = splitScoreSet(set, undefined, pinned, known);
+    const ofHe = (entries: readonly ScoreSetEntry[]) =>
+      entries.filter((entry) => entry.language === "he").map((entry) => entry.query);
+    const range = (from: number, to: number) =>
+      Array.from({ length: from - to + 1 }, (_, index) => `חיפוש new ${from - index}`);
 
-    expect(ofHe(publicSet)).toHaveLength(38);
-    expect(ofHe(hiddenSet)).toHaveLength(37);
-    expect(ofHe(publicSet).every((entry) => entry.source === "log")).toBe(true);
-    expect(ofHe(hiddenSet).every((entry) => entry.source === "model" && !known.has(entry.query))).toBe(true);
-    expect(known.pinned.get("simple he")).toBe(38);
+    expect(set.filter((entry) => entry.language === "he")).toHaveLength(67);
+    expect(set.filter((entry) => entry.language === "he").every((entry) => entry.source === "log")).toBe(true);
+    expect(ofHe(publicSet)).toHaveLength(34);
+    expect(ofHe(hiddenSet)).toHaveLength(33);
+    // The old 13 / 12 stay; hidden added are the 21 newest unknown, public added the rest.
+    expect(ofHe(publicSet).slice(0, 13)).toEqual(ofHe(old.publicSet));
+    expect(ofHe(hiddenSet).slice(0, 12)).toEqual(ofHe(old.hiddenSet));
+    expect(ofHe(hiddenSet).slice(12)).toEqual(range(40, 20));
+    expect(ofHe(publicSet).slice(13)).toEqual(["חיפוש new 41", ...range(19, 0)]);
+    // The check is on substrings, so "new 4" is known too: two public added searches are repository-known.
+    expect(known.pinned.get("simple he")).toBe(2);
+    // en is unchanged: its kept 25, 13 / 12.
+    expect(publicSet.filter((entry) => entry.language === "en")).toHaveLength(13);
   });
 
   it("reads every tracked file as normalized text for the repository check (AC-1, amended)", () => {
@@ -1766,14 +1791,14 @@ describe("Hebrew 75, the hard set and per-set tables (YOY-175)", () => {
     expect(code).toBe(0);
     const publicSet = JSON.parse(readFileSync(publicPath, "utf8")) as ScoreSetEntry[];
     expect(publicSet.every((entry) => entry.set === "simple" || entry.set === "hard")).toBe(true);
-    expect(publicSet.filter((entry) => entry.set === "simple" && entry.language === "he")).toHaveLength(38);
+    expect(publicSet.filter((entry) => entry.set === "simple" && entry.language === "he")).toHaveLength(1);
     for (const language of ["en", "he"] as const) {
       expect(publicSet.filter((entry) => entry.set === "hard" && entry.language === language)).toHaveLength(15);
     }
     const hiddenSet = decodeHiddenSet(readFileSync(hiddenPath, "utf8"));
-    expect(hiddenSet).toHaveLength(12 * 5 + 37 + 15 * 2);
+    expect(hiddenSet).toHaveLength(12 * 5 + 1 + 15 * 2);
     expect(hiddenSet.every((entry) => entry.set !== undefined)).toBe(true);
-    expect(out).toContain("set simple he 75: 38 public, 37 hidden; 2 log, 73 filler");
+    expect(out).toContain("set simple he 2: 1 public, 1 hidden; 2 log, 0 filler");
     // A synthetic build checks against no repository text, and says so as a count.
     expect(out).toContain("pinned simple he 0");
     expect(out).toContain("pinned hard en 0");
