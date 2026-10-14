@@ -16,6 +16,7 @@ import {
   leakCheckCommand,
   readFixtureFile,
   REPO_ROOT,
+  runRecallCommand,
   runScoreCommand,
   writeFixtureFile,
 } from "./cli.server";
@@ -28,6 +29,16 @@ import {
   searchScore,
 } from "./grade.server";
 import { findLeaks } from "./leak.server";
+import {
+  buildRecallTruth,
+  languageRecall,
+  RECALL_BATCH_SIZE,
+  RECALL_COST_CAP_USD,
+  RECALL_OPERATION,
+  recallSearches,
+  searchRecall,
+  type RecallTruth,
+} from "./recall.server";
 import {
   descriptionExcerpt,
   failureClassName,
@@ -1326,5 +1337,173 @@ describe("the score workflow (YOY-141 AC-1, AC-2)", () => {
     const names = workflow.indexOf("env | cut -d= -f1 | grep -E '^GEMINI_'");
     expect(names).toBeGreaterThan(-1);
     expect(names).toBeLessThan(workflow.indexOf("scripts/score-run.mts --hidden-set"));
+  });
+});
+
+describe("find recall (YOY-174)", () => {
+  const set: ScoreSetEntry[] = [
+    { query: "linen shirt", language: "en", source: "log", modelWritten: false },
+    { query: "שמלה שחורה", language: "he", source: "log", modelWritten: false },
+    { query: "chemise lin", language: "fr", source: "model", modelWritten: true },
+  ];
+
+  /** A grader answering grade 3 for products whose title holds "Linen", else 1. */
+  function batchGrader(): { llm: LlmClient; requests: StructuredCompletionRequest[] } {
+    const requests: StructuredCompletionRequest[] = [];
+    return {
+      requests,
+      llm: {
+        async completeStructured(request) {
+          requests.push(request);
+          const titles = [...request.prompt.matchAll(/^\d+\. (.*)$/gm)].map((match) => match[1]!);
+          return { grades: titles.map((title) => (title.includes("Linen") ? 3 : 1)) };
+        },
+      },
+    };
+  }
+
+  it("covers the en and he searches only (AC-1)", () => {
+    expect(recallSearches(set).map((entry) => entry.language)).toEqual(["en", "he"]);
+    expect(RECALL_BATCH_SIZE).toBe(48);
+  });
+
+  it("grades every product in batches with the rubric and keeps grades of 2 and up (AC-1)", async () => {
+    const db = await createTestDb();
+    await importScoreFixture(db, buildSyntheticFixture());
+    const { llm, requests } = batchGrader();
+    const build = await buildRecallTruth({
+      db,
+      llm,
+      storeKey: SYNTHETIC_STORE_KEY,
+      searches: recallSearches(set),
+      readCost: async () => ({ usd: 0, calls: 0 }),
+      batchSize: 3,
+      now: () => new Date("2026-10-14T00:00:00Z"),
+    });
+    // Seven products in batches of three: three calls per search.
+    expect(requests).toHaveLength(6);
+    for (const request of requests) {
+      expect(request.operation).toBe(RECALL_OPERATION);
+      expect(request.temperature).toBe(0);
+      expect(request.prompt.startsWith(SCORE_RUBRIC)).toBe(true);
+      // The truth is graded without descriptions.
+      expect(request.prompt).not.toContain("from the synthetic score catalog");
+    }
+    expect(build.complete).toBe(true);
+    if (!build.complete) return;
+    expect(build.truth.graded).toBe(7);
+    expect(build.truth.builtAt).toBe("2026-10-14T00:00:00.000Z");
+    // Grade 1 is not relevant; grade 3 is.
+    expect(build.truth.searches[0]!.relevant).toEqual([
+      { productId: "syn-1", grade: 3 },
+      { productId: "syn-4", grade: 3 },
+      { productId: "syn-5", grade: 3 },
+    ]);
+  });
+
+  it("stops at the cost cap and returns no truth (spend rule)", async () => {
+    const db = await createTestDb();
+    await importScoreFixture(db, buildSyntheticFixture());
+    const { llm, requests } = batchGrader();
+    let usd = 0;
+    const build = await buildRecallTruth({
+      db,
+      llm,
+      storeKey: SYNTHETIC_STORE_KEY,
+      searches: recallSearches(set),
+      // Each call costs a quarter of the cap: the fourth — the second
+      // search's first batch — passes it.
+      readCost: async () => {
+        usd += RECALL_COST_CAP_USD / 4 + 0.001;
+        return { usd, calls: requests.length };
+      },
+      batchSize: 3,
+    });
+    expect(build).toEqual({ complete: false, searchesDone: 1, cost: { usd, calls: 4 } });
+  });
+
+  it("counts recall by family, inside the find set and the first page (AC-2)", () => {
+    const families: Record<string, string> = { a1: "a", a2: "a", b: "b", c: "c", d: "d" };
+    const familyOf = (productId: string) => families[productId] ?? productId;
+    const search = {
+      query: "q",
+      language: "en" as const,
+      relevant: [
+        { productId: "a2", grade: 3 },
+        { productId: "a1", grade: 2 },
+        { productId: "c", grade: 2 },
+        { productId: "d", grade: 3 },
+      ],
+    };
+    // "a1" is the family's card; "d" is a keyword match beyond the find set
+    // but inside the first page; "c" is not found at all.
+    const row = searchRecall({ search, productIds: ["b", "a1", "d"], findSetCount: 2, familyOf });
+    expect(row).toEqual({
+      query: "q",
+      language: "en",
+      relevant: 3,
+      inFindSet: 1,
+      recall: 1 / 3,
+      inFirstPage: 2,
+    });
+    const none = searchRecall({ search: { ...search, relevant: [] }, productIds: [], findSetCount: 0, familyOf });
+    expect(none.recall).toBeNull();
+    expect(languageRecall([row, { ...row, recall: 1 }, { ...none }])).toEqual([
+      { language: "en", searches: 3, meanRecall: (1 / 3 + 1) / 2, lowRecall: 1, noneRelevant: 1 },
+      { language: "he", searches: 0, meanRecall: null, lowRecall: 0, noneRelevant: 0 },
+    ]);
+  });
+
+  it("builds and writes the truth once, then reads it without grading unless --rebuild-truth (AC-4)", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "score-recall-"));
+    const setPath = join(dir, "set.json");
+    const truthPath = join(dir, "truth.json");
+    writeFileSync(setPath, JSON.stringify(set));
+    async function run(argv: string[]): Promise<{ code: number; out: string[]; err: string[] }> {
+      const out: string[] = [];
+      const err: string[] = [];
+      const code = await runRecallCommand(argv, {
+        out: (text) => void out.push(...text.split("\n")),
+        err: (text) => void err.push(text),
+      });
+      return { code, out, err };
+    }
+
+    const first = await run(["--synthetic", "--set", setPath, "--truth", truthPath]);
+    expect(first.code).toBe(0);
+    expect(first.out[0]).toMatch(/^truth 2 searches, built .*, written$/);
+    expect(first.err.filter((line) => line.endsWith(" graded"))).toEqual(["[1/2] en graded", "[2/2] he graded"]);
+    const truth = JSON.parse(readFileSync(truthPath, "utf8")) as RecallTruth;
+    expect(truth.searches.map((search) => search.query)).toEqual(["linen shirt", "שמלה שחורה"]);
+    // The synthetic grader keeps titles holding a query word.
+    expect(truth.searches[0]!.relevant.map((product) => product.productId)).toEqual(["syn-1", "syn-4", "syn-5", "syn-7"]);
+    expect(first.out.filter((line) => line.startsWith("recall "))).toEqual([
+      expect.stringMatching(/^recall en 0 relevant 4 in-find-set 0 recall 0\.000 first-24 \d+ linen shirt$/),
+      "recall he 1 relevant 0 in-find-set 0 recall — first-24 0 שמלה שחורה",
+    ]);
+    expect(first.out.slice(-3)).toEqual([
+      "recall-mean en 0.000 over 1 of 1 searches, under 0.5 1, none relevant 0",
+      "recall-mean he — over 0 of 1 searches, under 0.5 0, none relevant 1",
+      "cost $0.0000 over 0 model calls",
+    ]);
+
+    // The truth exists: no grading, the same table.
+    const second = await run(["--synthetic", "--set", setPath, "--truth", truthPath]);
+    expect(second.code).toBe(0);
+    expect(second.out[0]).toBe(`truth 2 searches, built ${truth.builtAt}, read from file`);
+    expect(second.err.filter((line) => line.endsWith(" graded"))).toEqual([]);
+    expect(second.out.slice(1)).toEqual(first.out.slice(1));
+
+    const rebuilt = await run(["--synthetic", "--set", setPath, "--truth", truthPath, "--rebuild-truth"]);
+    expect(rebuilt.code).toBe(0);
+    expect(rebuilt.out[0]).toMatch(/, written$/);
+    expect(rebuilt.err.filter((line) => line.endsWith(" graded"))).toHaveLength(2);
+  });
+
+  it("writes nothing under --synthetic without --truth", async () => {
+    const out: string[] = [];
+    const code = await runRecallCommand(["--synthetic"], { out: (text) => void out.push(text), err: () => {} });
+    expect(code).toBe(0);
+    expect(out.join("\n")).toMatch(/^truth 26 searches, built .*, not written$/m);
   });
 });

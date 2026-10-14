@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { gunzipSync, gzipSync } from "node:zlib";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -7,6 +7,7 @@ import { parseArgs } from "node:util";
 import type { PrismaClient } from "@prisma/client";
 import type { CostRecorder, LlmClient } from "@unfiltered/engine";
 
+import type { FindStep } from "../search/find.server";
 import type { SearchOrchestrator } from "../search/orchestrator.server";
 import {
   exportScoreFixture,
@@ -16,8 +17,20 @@ import {
 import { gradeAgreement, gradeSearch, type GradedResult } from "./grade.server";
 import { findLeaks } from "./leak.server";
 import {
+  buildRecallTruth,
+  formatLanguageRecallLine,
+  formatRecallLine,
+  languageRecall,
+  measureRecall,
+  RECALL_COST_CAP_USD,
+  recallSearches,
+  type RecallTruth,
+} from "./recall.server";
+import {
+  formatCostLine,
   formatGradeLines,
   formatScoreTable,
+  readRunCost,
   runScoreSet,
   withCapturedConsole,
   type ScoreReport,
@@ -36,7 +49,9 @@ import {
   buildSyntheticFixture,
   createSyntheticFillerLlm,
   createSyntheticGrader,
+  createSyntheticFindStep,
   createSyntheticOrchestrator,
+  createSyntheticRecallGrader,
   seedSyntheticSearchLog,
 } from "./synthetic.server";
 
@@ -58,6 +73,8 @@ export const DEFAULT_PUBLIC_SET_PATH = join(APP_ROOT, "app", "score", "data", "p
  */
 export const DEFAULT_FIXTURE_PATH = join(APP_ROOT, "app", "score", "data", "seed-fixture.json.gz");
 export const DEFAULT_CALIBRATION_PATH = join(APP_ROOT, "app", "score", "data", "calibration.json");
+/** The committed find-recall truth (YOY-174 AC-1). */
+export const DEFAULT_RECALL_TRUTH_PATH = join(APP_ROOT, "app", "score", "data", "recall-truth.json");
 /** Grader model override; Flash-Lite by default (AC-4). */
 export const SCORE_MODEL_ENV = "GEMINI_SCORE_MODEL";
 
@@ -288,6 +305,128 @@ export async function runScoreCommand(
   } finally {
     await db.$disconnect();
   }
+}
+
+// --- score-recall (YOY-174) -------------------------------------------------
+
+export async function runRecallCommand(
+  argv: readonly string[],
+  { out = stdout, err = stderr }: { out?: Output; err?: Output } = {},
+): Promise<number> {
+  const { values } = parseArgs({
+    args: [...argv],
+    options: {
+      set: { type: "string" },
+      fixture: { type: "string" },
+      // Where the truth is read from and written to. `--synthetic` without
+      // it builds the truth in memory and writes nothing.
+      truth: { type: "string" },
+      synthetic: { type: "boolean", default: false },
+      // Grade again even though the truth file exists (AC-4).
+      "rebuild-truth": { type: "boolean", default: false },
+    },
+  });
+  let searches: ScoreSetEntry[];
+  try {
+    searches = recallSearches(
+      JSON.parse(readFileSync(values.set ?? DEFAULT_PUBLIC_SET_PATH, "utf8")) as ScoreSetEntry[],
+    );
+  } catch {
+    err("score recall: the set file is missing or unreadable");
+    return 1;
+  }
+  let fixture: ScoreFixture;
+  try {
+    fixture = values.synthetic
+      ? buildSyntheticFixture()
+      : readFixtureFile(values.fixture ?? DEFAULT_FIXTURE_PATH);
+  } catch {
+    err("score recall: the fixture is missing or unreadable — pass --fixture");
+    return 1;
+  }
+  const truthPath = values.truth ?? (values.synthetic ? undefined : DEFAULT_RECALL_TRUTH_PATH);
+  const reuse = truthPath !== undefined && existsSync(truthPath) && !values["rebuild-truth"];
+
+  const db = await createScratchDb();
+  try {
+    const { result } = await withCapturedConsole(async () => {
+      await importScoreFixture(db, fixture);
+      const { createPrismaCostRecorder } = await import("../ai/cost-recorder.server");
+      const lines: string[] = [];
+      let truth: RecallTruth;
+      if (reuse) {
+        // The truth exists: no grading call (AC-4).
+        truth = JSON.parse(readFileSync(truthPath, "utf8")) as RecallTruth;
+        lines.push(`truth ${truth.searches.length} searches, built ${truth.builtAt}, read from file`);
+      } else {
+        const build = await buildRecallTruth({
+          db,
+          llm: values.synthetic
+            ? createSyntheticRecallGrader()
+            : await flashLite(createPrismaCostRecorder(db)),
+          storeKey: fixture.storeKey,
+          searches,
+          readCost: () => readRunCost(db),
+          progress: (line) => err(line),
+        });
+        if (!build.complete) {
+          // The cap stops the build (spend rule): nothing is written.
+          return {
+            code: 1,
+            lines: [
+              `stopped at the cost cap ($${RECALL_COST_CAP_USD.toFixed(2)}) after ${build.searchesDone} of ${searches.length} searches; no truth written`,
+              formatCostLine(build.cost),
+            ],
+          };
+        }
+        truth = build.truth;
+        if (truthPath !== undefined) {
+          writeFileSync(truthPath, `${JSON.stringify(truth, null, 2)}\n`);
+        }
+        lines.push(
+          `truth ${truth.searches.length} searches, built ${truth.builtAt}${truthPath === undefined ? ", not written" : ", written"}`,
+        );
+      }
+      const find = values.synthetic
+        ? createSyntheticFindStep(db)
+        : await liveFindStep(db, createPrismaCostRecorder(db));
+      const rows = await measureRecall({ db, find, storeKey: fixture.storeKey, truth });
+      lines.push(
+        ...rows.map((row, index) => formatRecallLine(row, index)),
+        ...languageRecall(rows).map(formatLanguageRecallLine),
+        formatCostLine(await readRunCost(db)),
+      );
+      return { code: 0, lines };
+    });
+    out(result.lines.join("\n"));
+    return result.code;
+  } catch (error) {
+    // The name only: a message can carry query text.
+    err(`score recall failed (${(error as Error).name})`);
+    return 1;
+  } finally {
+    await db.$disconnect();
+  }
+}
+
+/** The find step as production builds it (YOY-174 AC-2): Gemini embeddings, the production find-set size. */
+async function liveFindStep(db: PrismaClient, costRecorder: CostRecorder): Promise<FindStep> {
+  const { createGeminiEmbeddingClient, geminiModelsFromEnv } = await import(
+    "@unfiltered/provider-gemini"
+  );
+  const { createPgTrgmClassicStore } = await import("../search/classic-store.server");
+  const { createFindStep, findSetSizeFromEnv } = await import("../search/find.server");
+  const models = geminiModelsFromEnv();
+  return createFindStep({
+    db,
+    embeddings: createGeminiEmbeddingClient({
+      modelId: models.embeddingModel,
+      dimension: models.embeddingDimension,
+      costRecorder,
+    }),
+    classicStore: createPgTrgmClassicStore(db),
+    findSetSize: findSetSizeFromEnv(),
+  });
 }
 
 // --- score-export-fixture -------------------------------------------------

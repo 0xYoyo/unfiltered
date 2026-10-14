@@ -191,6 +191,39 @@ band is `max(spread of the three, the language's M5 band, 0.03)`, the
 spread being the highest of the three minus the lowest. A single control
 is not a reference.
 
+## Find recall
+
+`scripts/score-recall.mts` (YOY-174; code in `app/score/recall.server.ts`)
+measures how much of a public search's relevant set the find step reaches.
+That separates a loss in find from a loss in the judge.
+
+1. **Truth.** Each of the 13 public `en` and 13 public `he` searches is
+   graded against every product of the seed fixture, 48 products per call,
+   with the score grader's rubric and prompt (ledger operation
+   `score-recall`, temperature 0). A product graded 2 or more is relevant.
+   The truth is written to `app/score/data/recall-truth.json` and committed,
+   so a re-run makes no grading call. With the file present the script never
+   grades unless `--rebuild-truth` is given.
+   **The truth was graded without descriptions:** each product shows the
+   grader's view minus its 300-character description excerpt, a decision
+   taken 2026-10-14 to fit the build under its $0.40 ledger cap. Once the
+   ledger passes the cap, the build stops and writes nothing.
+2. **Recall.** The find step runs alone (no extraction, no judge) at the
+   production find-set size, `FIND_SET_SIZE` (150 by default). It embeds each
+   query live, as production does, so a re-run's cost line shows 26
+   embedding calls and rounds to $0.0000. Per search, the command prints the
+   relevant count, how many are inside the find set, the recall share, and
+   how many are inside the first 24 of the find order. Per language, it
+   prints the mean recall and the count of searches under 0.5. A search with
+   nothing relevant is left out of the mean and counted on its own.
+   Counting is by family, one family per card: the find step shows one
+   colourway per family, so a relevant colourway counts as reached when its
+   family's card is reached.
+
+`--synthetic` runs the command offline against the synthetic tenant, with a
+grader that marks a title holding a query word as relevant. Without
+`--truth <file>` it writes nothing.
+
 ## Rubric
 
 The grader's prompt carries this text verbatim (a test holds the two equal):
