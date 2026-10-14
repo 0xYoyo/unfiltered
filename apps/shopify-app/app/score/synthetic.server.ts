@@ -20,8 +20,11 @@ import { GRADED_RESULTS, SCORE_GRADE_OPERATION } from "./grade.server";
 import { SCORE_RESULT_LIMIT } from "./run.server";
 import {
   SCORE_FILLER_OPERATION,
+  HARD_KINDS,
+  HARD_LANGUAGES,
+  HARD_SEARCHES_PER_LANGUAGE,
+  HEBREW_SEARCHES,
   SCORE_LANGUAGES,
-  SEARCHES_PER_LANGUAGE,
   type ScoreSetEntry,
 } from "./set.server";
 
@@ -156,22 +159,29 @@ export async function seedSyntheticSearchLog(
   }
 }
 
-/** Replay filler: every language × shape × count the builder can ask for. */
+/**
+ * Replay filler: every language × shape × count the simple-set builder can
+ * ask for (up to Hebrew's 75), and every hard-set language × kind × count
+ * (YOY-175).
+ */
 export function createSyntheticFillerLlm(): LlmClient {
   const entries: LlmRecording["entries"] = {};
+  const answer = (searches: string[]) => ({ output: { searches }, inputTokens: 0, outputTokens: 0 });
   for (const language of SCORE_LANGUAGES) {
     for (const shape of ["short", "medium", "long"] as const) {
-      for (let count = 1; count <= SEARCHES_PER_LANGUAGE; count += 1) {
-        entries[`filler ${language} ${shape} ${count}`] = {
-          output: {
-            searches: Array.from(
-              { length: count },
-              (_, index) => `${language} ${shape} synthetic search ${index + 1}`,
-            ),
-          },
-          inputTokens: 0,
-          outputTokens: 0,
-        };
+      for (let count = 1; count <= HEBREW_SEARCHES; count += 1) {
+        entries[`filler ${language} ${shape} ${count}`] = answer(
+          Array.from({ length: count }, (_, index) => `${language} ${shape} synthetic search ${index + 1}`),
+        );
+      }
+    }
+  }
+  for (const language of HARD_LANGUAGES) {
+    for (const kind of HARD_KINDS) {
+      for (let count = 1; count <= HARD_SEARCHES_PER_LANGUAGE; count += 1) {
+        entries[`hard ${language} ${kind} ${count}`] = answer(
+          Array.from({ length: count }, (_, index) => `${language} ${kind} synthetic hard search ${index + 1}`),
+        );
       }
     }
   }

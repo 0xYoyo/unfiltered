@@ -3,468 +3,961 @@
     "query": "long sleeve midi dress in black",
     "language": "en",
     "source": "log",
-    "modelWritten": false
+    "modelWritten": false,
+    "set": "simple"
   },
   {
     "query": "beige boots in stock",
     "language": "en",
     "source": "log",
-    "modelWritten": false
+    "modelWritten": false,
+    "set": "simple"
   },
   {
     "query": "midi dress with long sleeves under 300",
     "language": "en",
     "source": "log",
-    "modelWritten": false
+    "modelWritten": false,
+    "set": "simple"
   },
   {
     "query": "black dress",
     "language": "en",
     "source": "log",
-    "modelWritten": false
+    "modelWritten": false,
+    "set": "simple"
   },
   {
     "query": "blue dress under 500",
     "language": "en",
     "source": "log",
-    "modelWritten": false
+    "modelWritten": false,
+    "set": "simple"
   },
   {
     "query": "a midi dress with long sleeves",
     "language": "en",
     "source": "log",
-    "modelWritten": false
+    "modelWritten": false,
+    "set": "simple"
   },
   {
     "query": "dress for a wedding",
     "language": "en",
     "source": "log",
-    "modelWritten": false
+    "modelWritten": false,
+    "set": "simple"
   },
   {
     "query": "t-shirt",
     "language": "en",
     "source": "log",
-    "modelWritten": false
+    "modelWritten": false,
+    "set": "simple"
   },
   {
     "query": "same but under 300",
     "language": "en",
     "source": "log",
-    "modelWritten": false
+    "modelWritten": false,
+    "set": "simple"
   },
   {
     "query": "summer dress, not black under 400 dollars",
     "language": "en",
     "source": "log",
-    "modelWritten": false
+    "modelWritten": false,
+    "set": "simple"
   },
   {
     "query": "Mesh Over Dress",
     "language": "en",
     "source": "log",
-    "modelWritten": false
+    "modelWritten": false,
+    "set": "simple"
   },
   {
     "query": "floral summer dress under 50, not black",
     "language": "en",
     "source": "log",
-    "modelWritten": false
+    "modelWritten": false,
+    "set": "simple"
   },
   {
     "query": "long sleeve midi dress",
     "language": "en",
     "source": "log",
-    "modelWritten": false
+    "modelWritten": false,
+    "set": "simple"
   },
   {
     "query": "גינס",
     "language": "he",
     "source": "log",
-    "modelWritten": false
+    "modelWritten": false,
+    "set": "simple"
   },
   {
     "query": "מעיל אוברסייז שנופל יפה פחות מ1000 דולר אבל",
     "language": "he",
     "source": "log",
-    "modelWritten": false
+    "modelWritten": false,
+    "set": "simple"
   },
   {
     "query": "שמלה לחתונה עד 400 שקל שקל לא דולר",
     "language": "he",
     "source": "log",
-    "modelWritten": false
+    "modelWritten": false,
+    "set": "simple"
   },
   {
     "query": "נעלי עקב שחורות לנשים",
     "language": "he",
     "source": "log",
-    "modelWritten": false
+    "modelWritten": false,
+    "set": "simple"
   },
   {
     "query": "אותו דבר אבל עד 400",
     "language": "he",
     "source": "log",
-    "modelWritten": false
+    "modelWritten": false,
+    "set": "simple"
   },
   {
     "query": "מעיל אוברסייז שנופל יפה פחות מ100 דולר אבל",
     "language": "he",
     "source": "log",
-    "modelWritten": false
+    "modelWritten": false,
+    "set": "simple"
   },
   {
     "query": "ומתחת 600",
     "language": "he",
     "source": "log",
-    "modelWritten": false
+    "modelWritten": false,
+    "set": "simple"
   },
   {
     "query": "שמלה לחתונה עד 400 שקל",
     "language": "he",
     "source": "log",
-    "modelWritten": false
+    "modelWritten": false,
+    "set": "simple"
   },
   {
     "query": "מגפיים חומים במלאי",
     "language": "he",
     "source": "log",
-    "modelWritten": false
+    "modelWritten": false,
+    "set": "simple"
   },
   {
     "query": "עזוב תביא לי בכלל מכנסיים ירוקים",
     "language": "he",
     "source": "log",
-    "modelWritten": false
+    "modelWritten": false,
+    "set": "simple"
   },
   {
     "query": "שמלת מידי עם שרוולים ארוכים",
     "language": "he",
     "source": "log",
-    "modelWritten": false
+    "modelWritten": false,
+    "set": "simple"
   },
   {
     "query": "חולצת טריקו טריקו עם הדפסה",
     "language": "he",
     "source": "log",
-    "modelWritten": false
+    "modelWritten": false,
+    "set": "simple"
   },
   {
     "query": "סנדל עקב שחור",
     "language": "he",
     "source": "log",
-    "modelWritten": false
+    "modelWritten": false,
+    "set": "simple"
   },
   {
-    "query": "تنورة طويلة",
-    "language": "ar",
-    "source": "model",
-    "modelWritten": true
+    "query": "מעיל חורף",
+    "language": "he",
+    "source": "log",
+    "modelWritten": false,
+    "set": "simple"
   },
   {
-    "query": "فستان سهرة طويل لون احمر فخم",
-    "language": "ar",
-    "source": "model",
-    "modelWritten": true
+    "query": "שמלה אדומה",
+    "language": "he",
+    "source": "log",
+    "modelWritten": false,
+    "set": "simple"
   },
   {
-    "query": "ابي ملابس تنفع لحضور زفاف عائلي بس تكون مريحة",
-    "language": "ar",
-    "source": "model",
-    "modelWritten": true
+    "query": "שמלת פשתן",
+    "language": "he",
+    "source": "log",
+    "modelWritten": false,
+    "set": "simple"
   },
   {
-    "query": "ساعة نسائية",
-    "language": "ar",
-    "source": "model",
-    "modelWritten": true
+    "query": "סודר",
+    "language": "he",
+    "source": "log",
+    "modelWritten": false,
+    "set": "simple"
   },
   {
-    "query": "محتاج اشتري جاكيت شتوي ثقيل بس يكون شكله شيك للدوام",
-    "language": "ar",
-    "source": "model",
-    "modelWritten": true
+    "query": "מגפיים",
+    "language": "he",
+    "source": "log",
+    "modelWritten": false,
+    "set": "simple"
   },
   {
-    "query": "جاكيت جينز رجالي واسع شتوي",
-    "language": "ar",
-    "source": "model",
-    "modelWritten": true
+    "query": "מעיל",
+    "language": "he",
+    "source": "log",
+    "modelWritten": false,
+    "set": "simple"
   },
   {
-    "query": "حزام لحي",
-    "language": "ar",
-    "source": "model",
-    "modelWritten": true
+    "query": "שמלה עד 450",
+    "language": "he",
+    "source": "log",
+    "modelWritten": false,
+    "set": "simple"
   },
   {
-    "query": "قبعة صيفية",
-    "language": "ar",
-    "source": "model",
-    "modelWritten": true
+    "query": "שמלת ערב אדומה",
+    "language": "he",
+    "source": "log",
+    "modelWritten": false,
+    "set": "simple"
   },
   {
-    "query": "جاكيت جلد",
-    "language": "ar",
-    "source": "model",
-    "modelWritten": true
+    "query": "ז'קט עד 30",
+    "language": "he",
+    "source": "log",
+    "modelWritten": false,
+    "set": "simple"
   },
   {
-    "query": "حقيبة يد",
-    "language": "ar",
-    "source": "model",
-    "modelWritten": true
+    "query": "מעיל אוברסייז שנופל יפה",
+    "language": "he",
+    "source": "log",
+    "modelWritten": false,
+    "set": "simple"
   },
   {
-    "query": "قميص قطن رجالي ابيض رسمي رخيص",
-    "language": "ar",
-    "source": "model",
-    "modelWritten": true
+    "query": "חולצת פשתן עד 300",
+    "language": "he",
+    "source": "log",
+    "modelWritten": false,
+    "set": "simple"
   },
   {
-    "query": "شورت رياضي",
-    "language": "ar",
-    "source": "model",
-    "modelWritten": true
+    "query": "שמלה אלגנטית לערב",
+    "language": "he",
+    "source": "log",
+    "modelWritten": false,
+    "set": "simple"
+  },
+  {
+    "query": "שמלה",
+    "language": "he",
+    "source": "log",
+    "modelWritten": false,
+    "set": "simple"
+  },
+  {
+    "query": "סנובו",
+    "language": "he",
+    "source": "log",
+    "modelWritten": false,
+    "set": "simple"
+  },
+  {
+    "query": "סנו",
+    "language": "he",
+    "source": "log",
+    "modelWritten": false,
+    "set": "simple"
+  },
+  {
+    "query": "סנוב",
+    "language": "he",
+    "source": "log",
+    "modelWritten": false,
+    "set": "simple"
+  },
+  {
+    "query": "סנובורד כ",
+    "language": "he",
+    "source": "log",
+    "modelWritten": false,
+    "set": "simple"
+  },
+  {
+    "query": "סנובורד כחול מתחת ל900",
+    "language": "he",
+    "source": "log",
+    "modelWritten": false,
+    "set": "simple"
+  },
+  {
+    "query": "סנובורד כחול מתחת ל-90",
+    "language": "he",
+    "source": "log",
+    "modelWritten": false,
+    "set": "simple"
+  },
+  {
+    "query": "סנובורד כחול מתחת ל-",
+    "language": "he",
+    "source": "log",
+    "modelWritten": false,
+    "set": "simple"
+  },
+  {
+    "query": "סנובורד כחול מתחת ל-900",
+    "language": "he",
+    "source": "log",
+    "modelWritten": false,
+    "set": "simple"
+  },
+  {
+    "query": "סנובורד כחול מתחת ל",
+    "language": "he",
+    "source": "log",
+    "modelWritten": false,
+    "set": "simple"
+  },
+  {
+    "query": "סנובורד כחול מת",
+    "language": "he",
+    "source": "log",
+    "modelWritten": false,
+    "set": "simple"
+  },
+  {
+    "query": "סנובורד כחול מ",
+    "language": "he",
+    "source": "log",
+    "modelWritten": false,
+    "set": "simple"
+  },
+  {
+    "query": "סנובורד כחול",
+    "language": "he",
+    "source": "log",
+    "modelWritten": false,
+    "set": "simple"
   },
   {
     "query": "فستان سهرة",
     "language": "ar",
     "source": "model",
-    "modelWritten": true
+    "modelWritten": true,
+    "set": "simple"
   },
   {
-    "query": "черное платье миди для вечернего выхода",
-    "language": "ru",
+    "query": "جاكيت جلد",
+    "language": "ar",
     "source": "model",
-    "modelWritten": true
+    "modelWritten": true,
+    "set": "simple"
   },
   {
-    "query": "зимняя теплая куртка с капюшоном недорого",
-    "language": "ru",
+    "query": "حقيبة يد",
+    "language": "ar",
     "source": "model",
-    "modelWritten": true
+    "modelWritten": true,
+    "set": "simple"
   },
   {
-    "query": "красное шелковое платье на свадьбу недорого",
-    "language": "ru",
+    "query": "تنورة طويلة",
+    "language": "ar",
     "source": "model",
-    "modelWritten": true
+    "modelWritten": true,
+    "set": "simple"
   },
   {
-    "query": "белая хлопковая рубашка оверсайз на лето",
-    "language": "ru",
+    "query": "فستان سهرة طويل لون احمر فخم",
+    "language": "ar",
     "source": "model",
-    "modelWritten": true
+    "modelWritten": true,
+    "set": "simple"
   },
   {
-    "query": "хочу теплое худи оверсайз приятное к телу на каждый день",
-    "language": "ru",
+    "query": "نظارات شمسية",
+    "language": "ar",
     "source": "model",
-    "modelWritten": true
+    "modelWritten": true,
+    "set": "simple"
   },
   {
-    "query": "свободные джинсы с высокой посадкой женские",
-    "language": "ru",
+    "query": "حذاء رياضي نسائي ابيض رخيص",
+    "language": "ar",
     "source": "model",
-    "modelWritten": true
+    "modelWritten": true,
+    "set": "simple"
   },
   {
-    "query": "удобные кроссовки для бега черного цвета",
-    "language": "ru",
+    "query": "بدلة رسمية",
+    "language": "ar",
     "source": "model",
-    "modelWritten": true
+    "modelWritten": true,
+    "set": "simple"
   },
   {
-    "query": "шерстяной вязаный свитер оверсайз с горлом",
-    "language": "ru",
+    "query": "حذاء رياضي",
+    "language": "ar",
     "source": "model",
-    "modelWritten": true
+    "modelWritten": true,
+    "set": "simple"
   },
   {
-    "query": "кожаная сумка",
-    "language": "ru",
+    "query": "شورت صيفي",
+    "language": "ar",
     "source": "model",
-    "modelWritten": true
+    "modelWritten": true,
+    "set": "simple"
   },
   {
-    "query": "теплый свитер",
-    "language": "ru",
+    "query": "عباية سوداء",
+    "language": "ar",
     "source": "model",
-    "modelWritten": true
+    "modelWritten": true,
+    "set": "simple"
   },
   {
-    "query": "спортивный костюм",
+    "query": "دور على فستان سهرة طويل ومناسب لحضور فرح صاحبتي في قاعة",
+    "language": "ar",
+    "source": "model",
+    "modelWritten": true,
+    "set": "simple"
+  },
+  {
+    "query": "قميص قطن رجالي مريح واسع",
+    "language": "ar",
+    "source": "model",
+    "modelWritten": true,
+    "set": "simple"
+  },
+  {
+    "query": "платье",
     "language": "ru",
     "source": "model",
-    "modelWritten": true
+    "modelWritten": true,
+    "set": "simple"
   },
   {
     "query": "солнцезащитные очки",
     "language": "ru",
     "source": "model",
-    "modelWritten": true
+    "modelWritten": true,
+    "set": "simple"
   },
   {
-    "query": "шерстяной шарф",
+    "query": "спортивный костюм",
     "language": "ru",
     "source": "model",
-    "modelWritten": true
+    "modelWritten": true,
+    "set": "simple"
   },
   {
-    "query": "baskets blanches confortables pour marcher",
-    "language": "fr",
+    "query": "вязаный свитер",
+    "language": "ru",
     "source": "model",
-    "modelWritten": true
+    "modelWritten": true,
+    "set": "simple"
   },
   {
-    "query": "foulard soie",
-    "language": "fr",
+    "query": "ищу удобные кроссовки на каждый день которые не будут натирать ноги",
+    "language": "ru",
     "source": "model",
-    "modelWritten": true
+    "modelWritten": true,
+    "set": "simple"
   },
   {
-    "query": "manteau chaud d hiver imperméable noir",
-    "language": "fr",
+    "query": "кожаный ремень",
+    "language": "ru",
     "source": "model",
-    "modelWritten": true
+    "modelWritten": true,
+    "set": "simple"
   },
   {
-    "query": "je veux des vetements confortables mais chics pour travailler a la maison",
-    "language": "fr",
+    "query": "что надеть на свадьбу к подруге в июле чтобы не было жарко",
+    "language": "ru",
     "source": "model",
-    "modelWritten": true
+    "modelWritten": true,
+    "set": "simple"
   },
   {
-    "query": "sac a main",
-    "language": "fr",
+    "query": "пальто оверсайз",
+    "language": "ru",
     "source": "model",
-    "modelWritten": true
+    "modelWritten": true,
+    "set": "simple"
+  },
+  {
+    "query": "серое шерстяное пальто оверсайз",
+    "language": "ru",
+    "source": "model",
+    "modelWritten": true,
+    "set": "simple"
+  },
+  {
+    "query": "красный шелковый топ на лето",
+    "language": "ru",
+    "source": "model",
+    "modelWritten": true,
+    "set": "simple"
+  },
+  {
+    "query": "белая рубашка",
+    "language": "ru",
+    "source": "model",
+    "modelWritten": true,
+    "set": "simple"
+  },
+  {
+    "query": "хочу купить теплое зимнее пальто оверсайз бежевого цвета",
+    "language": "ru",
+    "source": "model",
+    "modelWritten": true,
+    "set": "simple"
+  },
+  {
+    "query": "мужская куртка",
+    "language": "ru",
+    "source": "model",
+    "modelWritten": true,
+    "set": "simple"
   },
   {
     "query": "gilet chaud",
     "language": "fr",
     "source": "model",
-    "modelWritten": true
+    "modelWritten": true,
+    "set": "simple"
   },
   {
-    "query": "basket blanche",
+    "query": "foulard soie",
     "language": "fr",
     "source": "model",
-    "modelWritten": true
+    "modelWritten": true,
+    "set": "simple"
   },
   {
-    "query": "manteau long",
+    "query": "baskets blanches confortables pour marcher",
     "language": "fr",
     "source": "model",
-    "modelWritten": true
-  },
-  {
-    "query": "robe longue rouge pour mariage elegante",
-    "language": "fr",
-    "source": "model",
-    "modelWritten": true
-  },
-  {
-    "query": "robe d ete",
-    "language": "fr",
-    "source": "model",
-    "modelWritten": true
-  },
-  {
-    "query": "sac a main en cuir marron",
-    "language": "fr",
-    "source": "model",
-    "modelWritten": true
-  },
-  {
-    "query": "t shirt noir",
-    "language": "fr",
-    "source": "model",
-    "modelWritten": true
+    "modelWritten": true,
+    "set": "simple"
   },
   {
     "query": "je cherche une robe longue et legere pour un mariage en ete",
     "language": "fr",
     "source": "model",
-    "modelWritten": true
+    "modelWritten": true,
+    "set": "simple"
   },
   {
-    "query": "abrigo largo",
-    "language": "es",
+    "query": "pantalon de costume gris moderne",
+    "language": "fr",
     "source": "model",
-    "modelWritten": true
+    "modelWritten": true,
+    "set": "simple"
   },
   {
-    "query": "chaqueta de cuero negra ajustada",
-    "language": "es",
+    "query": "t-shirt coton",
+    "language": "fr",
     "source": "model",
-    "modelWritten": true
+    "modelWritten": true,
+    "set": "simple"
   },
   {
-    "query": "necesito un vestido largo y fresco para una boda en la playa la proxima semana",
-    "language": "es",
+    "query": "pull en cachemire bleu pas cher",
+    "language": "fr",
     "source": "model",
-    "modelWritten": true
+    "modelWritten": true,
+    "set": "simple"
   },
   {
-    "query": "pantalones cargo",
-    "language": "es",
+    "query": "chemise blanche",
+    "language": "fr",
     "source": "model",
-    "modelWritten": true
+    "modelWritten": true,
+    "set": "simple"
   },
   {
-    "query": "top croptop",
-    "language": "es",
+    "query": "vous avez des pantoufles confortables pour trainer a la maison",
+    "language": "fr",
     "source": "model",
-    "modelWritten": true
+    "modelWritten": true,
+    "set": "simple"
   },
   {
-    "query": "vestido negro",
-    "language": "es",
+    "query": "robe d'été",
+    "language": "fr",
     "source": "model",
-    "modelWritten": true
+    "modelWritten": true,
+    "set": "simple"
   },
   {
-    "query": "botas de invierno",
-    "language": "es",
+    "query": "baskets femme",
+    "language": "fr",
     "source": "model",
-    "modelWritten": true
+    "modelWritten": true,
+    "set": "simple"
   },
   {
-    "query": "pantalones vaqueros anchos tiro alto",
-    "language": "es",
+    "query": "short denim",
+    "language": "fr",
     "source": "model",
-    "modelWritten": true
+    "modelWritten": true,
+    "set": "simple"
   },
   {
-    "query": "sueter de lana",
-    "language": "es",
+    "query": "jupe longue",
+    "language": "fr",
     "source": "model",
-    "modelWritten": true
+    "modelWritten": true,
+    "set": "simple"
   },
   {
     "query": "zapatillas blancas",
     "language": "es",
     "source": "model",
-    "modelWritten": true
+    "modelWritten": true,
+    "set": "simple"
   },
   {
-    "query": "bolso de mano pequeño elegante",
+    "query": "vaqueros rotos",
     "language": "es",
     "source": "model",
-    "modelWritten": true
+    "modelWritten": true,
+    "set": "simple"
   },
   {
-    "query": "suéter de lana gris cómodo",
+    "query": "zapatillas deportivas negras baratas para correr",
     "language": "es",
     "source": "model",
-    "modelWritten": true
+    "modelWritten": true,
+    "set": "simple"
   },
   {
-    "query": "camisa de lino azul claro",
+    "query": "vestido largo rojo para fiesta elegante",
     "language": "es",
     "source": "model",
-    "modelWritten": true
+    "modelWritten": true,
+    "set": "simple"
+  },
+  {
+    "query": "vestidos largos",
+    "language": "es",
+    "source": "model",
+    "modelWritten": true,
+    "set": "simple"
+  },
+  {
+    "query": "camisas formales",
+    "language": "es",
+    "source": "model",
+    "modelWritten": true,
+    "set": "simple"
+  },
+  {
+    "query": "falda corta estampada para verano fresca",
+    "language": "es",
+    "source": "model",
+    "modelWritten": true,
+    "set": "simple"
+  },
+  {
+    "query": "sandalias planas",
+    "language": "es",
+    "source": "model",
+    "modelWritten": true,
+    "set": "simple"
+  },
+  {
+    "query": "bolsos negros",
+    "language": "es",
+    "source": "model",
+    "modelWritten": true,
+    "set": "simple"
+  },
+  {
+    "query": "faldas florales",
+    "language": "es",
+    "source": "model",
+    "modelWritten": true,
+    "set": "simple"
+  },
+  {
+    "query": "ropa interior que no se note con vestidos ajustados y sea suave",
+    "language": "es",
+    "source": "model",
+    "modelWritten": true,
+    "set": "simple"
+  },
+  {
+    "query": "chaquetas de cuero",
+    "language": "es",
+    "source": "model",
+    "modelWritten": true,
+    "set": "simple"
+  },
+  {
+    "query": "camisa blanca de lino manga larga",
+    "language": "es",
+    "source": "model",
+    "modelWritten": true,
+    "set": "simple"
+  },
+  {
+    "query": "wedding guest outfit",
+    "language": "en",
+    "source": "model",
+    "modelWritten": true,
+    "set": "hard",
+    "kind": "occasion"
+  },
+  {
+    "query": "waterproof hiking boots with good ankle support",
+    "language": "en",
+    "source": "model",
+    "modelWritten": true,
+    "set": "hard",
+    "kind": "two-wishes"
+  },
+  {
+    "query": "vibe like 90s grunge concert",
+    "language": "en",
+    "source": "model",
+    "modelWritten": true,
+    "set": "hard",
+    "kind": "vague"
+  },
+  {
+    "query": "cartier love bracelet dupe",
+    "language": "en",
+    "source": "model",
+    "modelWritten": true,
+    "set": "hard",
+    "kind": "lookalike"
+  },
+  {
+    "query": "mens slim fit jeans with stretch fabric",
+    "language": "en",
+    "source": "model",
+    "modelWritten": true,
+    "set": "hard",
+    "kind": "two-wishes"
+  },
+  {
+    "query": "casual brunch with friends",
+    "language": "en",
+    "source": "model",
+    "modelWritten": true,
+    "set": "hard",
+    "kind": "occasion"
+  },
+  {
+    "query": "beach vacation wear",
+    "language": "en",
+    "source": "model",
+    "modelWritten": true,
+    "set": "hard",
+    "kind": "occasion"
+  },
+  {
+    "query": "what to wear when meeting his parents for the first time",
+    "language": "en",
+    "source": "model",
+    "modelWritten": true,
+    "set": "hard",
+    "kind": "vague"
+  },
+  {
+    "query": "rory gilmore fall outfits",
+    "language": "en",
+    "source": "model",
+    "modelWritten": true,
+    "set": "hard",
+    "kind": "reference"
+  },
+  {
+    "query": "cute brunch outfit that hides a food baby",
+    "language": "en",
+    "source": "model",
+    "modelWritten": true,
+    "set": "hard",
+    "kind": "vague"
+  },
+  {
+    "query": "lululemon align leggings lookalike",
+    "language": "en",
+    "source": "model",
+    "modelWritten": true,
+    "set": "hard",
+    "kind": "lookalike"
+  },
+  {
+    "query": "hailey bieber street style",
+    "language": "en",
+    "source": "model",
+    "modelWritten": true,
+    "set": "hard",
+    "kind": "reference"
+  },
+  {
+    "query": "friday night out",
+    "language": "en",
+    "source": "model",
+    "modelWritten": true,
+    "set": "hard",
+    "kind": "occasion"
+  },
+  {
+    "query": "euphoria maddy style",
+    "language": "en",
+    "source": "model",
+    "modelWritten": true,
+    "set": "hard",
+    "kind": "reference"
+  },
+  {
+    "query": "outfit for outdoor birthday party when it might rain",
+    "language": "en",
+    "source": "model",
+    "modelWritten": true,
+    "set": "hard",
+    "kind": "vague"
+  },
+  {
+    "query": "בגדים לחתונה של אחותי אבל לא יותר מדי",
+    "language": "he",
+    "source": "model",
+    "modelWritten": true,
+    "set": "hard",
+    "kind": "vague"
+  },
+  {
+    "query": "בגדי ים לחופשה בחול",
+    "language": "he",
+    "source": "model",
+    "modelWritten": true,
+    "set": "hard",
+    "kind": "occasion"
+  },
+  {
+    "query": "אופנת ערב לאירוע חברה",
+    "language": "he",
+    "source": "model",
+    "modelWritten": true,
+    "set": "hard",
+    "kind": "occasion"
+  },
+  {
+    "query": "בגדים בסגנון בלייק לייבלי",
+    "language": "he",
+    "source": "model",
+    "modelWritten": true,
+    "set": "hard",
+    "kind": "reference"
+  },
+  {
+    "query": "אופנת בוהו שיק",
+    "language": "he",
+    "source": "model",
+    "modelWritten": true,
+    "set": "hard",
+    "kind": "reference"
+  },
+  {
+    "query": "שמלה שחור לאירועים מבד נושם",
+    "language": "he",
+    "source": "model",
+    "modelWritten": true,
+    "set": "hard",
+    "kind": "two-wishes"
+  },
+  {
+    "query": "תיק דומה ללואי ויטון",
+    "language": "he",
+    "source": "model",
+    "modelWritten": true,
+    "set": "hard",
+    "kind": "lookalike"
+  },
+  {
+    "query": "מעיל ארוך לחורף בצבע בז עם קפוצ'ון",
+    "language": "he",
+    "source": "model",
+    "modelWritten": true,
+    "set": "hard",
+    "kind": "two-wishes"
+  },
+  {
+    "query": "בגדים בסגנון 90s",
+    "language": "he",
+    "source": "model",
+    "modelWritten": true,
+    "set": "hard",
+    "kind": "reference"
+  },
+  {
+    "query": "מעיל פרווה כמו של זארה",
+    "language": "he",
+    "source": "model",
+    "modelWritten": true,
+    "set": "hard",
+    "kind": "lookalike"
+  },
+  {
+    "query": "נעלי ספורט לבנות לריצה במידה 38",
+    "language": "he",
+    "source": "model",
+    "modelWritten": true,
+    "set": "hard",
+    "kind": "two-wishes"
+  },
+  {
+    "query": "חגורה דמוי נייקי",
+    "language": "he",
+    "source": "model",
+    "modelWritten": true,
+    "set": "hard",
+    "kind": "lookalike"
+  },
+  {
+    "query": "נעליים בסגנון של בלנסיאגה",
+    "language": "he",
+    "source": "model",
+    "modelWritten": true,
+    "set": "hard",
+    "kind": "lookalike"
+  },
+  {
+    "query": "חליפות כמו של ג'יימס בונד",
+    "language": "he",
+    "source": "model",
+    "modelWritten": true,
+    "set": "hard",
+    "kind": "reference"
+  },
+  {
+    "query": "בגדים לחתונה של אחותי",
+    "language": "he",
+    "source": "model",
+    "modelWritten": true,
+    "set": "hard",
+    "kind": "occasion"
   }
 ]

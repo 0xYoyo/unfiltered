@@ -18,18 +18,29 @@ only if the hidden score goes up. The tooling lives in
    (the latency probe's marker), and not one of the probe's committed
    queries in `scripts/latency-probe-queries.json`. Each is filed under a language by script alone: Hebrew → `he`,
    Arabic → `ar`, Cyrillic → `ru`, everything else → `en`. French and Spanish
-   are never taken from the log.
-2. **Fill** — each of `en, he, ar, ru, fr, es` is filled to exactly 25
-   searches: log queries first (the newest 25 when there are more), then Flash-Lite filler shaped
-   60 % one to three words, 30 % medium, 10 % long or vague. Each entry
-   carries `source: "log" | "model"`; a language with no log entry is marked
-   `modelWritten: true`.
-3. **Split** — each language is split 13 public / 12 hidden by a seeded
-   shuffle (seed 140): the same set always splits the same way. The public
-   half is written to `apps/shopify-app/app/score/data/public-set.json`. The
-   hidden half is written base64-encoded to `--hidden-out`; the builder
-   refuses, writing nothing, when that path is inside the repository or the
-   encoded file is 48 KB or larger.
+   are never taken from the log. The Hebrew log lives under the seed store
+   (`unfiltered-dev.myshopify.com`), so `PLAYGROUND_SEED_STORE_KEY` must be
+   given on the command line when the local `.env` lacks it.
+2. **Fill** — the simple set fills each of `en, ar, ru, fr, es` to 25
+   (YOY-175 AC-1; 25 everywhere before); `he` takes every shopper-shaped log
+   search, 75 in all (38 / 37; the log held 82 on 2026-10-14), and never
+   filler; only a log shorter than 75 gives a smaller `he`, and the build
+   prints `set simple he <n>`. Log
+   queries come first, newest first, then Flash-Lite filler shaped 60 % one
+   to three words, 30 % medium, 10 % long or vague. Each entry carries
+   `source: "log" | "model"` and `set: "simple"`; a language with no log
+   entry is marked `modelWritten: true`. The hard set is described under
+   "The grown set and the hard set" below.
+3. **Split** — each set's languages are split public `ceil(n/2)` / hidden
+   `floor(n/2)` by a seeded shuffle (seed 140): 25 → 13 / 12, 75 → 38 / 37,
+   30 → 15 / 15. The same set always splits the same way. A language kept
+   from an earlier build keeps its old halves exactly, and the shuffle
+   splits only the searches added to it (see "The grown set and the hard
+   set" below). Both public halves
+   are written to `apps/shopify-app/app/score/data/public-set.json`. Both
+   hidden halves are written to one base64 file at `--hidden-out`, each
+   entry carrying its `set`; the builder refuses, writing nothing, when that
+   path is inside the repository or the encoded file is 48 KB or larger.
 4. **Run** — the runner seeds an in-process PGlite database from a fixture
    (`scripts/score-export-fixture.mts <storeKey> --out <file>`: the store
    key's `CatalogProduct`, `ProductEnrichment` and `ProductEmbedding` rows,
@@ -225,7 +236,7 @@ That separates a loss in find from a loss in the judge.
 grader that marks a title holding a query word as relevant. Without
 `--truth <file>` it writes nothing.
 
-### Find recall — the public en and he searches (2026-10-14)
+### Find recall — the public en and he searches (2026-10-14; current set, built 2026-10-01)
 
 The truth was built on 2026-10-14 (12:55–13:00 UTC) on branch
 `YOY-174-find-recall` at `8baf481` (base `main` `96e8a17`), against
@@ -293,6 +304,60 @@ the find set, and the page served does not show them. he 16 (black heels for
 women) is the clearest case: its one relevant family is inside the find set
 but not in the first 24.
 
+## The grown set and the hard set (YOY-175)
+
+**Hebrew at 75.** Twelve hidden Hebrew searches let same-code runs differ
+by up to 0.06, so Hebrew's 0.090 band was the floor of what the set could
+see. The simple set now holds 75 Hebrew searches: 38 public and 37 hidden.
+
+`--keep-before <ISO time>` keeps the old set's en and he searches. It
+rebuilds each language's newest 25 shopper-shaped log searches from before
+that instant, splits them by the old 13 / 12 shuffle, and keeps the
+language only when the old public half (`--previous-public`, the committed
+file by default) comes back exactly: same entries, same order. Then the
+hidden 12 are the rest of the same 25, so the old set is kept whole without
+the hidden file ever being read. A kept Hebrew language adds every later
+log search, up to 75 in all, and no filler: 75 on 2026-10-14, split 38 / 37. A kept language keeps its old halves
+exactly (YOY-175 AC-1, amended): the old 13 public stay public and the old
+12 hidden stay hidden, in their old order, and the seeded shuffle splits
+only the added searches, so he's 50 go 25 / 25 and he is 38 / 37 in all. A
+search that was public is already in the repository, so it never enters a
+hidden half. The same holds for every added search. The added log
+searches are drawn into halves rather than shuffled: the hidden added are
+the newest whose normalized text (case-folded, whitespace collapsed)
+appears in no file tracked on `origin/main` (`git ls-tree`; never the
+branch's working tree, whose public set may be an earlier build), up to the hidden count (he:
+25); the public added are the newest remaining log searches, up to the
+public count (he: 25). Filler is used only when the log runs out, and
+never for Hebrew: too few unknown Hebrew searches fail the build; a known
+filler search is pinned public, or written again once the public share is
+full. The build prints one
+`pinned <set> <lang> <n>` line per set and language: counts, never the
+text. A synthetic build checks against no repository text, because its log
+and filler live in a tracked file. A language that does not reproduce is
+built fresh. The build prints `reproduce <lang> reproduced|not reproduced`
+and, per set and language, its public, hidden, log and filler counts.
+
+**The hard set.** It has 30 model-written searches per language in `en`
+and `he`. Each is asked for one kind at a time, the five kinds in equal
+parts (6 each): `reference` (a person or a look), `lookalike` (a brand the
+catalog does not carry), `occasion`, `vague` and `two-wishes` (one sentence
+with two wishes). Each entry carries `set: "hard"` and its `kind`, and the
+hard set shares no search with the simple set. It splits 15 / 15. The
+rubric's last paragraph (below) is what makes it measurable.
+
+**One table per set.** The runner scores each set on its own and prints
+its table after a strict `set simple` or `set hard` line, which the leak
+check admits. `--set-name simple|hard|all` chooses (default `all`). The
+per-search `grade` lines count indices within their own set. An entry with
+no `set` field, from a set built before YOY-175, is a simple entry.
+
+**Not comparable.** Every table above this section and under "Results"
+predates YOY-175 and holds the **current set, built 2026-10-01**: 25
+searches per language, 12 hidden each. The M7 tables (Hebrew 75, the hard
+set, the M7 reference bands) are on a different set and are not comparable
+to them. A gate names the set its reference was taken on.
+
 ## Rubric
 
 The grader's prompt carries this text verbatim (a test holds the two equal):
@@ -306,7 +371,14 @@ Grade each result for the shopper's search, the way the shopper would judge it.
 
 Example, grade 1: search "black running shoes", result "Black leather dress shoes" — black shoes, but not for running.
 Example, grade 0: search "dress not in red", result "Red wrap dress" — the shopper ruled red out.
+
+A brand or person reference is graded on the look it names, not on the brand: "shoes that look like Prada" grades 3 for a loafer with the same shape and finish and 0 for a sandal. A person reference is graded on the garment the sentence describes when it describes one, and on the category alone when it does not.
 ```
+
+The last paragraph was added for the hard set (YOY-175 AC-3). Without it, a
+look-alike search such as "like Prada" grades 0 everywhere and the hard set
+measures nothing. It changes nothing for a search that names no brand or
+person.
 
 ## Calibration
 
@@ -347,7 +419,7 @@ every result 1 (related only).
   (estimates until measured).
 - The hidden half never enters the repository.
 
-## Baseline — the public half on the M5 engine
+## Baseline — the public half on the M5 engine (current set, built 2026-10-01)
 
 The public half run three times on the current engine (`origin/main` at
 `5584566`, 2026-10-01, `npm run score:public`). Each language's mean is the
@@ -375,7 +447,7 @@ Read from each run's cost ledger (the run's cost line): one public run —
 (runs: $0.0597, $0.0595, $0.0594). Hidden run 1 — 72 searches, 255 model
 calls — costs **$0.0571**, read from the cost line in its workflow log.
 
-## Public reference after AC-17 (main, 2026-10-03)
+## Public reference after AC-17 (main, 2026-10-03; current set, built 2026-10-01)
 
 The public half on `main` at `7251eda` (YOY-147's facts rows and YOY-148
 merged), Engine v2, `JUDGE_DEADLINE_MS=4000`, one pass, 78 searches, 0
@@ -416,9 +488,11 @@ he 0.150 against a 0.368 reference — until the tiers were limited to the
 find front). A run on a cheaper catalog will move Hebrew for that reason,
 not because the engine changed.
 
-## Results
+## Results — current set, built 2026-10-01
 
-Hidden-half scores per language. "Under 1 s" is the latency probe's share
+Every table in this section is on the current set, built 2026-10-01 (25
+searches per language), and is not comparable to the M7 tables (see "The
+grown set and the hard set"). Hidden-half scores per language. "Under 1 s" is the latency probe's share
 of searches under 1,000 ms server-side against the deployment
 (`scripts/latency-probe.mts --runs 5 --set all`, docs/LATENCY.md); the
 score runner's own `under 1 s (local)` column times a local, in-process run
@@ -702,7 +776,7 @@ One side reading for the M7 speed chain: the replay's "no extraction"
 column (8–25 %) shows run 5's code missed the extraction grace on some
 searches on 2026-10-10, where today's code (0 %) did not.
 
-### M7 — current set: controls and baselines
+### M7 — current set: controls and baselines (current set, built 2026-10-01)
 
 YOY-173, 2026-10-14: five hidden runs dispatched 11:52 UTC and completed
 12:00–12:02 UTC, all with `ref=d401bdf6e231c87cda0e89f3a38343799f75b1dd`

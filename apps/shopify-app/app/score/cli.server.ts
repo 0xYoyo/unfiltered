@@ -36,14 +36,24 @@ import {
   type ScoreReport,
 } from "./run.server";
 import {
+  buildHardSet,
   buildScoreSet,
   decodeHiddenSet,
   exportLogQueries,
+  reproduceOldSet,
+  RepositoryText,
+  repositoryText,
+  SCORE_LANGUAGES,
+  SCORE_SET_NAMES,
   ScoreSetRefusal,
   SCORE_SPLIT_SEED,
+  setOf,
   splitScoreSet,
   writeScoreSets,
+  type OldHalves,
+  type ScoreLanguage,
   type ScoreSetEntry,
+  type ScoreSetName,
 } from "./set.server";
 import {
   buildSyntheticFixture,
@@ -141,12 +151,35 @@ export async function buildSetCommand(
       "public-out": { type: "string" },
       seed: { type: "string" },
       synthetic: { type: "boolean", default: false },
+      // Keep the old set's en and he searches (YOY-175 AC-1): rebuild them
+      // from the log as it stood before this instant, and keep each language
+      // whose old public half comes back exactly.
+      "keep-before": { type: "string" },
+      // The old public half that check compares against; the committed file by default.
+      "previous-public": { type: "string" },
     },
   });
   const hiddenOut = values["hidden-out"];
   if (hiddenOut === undefined) {
-    err("usage: score-build-set.mts --hidden-out <path outside the repo> [--public-out <path>] [--seed <n>] [--synthetic]");
+    err("usage: score-build-set.mts --hidden-out <path outside the repo> [--public-out <path>] [--seed <n>] [--keep-before <ISO time> [--previous-public <path>]] [--synthetic]");
     return 2;
+  }
+  const keepBefore = values["keep-before"] === undefined ? undefined : new Date(values["keep-before"]);
+  if (keepBefore !== undefined && Number.isNaN(keepBefore.getTime())) {
+    err("score set: --keep-before must be an ISO time, e.g. 2026-10-01T17:33:28Z");
+    return 2;
+  }
+  let previousPublic: ScoreSetEntry[] = [];
+  if (keepBefore !== undefined) {
+    try {
+      // Read before anything is written: the public file is overwritten below.
+      previousPublic = JSON.parse(
+        readFileSync(resolve(values["previous-public"] ?? DEFAULT_PUBLIC_SET_PATH), "utf8"),
+      ) as ScoreSetEntry[];
+    } catch {
+      err("score set: the previous public set is missing or unreadable");
+      return 1;
+    }
   }
   const seed = values.seed === undefined ? SCORE_SPLIT_SEED : Number(values.seed);
   const db = values.synthetic ? await createScratchDb() : await liveDb();
@@ -157,8 +190,26 @@ export async function buildSetCommand(
     const { playgroundStoreKeys } = await import("../playground/api.server");
     const logQueries = await exportLogQueries(db, await playgroundStoreKeys(db));
     const llm = values.synthetic ? createSyntheticFillerLlm() : await flashLite(noCost);
-    const set = await buildScoreSet({ logQueries, llm });
-    const { publicSet, hiddenSet } = splitScoreSet(set, seed);
+    const keep: Partial<Record<ScoreLanguage, ScoreSetEntry[]>> = {};
+    const pinned: Partial<Record<ScoreLanguage, OldHalves>> = {};
+    if (keepBefore !== undefined) {
+      for (const result of reproduceOldSet({ logQueries, previousPublic, before: keepBefore, seed })) {
+        // Counts and a verdict only: the rebuilt entries include hidden ones.
+        out(`reproduce ${result.language} ${result.reproduced ? "reproduced" : "not reproduced"}`);
+        if (result.entries !== undefined) keep[result.language] = result.entries;
+        if (result.halves !== undefined) pinned[result.language] = result.halves;
+      }
+    }
+    // No search already in the repository may enter a hidden half (YOY-175
+    // AC-1, amended): the hidden added searches are drawn only from log
+    // searches in no tracked file, and known filler is pinned public. The
+    // synthetic log and filler live in a tracked file, so a synthetic build
+    // checks against nothing.
+    const known = values.synthetic ? new RepositoryText("") : repositoryText(REPO_ROOT);
+    // The build draws each language's log searches into `pinned`: hidden from the repository-unknown ones.
+    const simple = await buildScoreSet({ logQueries, llm, keep, known, halves: pinned });
+    const hard = await buildHardSet({ llm, avoid: simple, known });
+    const { publicSet, hiddenSet } = splitScoreSet([...simple, ...hard], seed, pinned, known);
     writeScoreSets({
       publicSet,
       hiddenSet,
@@ -167,6 +218,22 @@ export async function buildSetCommand(
       repoRoot: REPO_ROOT,
     });
     out(`score set: ${publicSet.length} public, ${hiddenSet.length} hidden (seed ${seed})`);
+    // Counts only, never the text: added searches pinned public because the repository already holds them.
+    for (const [key, count] of known.pinned) out(`pinned ${key} ${count}`);
+    // Per set and language (YOY-175 AC-1, AC-2): sizes and where the
+    // searches came from, as counts — never a query.
+    for (const entries of [simple, hard]) {
+      for (const language of SCORE_LANGUAGES) {
+        const own = entries.filter((entry) => entry.language === language);
+        if (own.length === 0) continue;
+        const name = setOf(own[0]!);
+        const count = (half: readonly ScoreSetEntry[]) =>
+          half.filter((entry) => setOf(entry) === name && entry.language === language).length;
+        out(
+          `set ${name} ${language} ${own.length}: ${count(publicSet)} public, ${count(hiddenSet)} hidden; ${own.filter((entry) => entry.source === "log").length} log, ${own.filter((entry) => entry.source === "model").length} filler`,
+        );
+      }
+    }
     return 0;
   } catch (error) {
     err(error instanceof ScoreSetRefusal ? `refused: ${error.message}` : `score set failed: ${(error as Error).message}`);
@@ -194,8 +261,15 @@ export async function runScoreCommand(
       passes: { type: "string", default: "1" },
       // One line per public search with its query, after the table (YOY-172 AC-5).
       "per-search": { type: "boolean", default: false },
+      // Which set to score (YOY-175 AC-4): simple, hard or all.
+      "set-name": { type: "string", default: "all" },
     },
   });
+  const setName = values["set-name"];
+  if (setName !== "all" && !(SCORE_SET_NAMES as readonly string[]).includes(setName)) {
+    err("score run: --set-name must be simple, hard or all");
+    return 2;
+  }
   const hidden = values["hidden-set"] !== undefined;
   if (hidden && values["per-search"]) {
     // A hidden run prints the index alone (YOY-172 NG-4): refused before any call.
@@ -216,6 +290,16 @@ export async function runScoreCommand(
   } catch {
     // Never echo the file: it is query text.
     err("score run: the set file is missing or unreadable — build it with score-build-set.mts");
+    return 1;
+  }
+  // The sets to score, in order (YOY-175 AC-4): an entry without `set` is simple.
+  const sets: [ScoreSetName, ScoreSetEntry[]][] = SCORE_SET_NAMES.filter(
+    (name) => setName === "all" || setName === name,
+  )
+    .map((name): [ScoreSetName, ScoreSetEntry[]] => [name, set.filter((entry) => setOf(entry) === name)])
+    .filter(([, entries]) => entries.length > 0);
+  if (sets.length === 0) {
+    err(`score run: the set file holds no ${setName} searches`);
     return 1;
   }
   let fixture: ScoreFixture;
@@ -253,51 +337,64 @@ export async function runScoreCommand(
         grader = await flashLite(createPrismaCostRecorder(db));
         flushLedger = searchLedger.flush;
       }
-      // Each pass reports its own spend and extraction calls: the ledger is
-      // cumulative, so a later pass subtracts what came before it.
-      const results: ScoreReport[] = [];
+      // Each set is scored apart and reports its own table (YOY-175 AC-4).
+      // Each pass and set reports its own spend and extraction calls: the
+      // ledger is cumulative, so each table subtracts what came before it.
+      const results: { pass: number; name: ScoreSetName; entries: ScoreSetEntry[]; report: ScoreReport }[] = [];
       let before = { usd: 0, calls: 0, extractCalls: 0 };
-      for (let pass = 1; pass <= passes; pass += 1) {
-        const report = await runScoreSet({
-          db,
-          orchestrator,
-          grader,
-          storeKey: fixture.storeKey,
-          set,
-          flushLedger,
-          // Progress to stderr as each search finishes (YOY-149 runner guard).
-          progress: (line) => err(line),
-        });
-        const extractCalls = report.extractCalls ?? 0;
-        results.push({
-          ...report,
-          cost: { usd: report.cost.usd - before.usd, calls: report.cost.calls - before.calls },
-          extractCalls: extractCalls - before.extractCalls,
-        });
-        before = { usd: report.cost.usd, calls: report.cost.calls, extractCalls };
-        // A run that stopped early does not start another pass.
-        if (report.abortedAfter !== undefined) break;
+      passes: for (let pass = 1; pass <= passes; pass += 1) {
+        for (const [name, entries] of sets) {
+          const report = await runScoreSet({
+            db,
+            orchestrator,
+            grader,
+            storeKey: fixture.storeKey,
+            set: entries,
+            flushLedger,
+            // Progress to stderr as each search finishes (YOY-149 runner guard).
+            progress: (line) => err(line),
+          });
+          const extractCalls = report.extractCalls ?? 0;
+          results.push({
+            pass,
+            name,
+            entries,
+            report: {
+              ...report,
+              cost: { usd: report.cost.usd - before.usd, calls: report.cost.calls - before.calls },
+              extractCalls: extractCalls - before.extractCalls,
+            },
+          });
+          before = { usd: report.cost.usd, calls: report.cost.calls, extractCalls };
+          // A run that stopped early scores nothing more.
+          if (report.abortedAfter !== undefined) break passes;
+        }
       }
       return results;
     });
-    // After each table, one line per search (YOY-172 AC-1, AC-5): always on
-    // a hidden run, by index alone; on a public run with `--per-search`,
-    // with the query.
-    const printed = (report: ScoreReport) =>
+    // Each table is preceded by its strict `set <name>` line (YOY-175 AC-4),
+    // and followed by one line per search (YOY-172 AC-1, AC-5): always on a
+    // hidden run, by index alone; on a public run with `--per-search`, with
+    // the query. Indices count within the table's own set.
+    const printed = ({ name, entries, report }: (typeof reports)[number]) =>
       [
+        `set ${name}`,
         formatScoreTable(report),
         ...(hidden
           ? formatGradeLines(report.grades ?? [])
           : values["per-search"]
-            ? formatGradeLines(report.grades ?? [], set)
+            ? formatGradeLines(report.grades ?? [], entries)
             : []),
       ].join("\n");
-    out(
-      reports.length === 1
-        ? printed(reports[0]!)
-        : reports.map((report, index) => `pass ${index + 1}\n${printed(report)}`).join("\n"),
-    );
-    return reports.some((report) => report.abortedAfter !== undefined) ? 1 : 0;
+    const lines: string[] = [];
+    for (const [index, result] of reports.entries()) {
+      if (passes > 1 && (index === 0 || reports[index - 1]!.pass !== result.pass)) {
+        lines.push(`pass ${result.pass}`);
+      }
+      lines.push(printed(result));
+    }
+    out(lines.join("\n"));
+    return reports.some(({ report }) => report.abortedAfter !== undefined) ? 1 : 0;
   } catch (error) {
     // The name only: a message can carry query text.
     err(`score run failed (${(error as Error).name})`);
