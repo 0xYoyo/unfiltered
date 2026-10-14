@@ -16,7 +16,7 @@ import {
   type JudgeCandidateAttribute,
   type JudgeCandidateOption,
   type JudgeLabel,
-  type JudgeProvider,
+  type JudgeChoice,
   type JudgeVerdict,
   type JudgeVerdictCode,
 } from "@unfiltered/engine";
@@ -866,7 +866,7 @@ function warnJudgeStore(what: string, error: unknown): void {
  * land (YOY-158 AC-3) and otherwise the generic `close-match` (PRD v3.4 §3),
  * so its `other-variant` card still reads to a shopper like a `close` one.
  */
-export function judgeWritesFactLabel(provider: JudgeProvider): boolean {
+export function judgeWritesFactLabel(provider: JudgeChoice): boolean {
   return provider === "gemini";
 }
 
@@ -883,7 +883,7 @@ export function judgeWritesFactLabel(provider: JudgeProvider): boolean {
  */
 export function splitCloseVerdicts<
   T extends { verdict?: string; standIn?: true },
->(hits: readonly T[], provider: JudgeProvider): { matched: T[]; close: T[] } | null {
+>(hits: readonly T[], provider: JudgeChoice): { matched: T[]; close: T[] } | null {
   const variantMatches = judgeWritesFactLabel(provider);
   const judged = (hit: T) => hit.standIn !== true;
   const isMatch = (hit: T) =>

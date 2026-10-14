@@ -14,15 +14,18 @@ on:
         default: main
       # Which judge answers (YOY-152 AC-6): sets JUDGE_PROVIDER,
       # the switch the production judge factory reads. jev by default — the
-      # judge production serves (YOY-157 AC-19).
+      # judge production serves (YOY-157 AC-19). `none` scores the engine
+      # with no judge at all (YOY-172 AC-3): every page is the composed find
+      # order, route reason `find-only`.
       judge:
-        description: Judge to score with (gemini or jev)
+        description: Judge to score with (gemini, jev, or none for no judge)
         required: true
         default: jev
         type: choice
         options:
           - gemini
           - jev
+          - none
 
 permissions:
   contents: read
@@ -63,7 +66,7 @@ jobs:
         working-directory: apps/shopify-app
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          # The jev judge's key (YOY-152); unused when the judge is gemini.
+          # The jev judge's key (YOY-152); unused when the judge is gemini or none.
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           JUDGE_PROVIDER: ${{ inputs.judge }}
           # A score run measures the judge's judgment, not its speed

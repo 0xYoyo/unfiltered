@@ -16,6 +16,7 @@ import {
 import { gradeAgreement, gradeSearch, type GradedResult } from "./grade.server";
 import { findLeaks } from "./leak.server";
 import {
+  formatGradeLines,
   formatScoreTable,
   runScoreSet,
   withCapturedConsole,
@@ -174,8 +175,16 @@ export async function runScoreCommand(
       // Passes over the set on one scratch database (YOY-149 AC-18): the
       // second pass meets the caches the first filled — warm.
       passes: { type: "string", default: "1" },
+      // One line per public search with its query, after the table (YOY-172 AC-5).
+      "per-search": { type: "boolean", default: false },
     },
   });
+  const hidden = values["hidden-set"] !== undefined;
+  if (hidden && values["per-search"]) {
+    // A hidden run prints the index alone (YOY-172 NG-4): refused before any call.
+    err("score run: --per-search prints query text and is refused with --hidden-set");
+    return 1;
+  }
   const passes = Number(values.passes);
   if (!Number.isInteger(passes) || passes < 1 || passes > 3) {
     err("score run: --passes must be 1, 2 or 3");
@@ -254,10 +263,22 @@ export async function runScoreCommand(
       }
       return results;
     });
+    // After each table, one line per search (YOY-172 AC-1, AC-5): always on
+    // a hidden run, by index alone; on a public run with `--per-search`,
+    // with the query.
+    const printed = (report: ScoreReport) =>
+      [
+        formatScoreTable(report),
+        ...(hidden
+          ? formatGradeLines(report.grades ?? [])
+          : values["per-search"]
+            ? formatGradeLines(report.grades ?? [], set)
+            : []),
+      ].join("\n");
     out(
       reports.length === 1
-        ? formatScoreTable(reports[0]!)
-        : reports.map((report, index) => `pass ${index + 1}\n${formatScoreTable(report)}`).join("\n"),
+        ? printed(reports[0]!)
+        : reports.map((report, index) => `pass ${index + 1}\n${printed(report)}`).join("\n"),
     );
     return reports.some((report) => report.abortedAfter !== undefined) ? 1 : 0;
   } catch (error) {

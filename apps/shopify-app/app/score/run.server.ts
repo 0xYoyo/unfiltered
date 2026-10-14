@@ -26,6 +26,8 @@ export const FAST_SEARCH_MS = 1000;
 
 export interface SearchOutcome {
   language: ScoreLanguage;
+  /** The search's 0-based position in the set (YOY-172 AC-1). */
+  index: number;
   score: number;
   latencyMs: number;
   /**
@@ -93,8 +95,21 @@ export interface LanguageScore {
   failed: number;
 }
 
+/**
+ * One scored search as the per-search lines print it (YOY-172 AC-1, AC-5):
+ * its language, its 0-based position in the set and its score — null for a
+ * failed search. No query text: a public run's line looks it up in the set.
+ */
+export interface SearchGrade {
+  language: ScoreLanguage;
+  index: number;
+  score: number | null;
+}
+
 export interface ScoreReport {
   languages: LanguageScore[];
+  /** Every scored search in set order (YOY-172 AC-1); absent on a hand-built report. */
+  grades?: SearchGrade[];
   /** The run's spend, read from the cost ledger (YOY-141 AC-10). */
   cost: { usd: number; calls: number };
   /** Failed searches per (stage, class), most frequent first (YOY-141 AC-13). */
@@ -297,6 +312,7 @@ export async function runScoreSet({
       );
       outcomes.push({
         language: entry.language,
+        index,
         score: searchScore(grades),
         latencyMs,
         extractionInTime: response.extractionInTime ?? null,
@@ -312,6 +328,7 @@ export async function runScoreSet({
       // its message may carry the query.
       outcomes.push({
         language: entry.language,
+        index,
         score: 0,
         latencyMs: Infinity,
         extractionInTime: null,
@@ -345,6 +362,11 @@ export async function runScoreSet({
   await flushLedger();
   return {
     languages,
+    grades: outcomes.map(({ language, index, score, failed }) => ({
+      language,
+      index,
+      score: failed ? null : score,
+    })),
     cost: await readRunCost(db),
     failures: countFailures(outcomes),
     extractCalls: await db.aiCall.count({ where: { operation: "extract" } }),
@@ -431,6 +453,23 @@ export function formatScoreTable(report: ScoreReport): string {
  */
 export function formatNoExtractionLine(language: string, share: number): string {
   return `no-extraction ${language} ${Math.round(share * 100)}%`;
+}
+
+/**
+ * One line per scored search, after the table (YOY-172 AC-1, AC-5, AC-7):
+ * `grade <lang> <index> <score>`, or `failed` for a failed search. The one
+ * code path for both halves: a hidden run passes no set, so its lines carry
+ * the index alone; a public `--per-search` run passes its set, and each line
+ * ends with the query.
+ */
+export function formatGradeLines(
+  grades: readonly SearchGrade[],
+  set?: readonly ScoreSetEntry[],
+): string[] {
+  return grades.map(({ language, index, score }) => {
+    const line = `grade ${language} ${index} ${score === null ? "failed" : score.toFixed(3)}`;
+    return set === undefined ? line : `${line} ${set[index]!.query}`;
+  });
 }
 
 /** One line per (stage, class) under the cost line (YOY-141 AC-13). */

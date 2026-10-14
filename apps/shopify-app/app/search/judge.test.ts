@@ -26,6 +26,7 @@ import {
   type EmbeddingClient,
   type Judge,
   type JudgeCandidate,
+  type JudgeProvider,
   type LlmClient,
   type StructuredCompletionRequest,
   sentencePhrases,
@@ -979,10 +980,12 @@ describe("the one factory and its configuration (AC-1, AC-2, AC-6)", () => {
     expect(judgeProviderFromEnv({ JUDGE_PROVIDER: "gemini" })).toBe("gemini");
     expect(judgeProviderFromEnv({ JUDGE_PROVIDER: "jev" })).toBe("jev");
     expect(() => judgeProviderFromEnv({ JUDGE_PROVIDER: "gpt" })).toThrow(/JUDGE_PROVIDER/);
+    // No judge at all (YOY-172 AC-3): a score-run choice, never the default.
+    expect(judgeProviderFromEnv({ JUDGE_PROVIDER: "none" })).toBe("none");
 
     const decisions = scriptedDecisions({ a: { verdict: "exact" } });
     const judge = createJudge({
-      provider: judgeProviderFromEnv({}),
+      provider: judgeProviderFromEnv({}) as JudgeProvider,
       clients: {
         gemini: () => {
           throw new Error("the gemini client is built only when selected");
@@ -999,7 +1002,7 @@ describe("the one factory and its configuration (AC-1, AC-2, AC-6)", () => {
     let built = 0;
     const llm = scriptedLlm([answer(["E-X"])]);
     const judge = createJudge({
-      provider: judgeProviderFromEnv({ JUDGE_PROVIDER: "gemini" }),
+      provider: judgeProviderFromEnv({ JUDGE_PROVIDER: "gemini" }) as JudgeProvider,
       clients: {
         gemini: () => {
           built += 1;
@@ -1018,7 +1021,7 @@ describe("the one factory and its configuration (AC-1, AC-2, AC-6)", () => {
   it("selects the decision judge with JUDGE_PROVIDER=jev and builds only its client (YOY-152 AC-1)", async () => {
     const decisions = scriptedDecisions({ a: { verdict: "exact" } });
     const judge = createJudge({
-      provider: judgeProviderFromEnv({ JUDGE_PROVIDER: "jev" }),
+      provider: judgeProviderFromEnv({ JUDGE_PROVIDER: "jev" }) as JudgeProvider,
       clients: {
         gemini: () => {
           throw new Error("the gemini client is built only when selected");

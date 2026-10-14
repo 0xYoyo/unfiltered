@@ -6,7 +6,7 @@ import {
   type ClassicSearchStore,
   type ExtractRequest,
   type Judge,
-  type JudgeProvider,
+  type JudgeChoice,
   type JudgeLabel,
   type JudgeVerdictCode,
   type WishExtractor,
@@ -365,7 +365,7 @@ export interface SearchOrchestratorOptions {
    * The judge's provider, which decides the page's close group (YOY-157
    * AC-27) the colour order keeps to (YOY-171 AC-5); `JUDGE_PROVIDER` by default.
    */
-  judgeProvider?: JudgeProvider;
+  judgeProvider?: JudgeChoice;
   /** How long the judge may take after its call started; 1,500 ms by default (AC-6). */
   judgeDeadlineMs?: number;
   /**
@@ -900,7 +900,7 @@ export function createSearchOrchestrator(
  */
 function reorderWithinGroups<T extends { productId: string; verdict?: string; standIn?: true }>(
   cards: readonly T[],
-  provider: JudgeProvider,
+  provider: JudgeChoice,
   reorder: (run: T[]) => T[],
 ): T[] {
   const split = splitCloseVerdicts(cards, provider);
@@ -930,7 +930,7 @@ function reorderWithinGroups<T extends { productId: string; verdict?: string; st
  */
 export function colorFirstInGroups<
   T extends { productId: string; verdict?: string; standIn?: true },
->(cards: readonly T[], colorMatches: ReadonlySet<string>, provider: JudgeProvider): T[] {
+>(cards: readonly T[], colorMatches: ReadonlySet<string>, provider: JudgeChoice): T[] {
   if (colorMatches.size === 0) {
     return [...cards];
   }
@@ -948,7 +948,7 @@ export function colorFirstInGroups<
  */
 export function farCheapestFirstInGroups<
   T extends { productId: string; verdict?: string; standIn?: true },
->(cards: readonly T[], farPrices: ReadonlyMap<string, number>, provider: JudgeProvider): T[] {
+>(cards: readonly T[], farPrices: ReadonlyMap<string, number>, provider: JudgeChoice): T[] {
   if (farPrices.size === 0) {
     return [...cards];
   }
