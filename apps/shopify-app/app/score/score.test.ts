@@ -1638,6 +1638,48 @@ describe("Hebrew 75, the hard set and per-set tables (YOY-175)", () => {
     ]);
   });
 
+  it("keeps a reproduced language's old halves and shuffles only the added searches: 38 / 37 (AC-1, amended)", async () => {
+    const cutoff = new Date(Date.UTC(2026, 9, 1, 17, 0));
+    const before = log(30, new Date(Date.UTC(2026, 8, 20)), "old");
+    const after = log(60, new Date(Date.UTC(2026, 9, 5)), "new");
+    const oldSet = (["en", "he"] as const).flatMap((language) =>
+      before
+        .filter((entry) => detectLanguage(entry.query) === language)
+        .sort((a, b) => b.date.getTime() - a.date.getTime())
+        .slice(0, 25)
+        .map((entry) => ({ query: entry.query, language, source: "log" as const, modelWritten: false })),
+    );
+    const old = splitScoreSet(oldSet);
+    const logQueries = [...before, ...after];
+    const results = reproduceOldSet({ logQueries, previousPublic: old.publicSet, before: cutoff });
+    const keep = Object.fromEntries(results.map((result) => [result.language, result.entries!]));
+    const pinned = Object.fromEntries(results.map((result) => [result.language, result.halves!]));
+    const set = await buildScoreSet({ logQueries, llm: createSyntheticFillerLlm(), keep });
+    const { publicSet, hiddenSet } = splitScoreSet(set, undefined, pinned);
+    const queries = (entries: readonly ScoreSetEntry[], language: string) =>
+      entries.filter((entry) => entry.language === language).map((entry) => entry.query);
+
+    for (const language of ["en", "he"] as const) {
+      const hidden = new Set(queries(hiddenSet, language));
+      const shown = new Set(queries(publicSet, language));
+      // An old public search is in the repository: it can never land in the hidden half.
+      expect(queries(old.publicSet, language).some((query) => hidden.has(query))).toBe(false);
+      expect(queries(old.publicSet, language).every((query) => shown.has(query))).toBe(true);
+      expect(queries(old.hiddenSet, language).every((query) => hidden.has(query))).toBe(true);
+    }
+    // en keeps its 13 / 12 exactly, in the old order; he adds 50 split 25 / 25.
+    expect(queries(publicSet, "en")).toEqual(queries(old.publicSet, "en"));
+    expect(queries(hiddenSet, "en")).toEqual(queries(old.hiddenSet, "en"));
+    expect(queries(publicSet, "he")).toHaveLength(38);
+    expect(queries(hiddenSet, "he")).toHaveLength(37);
+    expect(queries(publicSet, "he").slice(0, 13)).toEqual(queries(old.publicSet, "he"));
+    expect(splitScoreSet(set, undefined, pinned)).toEqual({ publicSet, hiddenSet });
+
+    // Without the pin, the same 75 reshuffle and old public searches fall into the hidden half.
+    const loose = new Set(queries(splitScoreSet(set).hiddenSet, "he"));
+    expect(queries(old.publicSet, "he").some((query) => loose.has(query))).toBe(true);
+  });
+
   it("builds both sets offline, writes `set` on every public entry, and reports counts only (verify step 1)", async () => {
     const dir = mkdtempSync(join(tmpdir(), "score-set-175-"));
     const publicPath = join(dir, "public.json");

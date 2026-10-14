@@ -325,6 +325,14 @@ export interface Reproduction {
   reproduced: boolean;
   /** The old set's 25 entries, rebuilt from the log; present only when reproduced. */
   entries?: ScoreSetEntry[];
+  /** The old halves, 13 public and 12 hidden in the old order; present only when reproduced. */
+  halves?: OldHalves;
+}
+
+/** A reproduced language's old halves, which the split keeps exactly (YOY-175 AC-1, amended). */
+export interface OldHalves {
+  publicHalf: readonly ScoreSetEntry[];
+  hiddenHalf: readonly ScoreSetEntry[];
 }
 
 /**
@@ -371,7 +379,15 @@ export function reproduceOldSet({
       mine.length === oldPublic.length &&
       mine.every((query, index) => query === oldPublic[index]);
     return reproduced
-      ? { language, reproduced, entries: rebuilt.filter((entry) => entry.language === language) }
+      ? {
+          language,
+          reproduced,
+          entries: rebuilt.filter((entry) => entry.language === language),
+          halves: {
+            publicHalf: shuffled.slice(0, PUBLIC_PER_LANGUAGE),
+            hiddenHalf: shuffled.slice(PUBLIC_PER_LANGUAGE),
+          },
+        }
       : { language, reproduced };
   });
 }
@@ -464,23 +480,51 @@ function shuffleInPlace<T>(items: T[], random: () => number): void {
  * Split each set's languages public `ceil(n / 2)` / hidden `floor(n / 2)`
  * (AC-3; YOY-175 AC-1: 25 → 13 / 12, 75 → 38 / 37, 30 → 15 / 15) by a
  * seeded shuffle: the same set and seed always give the same halves. Each
- * set has its own shuffle from the seed, the simple set first, so the
- * simple set's shuffle is the one every earlier build used.
+ * set has its own shuffle from the seed, the simple set first.
+ *
+ * A reproduced language's old halves are kept exactly (YOY-175 AC-1,
+ * amended): its old public searches stay public and its old hidden ones stay
+ * hidden, in their old order, and the shuffle splits only the searches added
+ * after them — he 50 → 25 / 25, so 38 / 37 in all. An old public search is
+ * already in the repository, so it can never enter a hidden half.
  */
 export function splitScoreSet(
   entries: readonly ScoreSetEntry[],
   seed: number = SCORE_SPLIT_SEED,
+  pinned: Partial<Record<ScoreLanguage, OldHalves>> = {},
 ): { publicSet: ScoreSetEntry[]; hiddenSet: ScoreSetEntry[] } {
   const publicSet: ScoreSetEntry[] = [];
   const hiddenSet: ScoreSetEntry[] = [];
   for (const name of SCORE_SET_NAMES) {
     const random = seededRandom(seed);
     for (const language of SCORE_LANGUAGES) {
-      const shuffled = entries.filter((entry) => setOf(entry) === name && entry.language === language);
-      shuffleInPlace(shuffled, random);
-      const publicShare = publicCount(shuffled.length);
-      publicSet.push(...shuffled.slice(0, publicShare));
-      hiddenSet.push(...shuffled.slice(publicShare));
+      const own = entries.filter((entry) => setOf(entry) === name && entry.language === language);
+      const halves = name === "simple" ? pinned[language] : undefined;
+      if (halves === undefined) {
+        shuffleInPlace(own, random);
+        const publicShare = publicCount(own.length);
+        publicSet.push(...own.slice(0, publicShare));
+        hiddenSet.push(...own.slice(publicShare));
+        continue;
+      }
+      const byQuery = new Map(own.map((entry) => [entry.query, entry]));
+      const take = (half: readonly ScoreSetEntry[]) =>
+        half.map((old) => {
+          const entry = byQuery.get(old.query);
+          if (entry === undefined) throw new Error(`score set: a kept ${language} search is missing from the set`);
+          byQuery.delete(old.query);
+          return entry;
+        });
+      const keptPublic = take(halves.publicHalf);
+      const keptHidden = take(halves.hiddenHalf);
+      const added = [...byQuery.values()];
+      shuffleInPlace(added, random);
+      const addedPublic = publicCount(own.length) - keptPublic.length;
+      if (addedPublic < 0 || addedPublic > added.length) {
+        throw new Error(`score set: ${language} cannot keep its old halves at ${own.length} searches`);
+      }
+      publicSet.push(...keptPublic, ...added.slice(0, addedPublic));
+      hiddenSet.push(...keptHidden, ...added.slice(addedPublic));
     }
   }
   return { publicSet, hiddenSet };

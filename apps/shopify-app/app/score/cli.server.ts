@@ -48,6 +48,7 @@ import {
   setOf,
   splitScoreSet,
   writeScoreSets,
+  type OldHalves,
   type ScoreLanguage,
   type ScoreSetEntry,
   type ScoreSetName,
@@ -188,16 +189,18 @@ export async function buildSetCommand(
     const logQueries = await exportLogQueries(db, await playgroundStoreKeys(db));
     const llm = values.synthetic ? createSyntheticFillerLlm() : await flashLite(noCost);
     const keep: Partial<Record<ScoreLanguage, ScoreSetEntry[]>> = {};
+    const pinned: Partial<Record<ScoreLanguage, OldHalves>> = {};
     if (keepBefore !== undefined) {
       for (const result of reproduceOldSet({ logQueries, previousPublic, before: keepBefore, seed })) {
         // Counts and a verdict only: the rebuilt entries include hidden ones.
         out(`reproduce ${result.language} ${result.reproduced ? "reproduced" : "not reproduced"}`);
         if (result.entries !== undefined) keep[result.language] = result.entries;
+        if (result.halves !== undefined) pinned[result.language] = result.halves;
       }
     }
     const simple = await buildScoreSet({ logQueries, llm, keep });
     const hard = await buildHardSet({ llm, avoid: simple });
-    const { publicSet, hiddenSet } = splitScoreSet([...simple, ...hard], seed);
+    const { publicSet, hiddenSet } = splitScoreSet([...simple, ...hard], seed, pinned);
     writeScoreSets({
       publicSet,
       hiddenSet,

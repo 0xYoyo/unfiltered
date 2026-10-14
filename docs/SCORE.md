@@ -30,8 +30,10 @@ only if the hidden score goes up. The tooling lives in
    "The grown set and the hard set" below.
 3. **Split** — each set's languages are split public `ceil(n/2)` / hidden
    `floor(n/2)` by a seeded shuffle (seed 140): 25 → 13 / 12, 75 → 38 / 37,
-   30 → 15 / 15. The same set always splits the same way, and the simple
-   set's shuffle is the one every earlier build used. Both public halves
+   30 → 15 / 15. The same set always splits the same way. A language kept
+   from an earlier build keeps its old halves exactly, and the shuffle
+   splits only the searches added to it (see "The grown set and the hard
+   set" below). Both public halves
    are written to `apps/shopify-app/app/score/data/public-set.json`. Both
    hidden halves are written to one base64 file at `--hidden-out`, each
    entry carrying its `set`; the builder refuses, writing nothing, when that
@@ -312,7 +314,12 @@ language only when the old public half (`--previous-public`, the committed
 file by default) comes back exactly: same entries, same order. Then the
 hidden 12 are the rest of the same 25, so the old set is kept whole without
 the hidden file ever being read. A kept Hebrew language adds the 50 newest
-later log searches, then filler. A language that does not reproduce is
+later log searches, then filler. A kept language keeps its old halves
+exactly (YOY-175 AC-1, amended): the old 13 public stay public and the old
+12 hidden stay hidden, in their old order, and the seeded shuffle splits
+only the added searches, so he's 50 go 25 / 25 and he is 38 / 37 in all. A
+search that was public is already in the repository, so it never enters a
+hidden half. A language that does not reproduce is
 built fresh. The build prints `reproduce <lang> reproduced|not reproduced`
 and, per set and language, its public, hidden, log and filler counts.
 
