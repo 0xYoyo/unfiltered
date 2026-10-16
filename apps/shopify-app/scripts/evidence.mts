@@ -6,7 +6,7 @@
  *
  * Usage, from apps/shopify-app:
  *
- *   npx tsx scripts/evidence.mts counts             # index size per store
+ *   npx tsx scripts/evidence.mts counts             # index and card counts per store (EVIDENCE_SHOP)
  *   npx tsx scripts/evidence.mts searches [limit]   # latest SearchEvent rows
  *   npx tsx scripts/evidence.mts costs SEARCH_ID    # AiCall rows for one search
  *   npx tsx scripts/evidence.mts clicks [limit]     # latest ClickEvent rows
@@ -38,8 +38,9 @@ const SHOP = process.env.EVIDENCE_SHOP ?? "unfiltered-dev.myshopify.com";
 const db = new PrismaClient();
 
 async function counts(): Promise<void> {
-  const [products, enriched, embedded] = await Promise.all([
+  const [products, active, enriched, embedded, cards, carded] = await Promise.all([
     db.catalogProduct.count({ where: { shopDomain: SHOP } }),
+    db.catalogProduct.count({ where: { shopDomain: SHOP, status: "ACTIVE" } }),
     db.productEnrichment.count({
       where: { shopDomain: SHOP, status: "enriched" },
     }),
@@ -47,8 +48,17 @@ async function counts(): Promise<void> {
       `SELECT count(*) AS count FROM "ProductEmbedding" WHERE "shopDomain" = $1`,
       SHOP,
     ).then((rows) => Number(rows[0]?.count ?? 0)),
+    // Cards and card vectors (YOY-177 AC-1): written cards, and the
+    // products holding at least one card vector.
+    db.productCard.count({ where: { shopDomain: SHOP, status: "written" } }),
+    db.$queryRawUnsafe<Array<{ count: bigint }>>(
+      `SELECT count(DISTINCT "productId") AS count FROM "CardEmbedding" WHERE "shopDomain" = $1`,
+      SHOP,
+    ).then((rows) => Number(rows[0]?.count ?? 0)),
   ]);
-  console.table([{ shop: SHOP, products, enriched, embedded }]);
+  console.table([
+    { shop: SHOP, products, active, enriched, embedded, cards, "card vectors (products)": carded },
+  ]);
 }
 
 async function searches(limit: number): Promise<void> {

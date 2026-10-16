@@ -19,8 +19,8 @@ import { fileURLToPath } from "node:url";
 
 import { PrismaClient } from "@prisma/client";
 
-import { createCardWriter } from "../app/catalog/card.server";
-import { createCatalogEmbeddingClient } from "../app/catalog/embed.server";
+import { cardProviderFromEnv, createCardWriter } from "../app/catalog/card.server";
+import { createIngestEmbeddingClient } from "../app/catalog/embed.server";
 import {
   createEnrichmentLlmClient,
   createVisionLlmClient,
@@ -61,7 +61,9 @@ try {
     aiClients: () => ({
       llm: createEnrichmentLlmClient(db),
       vision: createVisionLlmClient(db),
-      embeddings: createCatalogEmbeddingClient(db),
+      // `CARD_PROVIDER=openrouter` (YOY-177 AC-1) moves the embedding and
+      // card calls to OpenRouter; enrichment and vision stay on Gemini.
+      embeddings: createIngestEmbeddingClient(db, cardProviderFromEnv()),
       // Used only on --cards (YOY-143; NG-3: no cards for the existing
       // playground catalogs unless asked).
       cards: createCardWriter(db),

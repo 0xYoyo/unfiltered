@@ -8,6 +8,10 @@ import {
 } from "@unfiltered/provider-gemini";
 
 import { createPrismaCostRecorder } from "../ai/cost-recorder.server";
+import {
+  createOpenRouterLlmClient,
+  openRouterCatalogModelsFromEnv,
+} from "../ai/openrouter-chat.server";
 import { fetchInlineImages, loadVisionImages } from "./enrich.server";
 import type { ImageFetch } from "./images.server";
 import { globalImageFetch } from "./images.server";
@@ -94,6 +98,30 @@ export function cardSpendCapFromEnv(
     throw new Error(`CARD_SPEND_CAP_USD must be a positive number of dollars, got ${JSON.stringify(raw)}`);
   }
   return cap;
+}
+
+/** Env var choosing who serves the card run's model calls (YOY-177 AC-1). */
+export const CARD_PROVIDER_ENV = "CARD_PROVIDER";
+
+/** The card run's model provider: the Gemini key, or the same models over OpenRouter. */
+export type CardProvider = "gemini" | "openrouter";
+
+/**
+ * `CARD_PROVIDER`: `gemini` (unset means gemini) or `openrouter`, which
+ * sends the card writer's and the ingest run's embedding calls through
+ * OpenRouter (docs/DEPLOY.md). Any other value fails before a call is made.
+ */
+export function cardProviderFromEnv(
+  env: Record<string, string | undefined> = process.env,
+): CardProvider {
+  const raw = env[CARD_PROVIDER_ENV];
+  if (raw === undefined || raw.trim() === "" || raw === "gemini") {
+    return "gemini";
+  }
+  if (raw === "openrouter") {
+    return "openrouter";
+  }
+  throw new Error(`${CARD_PROVIDER_ENV} must be gemini or openrouter, got ${JSON.stringify(raw)}`);
 }
 
 /** One card's sections, validated. */
@@ -522,8 +550,24 @@ export async function writeCatalogCards({
  * `low`), metered through the Prisma cost ledger under operation `card`.
  * Requires GEMINI_API_KEY.
  */
-export function createCardWriter(db: PrismaClient): CardWriter {
-  const models = geminiModelsFromEnv();
+export function createCardWriter(
+  db: PrismaClient,
+  env: Record<string, string | undefined> = process.env,
+): CardWriter {
+  const models = geminiModelsFromEnv(env);
+  if (cardProviderFromEnv(env) === "openrouter") {
+    // The same model family over OpenRouter (YOY-177 AC-1), at the Gemini
+    // card model's thinking level.
+    const { cardModel } = openRouterCatalogModelsFromEnv(env);
+    return {
+      llm: createOpenRouterLlmClient({
+        modelId: cardModel,
+        ...(models.cardThinkingLevel !== undefined ? { reasoningEffort: models.cardThinkingLevel } : {}),
+        costRecorder: createPrismaCostRecorder(db),
+      }),
+      modelId: cardModel,
+    };
+  }
   return {
     llm: createGeminiLlmClient({
       modelId: models.cardModel,
