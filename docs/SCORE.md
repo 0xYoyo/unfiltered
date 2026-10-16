@@ -413,6 +413,56 @@ at 7 % (1 of 15). Cost lines: a $0.1816 simple + $0.0572 hard = $0.2388
 (2,554 + 805 model calls); b $0.1843 + $0.0575 = $0.2418 (2,619 + 810); c
 $0.1837 + $0.0572 = $0.2409 (2,599 + 809). Total $0.7215.
 
+## The Hebrew cause
+
+YOY-176 tested four explanations for the hidden Hebrew fall from 0.407
+(run 5, 2026-10-04) to 0.218 (control C3, 2026-10-11), in order. **None of
+them is the cause.** No same-day comparison reproduces the fall between
+code states: run 5's code and `main` score public he 0.231 and 0.214 on
+one day. On the grown set, Hebrew holds the M7 reference. Each hypothesis
+has its own comment on the issue with the full numbers.
+
+| # | Hypothesis | Decisive run | Result |
+|---|---|---|---|
+| 1 | The catalog price effect on price-cap searches | $0: P1 `5c5adfe` against `main` (public, 2026-10-14) and the C4/S1 per-index lines | Not named. Public he moved −0.017 between the two code states; no public he search fell by 1.0 in mean grade; he searches without a price cap score as low as those with one (0.246 against 0.176), while en price caps cost en nothing (0.700 against 0.708). |
+| 2 | The empty Hebrew keyword leg | Public en and he, keyword leg on then off (`FIND_KEYWORD_LEG=off`, `d681d4d`, 2026-10-16) | Not named. en 0.688 → 0.765 (+0.077) and he 0.308 → 0.304: en does not fall toward he. |
+| 3 | The Jev judge reading Hebrew against English cards | $0: G1 against the C4 band (2026-10-14) | Closed. Flash-Lite he +0.072 and no judge +0.077, both inside 0.090. |
+| 4 | The extraction prompt's colour fields (v8) | Hidden, simple set, colour fields removed, prompt v9 ([run 38883253320](https://github.com/0xYoyo/unfiltered/actions/runs/38883253320), 2026-10-16) | Not named. he 0.282 against the M7 mean 0.305: −0.023, inside 0.090. en 0.602 (−0.040, inside 0.111). |
+
+The keyword-leg switch is read by the score runner only
+(`createRunnerOrchestrator` in `app/score/cli.server.ts`). The proxy
+factory never reads it, and a test proves both. Hypothesis 4 ran on a
+throwaway branch, `YOY-176-no-colour-throwaway` (`aac2d51`), which also set
+the workflow to `--set-name simple`. It is never merged.
+
+**Not visible on 12 hidden searches; re-tested on the 37 hidden Hebrew
+searches of the grown set.** The grown-set runs are the three M7 reference
+runs on `main` (he 0.290, 0.302, 0.323) and hypothesis 4's run (0.282). All
+four read he inside the M7 band; none reproduces a fall.
+
+**What the per-index lines show instead.** In all four grown-set runs, on
+two prompt versions, the same 12 of the 37 hidden Hebrew searches score
+0.000: indexes 37–48, all from the 25 added by YOY-175. Without them,
+Hebrew's mean over the other 25 would be about 0.42 in every run. These 12
+weigh Hebrew down on the grown set. The runner prints index and score only,
+so why they score 0 cannot be read from any output.
+
+**What the public half shows (reported, not acted on).** The YOY-174 recall
+truth grades each public search against every product, so it can grade the
+pages the P1 `main` run served. A product the truth graded below 2 counts
+0, so these numbers are a floor. Graded that way, the served pages score
+en 0.699 and he 0.350. The score grader gave the same pages en 0.764 and
+he 0.214. On the same products, the score grader sits +0.065 above the
+truth's floor for English and at least 0.136 below it for Hebrew. Two
+examples: public he 23 served six relevant long-sleeve midi dresses and
+scored 0.444, and he 19 served three relevant products and scored 0.000.
+The truth was graded 48 products per call without descriptions; the score
+grades six per call with descriptions. NG-2 keeps the grader unchanged, so
+no grader change is made or proposed here.
+
+Spend: hypothesis 2, two public runs ($0.0949 + $0.0962); hypothesis 4,
+one hidden run ($0.1781). Total $0.3692.
+
 ## Rubric
 
 The grader's prompt carries this text verbatim (a test holds the two equal):

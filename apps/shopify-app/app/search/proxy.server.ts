@@ -561,7 +561,11 @@ export function createProxySearchOrchestrator(
     // A per-call timeout on the judge and the wish extraction; the score
     // runner sets 30 s (YOY-149 runner guard). Unset keeps each client's own.
     requestTimeoutMs,
-  }: { costRecorder?: CostRecorder; requestTimeoutMs?: number } = {},
+    // The find step's keyword half (YOY-176 AC-2). Only the score runner
+    // passes it, from `FIND_KEYWORD_LEG`; this factory reads no such
+    // variable, so production always runs the keyword half.
+    keywordLeg,
+  }: { costRecorder?: CostRecorder; requestTimeoutMs?: number; keywordLeg?: boolean } = {},
 ): SearchOrchestrator {
   const models = geminiModelsFromEnv();
   const openRouterModels = openRouterModelsFromEnv();
@@ -581,6 +585,7 @@ export function createProxySearchOrchestrator(
       embeddings,
       classicStore,
       findSetSize: findSetSizeFromEnv(),
+      keywordLeg,
     }),
     // The judge (YOY-147): one call per page inside the find set,
     // through the one factory — `JUDGE_PROVIDER` picks the client, and the

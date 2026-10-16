@@ -126,6 +126,39 @@ async function liveDb(): Promise<PrismaClient> {
 /** The runner's per-call timeout on grader and judge calls (YOY-149 runner guard). */
 export const RUNNER_CALL_TIMEOUT_MS = 30_000;
 
+/**
+ * `FIND_KEYWORD_LEG=off` runs the find step without its keyword half
+ * (YOY-176 AC-2): a measurement switch read here, by the score runner, and
+ * nowhere else — the proxy factory never reads it. Unset or `on` keeps the
+ * keyword half; any other value fails before a call is made.
+ */
+export const FIND_KEYWORD_LEG_ENV = "FIND_KEYWORD_LEG";
+
+export function keywordLegFromEnv(env: Record<string, string | undefined> = process.env): boolean {
+  const raw = env[FIND_KEYWORD_LEG_ENV];
+  if (raw === undefined || raw === "on") {
+    return true;
+  }
+  if (raw === "off") {
+    return false;
+  }
+  throw new Error(`${FIND_KEYWORD_LEG_ENV} must be on or off, got ${JSON.stringify(raw)}`);
+}
+
+/** The production orchestrator as the score runner builds it, with the runner-only keyword-leg switch. */
+export async function createRunnerOrchestrator(
+  db: PrismaClient,
+  costRecorder: CostRecorder,
+  env: Record<string, string | undefined> = process.env,
+): Promise<SearchOrchestrator> {
+  const { createProxySearchOrchestrator } = await import("../search/proxy.server");
+  return createProxySearchOrchestrator(db, {
+    costRecorder,
+    requestTimeoutMs: RUNNER_CALL_TIMEOUT_MS,
+    keywordLeg: keywordLegFromEnv(env),
+  });
+}
+
 async function flashLite(costRecorder: CostRecorder): Promise<LlmClient> {
   const { createGeminiLlmClient, DEFAULT_INTENT_LITE_MODEL } = await import(
     "@unfiltered/provider-gemini"
@@ -281,6 +314,16 @@ export async function runScoreCommand(
     err("score run: --passes must be 1, 2 or 3");
     return 2;
   }
+  let keywordLeg: boolean;
+  try {
+    keywordLeg = keywordLegFromEnv();
+  } catch (error) {
+    err(`score run: ${(error as Error).message}`);
+    return 2;
+  }
+  if (!keywordLeg) {
+    err("score run: find keyword leg off (FIND_KEYWORD_LEG=off)");
+  }
   let set: ScoreSetEntry[];
   try {
     set =
@@ -323,17 +366,13 @@ export async function runScoreCommand(
         orchestrator = createSyntheticOrchestrator(db);
         grader = await createSyntheticGrader(orchestrator, set);
       } else {
-        const { createProxySearchOrchestrator } = await import("../search/proxy.server");
         const { createPrismaCostRecorder, createQueuedCostRecorder } = await import(
           "../ai/cost-recorder.server"
         );
         // The run reads its spend from this ledger (AC-10): it owns the
         // pipeline's queued recorder so it can flush it first.
         const searchLedger = createQueuedCostRecorder(createPrismaCostRecorder(db));
-        orchestrator = createProxySearchOrchestrator(db, {
-          costRecorder: searchLedger,
-          requestTimeoutMs: RUNNER_CALL_TIMEOUT_MS,
-        });
+        orchestrator = await createRunnerOrchestrator(db, searchLedger);
         grader = await flashLite(createPrismaCostRecorder(db));
         flushLedger = searchLedger.flush;
       }
