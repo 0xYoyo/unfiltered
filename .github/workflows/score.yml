@@ -86,7 +86,7 @@ jobs:
           echo "judge deadline: JUDGE_DEADLINE_MS=$JUDGE_DEADLINE_MS"
           echo "extraction grace: EXTRACTION_GRACE_MS=$EXTRACTION_GRACE_MS"
           set +e
-          npx tsx scripts/score-run.mts --hidden-set "$RUNNER_TEMP/hidden.b64" \
+          npx tsx scripts/score-run.mts --hidden-set "$RUNNER_TEMP/hidden.b64" --set-name simple \
             > "$RUNNER_TEMP/score-output.txt" 2>&1
           run_status=$?
           set -e

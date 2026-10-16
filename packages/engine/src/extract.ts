@@ -21,7 +21,7 @@ import type { JsonSchema, LlmClient } from "./index.js";
  * Bump it with every change to `buildExtractPrompt`, `EXTRACT_SCHEMA` or
  * `parseExtractAnswer`.
  */
-export const EXTRACT_PROMPT_VERSION = 8;
+export const EXTRACT_PROMPT_VERSION = 9;
 
 /** One term the shopper excluded, as typed and in English (AC-1). */
 export interface ExcludedTerm {
@@ -87,9 +87,6 @@ export const EXTRACT_SCHEMA: JsonSchema = {
     priceMin: { type: ["number", "null"] },
     currency: { type: ["string", "null"] },
     size: { type: ["string", "null"] },
-    // YOY-171 AC-5: the asked colour as typed, and in English.
-    color: { type: ["string", "null"] },
-    colorEnglish: { type: ["string", "null"] },
     inStock: { type: ["boolean", "null"] },
     excluded: {
       type: "array",
@@ -109,8 +106,6 @@ export const EXTRACT_SCHEMA: JsonSchema = {
     "priceMin",
     "currency",
     "size",
-    "color",
-    "colorEnglish",
     "inStock",
     "excluded",
     "priceFirm",
@@ -164,9 +159,6 @@ export function buildExtractPrompt(sentence: string, previousSentence?: string):
     "\"₪\" or \"שקל\" is ILS, \"€\" is EUR, \"£\" is GBP); for a price written in Hebrew with no",
     "currency, ILS; otherwise null.",
     "size: a clothing or shoe size the shopper asked for, exactly as written (\"M\", \"38\"), or null.",
-    "color: the one colour the shopper asked for, exactly as written (\"red\", \"אדומה\"), or null; a",
-    "colour the shopper does NOT want is an exclusion, never a color. colorEnglish: that colour in",
-    "English, one lower-case word (\"אדומה\" -> \"red\"), or null.",
     "inStock: true only when the shopper asked for items in stock or available now; else null.",
     "excluded: every thing the shopper said they do NOT want: typed is the excluded word",
     "exactly as written, WITHOUT the negation (\"not black\" -> \"black\"; \"no wool\" -> \"wool\";",
