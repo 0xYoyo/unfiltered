@@ -160,6 +160,12 @@ export interface FindStepOptions {
   classicStore: ClassicSearchStore;
   /** Nearest products taken from the card index; `FIND_SET_SIZE` by default. */
   findSetSize?: number;
+  /**
+   * False skips the keyword half: the find order is the vector half alone
+   * (YOY-176 AC-2). A measurement switch for the score runner only; every
+   * production caller leaves it unset, which means on.
+   */
+  keywordLeg?: boolean;
   /** The card-index query; `queryCardIndex` by default (a seam for tests). */
   nearest?: (request: {
     db: PrismaClient;
@@ -172,6 +178,7 @@ export interface FindStepOptions {
 export function createFindStep(options: FindStepOptions): FindStep {
   const { db, embeddings, classicStore } = options;
   const findSetSize = options.findSetSize ?? DEFAULT_FIND_SET_SIZE;
+  const keywordLeg = options.keywordLeg ?? true;
   const nearest = options.nearest ?? queryCardIndex;
   const vectors = new Map<string, number[]>();
 
@@ -268,7 +275,9 @@ export function createFindStep(options: FindStepOptions): FindStep {
           (hits) => ({ ok: true as const, hits }),
           (error: unknown) => ({ ok: false as const, error }),
         );
-      const keyword = await classicStore.search({ storeId: shopDomain, query: text });
+      const keyword = keywordLeg
+        ? await classicStore.search({ storeId: shopDomain, query: text })
+        : { hits: [] };
       const vector = await vectorHalf;
       if (!vector.ok) {
         console.warn(
