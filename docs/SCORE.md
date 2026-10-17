@@ -549,7 +549,7 @@ against the search. Tentree is mostly tops (313 of 500). It has no shoes,
 boots, sneakers or coats, and a third of the seed catalog's dresses (34
 against 99). A search for something tentree does not sell can score no
 higher than its nearest products earn, whatever the engine does. That is
-the main catalog effect, and it lowers every language: five of the six
+the main catalog effect, and it lowers almost every score: five of the six
 simple hidden languages fall by more than 0.2. Only Hebrew stays near its
 seed score (−0.071, inside its band), and hard Hebrew rises (+0.015). On
 one run this cannot be split from Hebrew's seed score already being low
