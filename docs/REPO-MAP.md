@@ -347,6 +347,7 @@ apps/
           score-baseline.json
           score-reference-m7.json
           seed-fixture.json.gz
+          tentree-fixture.json.gz
         fixture.server.ts
         grade.server.ts
         judge-none.test.ts

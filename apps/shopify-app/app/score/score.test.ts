@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -14,12 +14,14 @@ import {
   DEFAULT_FIXTURE_PATH,
   DEFAULT_PUBLIC_SET_PATH,
   type CalibrationEntry,
+  fixturePathFromName,
   leakCheckCommand,
   readFixtureFile,
   buildSetCommand,
   REPO_ROOT,
   runRecallCommand,
   runScoreCommand,
+  SCORE_FIXTURES,
   writeFixtureFile,
 } from "./cli.server";
 import { exportScoreFixture, importScoreFixture } from "./fixture.server";
@@ -1346,10 +1348,58 @@ describe("the score workflow (YOY-141 AC-1, AC-2)", () => {
     expect(checkJob).toContain('exit "${RUN_STATUS:-1}"');
   });
 
+  it("scores the fixture the dispatch names: a seed-or-tentree choice, seed by default, echoed and passed by name (YOY-177 AC-3)", () => {
+    expect(triggers).toMatch(
+      /fixture:\n(?:\s+.*\n)*?\s+default: seed\n\s+type: choice\n\s+options:\n\s+- seed\n\s+- tentree\n/,
+    );
+    expect(runJob).toContain("SCORE_FIXTURE: ${{ inputs.fixture }}");
+    expect(runJob).toContain('echo "fixture: SCORE_FIXTURE=$SCORE_FIXTURE"');
+    expect(runJob).toContain('--fixture-name "$SCORE_FIXTURE"');
+    // The summary names it outside the leak-checked output.
+    expect(checkJob).toContain("SCORE_FIXTURE: ${{ inputs.fixture }}");
+    expect(checkJob).toContain('echo "fixture: $SCORE_FIXTURE"');
+  });
+
   it("prints the GEMINI_ env names before the run, never their values (YOY-141 AC-13)", () => {
     const names = workflow.indexOf("env | cut -d= -f1 | grep -E '^GEMINI_'");
     expect(names).toBeGreaterThan(-1);
     expect(names).toBeLessThan(workflow.indexOf("scripts/score-run.mts --hidden-set"));
+  });
+});
+
+describe("the fixture choice (YOY-177 AC-2, AC-3)", () => {
+  it("resolves each name to a committed file, seed by default, and refuses any other name", () => {
+    expect(Object.keys(SCORE_FIXTURES)).toEqual(["seed", "tentree"]);
+    expect(fixturePathFromName("seed")).toBe(DEFAULT_FIXTURE_PATH);
+    for (const name of Object.keys(SCORE_FIXTURES)) {
+      const path = fixturePathFromName(name);
+      expect(existsSync(path), `${name} → ${path}`).toBe(true);
+      expect(execFileSync("git", ["ls-files", "--error-unmatch", path], { cwd: REPO_ROOT }).toString().trim()).not.toBe("");
+    }
+    for (const name of ["", "../seed", "app/score/data/seed-fixture.json.gz", "constructor", "toString"]) {
+      expect(() => fixturePathFromName(name)).toThrow("--fixture-name must be seed or tentree");
+    }
+  });
+
+  it("refuses an unknown name, or a name beside a path, before any call", async () => {
+    const err: string[] = [];
+    const run = (argv: string[]) => runScoreCommand(argv, { out: () => {}, err: (text) => void err.push(text) });
+    expect(await run(["--synthetic", "--fixture-name", "whitestuff"])).toBe(2);
+    expect(err.at(-1)).toBe("score run: --fixture-name must be seed or tentree");
+    expect(await run(["--synthetic", "--fixture-name", "seed", "--fixture", DEFAULT_FIXTURE_PATH])).toBe(2);
+    expect(err.at(-1)).toBe("score run: pass --fixture or --fixture-name, not both");
+  });
+
+  it("commits the tentree catalog with its cards and both vector tables, under the 12 MB cap (AC-2)", () => {
+    expect(statSync(SCORE_FIXTURES.tentree).size).toBeLessThanOrEqual(12 * 1024 * 1024);
+    const fixture = readFixtureFile(SCORE_FIXTURES.tentree);
+    expect(fixture.storeKey).toBe("playground:tentree");
+    expect(fixture.products).toHaveLength(500);
+    expect(fixture.embeddings).toHaveLength(500);
+    expect(fixture.cards).toHaveLength(500);
+    expect(fixture.cardEmbeddings).toHaveLength(1500);
+    // Ingested 2026-08-27, before variant capture: no variant rows exist.
+    expect(fixture.variants).toEqual([]);
   });
 });
 
