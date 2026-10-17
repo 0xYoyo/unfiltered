@@ -463,6 +463,104 @@ no grader change is made or proposed here.
 Spend: hypothesis 2, two public runs ($0.0949 + $0.0962); hypothesis 4,
 one hidden run ($0.1781). Total $0.3692.
 
+## Real-merchant catalog
+
+Every table above scores the seed catalog. This section scores the same
+sets once on a real merchant's catalog, the tentree playground store, to
+show which findings come from the catalog. It is one run, read against the
+M7 reference as context. It sets no band and gates nothing.
+
+**The fixture.** `app/score/data/tentree-fixture.json.gz` was exported
+2026-10-17 from store key `playground:tentree` with
+`scripts/score-export-fixture.mts`. It holds 500 products, 500
+enrichments, 500 embeddings, 500 cards and 1,500 card vectors, and is 6.57
+MB gzipped, under the 12 MB cap. It has **no variants**: tentree was
+ingested on 2026-08-27, before variant capture existed, so the database
+has no variant rows for it. The cards were written on OpenRouter for
+**$0.7159** measured (500 products, `CARD_PROVIDER=openrouter`); the seed
+catalog's cards cost about $2 for 465 products on the Gemini key.
+
+The two catalogs, from the fixtures:
+
+| | seed | tentree |
+|---|---|---|
+| Products | 465 | 500 |
+| Median price (USD) | 313.60 | 62.40 |
+| Categories | top 149, dress 99, pants 54, jacket 44, coat 30, shoes 29, skirt 25, accessories 13, bag 8, boots 8, sneakers 5 | top 313, accessories 76, pants 40, dress 34, bag 16, jacket 14, skirt 4, other 3 |
+| Enriched with colours | 465 of 465 | 369 of 500 |
+| Variants | 1,820 | 0 |
+
+**How to run it.** `npm run score:public -- --fixture-name tentree` from
+`apps/shopify-app` runs the public half. The score workflow takes a
+`fixture` choice, `seed` (the default) or `tentree`. The run job prints it
+in its settings block (`fixture: SCORE_FIXTURE=tentree`), and the job
+summary names it above the output. Both paths pass it to the runner as
+`--fixture-name`, which resolves a name to its committed file and refuses
+any other name.
+
+**The hidden run.** [Run 39028684040](https://github.com/0xYoyo/unfiltered/actions/runs/39028684040),
+2026-10-17 11:26 UTC, `ref=6a0d4cb3d5dbcfb337ce4baebdb890a06234b8c4`,
+`judge=jev`, `fixture=tentree`. The judge deadline and the extraction
+grace were 4,000 ms. The run was green: leak check clean (127 checked), 0
+failed searches, 127 extraction calls. Δ is tentree minus the M7 mean.
+
+`set simple`, hidden:
+
+| | en | he | ar | ru | fr | es |
+|---|---|---|---|---|---|---|
+| tentree | 0.417 | 0.234 | 0.222 | 0.171 | 0.125 | 0.389 |
+| M7 mean (seed) | 0.642 | 0.305 | 0.494 | 0.418 | 0.656 | 0.634 |
+| Δ | −0.225 | −0.071 | −0.272 | −0.247 | −0.531 | −0.245 |
+| M7 band | 0.111 | 0.090 | 0.074 | 0.055 | 0.030 | 0.060 |
+
+`set hard`, hidden:
+
+| | en | he |
+|---|---|---|
+| tentree | 0.344 | 0.419 |
+| M7 mean (seed) | 0.460 | 0.404 |
+| Δ | −0.116 | +0.015 |
+| M7 band | 0.111 | 0.090 |
+
+**The public run.** 2026-10-17, local, on the same commit's code with
+`JUDGE_PROVIDER=jev`, `EXTRACTION_GRACE_MS=4000` and the 4,000 ms judge
+deadline of `score:public`. 0 failed searches.
+
+| `set simple`, public | en | he | ar | ru | fr | es |
+|---|---|---|---|---|---|---|
+| tentree | 0.368 | 0.171 | 0.158 | 0.295 | 0.269 | 0.141 |
+
+| `set hard`, public | en | he |
+|---|---|---|
+| tentree | 0.422 | 0.237 |
+
+For context only: the latest public seed run on this set, "The Hebrew
+cause" hypothesis 2 with the keyword leg on (2026-10-16), scored simple en
+0.688 and he 0.308.
+
+**No-extraction share:** 0 % in every set and language, in both runs.
+**Cost:** hidden $0.1332 simple + $0.0417 hard = $0.1749 (2,614 + 809
+model calls); public $0.1418 + $0.0416 = $0.1834 (2,774 + 810). Total for
+the two runs: $0.3583. With the cards: $1.0742.
+
+**Which differences are catalog effects.** The sets were built from
+shopper searches on the seed catalog, and the grader grades each result
+against the search. Tentree is mostly tops (313 of 500). It has no shoes,
+boots, sneakers or coats, and a third of the seed catalog's dresses (34
+against 99). A search for something tentree does not sell can score no
+higher than its nearest products earn, whatever the engine does. That is
+the main catalog effect, and it lowers every language: five of the six
+simple hidden languages fall by more than 0.2. Only Hebrew stays near its
+seed score (−0.071, inside its band), and hard Hebrew rises (+0.015). On
+one run this cannot be split from Hebrew's seed score already being low
+for other reasons ("The Hebrew cause"). Tentree's prices are lower (median
+$62 against $314), so a budget search is less often priced out here than
+on seed. A search with a size or an "in stock" wish reads no variant on
+tentree, so its size wall, size tier and `size-missing` label do not act.
+131 of 500 tentree products carry no enriched colour, so colour wishes
+have less to match. None of these differences is read as an engine
+effect: this is one run on a catalog the sets were not drawn from.
+
 ## Rubric
 
 The grader's prompt carries this text verbatim (a test holds the two equal):
