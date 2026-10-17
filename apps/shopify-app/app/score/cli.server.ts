@@ -82,6 +82,24 @@ export const DEFAULT_PUBLIC_SET_PATH = join(APP_ROOT, "app", "score", "data", "p
  * always holds every product (YOY-141 AC-4).
  */
 export const DEFAULT_FIXTURE_PATH = join(APP_ROOT, "app", "score", "data", "seed-fixture.json.gz");
+/**
+ * The committed fixtures a run can name (YOY-177 AC-3): `--fixture-name`
+ * and the score workflow's `fixture` choice take a name, never a path. The
+ * seed catalog stays the default (NG-3).
+ */
+export const SCORE_FIXTURES = {
+  seed: DEFAULT_FIXTURE_PATH,
+  tentree: join(APP_ROOT, "app", "score", "data", "tentree-fixture.json.gz"),
+} as const;
+export type ScoreFixtureName = keyof typeof SCORE_FIXTURES;
+
+/** The committed file a fixture name stands for; an unknown name throws. */
+export function fixturePathFromName(name: string): string {
+  if (!Object.hasOwn(SCORE_FIXTURES, name)) {
+    throw new Error(`--fixture-name must be ${Object.keys(SCORE_FIXTURES).join(" or ")}`);
+  }
+  return SCORE_FIXTURES[name as ScoreFixtureName];
+}
 export const DEFAULT_CALIBRATION_PATH = join(APP_ROOT, "app", "score", "data", "calibration.json");
 /** The committed find-recall truth (YOY-174 AC-1). */
 export const DEFAULT_RECALL_TRUTH_PATH = join(APP_ROOT, "app", "score", "data", "recall-truth.json");
@@ -288,6 +306,8 @@ export async function runScoreCommand(
       set: { type: "string" },
       "hidden-set": { type: "string" },
       fixture: { type: "string" },
+      // A committed fixture by name (YOY-177 AC-3): seed or tentree.
+      "fixture-name": { type: "string" },
       synthetic: { type: "boolean", default: false },
       // Passes over the set on one scratch database (YOY-149 AC-18): the
       // second pass meets the caches the first filled — warm.
@@ -313,6 +333,19 @@ export async function runScoreCommand(
   if (!Number.isInteger(passes) || passes < 1 || passes > 3) {
     err("score run: --passes must be 1, 2 or 3");
     return 2;
+  }
+  let fixturePath = values.fixture ?? DEFAULT_FIXTURE_PATH;
+  if (values["fixture-name"] !== undefined) {
+    if (values.fixture !== undefined) {
+      err("score run: pass --fixture or --fixture-name, not both");
+      return 2;
+    }
+    try {
+      fixturePath = fixturePathFromName(values["fixture-name"]);
+    } catch (error) {
+      err(`score run: ${(error as Error).message}`);
+      return 2;
+    }
   }
   let keywordLeg: boolean;
   try {
@@ -347,9 +380,7 @@ export async function runScoreCommand(
   }
   let fixture: ScoreFixture;
   try {
-    fixture = values.synthetic
-      ? buildSyntheticFixture()
-      : readFixtureFile(values.fixture ?? DEFAULT_FIXTURE_PATH);
+    fixture = values.synthetic ? buildSyntheticFixture() : readFixtureFile(fixturePath);
   } catch {
     err("score run: the fixture is missing or unreadable — export one with score-export-fixture.mts, or pass --fixture");
     return 1;

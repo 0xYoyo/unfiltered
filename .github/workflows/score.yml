@@ -26,6 +26,17 @@ on:
           - gemini
           - jev
           - none
+      # Which committed catalog the run scores against (YOY-177 AC-3): a
+      # choice, never a path. The seed catalog stays the default; `tentree`
+      # is the real-merchant playground catalog.
+      fixture:
+        description: Catalog fixture to score against (seed, or tentree)
+        required: true
+        default: seed
+        type: choice
+        options:
+          - seed
+          - tentree
 
 permissions:
   contents: read
@@ -69,6 +80,8 @@ jobs:
           # The jev judge's key (YOY-152); unused when the judge is gemini or none.
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           JUDGE_PROVIDER: ${{ inputs.judge }}
+          # The runner resolves the name to a committed fixture (YOY-177 AC-3).
+          SCORE_FIXTURE: ${{ inputs.fixture }}
           # A score run measures the judge's judgment, not its speed
           # (YOY-147 AC-18): speed is the latency probe's, on the deployment.
           # Production keeps its 1,500 ms deadline.
@@ -83,10 +96,13 @@ jobs:
           env | cut -d= -f1 | grep -E '^GEMINI_' | sort | sed 's/^/  /'
           # The judge is a choice input, not a secret: printed as-is.
           echo "judge: JUDGE_PROVIDER=$JUDGE_PROVIDER"
+          # The fixture is a choice input too: printed as-is.
+          echo "fixture: SCORE_FIXTURE=$SCORE_FIXTURE"
           echo "judge deadline: JUDGE_DEADLINE_MS=$JUDGE_DEADLINE_MS"
           echo "extraction grace: EXTRACTION_GRACE_MS=$EXTRACTION_GRACE_MS"
           set +e
           npx tsx scripts/score-run.mts --hidden-set "$RUNNER_TEMP/hidden.b64" \
+            --fixture-name "$SCORE_FIXTURE" \
             > "$RUNNER_TEMP/score-output.txt" 2>&1
           run_status=$?
           set -e
@@ -138,6 +154,7 @@ jobs:
           HIDDEN_SET_B64: ${{ secrets.HIDDEN_SET_B64 }}
           # Through env, never interpolated into the script: a ref is input.
           SCORE_REF: ${{ inputs.ref }}
+          SCORE_FIXTURE: ${{ inputs.fixture }}
           RUN_STATUS: ${{ needs.run.outputs.run-status }}
         run: |
           test -n "$HIDDEN_SET_B64" || { echo "HIDDEN_SET_B64 is not set"; exit 1; }
@@ -150,6 +167,9 @@ jobs:
           cat "$RUNNER_TEMP/score-output.txt"
           {
             echo "### Hidden score — \`$SCORE_REF\`"
+            echo
+            # Outside the captured output: a choice input, never query text.
+            echo "fixture: $SCORE_FIXTURE"
             echo
             echo '```'
             cat "$RUNNER_TEMP/score-output.txt"

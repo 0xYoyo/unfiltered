@@ -16,6 +16,16 @@
       "$comment": "The judge challenger via OpenRouter (YOY-152 AC-5; docs/PRD.md §3 Refinement 1, verified 28 Sep 2026): input only, output tokens free.",
       "inputUsdPerMTok": 0.042,
       "outputUsdPerMTok": 0
+    },
+    "google/gemini-3.5-flash-lite": {
+      "$comment": "The card model over OpenRouter (YOY-177 AC-1, CARD_PROVIDER=openrouter): OpenRouter's listed price for google/gemini-3.5-flash-lite, checked 2026-10-16 — the same as Google's own rate.",
+      "inputUsdPerMTok": 0.3,
+      "outputUsdPerMTok": 2.5
+    },
+    "google/gemini-embedding-001": {
+      "$comment": "The embedding model over OpenRouter (YOY-177 AC-1): OpenRouter's listed price, checked 2026-10-16.",
+      "inputUsdPerMTok": 0.15,
+      "outputUsdPerMTok": 0
     }
   }
 }

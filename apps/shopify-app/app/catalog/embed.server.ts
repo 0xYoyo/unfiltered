@@ -8,6 +8,10 @@ import {
 } from "@unfiltered/provider-gemini";
 
 import { createPrismaCostRecorder } from "../ai/cost-recorder.server";
+import {
+  createOpenRouterEmbeddingClient,
+  openRouterCatalogModelsFromEnv,
+} from "../ai/openrouter-chat.server";
 import { withTenantVectorScan } from "./hnsw.server";
 
 /**
@@ -352,6 +356,27 @@ export function createCatalogEmbeddingClient(db: PrismaClient): EmbeddingClient 
   return createGeminiEmbeddingClient({
     modelId: models.embeddingModel,
     dimension: models.embeddingDimension,
+    costRecorder: createPrismaCostRecorder(db),
+  });
+}
+
+/**
+ * The ingest run's embedding client under `CARD_PROVIDER` (YOY-177 AC-1):
+ * `openrouter` embeds product and card texts with the same model and
+ * dimension over OpenRouter, so its vectors share the query vectors' space;
+ * otherwise the Gemini key's client above.
+ */
+export function createIngestEmbeddingClient(
+  db: PrismaClient,
+  provider: "gemini" | "openrouter",
+  env: Record<string, string | undefined> = process.env,
+): EmbeddingClient {
+  if (provider === "gemini") {
+    return createCatalogEmbeddingClient(db);
+  }
+  return createOpenRouterEmbeddingClient({
+    modelId: openRouterCatalogModelsFromEnv(env).embeddingModel,
+    dimension: geminiModelsFromEnv(env).embeddingDimension,
     costRecorder: createPrismaCostRecorder(db),
   });
 }

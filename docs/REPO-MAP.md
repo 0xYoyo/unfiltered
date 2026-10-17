@@ -48,6 +48,8 @@ apps/
         cost-aggregates.server.ts
         cost-recorder.server.ts
         cost-recorder.test.ts
+        openrouter-chat.server.ts
+        openrouter-chat.test.ts
         openrouter.server.ts
         openrouter.test.ts
         pricing.server.ts
@@ -58,6 +60,7 @@ apps/
       catalog/
         card-embed.server.test.ts
         card-embed.server.ts
+        card-provider.test.ts
         card.server.test.ts
         card.server.ts
         embed.server.ts
@@ -344,6 +347,7 @@ apps/
           score-baseline.json
           score-reference-m7.json
           seed-fixture.json.gz
+          tentree-fixture.json.gz
         fixture.server.ts
         grade.server.ts
         judge-none.test.ts
@@ -503,6 +507,7 @@ apps/
           garment-05.svg
           garment-06.svg
     scripts/
+      cards.mts
       evidence.mts
       ingest-public.mts
       ingest.mts
@@ -1638,6 +1643,8 @@ vitest.setup.ts
 - apps/shopify-app/app/ai-costs.test.ts → apps/shopify-app/app/ai/cost-aggregates.server.ts, apps/shopify-app/app/ai/cost-recorder.server.ts, apps/shopify-app/app/db.server.ts, apps/shopify-app/app/routes/internal.costs.tsx, apps/shopify-app/app/testing/helpers.server.ts
 - apps/shopify-app/app/ai/cost-recorder.server.ts → apps/shopify-app/app/ai/pricing.server.ts
 - apps/shopify-app/app/ai/cost-recorder.test.ts → apps/shopify-app/app/ai/cost-recorder.server.ts, apps/shopify-app/app/testing/helpers.server.ts
+- apps/shopify-app/app/ai/openrouter-chat.server.ts → apps/shopify-app/app/ai/openrouter.server.ts
+- apps/shopify-app/app/ai/openrouter-chat.test.ts → apps/shopify-app/app/ai/openrouter-chat.server.ts, apps/shopify-app/app/ai/openrouter.server.ts, apps/shopify-app/app/ai/pricing.server.ts
 - apps/shopify-app/app/ai/openrouter.test.ts → apps/shopify-app/app/ai/openrouter.server.ts
 - apps/shopify-app/app/ai/pricing.server.ts → config/ai-prices.json (unresolved)
 - apps/shopify-app/app/ai/pricing.test.ts → apps/shopify-app/app/ai/pricing.server.ts
@@ -1646,9 +1653,10 @@ vitest.setup.ts
 - apps/shopify-app/app/catalog-ingestion.test.ts → apps/shopify-app/app/catalog/ingest.server.ts, apps/shopify-app/app/catalog/mapping.server.ts, apps/shopify-app/app/catalog/mapping.test.ts, apps/shopify-app/app/testing/helpers.server.ts
 - apps/shopify-app/app/catalog/card-embed.server.test.ts → apps/shopify-app/app/catalog/card-embed.server.ts, apps/shopify-app/app/catalog/ingest.server.ts, apps/shopify-app/app/catalog/webhook-sync.server.ts, apps/shopify-app/app/playground/catalog-source.server.ts, apps/shopify-app/app/playground/ingest-public.server.ts, apps/shopify-app/app/testing/helpers.server.ts
 - apps/shopify-app/app/catalog/card-embed.server.ts → apps/shopify-app/app/catalog/embed.server.ts
+- apps/shopify-app/app/catalog/card-provider.test.ts → apps/shopify-app/app/catalog/card.server.ts, apps/shopify-app/app/catalog/embed.server.ts
 - apps/shopify-app/app/catalog/card.server.test.ts → apps/shopify-app/app/ai/cost-aggregates.server.ts, apps/shopify-app/app/catalog/card.server.ts, apps/shopify-app/app/catalog/images.server.ts, apps/shopify-app/app/catalog/ingest.server.ts, apps/shopify-app/app/catalog/webhook-sync.server.ts, apps/shopify-app/app/playground/catalog-source.server.ts, apps/shopify-app/app/playground/ingest-public.server.ts, apps/shopify-app/app/testing/helpers.server.ts
-- apps/shopify-app/app/catalog/card.server.ts → apps/shopify-app/app/ai/cost-recorder.server.ts, apps/shopify-app/app/catalog/enrich.server.ts, apps/shopify-app/app/catalog/images.server.ts
-- apps/shopify-app/app/catalog/embed.server.ts → apps/shopify-app/app/ai/cost-recorder.server.ts, apps/shopify-app/app/catalog/hnsw.server.ts
+- apps/shopify-app/app/catalog/card.server.ts → apps/shopify-app/app/ai/cost-recorder.server.ts, apps/shopify-app/app/ai/openrouter-chat.server.ts, apps/shopify-app/app/catalog/enrich.server.ts, apps/shopify-app/app/catalog/images.server.ts
+- apps/shopify-app/app/catalog/embed.server.ts → apps/shopify-app/app/ai/cost-recorder.server.ts, apps/shopify-app/app/ai/openrouter-chat.server.ts, apps/shopify-app/app/catalog/hnsw.server.ts
 - apps/shopify-app/app/catalog/enrich.server.ts → apps/shopify-app/app/ai/cost-recorder.server.ts, apps/shopify-app/app/catalog/images.server.ts
 - apps/shopify-app/app/catalog/hnsw.server.test.ts → apps/shopify-app/app/catalog/hnsw.server.ts
 - apps/shopify-app/app/catalog/images.server.test.ts → apps/shopify-app/app/catalog/images.server.ts, apps/shopify-app/app/catalog/mapping.server.ts, apps/shopify-app/app/catalog/webhook-sync.server.ts, apps/shopify-app/app/testing/helpers.server.ts
@@ -1801,6 +1809,7 @@ vitest.setup.ts
 - apps/shopify-app/app/store-preload-route.test.ts → apps/shopify-app/app/db.server.ts, apps/shopify-app/app/routes/s.$slug.tsx, apps/shopify-app/app/testing/helpers.server.ts
 - apps/shopify-app/app/testing/fake-store.server.ts → apps/shopify-app/app/playground/polite-fetch.server.ts
 - apps/shopify-app/app/workspace-resolution.test.ts → apps/shopify-app/app/eval/source-guard.server.ts, apps/shopify-app/vite.config.ts, vitest.config.ts
+- apps/shopify-app/scripts/cards.mts → apps/shopify-app/app/catalog/card-embed.server.ts, apps/shopify-app/app/catalog/card.server.ts, apps/shopify-app/app/catalog/embed.server.ts
 - apps/shopify-app/scripts/ingest-public.mts → apps/shopify-app/app/catalog/card.server.ts, apps/shopify-app/app/catalog/embed.server.ts, apps/shopify-app/app/catalog/enrich.server.ts, apps/shopify-app/app/playground/ingest-public-cli.server.ts, apps/shopify-app/app/playground/jsonld-crawl-source.server.ts, apps/shopify-app/app/playground/polite-fetch.server.ts
 - apps/shopify-app/scripts/ingest.mts → apps/shopify-app/app/catalog/card-embed.server.ts, apps/shopify-app/app/catalog/card.server.ts, apps/shopify-app/app/catalog/embed.server.ts, apps/shopify-app/app/catalog/enrich.server.ts, apps/shopify-app/app/catalog/ingest.server.ts, apps/shopify-app/app/catalog/offline-token.server.ts
 - apps/shopify-app/scripts/judge-compare.mts → apps/shopify-app/app/search/judge-compare.server.ts
