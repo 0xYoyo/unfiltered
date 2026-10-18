@@ -398,6 +398,23 @@ describe("preview, refinement, and chip removal pass through (AC-3)", () => {
     expect(await db.searchEvent.count()).toBe(0);
   });
 
+  it("judge=off asks the orchestrator to skip the judge on a submit and never on a preview; any other value is ignored (YOY-178 AC-3)", async () => {
+    const off = await searchLoader(loaderArgs(searchRequest({ judge: "off" })));
+    expect(off.status).toBe(200);
+    expect(orchestratorSeam.requests[0]).toMatchObject({ skipJudge: true });
+    expect(orchestratorSeam.requests[0].forceClassic).toBeUndefined();
+
+    const preview = await searchLoader(
+      loaderArgs(searchRequest({ judge: "off", mode: "preview" })),
+    );
+    expect(preview.status).toBe(200);
+    expect(orchestratorSeam.requests[1].skipJudge).toBeUndefined();
+
+    const other = await searchLoader(loaderArgs(searchRequest({ judge: "on" })));
+    expect(other.status).toBe(200);
+    expect(orchestratorSeam.requests[2].skipJudge).toBeUndefined();
+  });
+
   it("a classic rescue runs forced-classic with the rescue reason and writes one SearchEvent carrying it (YOY-96 AC-9)", async () => {
     const response = await searchLoader(
       loaderArgs(searchRequest({ mode: "classic" })),

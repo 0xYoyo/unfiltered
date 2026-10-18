@@ -81,6 +81,8 @@ export interface PlaygroundSearchRequest {
    * one; a keystroke preview never does.
    */
   paging?: { page: number; pageSize: number };
+  /** `judge=off` from the page URL (YOY-178 AC-3): the judge-off side of the by-eye comparison. */
+  judgeOff?: boolean;
   signal?: AbortSignal;
 }
 
@@ -92,6 +94,7 @@ export function playgroundSearchUrl(request: {
   removedChips?: readonly RemovedChip[];
   previousQuery?: string;
   paging?: { page: number; pageSize: number };
+  judgeOff?: boolean;
 }): string {
   const params = new URLSearchParams({
     query: request.query,
@@ -123,6 +126,9 @@ export function playgroundSearchUrl(request: {
     params.set("page", String(request.paging.page));
     params.set("pageSize", String(request.paging.pageSize));
   }
+  if (request.judgeOff === true && !request.preview) {
+    params.set("judge", "off");
+  }
   return `/api/playground/search?${params.toString()}`;
 }
 
@@ -142,6 +148,7 @@ export async function searchPlayground(
       ? {}
       : { previousQuery: request.previousQuery }),
     ...(request.paging === undefined ? {} : { paging: request.paging }),
+    ...(request.judgeOff === true ? { judgeOff: true } : {}),
   });
   const response = await fetch(url, {
     ...(request.signal === undefined ? {} : { signal: request.signal }),

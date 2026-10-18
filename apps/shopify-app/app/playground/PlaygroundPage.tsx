@@ -100,6 +100,7 @@ export function PlaygroundPage({
   detailsOpen: initialDetailsOpen,
   catalog,
   store,
+  judgeOff = false,
 }: {
   locale: PlaygroundLocale;
   pathname: string;
@@ -109,6 +110,8 @@ export function PlaygroundPage({
   catalog?: string;
   /** The preloaded store, when this is a `/s/<slug>` page. */
   store?: { name: string; productCount: number };
+  /** `?judge=off` on the page URL (YOY-178 AC-3): every submit is served with no judge call. */
+  judgeOff?: boolean;
 }) {
   const strings = getPlaygroundStrings(locale);
 
@@ -285,6 +288,7 @@ export function PlaygroundPage({
           // Every submit asks for page 1 (YOY-146 AC-1); a preview is
           // never paged.
           ...(preview ? {} : { paging: { page: 1, pageSize: PAGE_SIZE } }),
+          ...(judgeOff ? { judgeOff: true } : {}),
           signal: controller.signal,
         });
         if (controller.signal.aborted) {
@@ -337,7 +341,7 @@ export function PlaygroundPage({
         setPhase("settled");
       }
     },
-    [catalog, awaitLabels],
+    [catalog, awaitLabels, judgeOff],
   );
 
   /**
@@ -370,6 +374,7 @@ export function PlaygroundPage({
           ? {}
           : { previousQuery: state.previousQuery }),
         paging: { page: state.nextPage, pageSize: PAGE_SIZE },
+        ...(judgeOff ? { judgeOff: true } : {}),
       });
       if (pagingRef.current !== state) {
         return;
@@ -395,7 +400,7 @@ export function PlaygroundPage({
         setLoadingMore(false);
       }
     }
-  }, [catalog, awaitLabels]);
+  }, [catalog, awaitLabels, judgeOff]);
 
   // Stable, so the grid's last-card watch re-arms only when cards change.
   const appendNextPage = useCallback(() => {

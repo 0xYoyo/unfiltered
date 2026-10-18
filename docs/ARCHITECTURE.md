@@ -1448,7 +1448,13 @@ plus the engine details the playground shows on demand.
   rather than silently searching the seed; a malformed request answers `400`.
   Every response — every status — carries `Cache-Control: no-store` and no
   CORS headers at all: the playground's pages are same-origin, and a third
-  party must not be able to spend our AI budget from their site.
+  party must not be able to spend our AI budget from their site. One more
+  parameter is the playground's alone (YOY-178 AC-3): `judge=off` serves a
+  submitted search as the composed find order with no judge call — route
+  `ai`, reason `find-only`, chips and code labels kept — the judge-off side
+  of a by-eye comparison; `/try?judge=off` sends it on every submit. The
+  route reads it itself, outside `parseProxySearchParams`, so the storefront
+  proxy never sees it (a route test proves it); a preview ignores it.
 - **Response body** = the proxy contract (above) plus
   `details: { routeReason, latencyMs, limited, stages, judge,
   extractionInTime, extractionCached }`, built by

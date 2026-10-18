@@ -29,6 +29,8 @@ export interface PlaygroundSearchInput {
   previousQuery?: string;
   /** A preview's wish-extraction allowance (YOY-171 AC-13). */
   extractionAllowance?: () => boolean;
+  /** `judge=off` (YOY-178 AC-3): the page is the composed find order, no judge call. */
+  judgeOff?: boolean;
 }
 
 export interface PlaygroundSearchResult {
@@ -46,6 +48,9 @@ export async function runPlaygroundSearch(
     shopDomain: input.storeKey,
     limit: input.limit ?? PLAYGROUND_RESULT_LIMIT,
     ...(input.paging !== undefined ? { paging: input.paging } : {}),
+    ...(input.judgeOff === true && input.preview !== true && input.classic !== true
+      ? { skipJudge: true }
+      : {}),
     ...(input.removedChips !== undefined && input.preview !== true && input.classic !== true
       ? { removedChips: input.removedChips }
       : {}),

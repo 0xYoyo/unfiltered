@@ -167,4 +167,40 @@ describe("judge=none on the runner's orchestrator (YOY-172 AC-3, AC-4)", () => {
     expect(recorded.operations).toContain("judge");
     expect(response.routeReason).not.toBe("find-only");
   });
+
+  it("judgeOff serves find-only with chips and code labels while a judge is wired, and not on a preview (YOY-178 AC-3)", async () => {
+    vi.stubEnv("JUDGE_PROVIDER", "gemini");
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const orchestrator = runnerOrchestrator();
+
+    const { response } = await runPlaygroundSearch(orchestrator, {
+      query: "dress under 100",
+      storeKey: SHOP,
+      limit: SCORE_RESULT_LIMIT,
+      judgeOff: true,
+    });
+
+    expect(recorded.operations).not.toContain("judge");
+    expect(response.route).toBe("ai");
+    expect(response.routeReason).toBe("find-only");
+    expect(response.labelsPending).toBeUndefined();
+    expect(response.chips).toEqual([expect.objectContaining({ field: "priceMax", value: "100" })]);
+    expect(response.hits.map((hit) => hit.productId)).toEqual(["p1", "p2", "p3"]);
+    expect(response.hits.map((hit) => hit.label?.template ?? null)).toEqual([
+      null,
+      "price-near",
+      "price-far",
+    ]);
+
+    // A preview is the keyword path whatever the flag says.
+    const preview = await runPlaygroundSearch(orchestrator, {
+      query: "dress under 100",
+      storeKey: SHOP,
+      limit: SCORE_RESULT_LIMIT,
+      preview: true,
+      judgeOff: true,
+    });
+    expect(preview.response.route).toBe("classic");
+    expect(recorded.operations).not.toContain("judge");
+  });
 });

@@ -39,6 +39,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     // The engine-details panel is opt-in and its state IS the URL, so it
     // survives a reload and can be shared as a link (YOY-93 AC-5).
     detailsOpen: url.searchParams.get("details") === "1",
+    // `?judge=off` (YOY-178 AC-3): the by-eye comparison's judge-off side;
+    // every submit from this page is served with no judge call.
+    judgeOff: url.searchParams.get("judge") === "off",
   };
 };
 
@@ -53,7 +56,7 @@ export const meta: MetaFunction<typeof loader> = ({ data }) => {
 };
 
 export default function PlaygroundRoute() {
-  const { locale, pathname, initialQuery, detailsOpen } =
+  const { locale, pathname, initialQuery, detailsOpen, judgeOff } =
     useLoaderData<typeof loader>();
 
   return (
@@ -64,6 +67,7 @@ export default function PlaygroundRoute() {
         pathname={pathname}
         initialQuery={initialQuery}
         detailsOpen={detailsOpen}
+        judgeOff={judgeOff}
       />
       <SiteFooter />
     </>
