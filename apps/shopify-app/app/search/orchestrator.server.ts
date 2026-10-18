@@ -148,6 +148,13 @@ export interface SearchRequest {
    */
   forceClassicReason?: ForceClassicReason;
   /**
+   * Serve the composed find order with no judge call, reason "find-only",
+   * route "ai" (YOY-178 AC-3): the by-eye comparison's judge-off side.
+   * Only the playground's `judge=off` request sets it; the storefront
+   * proxy never does. Chips, code labels and the extraction are unchanged.
+   */
+  skipJudge?: boolean;
+  /**
    * Keystroke preview (YOY-68 AC-1): classic-only results with zero model
    * calls on its own path. Unlike the rescue, the response is NOT degraded:
    * a preview is the intended shape. Takes precedence over every other mode.
@@ -694,7 +701,7 @@ export function createSearchOrchestrator(
     if (request.forceClassic === true) {
       return respond("capped", withLabels(null));
     }
-    if (judge === undefined || judgedPart.length === 0) {
+    if (judge === undefined || judgedPart.length === 0 || request.skipJudge === true) {
       return respond("find-only", withLabels(null));
     }
     const judgeStartedAt = performance.now();

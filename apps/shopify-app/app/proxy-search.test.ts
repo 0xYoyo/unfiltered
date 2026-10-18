@@ -473,6 +473,30 @@ describe("request validation", () => {
     }
   });
 
+  it("ignores judge=off: the storefront proxy cannot be asked to skip the judge (YOY-178 AC-3)", async () => {
+    await seed([
+      { productId: "wrap-dress", title: "Wrap Dress", y: 0.1 },
+      { productId: "linen-shirt", title: "Linen Shirt", y: 0.2 },
+    ]);
+    const judgeLlm = scriptedJudgeLlm({ c: ["E-X", "E-X"], d: [] });
+    installOrchestrator({ judgeLlm });
+
+    const response = await action(
+      actionArgs(
+        proxyRequest({
+          payload: { query: QUERY, sessionId: "s1", judge: "off" },
+          prependUnsigned: [["judge", "off"]],
+        }),
+      ),
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.route).toBe("ai");
+    expect(judgeLlm.requests).toHaveLength(1);
+    const events = await db.searchEvent.findMany({ where: { sessionId: "s1" } });
+    expect(events.map((event) => event.routeReason)).toEqual(["judged"]);
+  });
+
   it("ignores a sent previousIntent or removeChip rather than honouring it (YOY-155)", async () => {
     await seed([
       { productId: "wrap-dress", title: "Wrap Dress", y: 0.1 },

@@ -98,6 +98,11 @@ export const loader = async ({
       : Response.json(outcome.body, { headers: PLAYGROUND_RESPONSE_HEADERS });
   }
 
+  // `judge=off` (YOY-178 AC-3): the by-eye comparison's judge-off side. Read
+  // here, on the playground only — `parseProxySearchParams` never sees it,
+  // so the storefront proxy cannot be asked to skip the judge. Any other
+  // value, or none, is the normal judged page.
+  const judgeOff = url.searchParams.get("judge") === "off";
   const catalog = await resolveCatalog(db, url.searchParams.get("catalog"));
   if ("status" in catalog) {
     return emptyResponse(catalog.status);
@@ -137,6 +142,7 @@ export const loader = async ({
       preview,
       classic,
       limited: limited !== null,
+      ...(judgeOff ? { judgeOff: true } : {}),
       // A preview's wish extraction has its own per-IP allowance (YOY-171
       // AC-13); a limited search makes no new extraction call at all.
       ...(preview
