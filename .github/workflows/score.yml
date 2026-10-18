@@ -80,6 +80,8 @@ jobs:
           # The jev judge's key (YOY-152); unused when the judge is gemini or none.
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           JUDGE_PROVIDER: ${{ inputs.judge }}
+          # Throwaway (YOY-178): score the judge on Jev 1.14 instead of 1.13.
+          OPENROUTER_JUDGE_MODEL: typesafe/jev-1.14
           # The runner resolves the name to a committed fixture (YOY-177 AC-3).
           SCORE_FIXTURE: ${{ inputs.fixture }}
           # A score run measures the judge's judgment, not its speed
