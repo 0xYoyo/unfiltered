@@ -484,8 +484,10 @@ describe("request validation", () => {
     const response = await action(
       actionArgs(
         proxyRequest({
+          // Shopify signs every proxy query parameter, so a client can
+          // only smuggle the field through the body — which the proxy
+          // parser does not read.
           payload: { query: QUERY, sessionId: "s1", judge: "off" },
-          prependUnsigned: [["judge", "off"]],
         }),
       ),
     );
